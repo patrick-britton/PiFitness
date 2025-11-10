@@ -5,7 +5,6 @@ pandas
 numpy
 requests
 spotipy
-json
 time
 importlib
 dotenv
