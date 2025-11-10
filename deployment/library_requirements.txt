@@ -8,3 +8,5 @@ spotipy
 json
 time
 importlib
+dotenv
+os
