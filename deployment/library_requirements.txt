@@ -1,0 +1,10 @@
+streamlit
+psycopg2-binary
+sqlalchemy
+pandas
+numpy
+requests
+spotipy
+json
+time
+importlib
