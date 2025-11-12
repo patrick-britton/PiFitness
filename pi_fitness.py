@@ -1,5 +1,5 @@
-from frontend_functions.app_skeleton import render_homepage
+from frontend_functions.app_skeleton import render_skeleton
 
-render_homepage()
+render_skeleton()
 
 
