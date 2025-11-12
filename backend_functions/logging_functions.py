@@ -14,10 +14,9 @@ def log_app_event(cat, desc, err=None, exec_time=None):
         err = err.replace("'", "")
 
     statement = (f"""INSERT INTO logging.application_events
-     (event_category, event_description, execution_time_ms, error_text)
-    VALUES 
-    (%s, %s, %s, %s);
-             """)
+                (event_category, event_description, execution_time_ms, error_text)
+                VALUES (%s, %s, %s, %s);
+                         """)
     params = (cat, desc, exec_time, err)
 
     qec(statement, params)
@@ -29,4 +28,4 @@ def start_timer():
 
 
 def elapsed_ms(start_time):
-    return (time.perf_counter() - start_time) * 1000
+    return int((time.perf_counter() - start_time) * 1000)
