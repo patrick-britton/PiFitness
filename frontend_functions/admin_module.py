@@ -101,7 +101,7 @@ def handle_service_changes(original_df):
 
             update_sql = """
                     UPDATE api_services.api_service_list 
-                    SET api_service_functions = %s,
+                    SET api_service_function = %s,
                         api_credential_requirements = %s
                     WHERE api_service_name = %s;
                 """
@@ -112,8 +112,8 @@ def handle_service_changes(original_df):
                 service_name = original_df.iloc[row_idx]['api_service_name']
 
                 # Get updated values (use original if not changed)
-                api_functions = changes.get('api_service_functions',
-                                            original_df.iloc[row_idx]['api_service_functions'])
+                api_functions = changes.get('api_service_function',
+                                            original_df.iloc[row_idx]['api_service_function'])
                 api_credentials = changes.get('api_credential_requirements',
                                               original_df.iloc[row_idx]['api_credential_requirements'])
 
