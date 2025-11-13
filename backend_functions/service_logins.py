@@ -250,11 +250,8 @@ def test_login(service_name):
                 WHERE api_service_name = '{service_name}'; """
 
     test_str = one_sql_result(test_sql)
-    module_name, test_name = test_str.get("api_service_function").rsplit('.', 1)
+    module_name, test_name = test_str.rsplit('.', 1)
     module = importlib.import_module(module_name)
     svc_function = getattr(module, test_name)
     client = svc_function()
-    if client:
-        return 'Success!'
-    else:
-        return 'Failure!'
+    return client is not None

@@ -7,6 +7,7 @@ from backend_functions.credential_management import encrypt_dict
 from backend_functions.database_functions import get_conn, qec, sql_to_dict
 from backend_functions.helper_functions import reverse_key_lookup, list_to_dict_by_key
 from backend_functions.logging_functions import log_app_event, start_timer, elapsed_ms
+from backend_functions.service_logins import test_login
 
 
 def admin_button_dict():
@@ -169,7 +170,7 @@ def handle_service_changes(original_df):
 
 def render_password_submodule():
     # Enables the user to store the credentials required for a specific service
-
+    t0 = None
     # Get the list of credentials into a dictionary
     cred_sql = """SELECT api_service_name, api_credential_requirements from api_services.api_service_list"""
     service_dict = list_to_dict_by_key(list_of_dicts=sql_to_dict(cred_sql),
@@ -207,9 +208,23 @@ def render_password_submodule():
             params = (ss.selected_service, enc_input)
             qec(insert_sql, params)
             log_app_event(cat='Admin', desc=f"Credential Saved: {ss.selected_service}", exec_time=elapsed_ms(t0))
-            ss.selected_service = None
-            time.sleep(1)
-            st.rerun()
+            if test_login(ss.selected_service):
+                st.balloons()
+                st.success('Successful connection established')
+                ss.selected_service = None
+                ss.user_inputs = None
+                ss.credential_test_proceed = None
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error('Unable to establish connection with those credentials')
+                delete_sql = f"""DELETE FROM api_services.credentials WHERE api_service_name = ?"""
+                params = (ss.selected_service, )
+                qec(delete_sql, params)
+                ss.user_inputs = None
+                ss.credential_test_proceed = None
+                time.sleep(1)
+                st.rerun()
 
 
     return None
