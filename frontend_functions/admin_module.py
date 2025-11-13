@@ -33,13 +33,6 @@ def render_admin_module():
         render_service_submodule()
 
 
-def render_password_submodule():
-    # Get service list
-    # Obtain Credentials
-    df_sql = """SELECT api_service_name, api_credential_requirements from api_services.api_service_list"""
-
-
-
 def render_service_submodule():
     # Read in any existing services
     t0 = None
@@ -174,7 +167,7 @@ def handle_service_changes(original_df):
 
 
 
-def render_credential_capture():
+def render_password_submodule():
     # Enables the user to store the credentials required for a specific service
 
     # Get the list of credentials into a dictionary
