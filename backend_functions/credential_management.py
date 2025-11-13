@@ -1,3 +1,4 @@
+import json
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 import os
@@ -23,9 +24,15 @@ def load_key():
     return base64.urlsafe_b64encode(kdf.derive(passphrase.encode()))
 
 
-def encrypt_text(text, key=load_key()):
-    return Fernet(key).encrypt(text.encode()).decode()
+def encrypt_dict(dict, key=load_key()):
+    # Convert dict to JSON string, then encrypt
+    json_data = json.dumps(dict)
+    return Fernet(key).encrypt(json_data.encode()).decode()
 
 
-def decrypt_text(token, key=load_key()):
-    return Fernet(key).decrypt(token.encode()).decode()
+
+def decrypt_dict(token, key=load_key()):
+    decoded_data = Fernet(key).decrypt(token.encode()).decode()
+    # Convert back to dict
+    return json.loads(decoded_data)
+

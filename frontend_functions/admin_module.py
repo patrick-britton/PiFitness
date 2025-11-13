@@ -3,7 +3,7 @@ import streamlit as st
 from streamlit import session_state as ss
 import pandas as pd
 
-from backend_functions.credential_management import encrypt_text
+from backend_functions.credential_management import encrypt_dict
 from backend_functions.database_functions import get_conn, qec, sql_to_dict
 from backend_functions.helper_functions import reverse_key_lookup, list_to_dict_by_key
 from backend_functions.logging_functions import log_app_event, start_timer, elapsed_ms
@@ -194,7 +194,7 @@ def render_password_submodule():
         if all(user_inputs.values()):
             t0 = start_timer()
             st.success(f"All credentials captured for {ss.selected_service}.")
-            enc_input = encrypt_text(user_inputs)
+            enc_input = encrypt_dict(user_inputs)
             insert_sql = """INSERT INTO api_services.credentials (api_service_name, api_credentials)
                              VALUES (%s, %s);"""
             params = (ss.selected_service, enc_input)
