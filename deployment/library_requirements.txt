@@ -6,3 +6,6 @@ numpy
 requests
 spotipy
 dotenv
+cryptography
+pathlib
+base64

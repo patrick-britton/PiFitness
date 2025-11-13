@@ -4,3 +4,4 @@ PG_PASSWORD=## DB PASSWORD
 PG_PORT=5432
 PG_DB=## DB NAMEW
 PGSSLMODE=disable
+KEY_PATH=## Text file path with unique passphrase

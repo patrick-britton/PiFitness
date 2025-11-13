@@ -2,8 +2,10 @@ import numpy as np
 import streamlit as st
 from streamlit import session_state as ss
 import pandas as pd
-from backend_functions.database_functions import get_conn, qec
-from backend_functions.helper_functions import reverse_key_lookup
+
+from backend_functions.credential_management import encrypt_text
+from backend_functions.database_functions import get_conn, qec, sql_to_dict
+from backend_functions.helper_functions import reverse_key_lookup, list_to_dict_by_key
 from backend_functions.logging_functions import log_app_event, start_timer, elapsed_ms
 
 
@@ -34,7 +36,8 @@ def render_admin_module():
 def render_password_submodule():
     # Get service list
     # Obtain Credentials
-    st.write("dependency on services")
+    df_sql = """SELECT api_service_name, api_credential_requirements from api_services.api_service_list"""
+
 
 
 def render_service_submodule():
@@ -43,7 +46,7 @@ def render_service_submodule():
     df = pd.read_sql('SELECT * FROM api_services.api_service_list', get_conn(alchemy=True))
     if not df.empty:
         col_config = {"api_service_name": st.column_config.TextColumn(label="Service",
-                                                                      pinned=True, disabled=True),
+                                                                      pinned=True, disabled=False),
                       "api_service_function": st.column_config.TextColumn(label="Login Functions",
                                                                            pinned=False,
                                                                            disabled=False),
@@ -76,7 +79,7 @@ def render_service_submodule():
         insert_sql = """INSERT INTO api_services.api_service_list (api_service_name, 
                        api_service_function, api_credential_requirements)
                        VALUES (%s, %s, %s);"""
-        params = (ss.new_service_name.lower(), ss.new_service_functions.lower(), ss.new_credential_requirements.lower())
+        params = (ss.new_service_name, ss.new_service_functions.lower(), ss.new_credential_requirements.lower())
         qec(insert_sql, params)
         log_app_event(cat="Admin", desc=f"New Service Creation: {ss.new_service_name}", exec_time=elapsed_ms(t0))
         ss.new_service_submission = False
@@ -168,3 +171,40 @@ def handle_service_changes(original_df):
         desc=f"Service Updates: {len(changed_indices)} rows changed",
         exec_time=elapsed_ms(t0)
     )
+
+
+
+def render_credential_capture():
+    # Enables the user to store the credentials required for a specific service
+
+    # Get the list of credentials into a dictionary
+    cred_sql = """SELECT api_service_name, api_credential_requirements from api_service_list"""
+    service_dict = list_to_dict_by_key(list_of_dicts=sql_to_dict(cred_sql),
+                                       primary_key="api_service_name")
+
+    # Step 1: Let user pick a service
+    service_list = list(service_dict.keys())
+    selected_service = st.selectbox("Select a service", service_list)
+
+    # Step 2: Extract credential fields for that service
+    creds = [c.strip() for c in service_dict[selected_service].split(",") if c.strip()]
+
+    # Step 3: Dynamically generate inputs
+    user_inputs = {}
+    st.subheader(f"Enter credentials for {selected_service}")
+    for cred in creds:
+        user_inputs[cred] = st.text_input(cred)
+
+    # Step 4: Return structure only when all credentials are filled
+    if all(user_inputs.values()):
+        t0 = start_timer()
+        st.success(f"All credentials captured for {selected_service}.")
+        enc_input = encrypt_text(user_inputs)
+        insert_sql = """INSERT INTO api_services.credentials (api_service_name, api_credentials)
+                         VALUES (%s, %s);"""
+        params = (selected_service, enc_input)
+        qec(insert_sql, params)
+        log_app_event(cat='Admin', desc=f"Credential Saved: {selected_service}", exec_time=elapsed_ms(t0))
+        # Save encrypted results
+
+    return None
