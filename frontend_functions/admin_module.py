@@ -89,17 +89,53 @@ def handle_service_changes(original_df):
 
     t0 = start_timer()
 
-    # Get the edited dataframe from session state using the key
-    edited_df = ss.service_editor
+    # Get the edited data from session state
+    edited_data = ss.service_editor
 
-    # Quick check if dataframes are identical (fastest path)
+    # Convert to DataFrame if it's a dict with edited_rows metadata
+    if isinstance(edited_data, dict):
+        # st.data_editor returns edited data in a special format
+        # Use the 'edited_rows' key to get actual changes
+        if 'edited_rows' in edited_data and edited_data['edited_rows']:
+            edited_rows = edited_data['edited_rows']
+
+            update_sql = """
+                    UPDATE api_services.api_service_list 
+                    SET api_service_functions = %s,
+                        api_credential_requirements = %s
+                    WHERE api_service_name = %s;
+                """
+
+            # edited_rows is a dict where keys are row indices
+            for row_idx, changes in edited_rows.items():
+                # Get the service name from original df
+                service_name = original_df.iloc[row_idx]['api_service_name']
+
+                # Get updated values (use original if not changed)
+                api_functions = changes.get('api_service_functions',
+                                            original_df.iloc[row_idx]['api_service_functions'])
+                api_credentials = changes.get('api_credential_requirements',
+                                              original_df.iloc[row_idx]['api_credential_requirements'])
+
+                params = (api_functions, api_credentials, service_name)
+                qec(update_sql, params)
+
+            log_app_event(
+                cat="Admin",
+                desc=f"Service Updates: {len(edited_rows)} rows changed",
+                exec_time=elapsed_ms(t0)
+            )
+        return
+
+    # If it's already a DataFrame (older Streamlit versions)
+    edited_df = edited_data
+
     if original_df.equals(edited_df):
         return
 
-    # Define columns to check for changes
-    check_cols = ['api_service_function', 'api_credential_requirements']
+    check_cols = ['api_service_functions', 'api_credential_requirements']
 
-    # Find changed rows by comparing as strings (handles lists and other types)
+    # Find changed rows
     changed_indices = []
     for idx in range(len(edited_df)):
         for col in check_cols:
@@ -112,18 +148,16 @@ def handle_service_changes(original_df):
     if not changed_indices:
         return
 
-    # Prepare batch update
     update_sql = """
-        UPDATE api_services.api_service_list 
-        SET api_service_function = %s,
-            api_credential_requirements = %s
-        WHERE api_service_name = %s;
-    """
+            UPDATE api_services.api_service_list 
+            SET api_service_functions = %s,
+                api_credential_requirements = %s
+            WHERE api_service_name = %s;
+        """
 
-    # Execute updates for changed rows only
     for idx in changed_indices:
         params = (
-            edited_df.iloc[idx]['api_service_function'],
+            edited_df.iloc[idx]['api_service_functions'],
             edited_df.iloc[idx]['api_credential_requirements'],
             edited_df.iloc[idx]['api_service_name']
         )
