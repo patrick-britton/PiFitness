@@ -44,7 +44,7 @@ def render_service_submodule():
     if not df.empty:
         col_config = {"api_service_name": st.column_config.TextColumn(label="Service",
                                                                       pinned=True, disabled=True),
-                      "api_service_functions": st.column_config.TextColumn(label="Login Functions",
+                      "api_service_function": st.column_config.TextColumn(label="Login Functions",
                                                                            pinned=False,
                                                                            disabled=False),
                       "api_credential_requirements": st.column_config.TextColumn(label="Credentials Needed",
@@ -97,7 +97,7 @@ def handle_service_changes(orig_df):
         return
 
     # Define columns to check for changes
-    check_cols = ['api_service_functions', 'api_credential_requirements']
+    check_cols = ['api_service_function', 'api_credential_requirements']
 
     # Convert to numpy arrays for fast comparison
     orig_vals = orig_df[check_cols].values
