@@ -1,3 +1,4 @@
+import numpy as np
 import streamlit as st
 from streamlit import session_state as ss
 import pandas as pd
@@ -80,40 +81,54 @@ def render_service_submodule():
         log_app_event(cat="Admin", desc=f"New Service Creation: {ss.new_service_name}", exec_time=elapsed_ms(t0))
         ss.new_service_submission = False
         ss.admin_service_add = False
+        st.rerun()
 
 
 def handle_service_changes(orig_df):
     # used in conjunction with data editor, records changes to postgres
+
     t0 = start_timer()
 
     # Get the edited dataframe from session state using the key
     edited_df = ss.service_editor
 
-    # Find rows that have changed
-    changed_mask = (orig_df != edited_df).any(axis=1)
-    changed_rows = edited_df[changed_mask]
-
-    if changed_rows.empty:
+    # Quick check if dataframes are identical (fastest path)
+    if orig_df.equals(edited_df):
         return
 
-    # Update each changed row
-    update_sql = """
-        UPDATE api_services.api_service_list 
-        SET api_service_functions = %s,
-            api_credential_requirements = %s
-        WHERE api_service_name = %s;
-    """
+    # Define columns to check for changes
+    check_cols = ['api_service_functions', 'api_credential_requirements']
 
-    for _, row in changed_rows.iterrows():
+    # Convert to numpy arrays for fast comparison
+    orig_vals = orig_df[check_cols].values
+    edit_vals = edited_df[check_cols].values
+
+    # Find changed rows using numpy (much faster than pandas)
+    changed_mask = (orig_vals != edit_vals).any(axis=1)
+    changed_indices = np.where(changed_mask)[0]
+
+    if len(changed_indices) == 0:
+        return
+
+    # Prepare batch update
+    update_sql = """
+            UPDATE api_services.api_service_list 
+            SET api_service_functions = %s,
+                api_credential_requirements = %s
+            WHERE api_service_name = %s;
+        """
+
+    # Execute updates for changed rows only
+    for idx in changed_indices:
         params = (
-            row['api_service_functions'],
-            row['api_credential_requirements'],
-            row['api_service_name']
+            edited_df.iloc[idx]['api_service_functions'],
+            edited_df.iloc[idx]['api_credential_requirements'],
+            edited_df.iloc[idx]['api_service_name']
         )
         qec(update_sql, params)
 
     log_app_event(
         cat="Admin",
-        desc=f"Service Updates: {len(changed_rows)} rows changed",
+        desc=f"Service Updates: {len(changed_indices)} rows changed",
         exec_time=elapsed_ms(t0)
     )
