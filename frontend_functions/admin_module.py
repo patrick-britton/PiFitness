@@ -73,7 +73,7 @@ def render_service_submodule():
 
     if "new_service_submission" in ss and ss.new_service_submission:
         insert_sql = """INSERT INTO api_services.api_service_list (api_service_name, 
-                       api_service_functions, api_credential_requirements)
+                       api_service_function, api_credential_requirements)
                        VALUES (%s, %s, %s);"""
         params = (ss.new_service_name.lower(), ss.new_service_functions.lower(), ss.new_credential_requirements.lower())
         qec(insert_sql, params)
