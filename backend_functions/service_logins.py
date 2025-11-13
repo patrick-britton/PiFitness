@@ -132,7 +132,7 @@ def get_spotify_token():
         scope = scope + scope_type + ' '
     scope = scope.strip()
 
-    cache_loc = Path(os.getenv("LOCAL_STORAGE_PATH")).read_text().strip()
+    cache_loc = Path(os.getenv("LOCAL_STORAGE_PATH"))
 
     # Create the auth manager
     auth_manager = SpotifyOAuth(
