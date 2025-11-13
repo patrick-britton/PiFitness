@@ -177,27 +177,29 @@ def render_password_submodule():
 
     # Step 1: Let user pick a service
     service_list = list(service_dict.keys())
-    selected_service = st.selectbox("Select a service", service_list)
+    ss.selected_service = st.selectbox("Select a service", service_list)
 
     # Step 2: Extract credential fields for that service
-    creds = [c.strip() for c in service_dict[selected_service].split(",") if c.strip()]
+    if "selected_service" in ss and ss.selected_service:
+        creds = [c.strip() for c in service_dict[ss.selected_service].split(",") if c.strip()]
 
-    # Step 3: Dynamically generate inputs
-    user_inputs = {}
-    st.subheader(f"Enter credentials for {selected_service}")
-    for cred in creds:
-        user_inputs[cred] = st.text_input(cred)
+        # Step 3: Dynamically generate inputs
+        user_inputs = {}
+        st.subheader(f"Enter credentials for {ss.selected_service}")
+        for cred in creds:
+            user_inputs[cred] = st.text_input(cred)
 
-    # Step 4: Return structure only when all credentials are filled
-    if all(user_inputs.values()):
-        t0 = start_timer()
-        st.success(f"All credentials captured for {selected_service}.")
-        enc_input = encrypt_text(user_inputs)
-        insert_sql = """INSERT INTO api_services.credentials (api_service_name, api_credentials)
-                         VALUES (%s, %s);"""
-        params = (selected_service, enc_input)
-        qec(insert_sql, params)
-        log_app_event(cat='Admin', desc=f"Credential Saved: {selected_service}", exec_time=elapsed_ms(t0))
-        # Save encrypted results
+        # Step 4: Return structure only when all credentials are filled
+        if all(user_inputs.values()):
+            t0 = start_timer()
+            st.success(f"All credentials captured for {ss.selected_service}.")
+            enc_input = encrypt_text(user_inputs)
+            insert_sql = """INSERT INTO api_services.credentials (api_service_name, api_credentials)
+                             VALUES (%s, %s);"""
+            params = (ss.selected_service, enc_input)
+            qec(insert_sql, params)
+            log_app_event(cat='Admin', desc=f"Credential Saved: {ss.selected_service}", exec_time=elapsed_ms(t0))
+            ss.selected_service = None
+            # Save encrypted results
 
     return None
