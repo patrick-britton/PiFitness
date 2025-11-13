@@ -2,7 +2,7 @@ import numpy as np
 import streamlit as st
 from streamlit import session_state as ss
 import pandas as pd
-
+import time
 from backend_functions.credential_management import encrypt_dict
 from backend_functions.database_functions import get_conn, qec, sql_to_dict
 from backend_functions.helper_functions import reverse_key_lookup, list_to_dict_by_key
@@ -185,22 +185,31 @@ def render_password_submodule():
         creds_needed = [c.strip() for c in cred_str.split(",") if c.strip()]
 
         # Step 3: Dynamically generate inputs
-        user_inputs = {}
+        ss.user_inputs = {}
         st.subheader(f"Enter credentials for {ss.selected_service}")
         for cred in creds_needed:
-            user_inputs[cred] = st.text_input(cred)
+            ss.user_inputs[cred] = st.text_input(cred)
 
         # Step 4: Return structure only when all credentials are filled
-        if all(user_inputs.values()):
+        if all(ss.user_inputs.values()):
             t0 = start_timer()
-            st.success(f"All credentials captured for {ss.selected_service}.")
-            enc_input = encrypt_dict(user_inputs)
+            if st.button(f":material/experiment: Click to test {ss.selected_service} connection"):
+                ss.credential_test_proceed = True
+
+
+        if "credential_test_proceed" in ss and ss.credential_test_proceed:
+            # Encrypt the results,
+            enc_input = encrypt_dict(ss.user_inputs)
             insert_sql = """INSERT INTO api_services.credentials (api_service_name, api_credentials)
-                             VALUES (%s, %s);"""
+                        VALUES (%s, %s)
+                        ON CONFLICT (api_service_name) 
+                        DO UPDATE SET api_credentials = EXCLUDED.api_credentials;"""
             params = (ss.selected_service, enc_input)
             qec(insert_sql, params)
             log_app_event(cat='Admin', desc=f"Credential Saved: {ss.selected_service}", exec_time=elapsed_ms(t0))
             ss.selected_service = None
-            # Save encrypted results
+            time.sleep(1)
+            st.rerun()
+
 
     return None
