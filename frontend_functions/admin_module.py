@@ -133,7 +133,7 @@ def handle_service_changes(original_df):
     if original_df.equals(edited_df):
         return
 
-    check_cols = ['api_service_functions', 'api_credential_requirements']
+    check_cols = ['api_service_function', 'api_credential_requirements']
 
     # Find changed rows
     changed_indices = []
@@ -150,14 +150,14 @@ def handle_service_changes(original_df):
 
     update_sql = """
             UPDATE api_services.api_service_list 
-            SET api_service_functions = %s,
+            SET api_service_function = %s,
                 api_credential_requirements = %s
             WHERE api_service_name = %s;
         """
 
     for idx in changed_indices:
         params = (
-            edited_df.iloc[idx]['api_service_functions'],
+            edited_df.iloc[idx]['api_service_function'],
             edited_df.iloc[idx]['api_credential_requirements'],
             edited_df.iloc[idx]['api_service_name']
         )
