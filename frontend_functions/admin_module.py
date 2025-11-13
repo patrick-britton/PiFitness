@@ -84,7 +84,7 @@ def render_service_submodule():
         st.rerun()
 
 
-def handle_service_changes(orig_df):
+def handle_service_changes(original_df):
     # used in conjunction with data editor, records changes to postgres
 
     t0 = start_timer()
@@ -93,35 +93,37 @@ def handle_service_changes(orig_df):
     edited_df = ss.service_editor
 
     # Quick check if dataframes are identical (fastest path)
-    if orig_df.equals(edited_df):
+    if original_df.equals(edited_df):
         return
 
     # Define columns to check for changes
     check_cols = ['api_service_function', 'api_credential_requirements']
 
-    # Convert to numpy arrays for fast comparison
-    orig_vals = orig_df[check_cols].values
-    edit_vals = edited_df[check_cols].values
+    # Find changed rows by comparing as strings (handles lists and other types)
+    changed_indices = []
+    for idx in range(len(edited_df)):
+        for col in check_cols:
+            orig_val = str(original_df.iloc[idx][col]) if pd.notna(original_df.iloc[idx][col]) else ''
+            edit_val = str(edited_df.iloc[idx][col]) if pd.notna(edited_df.iloc[idx][col]) else ''
+            if orig_val != edit_val:
+                changed_indices.append(idx)
+                break
 
-    # Find changed rows using numpy (much faster than pandas)
-    changed_mask = (orig_vals != edit_vals).any(axis=1)
-    changed_indices = np.where(changed_mask)[0]
-
-    if len(changed_indices) == 0:
+    if not changed_indices:
         return
 
     # Prepare batch update
     update_sql = """
-            UPDATE api_services.api_service_list 
-            SET api_service_functions = %s,
-                api_credential_requirements = %s
-            WHERE api_service_name = %s;
-        """
+        UPDATE api_services.api_service_list 
+        SET api_service_function = %s,
+            api_credential_requirements = %s
+        WHERE api_service_name = %s;
+    """
 
     # Execute updates for changed rows only
     for idx in changed_indices:
         params = (
-            edited_df.iloc[idx]['api_service_functions'],
+            edited_df.iloc[idx]['api_service_function'],
             edited_df.iloc[idx]['api_credential_requirements'],
             edited_df.iloc[idx]['api_service_name']
         )
