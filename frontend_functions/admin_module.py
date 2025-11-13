@@ -171,7 +171,7 @@ def render_password_submodule():
     # Enables the user to store the credentials required for a specific service
 
     # Get the list of credentials into a dictionary
-    cred_sql = """SELECT api_service_name, api_credential_requirements from api_service_list"""
+    cred_sql = """SELECT api_service_name, api_credential_requirements from api_services.api_service_list"""
     service_dict = list_to_dict_by_key(list_of_dicts=sql_to_dict(cred_sql),
                                        primary_key="api_service_name")
 
