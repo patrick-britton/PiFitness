@@ -71,3 +71,13 @@ def one_sql_result(sql=None):
 
     # row is a tuple — return the first element
     return row[0]
+
+
+def sql_to_dict(query_str):
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute(query_str)
+    rows = cur.fetchall()  # list of dicts if using RealDictCursor
+    cur.close()
+    conn.close()
+    return rows
