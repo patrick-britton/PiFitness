@@ -181,12 +181,13 @@ def render_password_submodule():
 
     # Step 2: Extract credential fields for that service
     if "selected_service" in ss and ss.selected_service:
-        creds = [c.strip() for c in service_dict[ss.selected_service].split(",") if c.strip()]
+        cred_str = service_dict[ss.selected_service].get("api_credential_requirements")
+        creds_needed = [c.strip() for c in cred_str.split(",") if c.strip()]
 
         # Step 3: Dynamically generate inputs
         user_inputs = {}
         st.subheader(f"Enter credentials for {ss.selected_service}")
-        for cred in creds:
+        for cred in creds_needed:
             user_inputs[cred] = st.text_input(cred)
 
         # Step 4: Return structure only when all credentials are filled
