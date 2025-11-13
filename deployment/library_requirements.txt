@@ -8,3 +8,4 @@ spotipy
 dotenv
 cryptography
 pathlib
+garminconnect
