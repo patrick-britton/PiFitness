@@ -381,7 +381,7 @@ def render_task_submodule():
         ss.new_task_priority = st.number_input(label="Priority",
                                                min_value=0,
                                                max_value=999,
-                                               default=999)
+                                               value =999)
         ss.new_task_frequency = st.selectbox(label="Frequency",
                                              options=['Hourly', 'Daily', 'Weekly', 'Monthly'],
                                              default='Daily')
@@ -389,22 +389,22 @@ def render_task_submodule():
             ss.new_task_interval = st.number_input(label='Which hour of day to run?',
                                                min_value=0,
                                                max_value=23,
-                                               default=23)
+                                               value =23)
         elif ss.new_task_frequency == 'Hourly':
             ss.new_task_interval = st.number_input(label='How many hours between runs',
                                                min_value=0,
                                                max_value=23,
-                                               default=3)
+                                               value =3)
         elif ss.new_task_frequency == 'Weekly':
             ss.new_task_interval = st.number_input(label='What day of week to run?',
                                                min_value=0,
                                                max_value=6,
-                                               default=6)
+                                               value =6)
         elif ss.new_task_frequency == 'Monthly':
             ss.new_task_interval = st.number_input(label='What day of month to run?',
                                                min_value=0,
                                                max_value=6,
-                                               default=1)
+                                               value =1)
         else:
             ss.new_task_interval=23
 
