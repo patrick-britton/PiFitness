@@ -426,7 +426,7 @@ def render_task_submodule():
             ss.new_api_post_processing = None
 
         ss.new_python_function = st.text_input(label="Call a python function?",
-                                               default=None)
+                                               value=None)
 
         if st.button(":material/save: Submit"):
             ss.new_task_submission = True
