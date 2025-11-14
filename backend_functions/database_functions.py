@@ -98,6 +98,6 @@ def get_sproc_list(append_option=None):
     cursor = conn.cursor()
     cursor.execute(sql)
     sproc_list = [row[0] for row in cursor.fetchall()]
-    if not append_option:
+    if append_option:
         sproc_list.append(append_option)
     return sproc_list

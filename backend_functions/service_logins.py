@@ -263,6 +263,6 @@ def get_service_list(append_option=None):
     cursor = conn.cursor()
     cursor.execute(sql)
     service_list = [row[0] for row in cursor.fetchall()]
-    if not append_option:
+    if append_option:
         service_list.append(append_option)
     return service_list
