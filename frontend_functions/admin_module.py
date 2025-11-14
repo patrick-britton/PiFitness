@@ -365,7 +365,7 @@ def render_task_submodule():
                         column_config=col_config,
                         key = "service_editor",
                         on_change = handle_task_changes,
-                        args = (ss.existing_tasks_dff,)
+                        args = (ss.existing_tasks_df,)
         )
 
     if st.button(":material/add: Add New Task"):
