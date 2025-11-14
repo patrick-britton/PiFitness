@@ -12,6 +12,7 @@ def top_button_dictionary():
     return d
 
 def render_skeleton():
+    st.set_page_config(layout="wide")
     tbd = top_button_dictionary()
 
     ss.top_nav_selection = st.pills(label="top_nav_selection",
