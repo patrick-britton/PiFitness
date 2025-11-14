@@ -29,7 +29,7 @@ def render_admin_module():
     if simple_selection == 'passwords':
         render_password_submodule()
     elif simple_selection == 'admin':
-        st.write("Task Submodule")
+        render_task_submodule()
     elif simple_selection == 'services':
         render_service_submodule()
 
