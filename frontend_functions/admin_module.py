@@ -28,7 +28,7 @@ def render_admin_module():
     simple_selection = reverse_key_lookup(abd, ss.admin_nav_selection)
     if simple_selection == 'passwords':
         render_password_submodule()
-    elif simple_selection == 'admin':
+    elif simple_selection == 'tasks':
         render_task_submodule()
     elif simple_selection == 'services':
         render_service_submodule()
