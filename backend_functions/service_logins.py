@@ -8,7 +8,7 @@ from garminconnect import Garmin, GarminConnectAuthenticationError, GarminConnec
 from spotipy import SpotifyOAuth
 from pathlib import Path
 from backend_functions.credential_management import decrypt_dict
-from backend_functions.database_functions import one_sql_result
+from backend_functions.database_functions import one_sql_result, get_conn
 from backend_functions.logging_functions import log_api_event, log_app_event, start_timer, elapsed_ms
 
 load_dotenv()
@@ -147,7 +147,7 @@ def get_spotify_token():
         token_info = auth_manager.get_access_token(as_dict=True)
         access_token = token_info["access_token"]
         login_time = time.time()
-        log_api_event(service='Spotify', event='token acquired')
+        log_api_event(service='Spotify', event='login with New Token')
         final_token = {"client": None,
                        "token": access_token,
                        "token_time": login_time}
@@ -255,3 +255,14 @@ def test_login(service_name):
     svc_function = getattr(module, test_name)
     client = svc_function()
     return client is not None
+
+def get_service_list(append_option=None):
+    # Returns the known api services as a list
+    sql="SELECT api_service_name from api_services.api_service_list"
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute(sql)
+    service_list = [row[0] for row in cursor.fetchall()]
+    if not append_option:
+        service_list.append(append_option)
+    return service_list

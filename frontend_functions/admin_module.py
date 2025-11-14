@@ -4,10 +4,10 @@ from streamlit import session_state as ss
 import pandas as pd
 import time
 from backend_functions.credential_management import encrypt_dict
-from backend_functions.database_functions import get_conn, qec, sql_to_dict
+from backend_functions.database_functions import get_conn, qec, sql_to_dict, get_sproc_list
 from backend_functions.helper_functions import reverse_key_lookup, list_to_dict_by_key
 from backend_functions.logging_functions import log_app_event, start_timer, elapsed_ms
-from backend_functions.service_logins import test_login
+from backend_functions.service_logins import test_login, get_service_list
 
 
 def admin_button_dict():
@@ -36,11 +36,12 @@ def render_admin_module():
 
 def render_service_submodule():
     # Read in any existing services
+    st.subheader("API Service Management")
     t0 = None
     df = pd.read_sql('SELECT * FROM api_services.api_service_list', get_conn(alchemy=True))
     if not df.empty:
         col_config = {"api_service_name": st.column_config.TextColumn(label="Service",
-                                                                      pinned=True, disabled=False),
+                                                                      pinned=True, disabled=True),
                       "api_service_function": st.column_config.TextColumn(label="Login Functions",
                                                                            pinned=False,
                                                                            disabled=False),
@@ -167,8 +168,75 @@ def handle_service_changes(original_df):
     )
 
 
+def handle_task_changes(original_df):
+    # used in conjunction with data editor, records changes to postgres
+
+    t0 = start_timer()
+
+    # Get the edited data from session state
+    edited_data = ss.service_editor
+
+    # Convert to DataFrame if it's a dict with edited_rows metadata
+    if isinstance(edited_data, dict):
+        # st.data_editor returns edited data in a special format
+        # Use the 'edited_rows' key to get actual changes
+        if 'edited_rows' in edited_data and edited_data['edited_rows']:
+            edited_rows = edited_data['edited_rows']
+
+            update_sql = """
+                    UPDATE tasks.task_config 
+                    SET task_description = %s,
+                        task_priority = %s,
+                        task_frequency = %s,
+                        task_interval = %s,
+                        api_function = %s,
+                        api_service_name = %s,
+                        api_loop_type = %s,
+                        api_post_processing = %s,
+                        python_function = %s
+                    WHERE task_name = %s;
+                """
+
+            # edited_rows is a dict where keys are row indices
+            for row_idx, changes in edited_rows.items():
+                # Get the service name from original df
+                task_description = original_df.iloc[row_idx]['task_description']
+                task_priority = original_df.iloc[row_idx]['task_priority']
+                task_frequency = original_df.iloc[row_idx]['task_frequency']
+                task_interval = original_df.iloc[row_idx]['task_interval']
+                api_function = original_df.iloc[row_idx]['api_function']
+                api_service_name = original_df.iloc[row_idx]['api_service_name']
+                api_loop_type = original_df.iloc[row_idx]['api_loop_type']
+                api_post_processing = original_df.iloc[row_idx]['api_post_processing']
+                python_function = original_df.iloc[row_idx]['python_function']
+                task_name = original_df.iloc[row_idx]['task_name']
+
+                params = (task_description, task_priority, task_frequency,
+                          task_interval,
+                          api_function,
+                          api_service_name,
+                          api_loop_type,
+                          api_post_processing,
+                          python_function,
+                          task_name)
+                qec(update_sql, params)
+
+            log_app_event(
+                cat="Admin",
+                desc=f"Task Updates: {len(edited_rows)} rows changed",
+                exec_time=elapsed_ms(t0)
+            )
+            #Regen Dataframe
+            ss.existing_tasks_df = pd.read_sql('SELECT * FROM tasks.task_config', get_conn(alchemy=True))
+        return
+    else:
+        st.info("Did nothing with the task changes")
+        time.sleep(3)
+
+
 
 def render_password_submodule():
+    st.subheader("API Credential Management")
     # Enables the user to store the credentials required for a specific service
     t0 = None
     # Get the list of credentials into a dictionary
@@ -228,3 +296,167 @@ def render_password_submodule():
 
 
     return None
+
+
+def render_task_submodule():
+    st.subheader("Task Scheduler")
+    t0 = None
+    if "existing tasks" not in ss:
+        ss.existing_tasks_df = pd.read_sql('SELECT * FROM tasks.task_config', get_conn(alchemy=True))
+
+
+    if not ss.existing_tasks_df.empty:
+        if "svc_list" not in ss:
+            ss.svc_list = get_service_list(append_option='N/A')
+            ss.sproc_list = get_sproc_list(append_option='N/A')
+
+        col_config = {"task_name": st.column_config.TextColumn(label="Name",
+                                                                      pinned=True, disabled=True),
+                      "task_description": st.column_config.TextColumn(label="Description",
+                                                                           pinned=False,
+                                                                           disabled=False),
+                      "task_priority": st.column_config.NumberColumn(label="Priority",
+                                                                     pinned=False,
+                                                                     disabled=False,
+                                                                     default=999,
+                                                                     format='%d'),
+                      "task_frequency": st.column_config.SelectboxColumn(label="Frequency",
+                                                                         pinned=False,
+                                                                         options=['Hourly',
+                                                                                  'Daily',
+                                                                                  'Weekly',
+                                                                                  'Monthly',
+                                                                                  'Retired'],
+                                                                         disabled=False,
+                                                                         default='Daily'),
+                      "task_interval": st.column_config.NumberColumn(label="Interval",
+                                                                     pinned=False,
+                                                                     default=23,
+                                                                     format='%d',
+                                                                     disabled=False),
+                      "api_function": st.column_config.TextColumn(label='API Function',
+                                                                  pinned=False,
+                                                                  disabled=False),
+                      "api_service_name": st.column_config.SelectboxColumn(label='API',
+                                                                           default='N/A',
+                                                                           pinned=False,
+                                                                           options=ss.svc_list,
+                                                                           ),
+                      "api_loop_type": st.column_config.SelectboxColumn(label="Loop Type",
+                                                                        pinned=False,
+                                                                        disabled=False,
+                                                                        options=['Day', 'Range', 'Next', 'N/A'],
+                                                                        default='N/A'),
+                      'api_post_processing': st.column_config.SelectboxColumn(label='SPROC',
+                                                                              pinned=False,
+                                                                              disabled=False,
+                                                                              options=ss.sproc_list,
+                                                                              default='N/A'),
+                      "python_function": st.column_config.TextColumn(label="Python Function",
+                                                                     pinned=False,
+                                                                     disabled=False,
+                                                                     default=None),
+                      "last_calendar_date": st.column_config.DateColumn(label="Current Through",
+                                                                        disabled=True,
+                                                                        pinned=False)}
+        st.write("Existing tasks")
+        st.data_editor(ss.existing_tasks_df,
+                        hide_index=True,
+                        column_config=col_config,
+                        key = "service_editor",
+                        on_change = handle_task_changes,
+                        args = (ss.existing_tasks_dff,)
+        )
+
+    if st.button(":material/add: Add New Task"):
+        ss.admin_task_add = True
+
+    if "admin_task_add" in ss and ss.admin_task_add:
+        if "svc_list" not in ss:
+            ss.svc_list = get_service_list(append_option='N/A')
+            ss.sproc_list = get_sproc_list(append_option='N/A')
+
+        ss.new_task_name = st.text_input(label="Name:")
+        ss.new_task_description = st.text_area(label="Description")
+        ss.new_task_priority = st.number_input(label="Priority",
+                                               min_value=0,
+                                               max_value=999,
+                                               default=999)
+        ss.new_task_frequency = st.selectbox(label="Frequency",
+                                             options=['Hourly', 'Daily', 'Weekly', 'Monthly'],
+                                             default='Daily')
+        if ss.new_task_frequency == 'Daily':
+            ss.new_task_interval = st.number_input(label='Which hour of day to run?',
+                                               min_value=0,
+                                               max_value=23,
+                                               default=23)
+        elif ss.new_task_frequency == 'Hourly':
+            ss.new_task_interval = st.number_input(label='How many hours between runs',
+                                               min_value=0,
+                                               max_value=23,
+                                               default=3)
+        elif ss.new_task_frequency == 'Weekly':
+            ss.new_task_interval = st.number_input(label='What day of week to run?',
+                                               min_value=0,
+                                               max_value=6,
+                                               default=6)
+        elif ss.new_task_frequency == 'Monthly':
+            ss.new_task_interval = st.number_input(label='What day of month to run?',
+                                               min_value=0,
+                                               max_value=6,
+                                               default=1)
+        else:
+            ss.new_task_interval=23
+
+        ss.new_api_service_name = st.selectbox(label='Which API Service?',
+                                               options=ss.svc_list,
+                                               default='N/A')
+
+        if ss.new_api_service_name != 'N/A':
+            ss.new_api_function = st.text_input(label="Which function should be called?")
+            ss.new_api_loop_type = st.selectbox(label="Is there a loop to the API call?",
+                                            options=['Day', 'Range', 'Next', 'N/A'],
+                                            default='N/A')
+            ss.new_api_post_processing = st.selectbox(label="Call an SPROC After loading?",
+                                                      options=ss.sproc_list,
+                                                      default='N/A')
+        else:
+            ss.new_api_function = None
+            ss.new_api_loop_type = None
+            ss.new_api_post_processing = None
+
+        ss.new_python_function = st.text_input(label="Call a python function?",
+                                               default=None)
+
+        if st.button(":material/save: Submit"):
+            ss.new_task_submission = True
+            t0 = start_timer()
+
+    if "new_task_submission" in ss and ss.new_task_submission:
+        insert_sql = """INSERT INTO tasks.task_config(task_name,
+                        task_description,
+                        task_priority,
+                        task_frequency,
+                        task_interval,
+                        api_function,
+                        api_service_name,
+                        api_loop_type,
+                        api_post_processing,
+                        python_function)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"""
+        params = (ss.new_task_name,
+                  ss.new_task_description,
+                  ss.new_task_priority,
+                  ss.new_task_frequency,
+                  ss.new_task_interval,
+                  ss.new_api_function,
+                  ss.new_api_service_name,
+                  ss.new_api_loop_type,
+                  ss.new_api_post_processing,
+                  ss.new_python_function)
+        qec(insert_sql, params)
+        log_app_event(cat="Admin", desc=f"New Task Creation: {ss.new_task_name}", exec_time=elapsed_ms(t0))
+        ss.new_task_submission = False
+        ss.admin_task_add = False
+        ss.existing_tasks_df = pd.read_sql('SELECT * FROM tasks.task_config', get_conn(alchemy=True))
+        st.rerun()

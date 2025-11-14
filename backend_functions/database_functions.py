@@ -81,3 +81,23 @@ def sql_to_dict(query_str):
     cur.close()
     conn.close()
     return rows
+
+
+def get_sproc_list(append_option=None):
+    # Returns the known api services as a list
+    sql="""SELECT 
+            routine_name,
+            routine_type,
+            data_type AS return_type,
+            routine_definition,
+            routine_schema
+        FROM information_schema.routines
+        WHERE routine_type = 'PROCEDURE'
+        ORDER BY routine_name"""
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute(sql)
+    sproc_list = [row[0] for row in cursor.fetchall()]
+    if not append_option:
+        sproc_list.append(append_option)
+    return sproc_list
