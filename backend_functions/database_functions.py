@@ -5,9 +5,18 @@ import psycopg2
 import socket
 from psycopg2.extras import RealDictCursor, execute_values
 import time
-from backend_functions.logging_functions import start_timer
+
 
 load_dotenv()
+
+
+def start_timer():
+    return time.perf_counter()
+
+
+def elapsed_ms(start_time):
+    return int((time.perf_counter() - start_time) * 1000)
+
 
 def get_conn(alchemy=False):
     # returns the raw psycopg2 connection unless pandas/alchemy is requested.
