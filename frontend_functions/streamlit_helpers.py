@@ -100,12 +100,13 @@ def reconcile_with_postgres(orig_df_key, new_df_key, pg_table, pg_table_key, de_
     inserted_count = _handle_inserts(edited_dict, pg_table, pg_table_key, editable_cols)
     deleted_count = _handle_deletes(edited_dict, orig_df, pg_table, pg_table_key)
 
-    # Log summary
-    _log_changes(pg_table, updated_count, inserted_count, deleted_count, t0)
+    if updated_count + inserted_count + deleted_count > 0:
+        # Log summary
+        _log_changes(pg_table, updated_count, inserted_count, deleted_count, t0)
 
-    # Clear the original dataframe (forces a refresh elsewhere):
-    ss[orig_df_key] = None
-    st.rerun()
+        # Clear the original dataframe (forces a refresh elsewhere):
+        ss[orig_df_key] = None
+        st.rerun()
 
 
 def _handle_updates(edited_dict, orig_df, pg_table, pg_table_key, de_col_config):
@@ -154,6 +155,9 @@ def _handle_inserts(edited_dict, pg_table, pg_table_key, de_col_config):
     # Determine if primary key is provided or auto-generated
     first_row = added_rows[0]
     include_pk = pg_table_key in first_row and first_row[pg_table_key] is not None
+
+    if not include_pk:
+        return 0
 
     # Build INSERT query
     cols = [pg_table_key] + de_col_config if include_pk else de_col_config

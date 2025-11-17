@@ -300,7 +300,7 @@ def render_password_submodule():
 
 
 def render_task_submodule():
-    st.subheader("Task Configuration")
+    st.write("__Task Configuration__")
     t0 = None
     if "existing tasks" not in ss:
         ss.existing_tasks_df = pd.read_sql('SELECT * FROM tasks.task_config', get_conn(alchemy=True))
@@ -352,6 +352,8 @@ def render_task_submodule():
                     args = ('existing_tasks_df', task_config_key, 'tasks.task_config', 'task_name', config_col_config)
     )
 
+    # Display the task scheduling table
+    st.write("__Task Configuration__")
     sched_col_config = {"task_name": st.column_config.TextColumn(label="Name",
                                                                   pinned=True, disabled=True),
                   "task_priority": st.column_config.NumberColumn(label="Priority",
