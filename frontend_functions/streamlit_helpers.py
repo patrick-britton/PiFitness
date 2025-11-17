@@ -110,7 +110,7 @@ def reconcile_with_postgres(orig_df_key, new_df_key, pg_table, pg_table_key, de_
 
         # Clear the original dataframe (forces a refresh elsewhere):
         ss[orig_df_key] = None
-        st.rerun()
+        # st.rerun()
 
 
 def _handle_updates(edited_dict, orig_df, pg_table, pg_table_key, de_col_config):
