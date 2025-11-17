@@ -410,7 +410,7 @@ def render_task_submodule():
 
         ss.new_api_service_name = st.selectbox(label='Which API Service?',
                                                options=ss.svc_list,
-                                               index=None)
+                                               index=len(ss.svc_list)-1)
 
         if ss.new_api_service_name != 'N/A':
             ss.new_api_function = st.text_input(label="Which function should be called?",
@@ -435,6 +435,8 @@ def render_task_submodule():
             t0 = start_timer()
 
     if "new_task_submission" in ss and ss.new_task_submission:
+        if ss.api_service_name == 'N/A':
+            ss.api_service_name = None
         insert_sql = """INSERT INTO tasks.task_config(task_name,
                         task_description,
                         task_priority,
