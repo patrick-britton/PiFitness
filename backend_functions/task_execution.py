@@ -47,7 +47,11 @@ def task_executioner(force_task_name=None, force_task=False):
 
         # Execute the prescribed function (e.g. database cleanup)
         if task.get("api_function") is None:
-            print('execute a function')
+            local_function_str = task.get("python_function")
+            module_name, svc_function_name = local_function_str.rsplit('.', 1)
+            module = importlib.import_module(module_name)
+            local_function = getattr(module, svc_function_name)
+            local_function()
             continue
 
         # Extract data from API
@@ -196,6 +200,7 @@ def json_date_loop(client, function, loop_type, date_list):
             break
 
     return all_json
+
 
 def json_loading(json_data, function_name):
     if isinstance(json_data, dict):
