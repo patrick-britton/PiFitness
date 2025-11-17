@@ -3,6 +3,8 @@ import streamlit as st
 from streamlit import session_state as ss
 import pandas as pd
 import time
+
+from backend_functions.backend_tasks import backup_database
 from backend_functions.credential_management import encrypt_dict
 from backend_functions.database_functions import get_conn, qec, sql_to_dict, get_sproc_list
 from backend_functions.helper_functions import reverse_key_lookup, list_to_dict_by_key, set_keys_to_none
@@ -14,7 +16,8 @@ from frontend_functions.streamlit_helpers import reconcile_with_postgres
 def admin_button_dict():
     d = {"passwords": ":material/key_vertical:",
          "tasks": ":material/checklist:",
-         "services": ":material/api:"}
+         "services": ":material/api:",
+         "db_backup": ":material/database_upload:"}
     return d
 
 
@@ -33,6 +36,21 @@ def render_admin_module():
         render_task_submodule()
     elif simple_selection == 'services':
         render_service_submodule()
+    elif simple_selection == 'db_backup':
+        render_db_backup()
+
+def render_db_backup():
+    if st.button("Create a backup of the database"):
+        t0 = start_timer()
+        try:
+            backup_database()
+            log_app_event(cat='DB', desc='Backup Created', exec_time=elapsed_ms(t0))
+            st.success("Backup Created")
+
+            time.sleep(1.5)
+        except Exception as e:
+            st.error(f"DB Backup failed: {e}")
+            log_app_event(cat='DB', desc='Backup Created', exec_time=elapsed_ms(t0), err=e)
 
 
 def render_service_submodule():
