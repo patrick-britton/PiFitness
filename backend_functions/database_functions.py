@@ -4,6 +4,8 @@ from sqlalchemy import create_engine
 import psycopg2
 import socket
 from psycopg2.extras import RealDictCursor, execute_values
+import time
+from backend_functions.logging_functions import start_timer
 
 load_dotenv()
 
@@ -103,5 +105,92 @@ def get_sproc_list(append_option=None):
     return sproc_list
 
 
-def nightly_maintenance():
-    print('nightly maintenance)')
+def nightly_maintenance(days_to_keep=180):
+    # Truncates Log files
+    # Vacuums the database
+    # Optimizes weekly
+    # Reindexes and does a full vacuum monthly
+
+    st = start_timer() # Track elapsed seconds
+
+    conn, cursor = con_cur()
+
+    try:
+        conn.autocommit = True
+        # 2. Delete old eventLog rows (>48h)
+        cutoff = int(time.time() * 1000) - (days_to_keep*24) * 3600 * 1000  # ms since epoch
+
+        # Pull a list of all logging tables in the database
+        log_table_list = []
+
+        for log_table in log_table_list:
+            tsql = f"DELETE FROM logging.{log_table} WHERE event_time_utc < %s"
+            cursor.execute(tsql, (cutoff,))
+            conn.commit()
+        # log_entry(cat="DB Maintenance",
+        #           desc=f"Deleted {deleted} old eventLog rows (cutoff={cutoff})",
+        #           sql=sql,
+        #           sql_p=(cutoff,))
+
+        # Log stats before VACUUM
+        tsql = "SELECT SUM(total_size_mb) from public.vw_db_size"
+        size_before = one_sql_result(tsql)
+
+
+        # 3. Vacuum
+
+        cursor.execute("VACUUM;")
+        maintenance_type = 'daily'
+
+        if datetime.today().weekday() == 6:
+            cursor.execute("ANALYZE;")
+            maintenance_type = 'weekly'
+
+        if datetime.today().day == 1:
+            cursor.execute("REINDEX DATABASE personal_fitness;")
+            cursor.execute("VACUUM FULL;")
+            maintenance_type = 'monthly'
+
+
+        # Performance Testing
+        tsql = "SELECT * FROM public.vw_db_performance_test"
+        perf_start = int(datetime.now(pytz.UTC).timestamp() * 1000)
+        cursor.execute(tsql)
+        _ = cursor.fetchall()
+        perf_end = int(datetime.now(pytz.UTC).timestamp() * 1000)
+        elapsed_ms = perf_end - perf_start
+
+        # 4. Log results
+        tsql = """INSERT INTO public.db_size_log SELECT * FROM public.vw_db_size"""
+        qec(tsql)
+
+        tsql = "SELECT SUM(total_size_mb) from public.vw_db_size"
+        size_after = one_sql_result(tsql)
+
+
+
+        # 5. Record total elapsed time
+        elapsed = int(datetime.now(pytz.UTC).timestamp() * 1000) - st
+        log_entry(cat="DB Maintenance",
+                  desc=f"Time {elapsed / 1000:.2f}s | Size {size_before:.1f} → {size_after:.1f}MB",
+                  exec_time=elapsed)
+
+        tsql = """INSERT into public.db_performance_results (timestamp_utc, size_before, size_after, execution_time, 
+                        maintenance_time, maintenance_type) 
+                        VALUES (%s, %s, %s, %s, %s, %s);"""
+
+        qec(tsql, p=(st, size_before, size_after, elapsed_ms, elapsed, maintenance_type))
+        print('Nightly Maintenance success')
+
+
+    except Exception as e:
+        log_entry(cat="DB Maintenance", desc="Error during maintenance", err=e)
+        print(f"Nightly Maintenance failure: {e}")
+        conn.close()
+        return False
+
+    conn.close()
+
+
+
+    return True

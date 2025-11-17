@@ -8,6 +8,7 @@ from backend_functions.database_functions import get_conn, qec, sql_to_dict, get
 from backend_functions.helper_functions import reverse_key_lookup, list_to_dict_by_key
 from backend_functions.logging_functions import log_app_event, start_timer, elapsed_ms
 from backend_functions.service_logins import test_login, get_service_list
+from frontend_functions.streamlit_helpers import reconcile_with_postgres
 
 
 def admin_button_dict():
@@ -359,14 +360,16 @@ def render_task_submodule():
                       "last_calendar_date": st.column_config.DateColumn(label="Current Through",
                                                                         disabled=True,
                                                                         pinned=False)}
-        st.write("Existing tasks")
+        de_key = 'admin_task_editor'
         st.data_editor(ss.existing_tasks_df,
                         hide_index=True,
                         column_config=col_config,
-                        key = "service_editor",
-                        on_change = handle_task_changes,
-                        args = (ss.existing_tasks_df,)
+                        num_rows="dynamic",
+                        key = de_key,
+                        on_change = reconcile_with_postgres,
+                        args = (ss.existing_tasks_df, de_key, 'tasks.task_config', 'task_name')
         )
+        # orig_df, new_df_key, pg_table, pg_table_key, de_col_config)
 
     if st.button(":material/add: Add New Task"):
         ss.admin_task_add = True
