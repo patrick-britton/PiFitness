@@ -12,14 +12,27 @@ def elapsed_ms(start_time):
     return int((time.perf_counter() - start_time) * 1000)
 
 
+def get_editable_columns(col_config):
+    # Extract editable column names from Streamlit column_config.
+    editable = []
+    for col, config in col_config.items():
+        # Try to access the internal kwargs
+        try:
+            if hasattr(config, 'kwargs') and config.kwargs.get('disabled', False):
+                continue
+            editable.append(col)
+        except:
+            editable.append(col)
+    return editable
+
+
 def reconcile_with_postgres(orig_df, new_df_key, pg_table, pg_table_key, de_col_config):
     #Applies updates, inserts, and deletes made with st.data_editor to PostgreSQL table.
 
     t0 = start_timer()
     edited_dict = ss[new_df_key]
 
-    editable_cols = [col for col, config in de_col_config.items()
-                     if not config.disabled]
+    editable_cols = get_editable_columns(de_col_config)
 
     if not isinstance(edited_dict, dict):
         return
