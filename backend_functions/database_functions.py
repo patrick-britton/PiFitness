@@ -101,3 +101,7 @@ def get_sproc_list(append_option=None):
     if append_option:
         sproc_list.append(append_option)
     return sproc_list
+
+
+def nightly_maintenance():
+    print('nightly maintenance)')

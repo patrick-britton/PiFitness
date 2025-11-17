@@ -384,7 +384,7 @@ def render_task_submodule():
                                                value =999)
         ss.new_task_frequency = st.selectbox(label="Frequency",
                                              options=['Hourly', 'Daily', 'Weekly', 'Monthly'],
-                                             index=3)
+                                             index=1)
         if ss.new_task_frequency == 'Daily':
             ss.new_task_interval = st.number_input(label='Which hour of day to run?',
                                                min_value=0,
@@ -413,10 +413,12 @@ def render_task_submodule():
                                                index=None)
 
         if ss.new_api_service_name != 'N/A':
-            ss.new_api_function = st.text_input(label="Which function should be called?")
+            ss.new_api_function = st.text_input(label="Which function should be called?",
+                                                value=None)
             ss.new_api_loop_type = st.selectbox(label="Is there a loop to the API call?",
                                             options=['Day', 'Range', 'Next', 'N/A'],
-                                            index=3)
+                                            index=3,
+                                                )
             ss.new_api_post_processing = st.selectbox(label="Call an SPROC After loading?",
                                                       options=ss.sproc_list,
                                                       index=None)
