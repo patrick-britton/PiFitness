@@ -300,170 +300,113 @@ def render_password_submodule():
 
 
 def render_task_submodule():
-    st.subheader("Task Scheduler")
+    st.subheader("Task Configuration")
     t0 = None
     if "existing tasks" not in ss:
         ss.existing_tasks_df = pd.read_sql('SELECT * FROM tasks.task_config', get_conn(alchemy=True))
 
+    # Display the header information
 
-    if not ss.existing_tasks_df.empty:
-        if "svc_list" not in ss:
-            ss.svc_list = get_service_list(append_option='N/A')
-            ss.sproc_list = get_sproc_list(append_option='N/A')
+    if "svc_list" not in ss:
+        ss.svc_list = get_service_list(append_option='N/A')
+        ss.sproc_list = get_sproc_list(append_option='N/A')
 
-        col_config = {"task_name": st.column_config.TextColumn(label="Name",
-                                                                      pinned=True, disabled=True),
-                      "task_description": st.column_config.TextColumn(label="Description",
-                                                                           pinned=False,
-                                                                           disabled=False),
-                      "task_priority": st.column_config.NumberColumn(label="Priority",
-                                                                     pinned=False,
-                                                                     disabled=False,
-                                                                     default=999,
-                                                                     format='%d'),
-                      "task_frequency": st.column_config.SelectboxColumn(label="Frequency",
-                                                                         pinned=False,
-                                                                         options=['Hourly',
-                                                                                  'Daily',
-                                                                                  'Weekly',
-                                                                                  'Monthly',
-                                                                                  'Retired'],
-                                                                         disabled=False,
-                                                                         default='Daily'),
-                      "task_interval": st.column_config.NumberColumn(label="Interval",
-                                                                     pinned=False,
-                                                                     default=23,
-                                                                     format='%d',
-                                                                     disabled=False),
-                      "api_function": st.column_config.TextColumn(label='API Function',
+    config_col_config = {"task_name": st.column_config.TextColumn(label="Name",
+                                                                  pinned=True, disabled=True),
+                  "task_description": st.column_config.TextColumn(label="Description",
+                                                                       pinned=False,
+                                                                       disabled=False),
+                  "api_function": st.column_config.TextColumn(label='API Function',
+                                                              pinned=False,
+                                                              disabled=False),
+                  "api_service_name": st.column_config.SelectboxColumn(label='API',
+                                                                       default='N/A',
+                                                                       pinned=False,
+                                                                       options=ss.svc_list,
+                                                                       ),
+                  "api_loop_type": st.column_config.SelectboxColumn(label="Loop Type",
+                                                                    pinned=False,
+                                                                    disabled=False,
+                                                                    options=['Day', 'Range', 'Next', 'N/A'],
+                                                                    default='N/A'),
+                  'api_post_processing': st.column_config.SelectboxColumn(label='SPROC',
+                                                                          pinned=False,
+                                                                          disabled=False,
+                                                                          options=ss.sproc_list,
+                                                                          default='N/A'),
+                  "python_function": st.column_config.TextColumn(label="Python Function",
+                                                                 pinned=False,
+                                                                 disabled=False,
+                                                                 default=None),
+                  "last_calendar_field": st.column_config.TextColumn(label="Postgres As-of Column",
                                                                   pinned=False,
-                                                                  disabled=False),
-                      "api_service_name": st.column_config.SelectboxColumn(label='API',
-                                                                           default='N/A',
-                                                                           pinned=False,
-                                                                           options=ss.svc_list,
-                                                                           ),
-                      "api_loop_type": st.column_config.SelectboxColumn(label="Loop Type",
-                                                                        pinned=False,
-                                                                        disabled=False,
-                                                                        options=['Day', 'Range', 'Next', 'N/A'],
-                                                                        default='N/A'),
-                      'api_post_processing': st.column_config.SelectboxColumn(label='SPROC',
-                                                                              pinned=False,
-                                                                              disabled=False,
-                                                                              options=ss.sproc_list,
-                                                                              default='N/A'),
-                      "python_function": st.column_config.TextColumn(label="Python Function",
+                                                                  disabled=False,
+                                                                  default=None)}
+    config_key = 'admin_task_config'
+    st.data_editor(ss.existing_tasks_df,
+                    hide_index=True,
+                    column_config=config_col_config,
+                    num_rows="dynamic",
+                    key = config_key,
+                    on_change = reconcile_with_postgres,
+                    args = ('existing_tasks_df', config_key, 'tasks.task_config', 'task_name', config_col_config)
+    )
+
+    sched_col_config = {"task_name": st.column_config.TextColumn(label="Name",
+                                                                  pinned=True, disabled=True),
+                  "task_priority": st.column_config.NumberColumn(label="Priority",
+                                                                 pinned=False,
+                                                                 disabled=False,
+                                                                 default=999,
+                                                                 format='%d'),
+                  "task_frequency": st.column_config.SelectboxColumn(label="Frequency",
                                                                      pinned=False,
+                                                                     options=['Hourly',
+                                                                              'Daily',
+                                                                              'Weekly',
+                                                                              'Monthly',
+                                                                              'Retired'],
                                                                      disabled=False,
-                                                                     default=None),
-                      "last_calendar_date": st.column_config.DateColumn(label="Current Through",
-                                                                        disabled=True,
-                                                                        pinned=False)}
-        de_key = 'admin_task_editor'
-        st.data_editor(ss.existing_tasks_df,
-                        hide_index=True,
-                        column_config=col_config,
-                        num_rows="dynamic",
-                        key = de_key,
-                        on_change = reconcile_with_postgres,
-                        args = (ss.existing_tasks_df, de_key, 'tasks.task_config', 'task_name', col_config)
-        )
-        # orig_df, new_df_key, pg_table, pg_table_key, de_col_config)
+                                                                     default='Daily'),
+                  "task_interval": st.column_config.NumberColumn(label="Interval",
+                                                                 pinned=False,
+                                                                 default=23,
+                                                                 format='%d',
+                                                                 disabled=False),
+                  "api_function": st.column_config.TextColumn(label='API Function',
+                                                              pinned=False,
+                                                              disabled=False),
+                  "api_service_name": st.column_config.SelectboxColumn(label='API',
+                                                                       default='N/A',
+                                                                       pinned=False,
+                                                                       options=ss.svc_list,
+                                                                       ),
+                  "api_loop_type": st.column_config.SelectboxColumn(label="Loop Type",
+                                                                    pinned=False,
+                                                                    disabled=False,
+                                                                    options=['Day', 'Range', 'Next', 'N/A'],
+                                                                    default='N/A'),
+                  'api_post_processing': st.column_config.SelectboxColumn(label='SPROC',
+                                                                          pinned=False,
+                                                                          disabled=False,
+                                                                          options=ss.sproc_list,
+                                                                          default='N/A'),
+                  "python_function": st.column_config.TextColumn(label="Python Function",
+                                                                 pinned=False,
+                                                                 disabled=False,
+                                                                 default=None),
+                  "last_calendar_date_col": st.column_config.TextColumn(label="Current Through",
+                                                                    disabled=True,
+                                                                    pinned=False)}
+    task_sched_key = 'admin_task_config'
+    st.data_editor(ss.existing_tasks_df,
+                    hide_index=True,
+                    column_config=sched_col_config,
+                    num_rows="dynamic",
+                    key = config_key,
+                    on_change = reconcile_with_postgres,
+                    args = ('existing_tasks_df', task_sched_key, 'tasks.task_config', 'task_name', sched_col_config)
+    )
 
-    if st.button(":material/add: Add New Task"):
-        ss.admin_task_add = True
 
-    if "admin_task_add" in ss and ss.admin_task_add:
-        if "svc_list" not in ss:
-            ss.svc_list = get_service_list(append_option='N/A')
-            ss.sproc_list = get_sproc_list(append_option='N/A')
 
-        ss.new_task_name = st.text_input(label="Name:")
-        ss.new_task_description = st.text_area(label="Description")
-        ss.new_task_priority = st.number_input(label="Priority",
-                                               min_value=0,
-                                               max_value=999,
-                                               value =999)
-        ss.new_task_frequency = st.selectbox(label="Frequency",
-                                             options=['Hourly', 'Daily', 'Weekly', 'Monthly'],
-                                             index=1)
-        if ss.new_task_frequency == 'Daily':
-            ss.new_task_interval = st.number_input(label='Which hour of day to run?',
-                                               min_value=0,
-                                               max_value=23,
-                                               value =23)
-        elif ss.new_task_frequency == 'Hourly':
-            ss.new_task_interval = st.number_input(label='How many hours between runs',
-                                               min_value=0,
-                                               max_value=23,
-                                               value =3)
-        elif ss.new_task_frequency == 'Weekly':
-            ss.new_task_interval = st.number_input(label='What day of week to run?',
-                                               min_value=0,
-                                               max_value=6,
-                                               value =6)
-        elif ss.new_task_frequency == 'Monthly':
-            ss.new_task_interval = st.number_input(label='What day of month to run?',
-                                               min_value=0,
-                                               max_value=6,
-                                               value =1)
-        else:
-            ss.new_task_interval=23
-
-        ss.new_api_service_name = st.selectbox(label='Which API Service?',
-                                               options=ss.svc_list,
-                                               index=len(ss.svc_list)-1)
-
-        if ss.new_api_service_name != 'N/A':
-            ss.new_api_function = st.text_input(label="Which function should be called?",
-                                                value=None)
-            ss.new_api_loop_type = st.selectbox(label="Is there a loop to the API call?",
-                                            options=['Day', 'Range', 'Next', 'N/A'],
-                                            index=3,
-                                                )
-            ss.new_api_post_processing = st.selectbox(label="Call an SPROC After loading?",
-                                                      options=ss.sproc_list,
-                                                      index=None)
-        else:
-            ss.new_api_function = None
-            ss.new_api_loop_type = None
-            ss.new_api_post_processing = None
-
-        ss.new_python_function = st.text_input(label="Call a python function?",
-                                               value=None)
-
-        if st.button(":material/save: Submit"):
-            ss.new_task_submission = True
-            t0 = start_timer()
-
-    if "new_task_submission" in ss and ss.new_task_submission:
-        if ss.new_api_service_name == 'N/A':
-            ss.new_api_service_name = None
-        insert_sql = """INSERT INTO tasks.task_config(task_name,
-                        task_description,
-                        task_priority,
-                        task_frequency,
-                        task_interval,
-                        api_function,
-                        api_service_name,
-                        api_loop_type,
-                        api_post_processing,
-                        python_function)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"""
-        params = (ss.new_task_name,
-                  ss.new_task_description,
-                  ss.new_task_priority,
-                  ss.new_task_frequency,
-                  ss.new_task_interval,
-                  ss.new_api_function,
-                  ss.new_api_service_name,
-                  ss.new_api_loop_type,
-                  ss.new_api_post_processing,
-                  ss.new_python_function)
-        qec(insert_sql, params)
-        log_app_event(cat="Admin", desc=f"New Task Creation: {ss.new_task_name}", exec_time=elapsed_ms(t0))
-        ss.new_task_submission = False
-        ss.admin_task_add = False
-        ss.existing_tasks_df = pd.read_sql('SELECT * FROM tasks.task_config', get_conn(alchemy=True))
-        st.rerun()

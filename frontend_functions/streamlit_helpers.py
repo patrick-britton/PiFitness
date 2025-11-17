@@ -1,5 +1,6 @@
 from backend_functions.database_functions import qec, get_conn
 from backend_functions.logging_functions import log_app_event
+import streamlit as st
 from streamlit import session_state as ss
 import time
 import psycopg2.extensions
@@ -74,11 +75,20 @@ def get_editable_columns(col_config, pk_val):
     return editable
 
 
-def reconcile_with_postgres(orig_df, new_df_key, pg_table, pg_table_key, de_col_config):
+def reconcile_with_postgres(orig_df_key, new_df_key, pg_table, pg_table_key, de_col_config):
     #Applies updates, inserts, and deletes made with st.data_editor to PostgreSQL table.
 
     t0 = start_timer()
-    edited_dict = ss[new_df_key]
+
+    if orig_df_key not in ss:
+        return
+    else:
+        orig_df = ss[orig_df_key]
+
+    if new_df_key not in ss:
+        return
+    else:
+        edited_dict = ss[new_df_key]
 
     editable_cols = get_editable_columns(de_col_config, pg_table_key)
 
@@ -92,6 +102,10 @@ def reconcile_with_postgres(orig_df, new_df_key, pg_table, pg_table_key, de_col_
 
     # Log summary
     _log_changes(pg_table, updated_count, inserted_count, deleted_count, t0)
+
+    # Clear the original dataframe (forces a refresh elsewhere):
+    ss[orig_df_key] = None
+    st.rerun()
 
 
 def _handle_updates(edited_dict, orig_df, pg_table, pg_table_key, de_col_config):
