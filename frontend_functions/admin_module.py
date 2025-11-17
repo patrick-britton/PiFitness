@@ -342,14 +342,14 @@ def render_task_submodule():
                                                                   pinned=False,
                                                                   disabled=False,
                                                                   default=None)}
-    config_key = 'admin_task_config'
+    task_config_key = 'admin_task_config'
     st.data_editor(ss.existing_tasks_df,
                     hide_index=True,
                     column_config=config_col_config,
                     num_rows="dynamic",
-                    key = config_key,
+                    key = task_config_key,
                     on_change = reconcile_with_postgres,
-                    args = ('existing_tasks_df', config_key, 'tasks.task_config', 'task_name', config_col_config)
+                    args = ('existing_tasks_df', task_config_key, 'tasks.task_config', 'task_name', config_col_config)
     )
 
     sched_col_config = {"task_name": st.column_config.TextColumn(label="Name",
@@ -398,14 +398,18 @@ def render_task_submodule():
                   "last_calendar_date_col": st.column_config.TextColumn(label="Current Through",
                                                                     disabled=True,
                                                                     pinned=False)}
-    task_sched_key = 'admin_task_config'
+    task_schedule_config_key = 'admin_task_config'
     st.data_editor(ss.existing_tasks_df,
                     hide_index=True,
                     column_config=sched_col_config,
                     num_rows="dynamic",
-                    key = config_key,
+                    key = task_schedule_config_key,
                     on_change = reconcile_with_postgres,
-                    args = ('existing_tasks_df', task_sched_key, 'tasks.task_config', 'task_name', sched_col_config)
+                    args = ('existing_tasks_df',
+                            task_schedule_config_key,
+                            'tasks.task_config',
+                            'task_name',
+                            sched_col_config)
     )
 
 
