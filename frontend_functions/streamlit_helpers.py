@@ -12,17 +12,20 @@ def elapsed_ms(start_time):
     return int((time.perf_counter() - start_time) * 1000)
 
 
-def get_editable_columns(col_config):
+def get_editable_columns(col_config, pk_val):
     # Extract editable column names from Streamlit column_config.
     editable = []
     for col, config in col_config.items():
         # Try to access the internal kwargs
-        try:
-            if hasattr(config, 'kwargs') and config.kwargs.get('disabled', False):
-                continue
+        if col == pk_val:
+            continue
+        is_disabled = config.get('disabled', False)
+        if not is_disabled:
             editable.append(col)
-        except:
-            editable.append(col)
+            print(f"{col} : {config} : debug append")
+        else:
+            print(f"{col} : {config} : debug SKIP")
+
     return editable
 
 
@@ -32,7 +35,7 @@ def reconcile_with_postgres(orig_df, new_df_key, pg_table, pg_table_key, de_col_
     t0 = start_timer()
     edited_dict = ss[new_df_key]
 
-    editable_cols = get_editable_columns(de_col_config)
+    editable_cols = get_editable_columns(de_col_config, pg_table_key)
 
     if not isinstance(edited_dict, dict):
         return
