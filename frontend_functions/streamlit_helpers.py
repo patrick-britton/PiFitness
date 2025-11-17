@@ -18,12 +18,15 @@ def reconcile_with_postgres(orig_df, new_df_key, pg_table, pg_table_key, de_col_
     t0 = start_timer()
     edited_dict = ss[new_df_key]
 
+    editable_cols = [col for col, config in de_col_config.items()
+                     if not config.disabled]
+
     if not isinstance(edited_dict, dict):
         return
 
     # Process all operations
-    updated_count = _handle_updates(edited_dict, orig_df, pg_table, pg_table_key, de_col_config)
-    inserted_count = _handle_inserts(edited_dict, pg_table, pg_table_key, de_col_config)
+    updated_count = _handle_updates(edited_dict, orig_df, pg_table, pg_table_key, editable_cols)
+    inserted_count = _handle_inserts(edited_dict, pg_table, pg_table_key, editable_cols)
     deleted_count = _handle_deletes(edited_dict, orig_df, pg_table, pg_table_key)
 
     # Log summary
@@ -40,6 +43,7 @@ def _handle_updates(edited_dict, orig_df, pg_table, pg_table_key, de_col_config)
     # Build UPDATE query
     set_clause = ', '.join([f"{col} = %s" for col in de_col_config])
     update_sql = f"UPDATE {pg_table} SET {set_clause} WHERE {pg_table_key} = %s"
+
 
     # Prepare all params for batch execution
     params_list = []
