@@ -308,8 +308,8 @@ def render_task_submodule():
     # Display the header information
 
     if "svc_list" not in ss:
-        ss.svc_list = get_service_list(append_option='N/A')
-        ss.sproc_list = get_sproc_list(append_option='N/A')
+        ss.svc_list = get_service_list(append_option=None)
+        ss.sproc_list = get_sproc_list(append_option=None)
 
     parent_col_config = {"task_name": st.column_config.TextColumn(label="Name",
                                                                   pinned=True, disabled=False),
@@ -335,7 +335,7 @@ def render_task_submodule():
                                                               pinned=False,
                                                               disabled=False),
                         "api_service_name": st.column_config.SelectboxColumn(label='API',
-                                                                       default='N/A',
+                                                                       default=None,
                                                                        pinned=False,
                                                                        options=ss.svc_list,
                                                                        ),
@@ -348,7 +348,7 @@ def render_task_submodule():
                                                                           pinned=False,
                                                                           disabled=False,
                                                                           options=ss.sproc_list,
-                                                                          default='N/A'),
+                                                                          default=None),
                         "python_function": st.column_config.TextColumn(label="Python Function",
                                                                      pinned=False,
                                                                      disabled=False,
