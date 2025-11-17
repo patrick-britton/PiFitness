@@ -398,7 +398,7 @@ def render_task_submodule():
                   "last_calendar_date_col": st.column_config.TextColumn(label="Current Through",
                                                                     disabled=True,
                                                                     pinned=False)}
-    task_schedule_config_key = 'admin_task_config'
+    task_schedule_config_key = 'admin_schedule_config'
     st.data_editor(ss.existing_tasks_df,
                     hide_index=True,
                     column_config=sched_col_config,
