@@ -1,14 +1,22 @@
 from backend_functions.database_functions import qec, get_conn
-from backend_functions.logging_functions import start_timer, log_app_event, elapsed_ms
-import streamlit as st
+from backend_functions.logging_functions import log_app_event
 from streamlit import session_state as ss
+import time
+
+
+def start_timer():
+    return time.perf_counter()
+
+
+def elapsed_ms(start_time):
+    return int((time.perf_counter() - start_time) * 1000)
 
 
 def reconcile_with_postgres(orig_df, new_df_key, pg_table, pg_table_key, de_col_config):
     #Applies updates, inserts, and deletes made with st.data_editor to PostgreSQL table.
 
     t0 = start_timer()
-    edited_dict = st.session_state[new_df_key]
+    edited_dict = ss[new_df_key]
 
     if not isinstance(edited_dict, dict):
         return
