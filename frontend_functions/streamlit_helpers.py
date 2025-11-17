@@ -61,6 +61,9 @@ def _convert_to_python_type(value):
 def get_editable_columns(col_config, pk_val):
     # Extract editable column names from Streamlit column_config.
     editable = []
+    if col_config is None or pk_val is None:
+        return editable
+
     for col, config in col_config.items():
         # Try to access the internal kwargs
         if col == pk_val:
