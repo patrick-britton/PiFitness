@@ -367,7 +367,7 @@ def render_task_submodule():
                         num_rows="dynamic",
                         key = de_key,
                         on_change = reconcile_with_postgres,
-                        args = (ss.existing_tasks_df, de_key, 'tasks.task_config', 'task_name')
+                        args = (ss.existing_tasks_df, de_key, 'tasks.task_config', 'task_name', col_config)
         )
         # orig_df, new_df_key, pg_table, pg_table_key, de_col_config)
 
