@@ -435,8 +435,8 @@ def render_task_submodule():
             t0 = start_timer()
 
     if "new_task_submission" in ss and ss.new_task_submission:
-        if ss.api_service_name == 'N/A':
-            ss.api_service_name = None
+        if ss.new_api_service_name == 'N/A':
+            ss.new_api_service_name = None
         insert_sql = """INSERT INTO tasks.task_config(task_name,
                         task_description,
                         task_priority,
