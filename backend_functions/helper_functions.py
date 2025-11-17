@@ -52,3 +52,20 @@ def get_sync_dates(meta_sync_val=None, meta_sync_type=None, max_range_days=7):
             curr_start = curr_end + timedelta(days=1)
 
     return dates
+
+
+def set_keys_to_none(d, key_list):
+    # Sets the keys to None in the dictionary when not in the key_list
+    new_dict = {}
+    for key in key_list:
+        if key in d:
+            new_dict[key] = d[key]
+        else:
+            new_dict[key] = None
+
+    for key in d:
+        if key not in new_dict:
+            new_dict[key] = None
+    return new_dict
+
+

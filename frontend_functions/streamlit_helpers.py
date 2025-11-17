@@ -65,12 +65,9 @@ def get_editable_columns(col_config, pk_val):
         # Try to access the internal kwargs
         if col == pk_val:
             continue
-        is_disabled = config.get('disabled', False)
+        is_disabled = config.get('disabled', True)
         if not is_disabled:
             editable.append(col)
-            print(f"{col} : {config} : debug append")
-        else:
-            print(f"{col} : {config} : debug SKIP")
 
     return editable
 
