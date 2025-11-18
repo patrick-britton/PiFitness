@@ -132,6 +132,6 @@ def get_log_tables(as_list=False):
                     ORDER BY 
                         c.relname;"""
     if as_list:
-        return list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys().list()
+        return list(list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys())
     else:
         return list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys()
