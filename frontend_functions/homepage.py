@@ -100,6 +100,7 @@ def log_display():
                                                             disabled=True)}
 
     if "log_table_df" in ss and ss.log_table_df is not None:
+        st.write(f"Log Table: __{ss.table_selection}__")
         st.data_editor(ss.log_table_df, hide_index=True,
                        column_config=log_config)
     else:
