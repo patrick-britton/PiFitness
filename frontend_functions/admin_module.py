@@ -10,6 +10,7 @@ from backend_functions.database_functions import get_conn, qec, sql_to_dict, get
 from backend_functions.helper_functions import reverse_key_lookup, list_to_dict_by_key, set_keys_to_none
 from backend_functions.logging_functions import log_app_event, start_timer, elapsed_ms
 from backend_functions.service_logins import test_login, get_service_list
+from backend_functions.task_execution import task_executioner
 from frontend_functions.streamlit_helpers import reconcile_with_postgres
 
 
@@ -300,5 +301,14 @@ def render_task_submodule():
                             sched_col_config)
     )
 
+    st.divider()
+    st.write("Force Task Execution")
+    task_list = ss.existing_tasks_df['task_name'].to_list()
+    cols = st.columns(len(task_list))
+    for idx, task in enumerate(task_list):
+        with cols[idx]:
+            if st.button(task, key=f"btn_{task}", type='secondary'):
+                task_executioner(force_task_name=task, force_task=True)
+                st.rerun()
 
 
