@@ -25,9 +25,14 @@ def task_executioner(force_task_name=None, force_task=False):
         if force_task and task_name == force_task_name:
             execution_type = 'forced'
             print(f"Forced execution of {force_task_name}")
+        elif task.get("task_frequency") == 'Retired':
+            execution_type = 'Retired'
         else:
             execution_type = task.get("execution_logic")
-            print(f"DEBUG: Exec Type: {execution_type} for {task_name}")
+
+        # Skip any retired/inactive tasks
+        if execution_type == 'Retired':
+            continue
 
         # Skip the too-recently-executed tasks
         if execution_type == 'recency':
