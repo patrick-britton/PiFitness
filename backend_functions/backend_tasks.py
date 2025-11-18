@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from backend_functions.database_functions import qec, one_sql_result, con_cur, sql_to_dict
+from backend_functions.database_functions import qec, one_sql_result, con_cur, sql_to_dict, get_log_tables
 from backend_functions.helper_functions import list_to_dict_by_key
 from backend_functions.logging_functions import log_app_event, elapsed_ms, start_timer
 import os
@@ -26,19 +26,7 @@ def nightly_maintenance(days_to_keep=365):
         conn.autocommit = True
         # 2. Delete old eventLog rows (>48h)
 
-        logging_sql = """SELECT c.relname as table_name
-                        FROM pg_catalog.pg_class c
-                        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-                        JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid
-                        WHERE 
-                            n.nspname = 'logging'
-                            AND a.attname = 'event_time_utc'
-                            AND c.relkind = 'r'     -- only real tables
-                        ORDER BY 
-                            c.relname;"""
-
-
-        logging_tables = list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys()
+        logging_tables = get_log_tables()
 
         for log_table in logging_tables:
             del_sql = f"""

@@ -8,6 +8,7 @@ import socket
 from psycopg2.extras import RealDictCursor, execute_values
 import time
 
+from backend_functions.helper_functions import list_to_dict_by_key
 
 load_dotenv()
 
@@ -116,3 +117,19 @@ def get_sproc_list(append_option=None):
     if append_option:
         sproc_list.append(append_option)
     return sproc_list
+
+
+
+def get_log_tables():
+    logging_sql = """SELECT c.relname as table_name
+                    FROM pg_catalog.pg_class c
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid
+                    WHERE 
+                        n.nspname = 'logging'
+                        AND a.attname = 'event_time_utc'
+                        AND c.relkind = 'r'     -- only real tables
+                    ORDER BY 
+                        c.relname;"""
+
+    return list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys()
