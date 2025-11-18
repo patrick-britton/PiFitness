@@ -42,19 +42,19 @@ def nightly_maintenance(days_to_keep=365):
 
         for log_table in logging_tables:
             del_sql = f"""
-                        DELETE FROM {log_table}
-                        WHERE event_timestamp_utc < NOW() - INTERVAL %s;
+                        DELETE FROM logging.{log_table}
+                        WHERE event_time_utc < NOW() - INTERVAL %s;
                     """
             interval = f"{days_to_keep} days"
             qec(del_sql, (interval,))
 
         # Log stats before VACUUM
-        tsql = "SELECT SUM(total_size_mb) from public.vw_db_size"
+        tsql = "SELECT SUM(total_size_mb) from logging.vw_db_size"
         size_before = one_sql_result(tsql)
 
 
         # 3. Vacuum
-
+        maint_start = start_timer()
         cursor.execute("VACUUM;")
         maintenance_type = 'daily'
 
@@ -67,7 +67,7 @@ def nightly_maintenance(days_to_keep=365):
             cursor.execute("VACUUM FULL;")
             maintenance_type = 'monthly'
 
-
+        maint_elapsed_ms = elapsed_ms(maint_start)
         # # Performance Testing
         # tsql = "SELECT * FROM public.vw_db_performance_test"
         # perf_start = start_timer()
@@ -80,20 +80,20 @@ def nightly_maintenance(days_to_keep=365):
                 SELECT * FROM logging.vw_db_size"""
         qec(tsql)
 
-        tsql = "SELECT SUM(total_size_mb) from public.vw_db_size"
+        tsql = "SELECT SUM(total_size_mb) from logging.vw_db_size"
         size_after = one_sql_result(tsql)
 
         # 5. Record total elapsed time
-        elapsed = elapsed_ms(st)
+        total_elapsed = elapsed_ms(st)
         log_app_event(cat="DB Maintenance",
-                  desc=f"Time {elapsed / 1000:.2f}s | Size {size_before:.1f} → {size_after:.1f}MB",
-                  exec_time=elapsed)
+                  desc=f"Time {total_elapsed / 1000:.2f}s | Size {size_before:.1f} → {size_after:.1f}MB",
+                  exec_time=total_elapsed)
 
-        tsql = """INSERT into logging.db_stats (size_before, size_after, execution_time, 
-                        maintenance_time, maintenance_type) 
+        tsql = """INSERT into logging.db_stats (size_before_mb, size_after_mb, maintenance_time_ms, 
+                        total_time_ms, maintenance_type) 
                         VALUES (%s, %s, %s, %s, %s);"""
 
-        qec(tsql, p=(st, size_before, size_after, elapsed_ms, elapsed, maintenance_type))
+        qec(tsql, p=(size_before, size_after, maint_elapsed_ms, total_elapsed, maintenance_type))
         print('Nightly Maintenance success')
 
 

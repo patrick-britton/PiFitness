@@ -101,158 +101,6 @@ def render_service_submodule():
         st.rerun()
 
 
-def handle_service_changes(original_df):
-    # used in conjunction with data editor, records changes to postgres
-
-    t0 = start_timer()
-
-    # Get the edited data from session state
-    edited_data = ss.service_editor
-
-    # Convert to DataFrame if it's a dict with edited_rows metadata
-    if isinstance(edited_data, dict):
-        # st.data_editor returns edited data in a special format
-        # Use the 'edited_rows' key to get actual changes
-        if 'edited_rows' in edited_data and edited_data['edited_rows']:
-            edited_rows = edited_data['edited_rows']
-
-            update_sql = """
-                    UPDATE api_services.api_service_list 
-                    SET api_service_function = %s,
-                        api_credential_requirements = %s
-                    WHERE api_service_name = %s;
-                """
-
-            # edited_rows is a dict where keys are row indices
-            for row_idx, changes in edited_rows.items():
-                # Get the service name from original df
-                service_name = original_df.iloc[row_idx]['api_service_name']
-
-                # Get updated values (use original if not changed)
-                api_functions = changes.get('api_service_function',
-                                            original_df.iloc[row_idx]['api_service_function'])
-                api_credentials = changes.get('api_credential_requirements',
-                                              original_df.iloc[row_idx]['api_credential_requirements'])
-
-                params = (api_functions, api_credentials, service_name)
-                qec(update_sql, params)
-
-            log_app_event(
-                cat="Admin",
-                desc=f"Service Updates: {len(edited_rows)} rows changed",
-                exec_time=elapsed_ms(t0)
-            )
-        return
-
-    # If it's already a DataFrame (older Streamlit versions)
-    edited_df = edited_data
-
-    if original_df.equals(edited_df):
-        return
-
-    check_cols = ['api_service_function', 'api_credential_requirements']
-
-    # Find changed rows
-    changed_indices = []
-    for idx in range(len(edited_df)):
-        for col in check_cols:
-            orig_val = str(original_df.iloc[idx][col]) if pd.notna(original_df.iloc[idx][col]) else ''
-            edit_val = str(edited_df.iloc[idx][col]) if pd.notna(edited_df.iloc[idx][col]) else ''
-            if orig_val != edit_val:
-                changed_indices.append(idx)
-                break
-
-    if not changed_indices:
-        return
-
-    update_sql = """
-            UPDATE api_services.api_service_list 
-            SET api_service_function = %s,
-                api_credential_requirements = %s
-            WHERE api_service_name = %s;
-        """
-
-    for idx in changed_indices:
-        params = (
-            edited_df.iloc[idx]['api_service_function'],
-            edited_df.iloc[idx]['api_credential_requirements'],
-            edited_df.iloc[idx]['api_service_name']
-        )
-        qec(update_sql, params)
-
-    log_app_event(
-        cat="Admin",
-        desc=f"Service Updates: {len(changed_indices)} rows changed",
-        exec_time=elapsed_ms(t0)
-    )
-
-
-def handle_task_changes(original_df):
-    # used in conjunction with data editor, records changes to postgres
-
-    t0 = start_timer()
-
-    # Get the edited data from session state
-    edited_data = ss.service_editor
-
-    # Convert to DataFrame if it's a dict with edited_rows metadata
-    if isinstance(edited_data, dict):
-        # st.data_editor returns edited data in a special format
-        # Use the 'edited_rows' key to get actual changes
-        if 'edited_rows' in edited_data and edited_data['edited_rows']:
-            edited_rows = edited_data['edited_rows']
-
-            update_sql = """
-                    UPDATE tasks.task_config 
-                    SET task_description = %s,
-                        task_priority = %s,
-                        task_frequency = %s,
-                        task_interval = %s,
-                        api_function = %s,
-                        api_service_name = %s,
-                        api_loop_type = %s,
-                        api_post_processing = %s,
-                        python_function = %s
-                    WHERE task_name = %s;
-                """
-
-            # edited_rows is a dict where keys are row indices
-            for row_idx, changes in edited_rows.items():
-                # Get the service name from original df
-                task_description = original_df.iloc[row_idx]['task_description']
-                task_priority = original_df.iloc[row_idx]['task_priority']
-                task_frequency = original_df.iloc[row_idx]['task_frequency']
-                task_interval = original_df.iloc[row_idx]['task_interval']
-                api_function = original_df.iloc[row_idx]['api_function']
-                api_service_name = original_df.iloc[row_idx]['api_service_name']
-                api_loop_type = original_df.iloc[row_idx]['api_loop_type']
-                api_post_processing = original_df.iloc[row_idx]['api_post_processing']
-                python_function = original_df.iloc[row_idx]['python_function']
-                task_name = original_df.iloc[row_idx]['task_name']
-
-                params = (task_description, task_priority, task_frequency,
-                          task_interval,
-                          api_function,
-                          api_service_name,
-                          api_loop_type,
-                          api_post_processing,
-                          python_function,
-                          task_name)
-                qec(update_sql, params)
-
-            log_app_event(
-                cat="Admin",
-                desc=f"Task Updates: {len(edited_rows)} rows changed",
-                exec_time=elapsed_ms(t0)
-            )
-            #Regen Dataframe
-            ss.existing_tasks_df = pd.read_sql('SELECT * FROM tasks.task_config', get_conn(alchemy=True))
-        return
-    else:
-        st.info("Did nothing with the task changes")
-        time.sleep(3)
-
-
 
 def render_password_submodule():
     st.subheader("API Credential Management")
@@ -321,7 +169,7 @@ def render_task_submodule():
     st.write("__Task Configuration__")
     t0 = None
     if "existing tasks" not in ss:
-        ss.existing_tasks_df = pd.read_sql('SELECT * FROM tasks.task_config', get_conn(alchemy=True))
+        ss.existing_tasks_df = pd.read_sql('SELECT * FROM tasks.vw_task_execution', get_conn(alchemy=True))
 
     # Display the header information
 
@@ -423,6 +271,7 @@ def render_task_submodule():
 
     # Display the task scheduling table
     st.write("__Task Scheduling__")
+
     sched_col_config = set_keys_to_none(parent_col_config, ['task_name',
                                                            'task_frequency',
                                                            'task_interval',

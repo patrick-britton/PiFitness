@@ -47,11 +47,25 @@ def task_executioner(force_task_name=None, force_task=False):
 
         # Execute the prescribed function (e.g. database cleanup)
         if task.get("api_function") is None:
-            local_function_str = task.get("python_function")
-            module_name, svc_function_name = local_function_str.rsplit('.', 1)
-            module = importlib.import_module(module_name)
-            local_function = getattr(module, svc_function_name)
-            local_function()
+            pf_t0 = start_timer()
+            try:
+                local_function_str = task.get("python_function")
+                module_name, svc_function_name = local_function_str.rsplit('.', 1)
+                module = importlib.import_module(module_name)
+                local_function = getattr(module, svc_function_name)
+                local_function()
+                task_log(task.get("task_name"),
+                         e_time=None,
+                         l_time=None,
+                         t_time=elapsed_ms(pf_t0),
+                         fail_type='transform')
+            except Exception as e:
+                task_log(task.get("task_name"),
+                         e_time=None,
+                         l_time=None,
+                         t_time=elapsed_ms(pf_t0),
+                         fail_type='transform',
+                         fail_text=str(e))
             continue
 
         # Extract data from API
