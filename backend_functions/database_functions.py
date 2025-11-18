@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-
+import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 import psycopg2
@@ -135,3 +135,11 @@ def get_log_tables(as_list=False):
         return list(list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys())
     else:
         return list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys()
+
+
+def get_log_data(table_name):
+    sql = f"""SELECT * FROM logging.{table_name} ORDER BY event_time_utc DESC"""
+    df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
+    df["event_time_utc"] = pd.to_datetime(df["event_time_utc"], utc=True)
+    df["event_time_local"] = df["event_time_utc"].dt.tz_convert("America/Los_Angeles")
+    return df
