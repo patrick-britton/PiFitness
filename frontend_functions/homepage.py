@@ -2,27 +2,20 @@ import pandas as pd
 import streamlit as st
 from streamlit import session_state as ss
 
-from backend_functions.database_functions import get_log_tables, get_conn
+from backend_functions.database_functions import get_log_tables, get_conn, get_log_data
 
 
 def render_homepage():
     log_display()
 
 
-def clear_log_cache():
-    # Clear the cached log dataframe when table selection changes.
-    if "log_table_df" in ss:
-        ss.log_table_df = None
-
-
 def log_display():
     if "table_list" not in ss:
         ss.table_list = get_log_tables(as_list=True)
-        st.rerun()
 
     if "table_selection" not in ss:
-        ss.table_selection = ss.table_list[0]
-
+        ss.table_selection = 'task_executions'
+        ss.log_table_df = get_log_data(ss.table_selection)
 
     log_config = {"event_time_utc": None,
                   "event_time_local": st.column_config.DatetimeColumn(label="Time",
@@ -110,18 +103,17 @@ def log_display():
         st.data_editor(ss.log_table_df, hide_index=True,
                        column_config=log_config)
     else:
-        sql = f"""SELECT * FROM logging.{ss.table_selection} ORDER BY event_time_utc DESC"""
-        df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
-        df["event_time_utc"] = pd.to_datetime(df["event_time_utc"], utc=True)
-        df["event_time_local"] = df["event_time_utc"].dt.tz_convert("America/Los_Angeles")
-        ss.log_table_df = df
+        ss.log_table_df = get_log_data(ss.table_selection)
         st.rerun()
 
-
-    ss.table_selection = st.radio(label="Which Log table to display:",
-                                  options=ss.table_list,
-                                  key="home_log_table_selection",
-                                  index=0,
-                                  on_change=clear_log_cache)
+    cols = st.columns(len(ss.table_list))
+    for idx, table in enumerate(ss.table_list):
+        with cols[idx]:
+            button_type = "primary" if table == ss.table_selection else "secondary"
+            if st.button(table, key=f"btn_{table}", type=button_type):
+                if table != ss.table_selection:  # Only reload if different
+                    ss.table_selection = table
+                    ss.log_table_df = get_log_data(ss.table_selection)
+                    st.rerun()
 
 
