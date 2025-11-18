@@ -6,7 +6,7 @@ from backend_functions.database_functions import get_log_tables, get_conn
 
 
 def render_homepage():
-    st.info("Wow, such empty")
+    log_display()
 
 
 def clear_log_cache():
