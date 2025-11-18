@@ -26,8 +26,11 @@ def get_sync_dates(meta_sync_val=None, meta_sync_type=None, max_range_days=7):
         last_sync_date = date.today()
     elif isinstance(meta_sync_val, str):
         last_sync_date = datetime.fromisoformat(meta_sync_val).date()
-    elif isinstance(meta_sync_val, (date, datetime)):
-        last_sync_date = meta_sync_val if isinstance(meta_sync_val, date) else meta_sync_val.date()
+    elif isinstance(meta_sync_val, datetime):
+        # Explicitly handle datetime first (before date check)
+        last_sync_date = meta_sync_val.date()
+    elif isinstance(meta_sync_val, date):
+        last_sync_date = meta_sync_val
     else:
         raise ValueError(f"Cannot interpret meta_sync value: {meta_sync_val}")
 
