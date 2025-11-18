@@ -86,11 +86,15 @@ def task_executioner(force_task_name=None, force_task=False):
                 loop_type = task.get("api_loop_type")
                 if loop_type is None:
                     json_data = getattr(client, task.get("api_function"))()
-                elif loop_type == 'next':
+                elif loop_type == 'Next':
                     json_data = json_next_loop(client, task.get("api_function"))
                 else:
                     date_list = get_sync_dates(task.get("last_success_date"))
-                    json_data = json_date_loop(client, task.get("api_function"), loop_type, date_list)
+                    json_data = json_date_loop(client,
+                                               task.get("api_function"),
+                                               loop_type,
+                                               date_list,
+                                               task.get("api_parameters"))
                 extract_time = elapsed_ms(extract_start)
             except Exception as e:
                 extract_time = elapsed_ms(extract_start)
@@ -166,17 +170,27 @@ def task_log(task_name=None, e_time=None, l_time=None, t_time=None, fail_type=No
     return
 
 
-def json_next_loop(client, function):
+def json_next_loop(client, function, api_parameters=None):
     all_json = []
     # Fetch & loop through API results
     offset = 0
     limit = 50
+    param_list = [param.strip() for param in api_parameters.split(',')]
+
+    # Replace placeholders with actual date values
+    args = []
+    for param in param_list:
+        args.append(param)
+
     while True:
         # Ensure we're being good API Citizens
         if offset != 0:
             time.sleep(1)
 
-        raw_json = getattr(client, function)()
+        if api_parameters:
+            raw_json = getattr(client, function)(*args)
+        else:
+            raw_json = getattr(client, function)()
 
         if  raw_json is None:
             raw_json = {}
@@ -199,16 +213,37 @@ def json_next_loop(client, function):
     return all_json
 
 
-def json_date_loop(client, function, loop_type, date_list):
+def json_date_loop(client, function, loop_type, date_list, api_parameters=None):
 
     all_json = []
     for date_val in date_list:
-        if loop_type == 'date_range':
+        if loop_type == 'Range':
             d1 = date_val[0]
             d2 = date_val[1]
-            raw_json = getattr(client, function)(d1, d2)
         else:
-            raw_json = getattr(client, function)(date_val)
+            d1 = date_val
+            d2 = None
+
+        # Build the arguments list
+        param_list = [param.strip() for param in api_parameters.split(',')]
+        if api_parameters:
+            # Replace placeholders with actual date values
+            args = []
+            for param in param_list:
+                if param == '*D1*':
+                    args.append(d1)
+                elif param == '*D2*':
+                    args.append(d2)
+                else:
+                    # Keep other parameters as-is
+                    args.append(param)
+            raw_json = getattr(client, function)(*args)
+        else:
+            # Fallback to original behavior if no api_parameters specified
+            if loop_type == 'date_range':
+                raw_json = getattr(client, function)(d1, d2)
+            else:
+                raw_json = getattr(client, function)(date_val)
 
         # Append the results
         if isinstance(raw_json, dict):
@@ -240,7 +275,7 @@ def json_loading(json_data, function_name):
         # Single insert - minimal overhead
         cur.execute(
             """
-            INSERT INTO json_staging.api_imports (api_function_name, payload)
+            INSERT INTO staging.api_imports (api_function_name, payload)
             VALUES (%s, %s);
             """,
             values[0],
@@ -250,7 +285,7 @@ def json_loading(json_data, function_name):
         execute_values(
             cur,
             """
-            INSERT INTO json_staging.api_imports (api_function_name, payload)
+            INSERT INTO staging.api_imports (api_function_name, payload)
             VALUES %s;
             """,
             values,
