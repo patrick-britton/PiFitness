@@ -224,6 +224,10 @@ def render_task_submodule():
                                                                       pinned=False,
                                                                       disabled=False,
                                                                       default=None),
+                        "total_attempts": st.column_config.TextColumn(label="Total Attempts",
+                                                                      pinned=False,
+                                                                      disabled=True
+                                                                      ),
                         "execute_task": st.column_config.CheckboxColumn(label="Will execute",
                                                                         disabled=True),
                         "execution_logic": st.column_config.TextColumn(label="Logic used:",
@@ -248,7 +252,7 @@ def render_task_submodule():
                                                                               max_value=24),
                          "last_success_date": st.column_config.DatetimeColumn(label="Last Success",
                                                                               disabled=True),
-                         "next_execution": st.column_config.DatetimeColumn(label="Next Scheduled for:",
+                         "next_execution_date": st.column_config.DatetimeColumn(label="Next Scheduled for:",
                                                                               disabled=True)
                          }
     task_col_config = set_keys_to_none(parent_col_config, ['task_name',
@@ -275,11 +279,13 @@ def render_task_submodule():
     sched_col_config = set_keys_to_none(parent_col_config, ['task_name',
                                                            'task_frequency',
                                                            'task_interval',
-                                                           'next_execution',
+                                                            'last_success_date',
+                                                           'next_execution_date',
                                                            'execute_task',
                                                            'success_delta_h',
                                                            'failure_delta_h',
-                                                           'execution_delta_h'])
+                                                           'execution_delta_h',
+                                                            'total_attempts'])
     task_schedule_config_key = 'admin_schedule_config'
     st.data_editor(ss.existing_tasks_df,
                     hide_index=True,
