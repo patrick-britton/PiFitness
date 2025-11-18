@@ -77,6 +77,7 @@ def task_executioner(force_task_name=None, force_task=False):
             extract_start = start_timer()
             raw_api_function = task.get("api_service_function")
             try:
+                # Establish the client
                 module_name, svc_function_name = raw_api_function .rsplit('.', 1)
                 module = importlib.import_module(module_name)
                 svc_function = getattr(module, svc_function_name)

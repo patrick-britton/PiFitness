@@ -194,6 +194,9 @@ def render_task_submodule():
                                                                           disabled=False,
                                                                           options=ss.sproc_list,
                                                                           default=None),
+                        'api_parameters': st.column_config.TextColumn(label='API Parameters',
+                                                                      pinned=False,
+                                                                      disabled=False),
                         "python_function": st.column_config.TextColumn(label="Python Function",
                                                                      pinned=False,
                                                                      disabled=False,
@@ -240,6 +243,7 @@ def render_task_submodule():
                                                            'api_service_name',
                                                            'api_loop_type',
                                                            'api_post_processing',
+                                                           'api_parameters',
                                                            'python_function',
                                                            'last_calendar_field'])
     task_config_key = 'admin_task_config'
