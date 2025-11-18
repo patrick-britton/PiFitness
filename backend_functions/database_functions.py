@@ -65,6 +65,8 @@ def qec(t_sql=None, p=None):
         conn.close()
     except Exception as e:
         print(f"Query Execution failure: {e}")
+        print(f"Failing SQL: {t_sql}")
+        print(f"Failing Params: {p}")
 
 
     return
