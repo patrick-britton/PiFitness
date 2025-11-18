@@ -58,8 +58,8 @@ def render_service_submodule():
     # Read in any existing services
     st.subheader("API Service Management")
     t0 = None
-    df = pd.read_sql('SELECT * FROM api_services.api_service_list', get_conn(alchemy=True))
-    if not df.empty:
+    ss.service_df = pd.read_sql('SELECT * FROM api_services.api_service_list', get_conn(alchemy=True))
+    if not ss.service_df.empty:
         col_config = {"api_service_name": st.column_config.TextColumn(label="Service",
                                                                       pinned=True, disabled=True),
                       "api_service_function": st.column_config.TextColumn(label="Login Functions",
@@ -69,37 +69,15 @@ def render_service_submodule():
                                                                                  pinned=False,
                                                                                  disabled=False)}
         st.write("Known Services")
-        st.data_editor(df,
+        st.data_editor(ss.service_df,
                         hide_index=True,
                         column_config=col_config,
                         key = "service_editor",
-                        on_change = handle_service_changes,
-                        args = (df,)
+                       on_change=reconcile_with_postgres,
+                       args=('service_df', "service_editor", 'api_services.api_service_list', 'api_service_name', col_config)
         )
 
-    if st.button(":material/add: Add New Service"):
-        ss.admin_service_add = True
 
-    if "admin_service_add" in ss and ss.admin_service_add:
-        ss.new_service_name = st.text_input(label="Name:")
-        ss.new_service_functions = st.text_input(label="Login Functions",
-                                              placeholder="comma separated list")
-        ss.new_credential_requirements = st.text_input(label="Credential Requirements",
-                                              placeholder="comma separated list")
-        if st.button(":material/save: Submit"):
-            ss.new_service_submission = True
-            t0 = start_timer()
-
-    if "new_service_submission" in ss and ss.new_service_submission:
-        insert_sql = """INSERT INTO api_services.api_service_list (api_service_name, 
-                       api_service_function, api_credential_requirements)
-                       VALUES (%s, %s, %s);"""
-        params = (ss.new_service_name, ss.new_service_functions.lower(), ss.new_credential_requirements.lower())
-        qec(insert_sql, params)
-        log_app_event(cat="Admin", desc=f"New Service Creation: {ss.new_service_name}", exec_time=elapsed_ms(t0))
-        ss.new_service_submission = False
-        ss.admin_service_add = False
-        st.rerun()
 
 
 
