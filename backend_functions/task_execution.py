@@ -57,8 +57,7 @@ def task_executioner(force_task_name=None, force_task=False):
                 task_log(task.get("task_name"),
                          e_time=None,
                          l_time=None,
-                         t_time=elapsed_ms(pf_t0),
-                         fail_type='transform')
+                         t_time=elapsed_ms(pf_t0))
             except Exception as e:
                 task_log(task.get("task_name"),
                          e_time=None,
