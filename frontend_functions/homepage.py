@@ -107,7 +107,7 @@ def log_display():
                                                             disabled=True)}
 
     if "log_table_df" in ss and ss.log_table_df is not None:
-        st.data_editor(df=ss.log_table_df, hide_index=True,
+        st.data_editor(ss.log_table_df, hide_index=True,
                        column_config=log_config)
     else:
         sql = f"""SELECT * FROM logging.{ss.table_selection} ORDER BY event_time_utc DESC"""
