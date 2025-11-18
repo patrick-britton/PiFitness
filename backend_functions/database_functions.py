@@ -120,7 +120,7 @@ def get_sproc_list(append_option=None):
 
 
 
-def get_log_tables():
+def get_log_tables(as_list=False):
     logging_sql = """SELECT c.relname as table_name
                     FROM pg_catalog.pg_class c
                     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -131,5 +131,7 @@ def get_log_tables():
                         AND c.relkind = 'r'     -- only real tables
                     ORDER BY 
                         c.relname;"""
-
-    return list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys()
+    if as_list:
+        return list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys().list()
+    else:
+        return list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys()

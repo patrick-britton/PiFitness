@@ -17,7 +17,7 @@ def clear_log_cache():
 
 def log_display():
     if "table_list" not in ss:
-        ss.table_list = get_log_tables()
+        ss.table_list = get_log_tables(as_list=True)
         st.rerun()
 
     if "table_selection" not in ss:
