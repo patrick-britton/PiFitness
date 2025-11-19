@@ -101,7 +101,7 @@ def task_executioner(force_task_name=None, force_task=False):
                 elif loop_type == 'Next':
                     json_data = json_next_loop(client, task.get("api_function"))
                 else:
-                    date_list = get_sync_dates(task.get("last_success_date"), loop_type)
+                    date_list = get_sync_dates(task.get("sync_from_date"), loop_type)
                     json_data = json_date_loop(client,
                                                task.get("api_function"),
                                                loop_type,
@@ -139,7 +139,6 @@ def task_executioner(force_task_name=None, force_task=False):
 
             t_start = start_timer()
             sproc = task.get('api_post_processing')
-            print(sproc)
             if sproc is None:
                 t_time = elapsed_ms(t_start)
                 task_log(task.get("task_name"),
@@ -176,7 +175,7 @@ def task_executioner(force_task_name=None, force_task=False):
             if loop_type in ('Day', 'Range'):
                 cal_col = task.get("last_calendar_field")
                 if cal_col:
-                    pg_schema_table, pg_field_name = raw_api_function.rsplit('.', 1)
+                    pg_schema_table, pg_field_name = cal_col.rsplit('.', 1)
                     update_sql = f"""UPDATE tasks.task_config
                                 SET updated_through_date = (SELECT MAX({pg_field_name}) FROM {pg_schema_table}) 
                                 WHERE task_name = '{task_name}';"""
