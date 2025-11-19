@@ -173,7 +173,7 @@ def task_executioner(force_task_name=None, force_task=False):
             #############################################################
             # UPDATE CALENDAR DATE
             ############################################################
-            if loop_type in ('Date', 'Range'):
+            if loop_type in ('Day', 'Range'):
                 cal_col = task.get("last_calendar_field")
                 if cal_col:
                     pg_schema_table, pg_field_name = raw_api_function.rsplit('.', 1)
