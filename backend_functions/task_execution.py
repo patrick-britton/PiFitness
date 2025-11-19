@@ -1,12 +1,15 @@
 import json
 import time
 import importlib
-
+from datetime import date
 from psycopg2.extras import execute_values
 
 from backend_functions.database_functions import sql_to_dict, qec, con_cur
 from backend_functions.helper_functions import get_sync_dates
 from backend_functions.logging_functions import start_timer, log_app_event, elapsed_ms
+
+
+
 
 
 def task_executioner(force_task_name=None, force_task=False):
@@ -20,7 +23,12 @@ def task_executioner(force_task_name=None, force_task=False):
     timing_ctr = 0
     execution_ctr = 0
     for task in task_dict:
+        ####################################
+        # DETERMINE IF A RUN SHOULD BE MADE
+        ###################################
         task_name = task.get('task_name')
+        if force_task and force_task_name is not None and force_task_name != task_name:
+            continue
 
         if force_task and task_name == force_task_name:
             execution_type = 'forced'
@@ -49,8 +57,9 @@ def task_executioner(force_task_name=None, force_task=False):
         if execution_type == 'timing' and not task.get("execute_task"):
             timing_ctr += 1
             continue
-
+        ############################################################
         # Execute the prescribed function (e.g. database cleanup)
+        ############################################################
         if task.get("api_function") is None:
             pf_t0 = start_timer()
             try:
@@ -76,6 +85,9 @@ def task_executioner(force_task_name=None, force_task=False):
         else:
             extract_start = start_timer()
             raw_api_function = task.get("api_service_function")
+            ############################################################
+            # EXTRACT DATA FROM API
+            ############################################################
             try:
                 # Establish the client
                 module_name, svc_function_name = raw_api_function .rsplit('.', 1)
@@ -103,6 +115,10 @@ def task_executioner(force_task_name=None, force_task=False):
                 continue
             print(f"Extract: {extract_time}")
             # load the data to postgres
+
+            ############################################################
+            # LOAD JSON TO POSTGRES
+            ############################################################
             load_start = start_timer()
             try:
                 json_loading(json_data, task.get("api_function"))
@@ -116,7 +132,11 @@ def task_executioner(force_task_name=None, force_task=False):
                 failure_ctr += 1
                 continue
             print(f"Extract: {extract_time}, Load Time: {load_time}")
-            # Transform the data, if necessary
+
+            ############################################################
+            # TRANSFORM DATA IN POSTGRES
+            ############################################################
+
             t_start = start_timer()
             sproc = task.get('api_post_processing')
             print(sproc)
@@ -149,6 +169,26 @@ def task_executioner(force_task_name=None, force_task=False):
                     continue
 
             print(f"Extract: {extract_time}, Load Time: {load_time}, Transform: {t_time}")
+
+            #############################################################
+            # UPDATE CALENDAR DATE
+            ############################################################
+            if loop_type in ('Date', 'Range'):
+                cal_col = task.get("last_calendar_field")
+                if cal_col:
+                    pg_schema_table, pg_field_name = raw_api_function.rsplit('.', 1)
+                    update_sql = f"""UPDATE tasks.task_config
+                                SET updated_through_date = (SELECT MAX({pg_field_name}) FROM {pg_schema_table}) 
+                                WHERE task_name = {task_name};"""
+                    qec(update_sql)
+            else:
+                today = date.today()
+                update_sql = f"""UPDATE tasks.task_config
+                            SET updated_through_date = %s 
+                            WHERE task_name = %s;"""
+                params = (today, task_name)
+                qec(update_sql, params)
+
 
     all_task_time = elapsed_ms(all_task_start)
     msg = f"Attempts: E: {execution_ctr} F: {failure_ctr} || Skips: T: {timing_ctr} R: {recency_ctr}  "
