@@ -149,7 +149,7 @@ def task_executioner(force_task_name=None, force_task=False):
                 execution_ctr += 1
             else:
                 try:
-                    call_sql = f"CALL {sproc}();"
+                    call_sql = f"CALL staging.{sproc}();"
                     qec(call_sql)
                     t_time = elapsed_ms(t_start)
                     task_log(task.get("task_name"),
@@ -179,7 +179,7 @@ def task_executioner(force_task_name=None, force_task=False):
                     pg_schema_table, pg_field_name = raw_api_function.rsplit('.', 1)
                     update_sql = f"""UPDATE tasks.task_config
                                 SET updated_through_date = (SELECT MAX({pg_field_name}) FROM {pg_schema_table}) 
-                                WHERE task_name = {task_name};"""
+                                WHERE task_name = '{task_name}';"""
                     qec(update_sql)
             else:
                 today = date.today()
