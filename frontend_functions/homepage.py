@@ -72,7 +72,7 @@ def log_display():
                                                                      min_value=0,
                                                                      format='%d',
                                                                      pinned=False),
-                  "Transform": st.column_config.ProgressColumn(label="Transform/Execute",
+                  "transform_time_ms": st.column_config.ProgressColumn(label="Transform/Execute",
                                                                      min_value=0,
                                                                      format='%d',
                                                                      pinned=False),
