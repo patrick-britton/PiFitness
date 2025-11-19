@@ -19,7 +19,7 @@ def list_to_dict_by_key(list_of_dicts, primary_key):
 def get_sync_dates(meta_sync_val=None, meta_sync_type=None, max_range_days=7):
     # returns either a list of dates or a list of date pairs.
 
-    is_range = meta_sync_type == 'date_range'
+    is_range = meta_sync_type == 'Range'
 
     # Convert meta_sync to a date object
     if meta_sync_val is None:
