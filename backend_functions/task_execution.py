@@ -54,7 +54,7 @@ def task_executioner(force_task_name=None, force_task=False):
             continue
 
         # SKip tasks that fail for scheduling reasons
-        if execution_type == 'timing' and not task.get("execute_task"):
+        if execution_type == 'timing' and not task.get("do_execute"):
             timing_ctr += 1
             continue
         ############################################################
@@ -101,7 +101,7 @@ def task_executioner(force_task_name=None, force_task=False):
                 elif loop_type == 'Next':
                     json_data = json_next_loop(client, task.get("api_function"))
                 else:
-                    date_list = get_sync_dates(task.get("sync_from_date"), loop_type)
+                    date_list = get_sync_dates(task.get("updated_through_utc"), loop_type)
                     json_data = json_date_loop(client,
                                                task.get("api_function"),
                                                loop_type,
