@@ -256,6 +256,9 @@ def json_date_loop(client, function, loop_type, date_list, api_parameters=None):
 
     all_json = []
     for date_val in date_list:
+        if date_val != date_list[0]:
+            time.sleep(2)
+
         if loop_type == 'Range':
             d1 = date_val[0]
             d2 = date_val[1]
