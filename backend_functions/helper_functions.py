@@ -54,6 +54,11 @@ def get_sync_dates(meta_sync_val=None, meta_sync_type=None, max_range_days=7):
             dates.append((curr_start.strftime('%Y-%m-%d'), curr_end.strftime('%Y-%m-%d')))
             curr_start = curr_end + timedelta(days=1)
 
+
+    if meta_sync_type=='Day':
+        dates = dates[:28]
+    else:
+        dates = dates[:4]
     return dates
 
 
