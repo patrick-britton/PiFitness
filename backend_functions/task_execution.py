@@ -89,7 +89,7 @@ def task_executioner(force_task_name=None, force_task=False):
                 elif loop_type == 'Next':
                     json_data = json_next_loop(client, task.get("api_function"))
                 else:
-                    date_list = get_sync_dates(task.get("last_success_date"))
+                    date_list = get_sync_dates(task.get("last_success_date"), loop_type)
                     json_data = json_date_loop(client,
                                                task.get("api_function"),
                                                loop_type,
