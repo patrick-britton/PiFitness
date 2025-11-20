@@ -177,11 +177,15 @@ def task_executioner(force_task_name=None, force_task=False):
             if loop_type in ('Day', 'Range'):
                 cal_col = task.get("last_calendar_field")
                 if cal_col:
+                    print(f"Sending Updated value to task.config")
+                    print(f"Range Used: {date_list}")
                     pg_schema_table, pg_field_name = cal_col.rsplit('.', 1)
                     update_sql = f"""UPDATE tasks.task_config
                                 SET updated_through_date = (SELECT MAX({pg_field_name}) FROM {pg_schema_table}) 
                                 WHERE task_name = '{task_name}';"""
                     qec(update_sql)
+                    print(update_sql)
+                    print("Update Complete")
             else:
                 today = date.today()
                 update_sql = f"""UPDATE tasks.task_config
