@@ -219,6 +219,8 @@ def render_task_submodule():
                             min_value=0,
                             max_value=int(ss.existing_tasks_df['total_attempts'].max()) if not ss.existing_tasks_df.empty and pd.notna(ss.existing_tasks_df['total_attempts'].max()) else 100
                         ),
+                         "data_requires_catchup": st.column_config.CheckboxColumn(label="Will execute",
+                                                                       disabled=True),
                         "do_execute": st.column_config.CheckboxColumn(label="Will execute",
                                                                         disabled=True),
                         "execution_logic": st.column_config.TextColumn(label="Logic used:",
@@ -261,8 +263,8 @@ def render_task_submodule():
                                                             'task_priority',
                                                            'task_frequency',
                                                            'task_interval',
-                                                            'earliest_execution_utc',
                                                            'next_execution_utc',
+                                                            'data_requires_catchup',
                                                            'do_execute',
                                                             'updated_through_utc',
                                                             'total_attempts'])
