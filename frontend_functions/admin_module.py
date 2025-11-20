@@ -281,11 +281,23 @@ def render_task_submodule():
     st.divider()
     st.write("Force Task Execution")
     task_list = ss.existing_tasks_df['task_name'].to_list()
-    cols = st.columns(len(task_list))
-    for idx, task in enumerate(task_list):
-        with cols[idx]:
-            if st.button(task, key=f"btn_{task}", type='secondary'):
-                task_executioner(force_task_name=task, force_task=True)
-                st.rerun()
+    # Sort the task list
+    sorted_tasks = sorted(task_list)
+
+    # Create rows with maximum 5 columns each
+    max_cols = 5
+    for row_start in range(0, len(sorted_tasks), max_cols):
+        # Get tasks for this row (up to 5)
+        row_tasks = sorted_tasks[row_start:row_start + max_cols]
+
+        # Create columns for this row
+        cols = st.columns(len(row_tasks))
+
+        # Add buttons to columns
+        for idx, task in enumerate(row_tasks):
+            with cols[idx]:
+                if st.button(task, key=f"btn_{task}", type='secondary'):
+                    task_executioner(force_task_name=task, force_task=True)
+                    st.rerun()
 
 
