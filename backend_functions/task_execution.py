@@ -72,6 +72,7 @@ def task_executioner(force_task_name=None, force_task=False):
                          e_time=None,
                          l_time=None,
                          t_time=elapsed_ms(pf_t0))
+                execution_ctr += 1
             except Exception as e:
                 task_log(task.get("task_name"),
                          e_time=None,
@@ -79,6 +80,7 @@ def task_executioner(force_task_name=None, force_task=False):
                          t_time=elapsed_ms(pf_t0),
                          fail_type='transform',
                          fail_text=str(e))
+                failure_ctr += 1
             continue
 
         # Extract data from API
