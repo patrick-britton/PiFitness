@@ -212,11 +212,12 @@ def render_task_submodule():
                                                                       pinned=False,
                                                                       disabled=False,
                                                                       default=None),
-                        "total_attempts": st.column_config.ProgressColumn(label="Total Attempts",
-                                                      pinned=False,
-                                                      min_value=0,
-                                                      max_value=max(ss.existing_tasks_df['total_attempts'].max(), 1)
-                                                                      ),
+                        "total_attempts": st.column_config.ProgressColumn(
+                            label="Total Attempts",
+                            pinned=False,
+                            min_value=0,
+                            max_value=int(ss.existing_tasks_df['total_attempts'].max()) if not ss.existing_tasks_df.empty and pd.notna(ss.existing_tasks_df['total_attempts'].max()) else 100
+                        ),
                         "do_execute": st.column_config.CheckboxColumn(label="Will execute",
                                                                         disabled=True),
                         "execution_logic": st.column_config.TextColumn(label="Logic used:",
