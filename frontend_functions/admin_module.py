@@ -215,6 +215,7 @@ def render_task_submodule():
                         "total_attempts": st.column_config.ProgressColumn(
                             label="Total Attempts",
                             pinned=False,
+                            format='%d',
                             min_value=0,
                             max_value=int(ss.existing_tasks_df['total_attempts'].max()) if not ss.existing_tasks_df.empty and pd.notna(ss.existing_tasks_df['total_attempts'].max()) else 100
                         ),
