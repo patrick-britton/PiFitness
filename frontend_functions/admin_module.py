@@ -213,9 +213,9 @@ def render_task_submodule():
                                                                       disabled=False,
                                                                       default=None),
                         "total_attempts": st.column_config.ProgressColumn(label="Total Attempts",
-                                                                      pinned=False,
-                                                                      min_value=0,
-                                                                      max_value=ss.existing_tasks_df['total_attempts'].max()
+                                                      pinned=False,
+                                                      min_value=0,
+                                                      max_value=max(ss.existing_tasks_df['total_attempts'].max(), 1)
                                                                       ),
                         "do_execute": st.column_config.CheckboxColumn(label="Will execute",
                                                                         disabled=True),
