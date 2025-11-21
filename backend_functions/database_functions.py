@@ -143,3 +143,8 @@ def get_log_data(table_name):
     df["event_time_utc"] = pd.to_datetime(df["event_time_utc"], utc=True)
     df["event_time_local"] = df["event_time_utc"].dt.tz_convert("America/Los_Angeles")
     return df
+
+
+def get_table_row_count(pg_schema, pg_table):
+    q_sql = f"""SELECT COUNT(*) FROM {pg_schema}.{pg_table};"""
+    return one_sql_result(q_sql)

@@ -58,7 +58,7 @@ def get_sync_dates(meta_sync_val=None, meta_sync_type=None, max_range_days=7):
     if meta_sync_type=='Day':
         dates = dates[:28]
     else:
-        dates = dates[:4]
+        dates = dates[:21]
     return dates
 
 
@@ -75,6 +75,20 @@ def set_keys_to_none(d, key_list):
         if key not in new_dict:
             new_dict[key] = None
     return new_dict
+
+
+def get_last_date(date_list):
+    if not date_list:
+        return None  # or raise an error
+
+    last_item = date_list[-1]
+
+    # Case 1: last item is a pair/tuple/list → return second element
+    if isinstance(last_item, (tuple, list)) and len(last_item) >= 2:
+        return last_item[-1]
+
+    # Case 2: last item is a single date value
+    return last_item
 
 
 

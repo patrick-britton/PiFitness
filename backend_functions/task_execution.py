@@ -4,8 +4,8 @@ import importlib
 from datetime import date
 from psycopg2.extras import execute_values
 
-from backend_functions.database_functions import sql_to_dict, qec, con_cur
-from backend_functions.helper_functions import get_sync_dates
+from backend_functions.database_functions import sql_to_dict, qec, con_cur, get_table_row_count
+from backend_functions.helper_functions import get_sync_dates, get_last_date
 from backend_functions.logging_functions import start_timer, log_app_event, elapsed_ms
 
 
@@ -103,6 +103,14 @@ def task_executioner(force_task_name=None, force_task=False):
                 elif loop_type == 'Next':
                     json_data = json_next_loop(client, task.get("api_function"))
                 else:
+                    cal_col = task.get("last_calendar_field")
+                    if cal_col:
+                        pg_schema_table, pg_field_name = cal_col.rsplit('.', 1)
+                        pg_schema_name, pg_table_name = pg_schema_table.rsplit('.', 1)
+                        rc_before = get_table_row_count(pg_schema_name, pg_table_name)
+                    else:
+                        rc_before = 0
+
                     date_list = get_sync_dates(task.get("updated_through_utc"), loop_type)
                     json_data = json_date_loop(client,
                                                task.get("api_function"),
@@ -180,11 +188,23 @@ def task_executioner(force_task_name=None, force_task=False):
                     print(f"Sending Updated value to task.config")
                     print(f"Range Used: {date_list}")
                     pg_schema_table, pg_field_name = cal_col.rsplit('.', 1)
-                    update_sql = f"""UPDATE tasks.task_config
-                                SET updated_through_date = (SELECT MAX({pg_field_name}) FROM {pg_schema_table}) 
-                                WHERE task_name = '{task_name}';"""
-                    qec(update_sql)
-                    print(update_sql)
+                    pg_schema_name, pg_table_name = pg_schema_table.rsplit('.', 1)
+                    rc_after = get_table_row_count(pg_schema_name, pg_table_name)
+                    if rc_after > rc_before:
+                        print(f"Row Delta {rc_after-rc_before} : {rc_before}-->{rc_after}")
+                        update_sql = f"""UPDATE tasks.task_config
+                                    SET updated_through_date = (SELECT MAX({pg_field_name}) FROM {pg_schema_table}) 
+                                    WHERE task_name = '{task_name}';"""
+                        qec(update_sql)
+                        print(update_sql)
+                    else:
+                        print(f"Row Delta {rc_after - rc_before} : {rc_before}-->{rc_after}")
+                        through_date = get_last_date(date_list)
+                        update_sql = f"""UPDATE tasks.task_config 
+                                    SET updated_through_date = %s::DATE 
+                                    WHERE task_name = %s"""
+                        params = (through_date, task_name)
+                        qec(update_sql, params)
                     print("Update Complete")
             else:
                 today = date.today()
@@ -285,6 +305,7 @@ def json_date_loop(client, function, loop_type, date_list, api_parameters=None):
                 else:
                     # Keep other parameters as-is
                     args.append(param)
+            print(args)
             raw_json = getattr(client, function)(*args)
         else:
             # Fallback to original behavior if no api_parameters specified
