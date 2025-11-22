@@ -140,10 +140,8 @@ def get_log_tables(as_list=False):
 
 
 def get_log_data(table_name):
-    sql = f"""SELECT * FROM logging.{table_name} ORDER BY event_time_utc DESC"""
+    sql = f"""SELECT *, time_ago(event_time_utc) as event_age FROM logging.{table_name} ORDER BY event_time_utc DESC"""
     df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
-    df["event_time_utc"] = pd.to_datetime(df["event_time_utc"], utc=True)
-    df["event_time_local"] = df["event_time_utc"].dt.tz_convert("America/Los_Angeles")
     return df
 
 
