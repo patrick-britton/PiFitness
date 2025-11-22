@@ -19,7 +19,9 @@ def log_display():
         df = get_log_data(ss.table_selection)
         ss.log_table_df = add_time_ago_column(df, 'event_time_utc', 'time_ago')
 
-    log_config = {"event_time_utc": None,
+    log_config = {"event_time_utc": st.column_config.DatetimeColumn(label='Time',
+                                                                    disabled=True,
+                                                                    pinned=True),
                   "event_time_local": None,
                   "time_ago": st.column_config.TextColumn(label=':material/clock:',
                                                           pinned=True,
