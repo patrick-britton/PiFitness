@@ -101,7 +101,11 @@ def backup_database(keep=7):
 
     for var in ["PG_BACKUP_LOCATION", "PG_HOST", "PG_PORT", "PG_DB", "PG_USER", "PG_PASSWORD"]:
         if os.getenv(var) is None:
-            raise ValueError(f"Missing required environment variable: {var}")
+            if var == 'PG_BACKUP_LOCATION':
+                print('skipping backup, being run locally')
+                return None
+            else:
+                raise ValueError(f"Missing required environment variable: {var}")
 
 
     backup_dir = Path(os.getenv("PG_BACKUP_LOCATION"))
