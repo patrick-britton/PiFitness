@@ -74,6 +74,8 @@ def task_executioner(force_task_name=None, force_task=False):
                          l_time=None,
                          t_time=elapsed_ms(pf_t0))
                 execution_ctr += 1
+
+                update_task_through_date(task_name)
                 print(f"Logging Success fpr {task_name}")
             except Exception as e:
                 print(f"Logging Failure for {task_name}: {e}")
@@ -84,7 +86,7 @@ def task_executioner(force_task_name=None, force_task=False):
                          fail_type='transform',
                          fail_text=str(e))
                 failure_ctr += 1
-            continue
+
 
         # Extract data from API
         else:
@@ -210,12 +212,8 @@ def task_executioner(force_task_name=None, force_task=False):
                         qec(update_sql, params)
                     print("Update Complete")
             else:
-                today = date.today()
-                update_sql = f"""UPDATE tasks.task_config
-                            SET updated_through_date = %s 
-                            WHERE task_name = %s;"""
-                params = (today, task_name)
-                qec(update_sql, params)
+                # non-range task, update task with today
+                update_task_through_date(task_name)
 
 
     all_task_time = elapsed_ms(all_task_start)
@@ -399,3 +397,13 @@ def reset_and_reload():
         print(f"Deleting from: {stg_table}")
         del_sql = f"TRUNCATE staging.{stg_table}"
         qec(del_sql)
+
+
+def update_task_through_date(task_name):
+    today = date.today()
+    update_sql = f"""UPDATE tasks.task_config
+                                SET updated_through_date = %s 
+                                WHERE task_name = %s;"""
+    params = (today, task_name)
+    qec(update_sql, params)
+    return
