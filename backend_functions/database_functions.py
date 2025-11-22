@@ -51,12 +51,14 @@ def con_cur():
     return c, cr
 
 
-def qec(t_sql=None, p=None):
+def qec(t_sql=None, p=None, auto_commit=False):
     # takes in sql, connects, executes, commits, and closes
     if not t_sql:
         return
     try:
         conn, cur = con_cur()
+        if auto_commit:
+            conn.autocommit = True
         if p is None:
             cur.execute(t_sql)
         else:

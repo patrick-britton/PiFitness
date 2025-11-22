@@ -164,7 +164,7 @@ def task_executioner(force_task_name=None, force_task=False):
             else:
                 try:
                     call_sql = f"CALL staging.{sproc}();"
-                    qec(call_sql)
+                    qec(call_sql, auto_commit=True)
                     t_time = elapsed_ms(t_start)
                     task_log(task.get("task_name"),
                          e_time=extract_time,
@@ -327,6 +327,7 @@ def json_date_loop(client, function, loop_type, date_list, api_parameters=None):
 
 
 def json_loading(json_data, function_name):
+
     if isinstance(json_data, dict):
         json_data = [json_data]
 

@@ -56,7 +56,7 @@ def get_sync_dates(meta_sync_val=None, meta_sync_type=None, max_range_days=7):
 
 
     if meta_sync_type=='Day':
-        dates = dates[:7]
+        dates = dates[:21]
     else:
         dates = dates[:7]
     return dates
@@ -90,5 +90,21 @@ def get_last_date(date_list):
     # Case 2: last item is a single date value
     return last_item
 
+
+def col_value(df, col, return_type):
+    # returns the specified values of a column if it exists in the dataframe
+    defaults = {'min': 0,
+                'max': 1,
+                }
+
+    if col not in df.columns:
+        return defaults.get("return_type")
+
+    if return_type=='min':
+        return df[col].min()
+    elif return_type == 'max':
+        return df[col].max()
+    else:
+        return 0
 
 
