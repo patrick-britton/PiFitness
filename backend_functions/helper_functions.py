@@ -1,4 +1,6 @@
 from datetime import date, datetime, timedelta
+import pandas as pd
+import numpy as np
 
 def reverse_key_lookup(d, value):
     # Returns the key value for a dictionary when passed a list item
@@ -93,18 +95,43 @@ def get_last_date(date_list):
 
 def col_value(df, col, return_type):
     # returns the specified values of a column if it exists in the dataframe
-    defaults = {'min': 0,
-                'max': 1,
-                }
+    defaults = {
+        'min': 0,
+        'max': 1,
+    }
 
+    # Check if column exists
     if col not in df.columns:
-        return defaults.get("return_type")
+        return defaults.get(return_type, 0)
 
-    if return_type=='min':
-        return df[col].min()
-    elif return_type == 'max':
-        return df[col].max()
-    else:
-        return 0
+    # Check if column is empty
+    if df[col].empty or len(df[col].dropna()) == 0:
+        return defaults.get(return_type, 0)
+
+    try:
+        if return_type == 'min':
+            value = df[col].min()
+        elif return_type == 'max':
+            value = df[col].max()
+        else:
+            return 0
+
+        # Handle NaN, infinity, and None
+        if pd.isna(value) or np.isinf(value) or value is None:
+            return defaults.get(return_type, 0)
+
+        # Convert to float and round to 2 decimal places
+        value = float(value)
+        value = round(value, 2)
+
+        # Final safety check for JSON serialization
+        if not np.isfinite(value):
+            return defaults.get(return_type, 0)
+
+        return value
+
+    except (ValueError, TypeError, AttributeError):
+        # Catch any conversion errors
+        return defaults.get(return_type, 0)
 
 
