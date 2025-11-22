@@ -56,9 +56,9 @@ def get_sync_dates(meta_sync_val=None, meta_sync_type=None, max_range_days=7):
 
 
     if meta_sync_type=='Day':
-        dates = dates[:28]
+        dates = dates[:7]
     else:
-        dates = dates[:21]
+        dates = dates[:7]
     return dates
 
 

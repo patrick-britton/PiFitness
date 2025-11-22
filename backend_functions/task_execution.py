@@ -63,6 +63,7 @@ def task_executioner(force_task_name=None, force_task=False):
         if task.get("api_function") is None:
             pf_t0 = start_timer()
             try:
+
                 local_function_str = task.get("python_function")
                 module_name, svc_function_name = local_function_str.rsplit('.', 1)
                 module = importlib.import_module(module_name)
@@ -73,7 +74,9 @@ def task_executioner(force_task_name=None, force_task=False):
                          l_time=None,
                          t_time=elapsed_ms(pf_t0))
                 execution_ctr += 1
+                print(f"Logging Success fpr {task_name}")
             except Exception as e:
+                print(f"Logging Failure for {task_name}: {e}")
                 task_log(task.get("task_name"),
                          e_time=None,
                          l_time=None,
@@ -365,3 +368,34 @@ def json_loading(json_data, function_name):
     cur.close()
     conn.close()
     return
+
+
+def reset_and_reload():
+    task_sql = """SELECT DISTINCT task_name FROM tasks.task_config 
+                where task_name != 'Sync Garmin Activities' AND api_function is not NULL"""
+
+    task_list = sql_to_dict(task_sql)
+    for task_dict in task_list:
+        task_name = task_dict.get("task_name")
+        print(task_name)
+        reset_sql = f"""UPDATE tasks.task_config
+        	    SET updated_through_date = '2020-01-01'
+        	    WHERE task_name = '{task_name}';"""
+        qec(reset_sql)
+
+    stg_sql = """SELECT relname AS table_name
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'staging'
+                  AND c.relkind = 'r' 
+                  AND relname != 'stg_activitites'-- ordinary tables
+                ORDER BY relname;
+                        """
+
+    stg_list = sql_to_dict(stg_sql)
+
+    for stg in stg_list:
+        stg_table = stg.get("table_name")
+        print(f"Deleting from: {stg_table}")
+        del_sql = f"TRUNCATE staging.{stg_table}"
+        qec(del_sql)
