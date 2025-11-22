@@ -1,6 +1,7 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 import numpy as np
+
 
 def reverse_key_lookup(d, value):
     # Returns the key value for a dictionary when passed a list item
@@ -135,3 +136,49 @@ def col_value(df, col, return_type):
         return defaults.get(return_type, 0)
 
 
+def format_time_ago(timestamp):
+    """Convert timestamp to human-readable time ago format"""
+    if pd.isna(timestamp):
+        return ''
+
+    # Ensure timestamp is timezone-aware UTC
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+    # Calculate difference
+    now = datetime.now(timezone.utc)
+    delta = now - timestamp
+    total_seconds = int(delta.total_seconds())
+
+    # Handle future dates
+    if total_seconds < 0:
+        total_seconds = abs(total_seconds)
+        prefix = '+'
+    else:
+        prefix = ''
+
+    # Calculate appropriate unit
+    if total_seconds < 60:
+        return f"{prefix}{total_seconds}s"
+    elif total_seconds < 120 * 60:  # Less than 120 minutes
+        minutes = total_seconds // 60
+        return f"{prefix}{minutes}m"
+    elif total_seconds < 48 * 3600:  # Less than 48 hours
+        hours = total_seconds // 3600
+        return f"{prefix}{hours}h"
+    elif total_seconds < 30 * 86400:  # Less than 30 days
+        days = total_seconds // 86400
+        return f"{prefix}{days}d"
+    else:  # 30+ days
+        months = total_seconds // (30 * 86400)
+        return f"{prefix}{months}mo"
+
+
+def add_time_ago_column(df, timestamp_col, new_col_name='time_ago'):
+
+    if timestamp_col in df.columns:
+        df[new_col_name] = df[timestamp_col].apply(format_time_ago)
+    else:
+        df[new_col_name] = None
+
+    return df
