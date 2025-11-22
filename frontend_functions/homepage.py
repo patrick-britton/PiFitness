@@ -3,7 +3,7 @@ import streamlit as st
 from streamlit import session_state as ss
 
 from backend_functions.database_functions import get_log_tables, get_conn, get_log_data
-from backend_functions.helper_functions import col_value
+from backend_functions.helper_functions import col_value, add_time_ago_column
 
 
 def render_homepage():
@@ -16,12 +16,15 @@ def log_display():
 
     if "table_selection" not in ss:
         ss.table_selection = 'task_executions'
-        ss.log_table_df = get_log_data(ss.table_selection)
+        df = get_log_data(ss.table_selection)
+        ss.log_table_df = add_time_ago_column(df, 'event_time_utc', 'time_ago')
 
     log_config = {"event_time_utc": None,
-                  "event_time_local": st.column_config.DatetimeColumn(label="Time",
-                                                                      pinned=True,
-                                                                      disabled=True),
+                  "event_time_local": None,
+                  "time_ago": st.column_config.TextColumn(label=':material/clock:',
+                                                          pinned=True,
+                                                          disabled=True,
+                                                          width="small"),
                   "api_service_name": st.column_config.TextColumn(label="API",
                                                                   pinned=False,
                                                                   disabled=True),
