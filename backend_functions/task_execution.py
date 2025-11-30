@@ -105,12 +105,17 @@ def task_executioner(force_task_name=None, force_task=False):
                 client_dict = svc_function(client_dict)
                 client = client_dict.get("client")
                 loop_type = task.get("api_loop_type")
-                if loop_type is None:
+                print(f"DEBUG: Loop type: {loop_type}")
+                if loop_type is None or loop_type == 'N/A':
                     api_params = task.get("api_parameters")
                     curr_ts = int(datetime.now(pytz.UTC).timestamp() * 1000)
-                    args = to_params(api_params, '*CURR_TS*', curr_ts)
+                    args = to_params(param_list=api_params,
+                                     search_val='*CURR_TS*',
+                                     replace_val=curr_ts,
+                                     return_type='dict')
+                    print(f"DEBUG: args: {args}")
                     if args:
-                        json_data = getattr(client, task.get("api_function"))(*args)
+                        json_data = getattr(client, task.get("api_function"))(**args)
                     else:
                         json_data = getattr(client, task.get("api_function"))()
                 elif loop_type == 'Next':
@@ -418,7 +423,7 @@ def update_task_through_date(task_name):
     return
 
 
-def to_params(param_list=None, search_val=None, replace_val=None):
+def to_params(param_list=None, search_val=None, replace_val=None, return_type='list'):
     if isinstance(param_list, list):
         temp_list = param_list
     else:
@@ -431,4 +436,10 @@ def to_params(param_list=None, search_val=None, replace_val=None):
         else:
             rb_list.append(p)
 
-    return rb_list
+    if return_type == 'list':
+        return rb_list
+    elif return_type == 'dict':
+        return dict(p.split("=", 1) for p in rb_list)
+    else:
+        return ", ".join(rb_list)
+
