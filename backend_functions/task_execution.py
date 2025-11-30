@@ -1,7 +1,9 @@
 import json
 import time
 import importlib
-from datetime import date
+from datetime import date, datetime
+
+import pytz
 from psycopg2.extras import execute_values
 
 from backend_functions.database_functions import sql_to_dict, qec, con_cur, get_table_row_count
@@ -104,7 +106,13 @@ def task_executioner(force_task_name=None, force_task=False):
                 client = client_dict.get("client")
                 loop_type = task.get("api_loop_type")
                 if loop_type is None:
-                    json_data = getattr(client, task.get("api_function"))()
+                    api_params = task.get("api_parameters")
+                    curr_ts = int(datetime.now(pytz.UTC).timestamp() * 1000)
+                    args = to_params(api_params, '*CURR_TS*', curr_ts)
+                    if args:
+                        json_data = getattr(client, task.get("api_function"))(*args)
+                    else:
+                        json_data = getattr(client, task.get("api_function"))()
                 elif loop_type == 'Next':
                     json_data = json_next_loop(client, task.get("api_function"))
                 else:
@@ -408,3 +416,19 @@ def update_task_through_date(task_name):
     params = (today, task_name)
     qec(update_sql, params)
     return
+
+
+def to_params(param_list=None, search_val=None, replace_val=None):
+    if isinstance(param_list, list):
+        temp_list = param_list
+    else:
+        temp_list = [param.strip() for param in param_list.split(',')]
+
+    rb_list = []
+    for p in temp_list:
+        if search_val in p:
+            rb_list.append(p.replace(search_val, str(replace_val)))
+        else:
+            rb_list.append(p)
+
+    return rb_list
