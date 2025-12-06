@@ -72,16 +72,19 @@ def get_spotify_client(incoming_token=None):
     if incoming_token is None:
         new_spotify_token = get_spotify_token()
         new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
+        log_api_event('Spotify', 'New Token from none', token_age=0)
         return new_spotify_token
 
     if "token" not in incoming_token or "token_time" not in incoming_token:
         new_spotify_token = get_spotify_token()
         new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
+        log_api_event('Spotify', 'New Token from malformed dictionary', token_age=0)
         return new_spotify_token
 
     if incoming_token.get("client") is None:
         new_spotify_token = get_spotify_token()
         new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
+        log_api_event('Spotify', 'New Token from missing/none client', token_age=0)
         return new_spotify_token
 
 
@@ -91,16 +94,16 @@ def get_spotify_client(incoming_token=None):
         try:
             cl = incoming_token.get("client")
             cl.current_user()
-            log_api_event('Spotify', 'token age check passed', token_age=token_age)
+            log_api_event('Spotify', 'Token reuse: client still active', token_age=token_age)
             return incoming_token
         except Exception as e:
             # dbf.log_entry(cat="API Login", desc=f"Token invalid @ {round(token_age / 60, 0)}m old.")
             new_spotify_token = get_spotify_token()
             new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
-            log_api_event('Spotify', 'token age check failed', token_age=token_age)
+            log_api_event('Spotify', 'New Token from expired', token_age=token_age)
             return new_spotify_token
     else:
-        log_api_event('Spotify', 'token age check bypassed', token_age=token_age)
+        log_api_event('Spotify', 'Token Reuse, check skipped', token_age=token_age)
         return incoming_token
 
 
@@ -203,13 +206,14 @@ def get_garmin_client(incoming_token=None):
         new_token = {"client": garmin_login(),
                      "token": None,
                      "token_age": time.time()}
-
+        log_api_event('Garmin', 'New Token from none', token_age=0)
         return new_token
 
-    if "client" not in incoming_token or "token_time" not in incoming_token:
+    if "client" not in incoming_token or "token_age" not in incoming_token:
         new_token = {"client": garmin_login(),
                      "token": None,
                      "token_age": time.time()}
+        log_api_event('Garmin', 'New Token from malformed dictionary', token_age=0)
         return new_token
 
     if incoming_token.get("client") is None:
@@ -218,22 +222,22 @@ def get_garmin_client(incoming_token=None):
                      "token_age": time.time()}
         return new_token
 
-    token_age = time.time() - incoming_token["token_time"]
+    token_age = time.time() - incoming_token["token_age"]
     max_age = 300  # seconds
     if token_age > max_age:  # test token validity
         try:
             cl = incoming_token.get("client")
             cl.get_full_name()
-            log_api_event('Garmin', 'token age check passed', token_age=token_age)
+            log_api_event('Garmin', 'Token reuse: check and pass', token_age=token_age)
             return incoming_token
         except Exception as e:
             new_token = {"client": garmin_login(),
                          "token": None,
                          "token_age": time.time()}
-            log_api_event('Garmin', 'token age check failed', token_age=token_age)
+            log_api_event('Garmin', 'New Token from expired', token_age=token_age)
             return new_token
     else:
-        log_api_event('Garmin', 'token age check bypassed', token_age=token_age)
+        log_api_event('Garmin', 'Token reuse: recency skip', token_age=token_age)
         return incoming_token
 
 
