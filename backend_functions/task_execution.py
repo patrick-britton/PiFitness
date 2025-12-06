@@ -40,24 +40,29 @@ def task_executioner(force_task_name=None, force_task=False):
         else:
             execution_type = task.get("execution_logic")
 
+
         # Skip any retired/inactive tasks
         if execution_type == 'Retired':
+            print(f"Skipping {task_name} : retired")
             continue
 
         # Skip the too-recently-executed tasks
         if execution_type == 'recency':
             recency_ctr += 1
+            print(f"Skipping {task_name} : Recency")
             continue
 
         # Skip tasks with too many consecutive failures
         if execution_type == 'failures':
             log_app_event(cat='Task Failure', desc=task_name, err='Skipped due to consecutive Failures')
             failure_ctr += 1
+            print(f"Skipping {task_name} : failures")
             continue
 
         # SKip tasks that fail for scheduling reasons
         if execution_type == 'timing' and not task.get("do_execute"):
             timing_ctr += 1
+            print(f"Skipping {task_name} : scheduling")
             continue
         ############################################################
         # Execute the prescribed function (e.g. database cleanup)
