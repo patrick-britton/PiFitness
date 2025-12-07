@@ -84,7 +84,7 @@ def log_display():
                                                                          max_value=col_value(df=ss.log_table_df,
                                                                                              col="maintenance_time_ms",
                                                                                              return_type='max'),
-                                                                   format='plain',
+                                                                   format='%d',
                                                                    pinned=False),
                   "total_time_ms": st.column_config.ProgressColumn(label='Total Time',
                                                                    min_value=col_value(df=ss.log_table_df,
