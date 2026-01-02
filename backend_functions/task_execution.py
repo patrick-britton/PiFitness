@@ -305,8 +305,11 @@ def json_date_loop(client, function, loop_type, date_list, api_parameters=None):
             time.sleep(2)
 
         if loop_type == 'Range':
-            d1 = date_val[0]
-            d2 = date_val[1]
+            if not isinstance(date_val, (list, tuple)) or len(date_val) != 2:
+                continue
+            d1, d2 = date_val
+            if d1 is None or d2 is None:
+                continue
         else:
             d1 = date_val
             d2 = None
