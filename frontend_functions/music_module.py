@@ -18,7 +18,7 @@ from frontend_functions.nav_buttons import nav_button
 def render_music():
     nav_key = 'music'
     nav_button(nav_key)
-
+    st.subheader("Spotify Controls")
     nav_selection = ss.get(f"{nav_key}_active_decode")
     if not nav_selection:
         nav_selection='now_playing'
