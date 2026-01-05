@@ -14,6 +14,8 @@ def task_execution_chart():
 
     chart_width = 500
     row_height = 5
+    theme = st.get_option("theme.base")
+    pass_color = "white" if theme == "dark" else "black"
     max_etl = df["etl_time_s"].max()
     task_count = df["task_name"].nunique()
     x_min = df["event_time_utc"].min()
@@ -36,14 +38,14 @@ def task_execution_chart():
             color=alt.condition(
                 alt.datum.is_failure,
                 alt.value("red"),
-                alt.value("black"),
+                alt.value(pass_color),
             ),
             row=alt.Row(
                 "task_name:N",
                 header=alt.Header(
                     title=None,
                     labelAngle=0,
-                    labelAlign="right",
+                    labelAlign="left",
                     labelAnchor="end"
                 ),
                 sort=alt.SortField(
