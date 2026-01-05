@@ -8,7 +8,7 @@ from backend_functions.database_functions import get_conn, qec, sync_df_from_dat
 def playlist_config_table():
     sql = """SELECT * FROM music.playlist_config
             ORDER BY seeds_only asc,
-            autoshuffle DESC,
+            auto_shuffle DESC,
             make_recs DESC,
             track_count DESC;"""
 
