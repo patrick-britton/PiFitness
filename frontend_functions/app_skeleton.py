@@ -40,9 +40,11 @@ def render_skeleton():
     else:
         st.error('Uncaught navigation selection')
 
+    ss.qgp = st.experimental_get_query_params()
     debug_var_list = [f"{nav_key}_current",
                       f"{nav_key}_active",
-                      f"{nav_key}_active_decode"
+                      f"{nav_key}_active_decode",
+                      "qgp"
                       ]
     ss_debug(debug_var_list)
     return

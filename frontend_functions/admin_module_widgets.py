@@ -14,7 +14,7 @@ def task_execution_chart():
 
     chart_width = 500
     row_height = 5
-    theme = st.get_option("theme.base")
+    theme = st.context.theme.type
     pass_color = "white" if theme == "dark" else "black"
     max_etl = df["etl_time_s"].max()
     task_count = df["task_name"].nunique()
