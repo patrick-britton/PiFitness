@@ -41,7 +41,7 @@ def nav_dictionary():
 def build_options(d):
     # Builds the button options from the dictionary provided
     opts = []
-    for nav_opt in d:
+    for nav_opt in d.values():
         icon = nav_opt["icon"]
         if not icon:
             continue
