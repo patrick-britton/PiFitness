@@ -102,7 +102,7 @@ def decode_nav(pn):
     nav_dict = d.get(pn)
     btn_selection = ss[f"{pn}_active"]
     icon = btn_selection[10:-1]
-    for n in nav_dict:
+    for n in nav_dict.values():
         if n.get("icon") == icon:
             return n
 
