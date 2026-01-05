@@ -1,8 +1,10 @@
+import numpy as np
 import pandas as pd
 import streamlit as st
 from streamlit import session_state as ss
 
 from backend_functions.database_functions import get_conn, qec, sync_df_from_data_editor
+from backend_functions.helper_functions import convert_to_json_serializable
 
 
 def playlist_config_table():
@@ -13,12 +15,15 @@ def playlist_config_table():
             track_count DESC;"""
 
     ss.pc_df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
+    # Convert entire dataframe to JSON-serializable types
+    ss.pc_df = ss.pc_df.map(convert_to_json_serializable)
+
     if ss.pc_df.empty:
         st.info("Sync playlists to configure")
         return
 
     # set the configuration
-    max_songs = ss.pc_df["track_count"].max()
+    max_songs = int(ss.pc_df["track_count"].max())
 
     cols = ['playlist_name',
             'auto_shuffle',
