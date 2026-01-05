@@ -235,3 +235,10 @@ def _log_changes(pg_table, updated_count, inserted_count, deleted_count, t0):
             desc=f"{pg_table} changes: {', '.join(changes)}",
             exec_time=elapsed_ms(t0)
         )
+
+def ss_debug(ss_var_list=None):
+    if not ss_var_list:
+        return
+
+    for var in ss_var_list:
+        st.write(f"__{var}__ : {ss.get(var)}")
