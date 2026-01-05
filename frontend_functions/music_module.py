@@ -21,6 +21,7 @@ def render_music():
     st.subheader("Spotify Controls")
 
     nav_selection = ss.get(f"{music_nav_key}_active_decode")
+
     if not nav_selection:
         nav_selection='now_playing'
     if nav_selection == 'now_playing':
