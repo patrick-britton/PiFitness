@@ -8,13 +8,21 @@ from frontend_functions.nav_buttons import nav_button
 from frontend_functions.streamlit_helpers import ss_debug
 
 
-
+def init_session():
+    st.set_page_config(layout="wide")
+    if "is_dark_mode" not in ss:
+        ss.is_dark_mode = st.context.theme.type == "dark"
+        device = st.query_params.to_dict().get("device")
+        ss.is_mobile = False
+        if device:
+            ss.is_mobile = device == 'mobile'
+    return
 
 
 def render_skeleton():
-    st.set_page_config(layout="wide")
-    nav_key = 'main'
+    init_session()
 
+    nav_key = 'main'
     nav_button(nav_key)
 
     nav_selection = ss.get(f"{nav_key}_active_decode")
@@ -43,8 +51,7 @@ def render_skeleton():
     ss.qgp = st.query_params.to_dict()
     debug_var_list = [f"{nav_key}_current",
                       f"{nav_key}_active",
-                      f"{nav_key}_active_decode",
-                      "qgp"
+                      f"{nav_key}_active_decode"
                       ]
     ss_debug(debug_var_list)
     return
