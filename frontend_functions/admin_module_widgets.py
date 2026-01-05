@@ -47,7 +47,7 @@ def task_execution_chart():
                     labelAngle=0,
                     labelAlign="right",
                     # labelOrient="left",
-                    labelAnchor="end",
+                    labelAnchor="start",
                     labelPadding=3
                 ),
                 sort=alt.SortField(
