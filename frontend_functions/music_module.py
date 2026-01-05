@@ -22,13 +22,12 @@ def render_music():
     nav_selection = ss.get(f"{nav_key}_active_decode")
     if not nav_selection:
         nav_selection='now_playing'
-
     if nav_selection == 'now_playing':
         st.info(f"{nav_selection} module not yet built")
     elif nav_selection == 'listen_history':
         st.info(f"{nav_selection} module not yet built")
     elif nav_selection == 'list_config':
-        st.info(f"{nav_selection} module not yet built")
+        playlist_config_table()
     elif nav_selection == 'list_shuffle':
         st.info(f"{nav_selection} module not yet built")
     elif nav_selection == 'track_ratings':

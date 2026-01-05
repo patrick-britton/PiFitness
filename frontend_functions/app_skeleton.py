@@ -35,6 +35,7 @@ def render_skeleton():
     #  "running": {'icon': "sprint"},
     #  "food": {'icon': "local_dining"},
     #  "admin": {'icon': "shield_person"}
+
     if nav_selection == 'home':
         render_homepage()
     elif nav_selection == 'admin':
