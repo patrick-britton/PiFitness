@@ -4,6 +4,7 @@ import pandas as pd
 import altair as alt
 from backend_functions.database_functions import get_conn
 import streamlit as st
+from streamlit import session_state as ss
 
 
 def task_execution_chart():
@@ -12,10 +13,9 @@ def task_execution_chart():
     if df.empty:
         return
 
-    chart_width = 500
+    chart_width = 250 if ss.is_mobile else 500
     row_height = 5
-    theme = st.context.theme.type
-    pass_color = "white" if theme == "dark" else "black"
+    pass_color = "white" if ss.is_dark_mode else "black"
     max_etl = df["etl_time_s"].max()
     task_count = df["task_name"].nunique()
     x_min = df["event_time_utc"].min()
