@@ -45,10 +45,10 @@ def task_execution_chart():
                 header=alt.Header(
                     title=None,
                     labelAngle=0,
-                    labelAlign="right",
+                    labelAlign="left",
                     # labelOrient="left",
                     labelAnchor="start",
-                    labelPadding=3
+                    labelPadding=1
                 ),
                 sort=alt.SortField(
                     field="task_rank",
