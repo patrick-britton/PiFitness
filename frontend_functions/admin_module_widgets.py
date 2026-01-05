@@ -15,7 +15,7 @@ def task_execution_chart():
 
     chart_width = 250 if ss.is_mobile else 700
     row_height = 5
-    pass_color = "white" if ss.is_dark_mode else "black"
+    pass_color = "white" if ss.is_dark_mode else "darkslategrey"
     max_etl = df["etl_time_s"].max()
     task_count = df["task_name"].nunique()
     x_min = df["event_time_utc"].min()
@@ -46,7 +46,7 @@ def task_execution_chart():
                     title=None,
                     labelAngle=0,
                     labelAlign="left",
-                    labelOrient="bottom",
+                    labelBaseline="bottom",
                     labelPadding=3
                 ),
                 sort=alt.SortField(
