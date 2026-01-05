@@ -23,12 +23,12 @@ def nav_dictionary():
 
         # Music Page
         'music': {'now_playing': {'icon': 'radio', 'label': 'Now Playing'},
-                    'sync_history': {'icon': 'download', 'label': 'Sync History'},
-                    'tune': {'icon': 'tune', 'label': 'Playlist Config'},
-                    'sync_playlists': {'icon': 'queue_music', 'label': 'Playlist Sync'},
-                    'shuffle': {'icon': 'shuffle', 'label': 'Playlist Shuffle'},
-                    'voting_chip': {'icon': 'voting_chip', 'label': 'Ratings'},
-                    'clean_dupes': {'icon': 'cleaning_services', 'label': 'Review ISRCs'}
+                  'listen_history': {'icon': 'download', 'label': 'Sync History'},
+                  'list_config': {'icon': 'tune', 'label': 'Playlist Config'},
+                  'list_shuffle': {'icon': 'shuffle', 'label': 'Playlist Shuffle'},
+                  'track_ratings': {'icon': 'voting_chip', 'label': 'Ratings'},
+                  'isrc_clean': {'icon': 'cleaning_services', 'label': 'Review ISRCs'},
+                  'sync_playlists': {'icon': 'queue_music', 'label': 'Playlist Sync'},
                     },
 
         # Running

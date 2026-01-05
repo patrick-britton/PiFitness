@@ -261,16 +261,18 @@ def task_log(task_name=None, e_time=None, l_time=None, t_time=None, fail_type=No
 
 
 def json_next_loop(client, function, api_parameters=None):
+    print("DEBUG: INSIDE NEXT LOOP")
     all_json = []
     # Fetch & loop through API results
     offset = 0
     limit = 50
-    param_list = [param.strip() for param in api_parameters.split(',')]
+    if api_parameters:
+        param_list = [param.strip() for param in api_parameters.split(',')]
 
-    # Replace placeholders with actual date values
-    args = []
-    for param in param_list:
-        args.append(param)
+        # Replace placeholders with actual date values
+        args = []
+        for param in param_list:
+            args.append(param)
 
     while True:
         # Ensure we're being good API Citizens
@@ -285,6 +287,8 @@ def json_next_loop(client, function, api_parameters=None):
         if  raw_json is None:
             raw_json = {}
 
+        print('Next loop DEBUG raw JSON')
+        print(raw_json)
         # Append the results
         if isinstance(raw_json, dict):
             all_json.append(raw_json)
@@ -299,6 +303,7 @@ def json_next_loop(client, function, api_parameters=None):
                 break
         except:
             break
+
 
     return all_json
 
