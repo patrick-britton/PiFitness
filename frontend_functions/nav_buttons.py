@@ -48,9 +48,9 @@ def build_options(d):
 
         lbl = nav_opt.get("label")
         if lbl:
-            opts.append(f"{icon} {lbl}")
+            opts.append(f":material/{icon}: {lbl}")
         else:
-            opts.append(f"{icon}")
+            opts.append(f":material/{icon}:")
         continue
     return opts
 
