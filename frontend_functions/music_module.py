@@ -16,10 +16,11 @@ from frontend_functions.nav_buttons import nav_button
         #             },
 
 def render_music():
-    nav_key = 'music'
-    nav_button(nav_key)
+    music_nav_key = 'music'
+    nav_button(music_nav_key)
     st.subheader("Spotify Controls")
-    nav_selection = ss.get(f"{nav_key}_active_decode")
+
+    nav_selection = ss.get(f"{music_nav_key}_active_decode")
     if not nav_selection:
         nav_selection='now_playing'
     if nav_selection == 'now_playing':
@@ -27,7 +28,7 @@ def render_music():
     elif nav_selection == 'listen_history':
         st.info(f"{nav_selection} module not yet built")
     elif nav_selection == 'list_config':
-        playlist_config_table()
+        render_playlist_config(music_nav_key)
     elif nav_selection == 'list_shuffle':
         st.info(f"{nav_selection} module not yet built")
     elif nav_selection == 'track_ratings':
@@ -37,7 +38,7 @@ def render_music():
     elif nav_selection == 'sync_playlists':
         st.info(f"{nav_selection} module not yet built")
     else:
-        st.error(f"Uncaught nav exception for __{nav_key}__")
+        st.error(f"Uncaught nav exception for __{music_nav_key}__")
     return
 
 
