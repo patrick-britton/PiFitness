@@ -101,7 +101,7 @@ def decode_nav(pn):
     d = nav_dictionary()
     nav_dict = d.get(pn)
     btn_selection = ss[f"{pn}_active"]
-    icon = btn_selection[10:-1]
+    icon = btn_selection.split(':material/')[1].split(':')[0]
     for key, item in nav_dict.items():
         if icon == item.get("icon"):
             return key
