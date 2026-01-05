@@ -7,6 +7,7 @@ import psycopg2
 import socket
 from psycopg2.extras import RealDictCursor, execute_values
 import time
+import streamlit as st
 
 from backend_functions.helper_functions import list_to_dict_by_key
 
@@ -151,7 +152,7 @@ def get_table_row_count(pg_schema, pg_table):
 
 
 def sync_df_from_data_editor(df=None, state_dict=None, pk_col=None):
-    if not state_dict or not df or not pk_col:
+    if not state_dict or not df.empty or not pk_col:
         return
 
     edited_rows = state_dict.get("edited_rows", {})
@@ -163,4 +164,6 @@ def sync_df_from_data_editor(df=None, state_dict=None, pk_col=None):
             pk_value = df.loc[row_idx, pk_col]
             upd_sql = f"""UPDATE music.playlist_config SET {col_name} = {new_value} WHERE {pk_col} = '{pk_value}';"""
             qec(upd_sql)
+            st.write(upd_sql)
+    time.sleep(5)
     return
