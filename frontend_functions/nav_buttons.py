@@ -42,11 +42,11 @@ def build_options(d):
     # Builds the button options from the dictionary provided
     opts = []
     for nav_opt in d.values():
-        icon = nav_opt["icon"]
+        icon = nav_opt.get("icon")
         if not icon:
             continue
 
-        lbl = nav_opt["label"]
+        lbl = nav_opt.get("label")
         if lbl:
             opts.append(f"{icon} {lbl}")
         else:
