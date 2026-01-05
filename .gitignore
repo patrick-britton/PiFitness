@@ -209,3 +209,6 @@ __marimo__/
 
 # Spotify Auth
 .spotify_cache
+
+# All SQL
+/sql_pages
