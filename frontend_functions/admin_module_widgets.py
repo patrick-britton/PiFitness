@@ -13,7 +13,7 @@ def task_execution_chart():
         return
 
     chart_width = 500
-    row_height = 40
+    row_height = 8
     max_etl = df["etl_time_s"].max()
     task_count = df["task_name"].nunique()
     x_min = df["event_time_utc"].min()
@@ -45,6 +45,9 @@ def task_execution_chart():
                     labelAngle=0,
                     labelAlign="left",
                 ),
+                sort=alt.SortField(
+                    field="task_rank",
+                    order="ascending")
             ),
             tooltip=[
                 "task_name:N",
