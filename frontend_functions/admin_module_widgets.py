@@ -13,12 +13,12 @@ def task_execution_chart():
         return
 
     chart_width = 500
-    row_height = 8
+    row_height = 5
     max_etl = df["etl_time_s"].max()
     task_count = df["task_name"].nunique()
     x_min = df["event_time_utc"].min()
     x_max = datetime.now(timezone.utc)
-    total_height = task_count * row_height
+    total_height = (task_count * row_height) + 10
     chart = (
         alt.Chart(df)
         .mark_bar()
@@ -43,7 +43,8 @@ def task_execution_chart():
                 header=alt.Header(
                     title=None,
                     labelAngle=0,
-                    labelAlign="left",
+                    labelAlign="right",
+                    labelAnchor="end"
                 ),
                 sort=alt.SortField(
                     field="task_rank",
@@ -64,5 +65,6 @@ def task_execution_chart():
         .configure_axis(grid=False)
         .configure_facet(spacing=5)
     )
+    st.write("__Task Executions__:")
     st.altair_chart(chart)
     return
