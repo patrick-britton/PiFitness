@@ -41,13 +41,16 @@ def nav_dictionary():
 def build_options(d):
     # Builds the button options from the dictionary provided
     opts = []
-    for o in d:
-        str = f":material/{o.get("icon")}:"
-        lbl = o.get('label')
-        if o.get('label'):
-            str = str + f" {lbl}"
+    for nav_opt in d:
+        icon = nav_opt["icon"]
+        if not icon:
+            continue
 
-        opts.append(str)
+        lbl = nav_opt["label"]
+        if lbl:
+            opts.append(f"{icon} {lbl}")
+        else:
+            opts.append(f"{icon}")
         continue
     return opts
 
