@@ -182,3 +182,13 @@ def add_time_ago_column(df, timestamp_col, new_col_name='time_ago'):
         df[new_col_name] = None
 
     return df
+
+
+def convert_to_json_serializable(x):
+    if isinstance(x, (np.int64, np.int32, np.int16, np.int8)):
+        return int(x)
+    elif isinstance(x, (np.float64, np.float32)):
+        return float(x)
+    elif isinstance(x, np.bool_):
+        return bool(x)
+    return x
