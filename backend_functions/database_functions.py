@@ -148,3 +148,19 @@ def get_log_data(table_name):
 def get_table_row_count(pg_schema, pg_table):
     q_sql = f"""SELECT COUNT(*) FROM {pg_schema}.{pg_table};"""
     return one_sql_result(q_sql)
+
+
+def sync_df_from_data_editor(df=None, state_dict=None, pk_col=None):
+    if not state_dict or not df or not pk_col:
+        return
+
+    edited_rows = state_dict.get("edited_rows", {})
+    if not edited_rows:
+        return
+
+    for row_idx, changes in edited_rows.items():
+        for col_name, new_value in changes.items():
+            pk_value = df.loc[row_idx, pk_col]
+            upd_sql = f"""UPDATE music.playlist_config SET {col_name} = {new_value} WHERE {pk_col} = '{pk_value}';"""
+            qec(upd_sql)
+    return
