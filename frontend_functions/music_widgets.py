@@ -1,0 +1,70 @@
+import pandas as pd
+import streamlit as st
+from streamlit import session_state as ss
+
+from backend_functions.database_functions import get_conn, qec, sync_df_from_data_editor
+
+
+def playlist_config_table():
+    sql = """SELECT * FROM music.playlist_config
+            ORDER BY seeds_only asc,
+            autoshuffle DESC,
+            make_recs DESC,
+            track_count DESC;"""
+
+    ss.pc_df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
+    if ss.pc_df.empty:
+        st.info("Sync playlists to configure")
+        return
+
+    # set the configuration
+    max_songs = ss.pc_df["track_count"].max()
+
+    cols = ['playlist_name',
+            'auto_shuffle',
+            'make_recs',
+            'seeds_only',
+            'ratings_weight',
+            'recency_weight',
+            'randomness_weight',
+            'playlist_id']
+
+    col_config = {'playlist_name': st.column_config.TextColumn(label='Name',
+                                                               pinned=True,
+                                                               disabled=True
+                                                               ),
+                  'track_count': st.column_config.ProgressColumn(label='Songs',
+                                                                 min_value=0,
+                                                                 max_value = max_songs,
+                                                                 pinned=True),
+                  'auto_shuffle': st.column_config.CheckboxColumn(label='Auto Shuffle?',
+                                                                  disabled=False),
+                  'make_recs': st.column_config.CheckboxColumn(label='Generate Rec?',
+                                                                  disabled=False),
+                  'seeds_only': st.column_config.CheckboxColumn(label='Seeds only?',
+                                                                  disabled=False),
+                  'ratings_weight': st.column_config.NumberColumn(label="ELO Bias",
+                                                                  min_value=1,
+                                                                  max_value=20),
+                  'recency_weight': st.column_config.NumberColumn(label="Recency Bias",
+                                                                  min_value=1,
+                                                                  max_value=20),
+                  'randomness_weight': st.column_config.NumberColumn(label="Random Bias",
+                                                                  min_value=1,
+                                                                  max_value=20),
+                  'playlist_id': None
+                  }
+    key_val = 'de_playlist_config_df'
+    st.data_editor(data=ss.pc_df,
+                   key=key_val,
+                   on_change=sync_df_from_data_editor,
+                   num_rows="fixed",
+                   column_order=cols,
+                   column_config=col_config,
+                   args=(ss.pc_df, ss.get(key_val), 'playlist_id'))
+    return
+
+
+
+
+

@@ -1,6 +1,7 @@
 import streamlit as st
 from streamlit import session_state as ss
 
+from frontend_functions.music_widgets import playlist_config_table
 from frontend_functions.nav_buttons import nav_button
 
 
@@ -43,9 +44,7 @@ def render_music():
 
 def render_playlist_config(nav_key):
     st.info('Button - sync playlists')
-    st.info('Playlist table')
+    playlist_config_table()
 
     return
 
-
-def sync_playlists_to_db():
