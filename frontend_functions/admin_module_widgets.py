@@ -13,7 +13,7 @@ def task_execution_chart():
     if df.empty:
         return
 
-    chart_width = 250 if ss.is_mobile else 500
+    chart_width = 250 if ss.is_mobile else 700
     row_height = 5
     pass_color = "white" if ss.is_dark_mode else "black"
     max_etl = df["etl_time_s"].max()
@@ -46,7 +46,8 @@ def task_execution_chart():
                     title=None,
                     labelAngle=0,
                     labelAlign="left",
-                    labelBaseline="bottom"
+                    labelOrient="bottom",
+                    labelPadding=3
                 ),
                 sort=alt.SortField(
                     field="task_rank",
@@ -67,6 +68,8 @@ def task_execution_chart():
         .configure_axis(grid=False)
         .configure_facet(spacing=5)
     )
-    st.write("__Task Executions__:")
-    st.altair_chart(chart)
+    box = st.container(border=True)
+    with box:
+        st.write("__Task Executions__:")
+        st.altair_chart(chart)
     return
