@@ -5,6 +5,8 @@ from backend_functions.logging_functions import log_app_event, start_timer, elap
 from frontend_functions.admin_module import render_admin_module
 from frontend_functions.homepage import render_homepage
 from frontend_functions.nav_buttons import nav_button
+from frontend_functions.streamlit_helpers import ss_debug
+
 
 
 
@@ -36,4 +38,10 @@ def render_skeleton():
         st.info('FOOD NOT YET BUILT')
     else:
         st.error('Uncaught navigation selection')
+
+    debug_var_list = [f"{nav_key}_current",
+                      f"{nav_key}_active",
+                      f"{nav_key}_active_decode"
+                      ]
+    ss_debug(debug_var_list)
     return
