@@ -1,7 +1,7 @@
 import json
 import time
 import importlib
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytz
 from psycopg2.extras import execute_values
@@ -111,6 +111,8 @@ def task_executioner(force_task_name=None, force_task=False):
                 client = client_dict.get("client")
                 loop_type = task.get("api_loop_type")
                 print(f"DEBUG: Loop type: {loop_type}")
+
+                # If no loop type, just pull once
                 if loop_type is None or loop_type == 'N/A':
                     api_params = task.get("api_parameters")
                     curr_ts = int(datetime.now(pytz.UTC).timestamp() * 1000)
@@ -123,8 +125,12 @@ def task_executioner(force_task_name=None, force_task=False):
                         json_data = getattr(client, task.get("api_function"))(**args)
                     else:
                         json_data = getattr(client, task.get("api_function"))()
+
+                # if the api result is paginated
                 elif loop_type == 'Next':
                     json_data = json_next_loop(client, task.get("api_function"))
+
+                # If I need to make repeated api calls with different dates
                 else:
                     cal_col = task.get("last_calendar_field")
                     if cal_col:
@@ -301,15 +307,17 @@ def json_date_loop(client, function, loop_type, date_list, api_parameters=None):
 
     all_json = []
     for date_val in date_list:
+        # pause for 2 seconds during each loop
         if date_val != date_list[0]:
             time.sleep(2)
 
+        # If I can pull a range of values, the result will be a tuple.
         if loop_type == 'Range':
             if not isinstance(date_val, (list, tuple)) or len(date_val) != 2:
-                continue
+                d1, d2 = default_range()
             d1, d2 = date_val
             if d1 is None or d2 is None:
-                continue
+                d1, d2 = default_range()
         else:
             d1 = date_val
             d2 = None
@@ -451,3 +459,7 @@ def to_params(param_list=None, search_val=None, replace_val=None, return_type='l
     else:
         return ", ".join(rb_list)
 
+def default_range():
+    d2 = date.today()
+    d1 = d2 - timedelta(days=1)
+    return d1, d2

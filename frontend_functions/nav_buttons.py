@@ -1,7 +1,6 @@
-
-
-
-
+import time
+import streamlit as st
+from streamlit import session_state as ss
 
 def nav_dictionary():
     d = {
@@ -37,28 +36,80 @@ def nav_dictionary():
 
         'food': {}
     }
+    return d
+
+def build_options(d):
+    # Builds the button options from the dictionary provided
+    opts = []
+    for o in d:
+        str = f":material/{o.get("icon")}:"
+        lbl = o.get('label')
+        if o.get('label'):
+            str = str + f" {lbl}"
+
+        opts.append(str)
+        continue
+    return opts
 
 
 
-    #          button_dict = {
-    #     ":material/radio: Now Playing": "now_playing",
-    #     ":material/download: Get Listen History": "sync_history",
-    #     ":material/queue_music: Synchronize Playlists": "sync_playlists",
-    #     ":material/tune: Configure Playlists": "playlist_config",
-    #     ":material/voting_chip: Ratings": "ratings",
-    #     ":material/shuffle: Playlist Shuffle": "shuffle",
-    #     ":material/cleaning_services: Clean Dupes": "dupes"
-    # }
-    #
+def nav_button(page_name=None):
+    if not page_name:
+        return
+
+    all_d = nav_dictionary()
+    nav_dict = all_d.get(page_name)
+
+    if not nav_dict:
+        st.error('Navigation dictionary unassigned')
+        time.sleep(5)
+        return
+
+    opts = build_options(nav_dict)
+    key_val = f"key_{page_name}_nav_{ss.n_counter}"
+    prior_val = f"{page_name}_current"
+    st.segmented_control(label='',
+                         label_visibility='hidden',
+                         opts=opts,
+                         default=ss.get(prior_val),
+                         key=key_val,
+                         on_change=update_nav,
+                         args=(page_name, key_val))
+    return
 
 
-    d = {':material/home:': 'home',
-         ':material/music_cast:': 'music',
-             ':material/key:': 'passwords',
-             ':material/shield_person:': 'admin',
-         'food': 'calories', # Display eating, track new calories
-         ':material/scale:': 'weight', # Sync & display weight, manage targets
-         ':material/watch:': 'activity_sync', # sync recent activities
-         'running': 'running', # Reconcile new run (music), # Preview a run, top 10 lists, training load, vo2 max
-         'health': 'health'  # Resting heart rates, sleep,
-         }
+def update_nav(pn=None, key_val=None):
+    if not pn:
+        return
+
+    curr_value_var = f"{pn}_current"
+    old_value = ss.get(curr_value_var)
+    selected_var_name = f"{pn}_active"
+    new_value = ss.get(key_val)
+
+    if new_value != old_value:
+        ss[selected_var_name] = new_value
+        ss[curr_value_var] = new_value
+        ss[f"{pn}_active_decode"] = decode_nav(pn)
+    return
+
+
+def decode_nav(pn):
+    d = nav_dictionary()
+    nav_dict = d.get(pn)
+    btn_selection = ss[f"{pn}_active"]
+    icon = btn_selection[10:-1]
+    for n in nav_dict:
+        if n.get("icon") == icon:
+            return n
+
+    return None
+
+
+def inc_nav_counter():
+    if "n_counter" not in ss:
+        ss.n_counter =0
+        return
+
+    ss.n_counter += 1
+    return

@@ -4,24 +4,36 @@ from backend_functions.helper_functions import reverse_key_lookup
 from backend_functions.logging_functions import log_app_event, start_timer, elapsed_ms
 from frontend_functions.admin_module import render_admin_module
 from frontend_functions.homepage import render_homepage
+from frontend_functions.nav_buttons import nav_button
 
 
-def top_button_dictionary():
-    d = {"home": ":material/home:",
-         "admin": ":material/shield_person:"}
-    return d
+
 
 def render_skeleton():
     st.set_page_config(layout="wide")
-    tbd = top_button_dictionary()
+    nav_key = 'main'
 
-    ss.top_nav_selection = st.pills(label="top_nav_selection",
-                                    label_visibility="hidden",
-                                    options=list(set(tbd.values())),
-                                    default=tbd.get("home"))
+    nav_button(nav_key)
 
-    ss.simple_selection = reverse_key_lookup(tbd, ss.top_nav_selection)
-    if ss.simple_selection == 'home':
+    nav_selection = f"{nav_key}_active_decode"
+
+
+    # Current options:
+    # {"home": {'icon': "home"},
+    #  'music': {'icon': "music_cast"},
+    #  "running": {'icon': "sprint"},
+    #  "food": {'icon': "local_dining"},
+    #  "admin": {'icon': "shield_person"}
+    if nav_selection == 'home':
         render_homepage()
-    elif ss.simple_selection == 'admin':
+    elif nav_selection == 'admin':
         render_admin_module()
+    elif nav_selection == 'music':
+        st.info('MUSIC NOT YET BUILT')
+    elif nav_selection == 'running':
+        st.info('RUNNING NOT YET BUILT')
+    elif nav_selection == 'food':
+        st.info('FOOD NOT YET BUILT')
+    else:
+        st.error('Uncaught navigation selection')
+    return
