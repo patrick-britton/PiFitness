@@ -246,14 +246,20 @@ def ss_debug(ss_var_list=None):
 
 def sync_df_from_data_editor(df=None, key_val=None, pk_col=None):
     if not key_val or not df.empty or not pk_col:
+        st.error('No values')
+        time.sleep(3)
         return
 
     state_dict = ss.get(key_val)
     if not state_dict:
+        st.error('No state dict')
+        time.sleep(3)
         return
 
     edited_rows = state_dict.get("edited_rows", {})
     if not edited_rows:
+        st.error('No edited rows')
+        time.sleep(3)
         return
 
     for row_idx, changes in edited_rows.items():
@@ -262,5 +268,6 @@ def sync_df_from_data_editor(df=None, key_val=None, pk_col=None):
             upd_sql = f"""UPDATE music.playlist_config SET {col_name} = {new_value} WHERE {pk_col} = '{pk_value}';"""
             qec(upd_sql)
             st.write(upd_sql)
-    time.sleep(5)
+            st.success('successful writeback')
+            time.sleep(5)
     return
