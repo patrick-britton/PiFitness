@@ -46,7 +46,7 @@ def render_music():
 
 def render_playlist_config(nav_key):
     # Allow for manual loading of playlist headers
-    with st.button(label=':material/sync: Sync Playlists'):
+    if st.button(label=':material/sync: Sync Playlists'):
         task_name = 'Playlist Header Sync'
         task_executioner(force_task_name=task_name, force_task=True)
         st.rerun()
