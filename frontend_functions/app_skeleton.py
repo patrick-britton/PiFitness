@@ -51,12 +51,7 @@ def render_skeleton():
         st.error('Uncaught navigation selection')
 
     ss.qgp = st.query_params.to_dict()
-    debug_var_list = [f"main_current",
-                      f"main_active",
-                      f"main_active_decode",
-                      'music_current',
-                      'music_active',
-                      'music_active_decode'
+    debug_var_list = ['de_playlist_config_df'
                       ]
     ss_debug(debug_var_list)
     return
