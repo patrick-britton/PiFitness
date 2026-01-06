@@ -242,3 +242,25 @@ def ss_debug(ss_var_list=None):
 
     for var in ss_var_list:
         st.write(f"__{var}__ : {ss.get(var)}")
+
+
+def sync_df_from_data_editor(df=None, key_val=None, pk_col=None):
+    if not key_val or not df.empty or not pk_col:
+        return
+
+    state_dict = ss.get(key_val)
+    if not state_dict:
+        return
+
+    edited_rows = state_dict.get("edited_rows", {})
+    if not edited_rows:
+        return
+
+    for row_idx, changes in edited_rows.items():
+        for col_name, new_value in changes.items():
+            pk_value = df.loc[row_idx, pk_col]
+            upd_sql = f"""UPDATE music.playlist_config SET {col_name} = {new_value} WHERE {pk_col} = '{pk_value}';"""
+            qec(upd_sql)
+            st.write(upd_sql)
+    time.sleep(5)
+    return
