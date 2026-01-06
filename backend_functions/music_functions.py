@@ -102,11 +102,9 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
     # Integrate Results
     t0 = start_timer()
     try:
-        sql = f"CALL staging.flatten_playlist_details({list_type});"
+        sql = f"CALL staging.flatten_playlist_details('{list_type}');"
         qec(sql)
         transform_ms = elapsed_ms(t0)
-
-
 
     except Exception as e:
         task_log(task_name=task_name,
