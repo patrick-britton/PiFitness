@@ -67,7 +67,7 @@ def task_executioner(force_task_name=None, force_task=False):
         ############################################################
         # Execute the prescribed function (e.g. database cleanup)
         ############################################################
-        if task.get("api_function") is None:
+        if task.get("api_function") is None or task.get("api_function") == 'N/A':
             pf_t0 = start_timer()
             try:
 
