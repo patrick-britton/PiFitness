@@ -1,6 +1,7 @@
 import streamlit as st
 from streamlit import session_state as ss
 
+from backend_functions.task_execution import task_executioner
 from frontend_functions.music_widgets import playlist_config_table
 from frontend_functions.nav_buttons import nav_button
 
@@ -44,7 +45,13 @@ def render_music():
 
 
 def render_playlist_config(nav_key):
-    st.info('Button - sync playlists')
+    # Allow for manual loading of playlist headers
+    with st.button(lable=':material/sync: Sync Playlists'):
+        task_name = 'Playlist Header Sync'
+        task_executioner(force_task_name=task_name, force_task=True)
+        st.rerun()
+
+    # Read/write of playlist settings.
     playlist_config_table()
 
     return
