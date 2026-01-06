@@ -12,10 +12,10 @@ def get_playlist_list(list_type=None):
 
     if list_type == 'seeds':
         sql = """SELECT DISTINCT playlist_id from music.playlist_config WHERE
-        seeds_only"""
+        seeds_only and track_count >0 """
     elif list_type == 'once':
         sql = """SELECT DISTINCT playlist_id from music.playlist_config
-            WHERE NOT seeds_only and NOT auto_shuffle and NOT make_recs AND is_active"""
+            WHERE NOT seeds_only and NOT auto_shuffle and NOT make_recs AND is_active and track_count > 0"""
     else:
         sql = """SELECT DISTINCT playlist_id from music.playlist_config WHERE
                 is_active AND (auto_shuffle or make_recs) and track_count > 0"""
@@ -30,8 +30,16 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
     # Monitor performance, start the timer
     t0 = start_timer()
 
+    task_name = 'Playlist Detail Sync'
     if not list_type:
         list_type = 'auto'
+
+
+    if list_type == 'once':
+        task_name = 'One-time Seed Generation'
+    elif list_type == 'seeds':
+        task_name = 'Dynamic Seed Generation'
+
 
     # Put the single (or multiple) playlist into a list
     if not list_id:
@@ -69,7 +77,7 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
 
     # Stop if no results
     if not all_items:
-        task_log('playlist_details',
+        task_log(task_name=task_name,
                  e_time=extract_ms,
                  l_time=None,
                  t_time=None,
@@ -83,7 +91,7 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
         json_loading(all_items, 'playlist_details')
         load_ms = elapsed_ms(t0)
     except Exception as e:
-        task_log('playlist_details',
+        task_log(task_name=task_name,
                  e_time=extract_ms,
                  l_time=elapsed_ms(t0),
                  t_time=None,
@@ -101,7 +109,7 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
 
 
     except Exception as e:
-        task_log('playlist_details',
+        task_log(task_name=task_name,
                  e_time=extract_ms,
                  l_time=load_ms,
                  t_time=elapsed_ms(t0),
@@ -109,7 +117,7 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
                  fail_text=f"{len(playlists)} playlist(s) attempted: {e}")
         return client
 
-    task_log('playlist_details',
+    task_log(task_name=task_name,
              e_time=extract_ms,
              l_time=load_ms,
              t_time=transform_ms,
