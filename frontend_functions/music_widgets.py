@@ -10,7 +10,8 @@ from frontend_functions.streamlit_helpers import sync_df_from_data_editor
 
 def playlist_config_table():
     sql = """SELECT * FROM music.playlist_config
-            ORDER BY seeds_only asc,
+            ORDER BY is_active DESC, 
+            seeds_only asc,
             auto_shuffle DESC,
             make_recs DESC,
             track_count DESC;"""
@@ -34,9 +35,12 @@ def playlist_config_table():
             'ratings_weight',
             'recency_weight',
             'randomness_weight',
+            'is_active',
             'playlist_id']
 
-    col_config = {'playlist_name': st.column_config.TextColumn(label='Name',
+    col_config = {'is_active': st.column_config.CheckboxColumn(label='Active?',
+                                                                  disabled=True),
+                  'playlist_name': st.column_config.TextColumn(label='Name',
                                                                pinned=True,
                                                                disabled=True
                                                                ),
