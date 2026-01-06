@@ -245,7 +245,7 @@ def ss_debug(ss_var_list=None):
 
 
 def sync_df_from_data_editor(df=None, key_val=None, pk_col=None):
-    if not key_val or not df.empty or not pk_col:
+    if not key_val or df.empty or not pk_col:
         st.error('No values')
         time.sleep(3)
         return
