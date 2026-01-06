@@ -3,8 +3,9 @@ import pandas as pd
 import streamlit as st
 from streamlit import session_state as ss
 
-from backend_functions.database_functions import get_conn, qec, sync_df_from_data_editor
+from backend_functions.database_functions import get_conn, qec
 from backend_functions.helper_functions import convert_to_json_serializable
+from frontend_functions.streamlit_helpers import sync_df_from_data_editor
 
 
 def playlist_config_table():
@@ -66,7 +67,7 @@ def playlist_config_table():
                    num_rows="fixed",
                    column_order=cols,
                    column_config=col_config,
-                   args=(ss.pc_df, ss.get(key_val), 'playlist_id'))
+                   args=(ss.pc_df, key_val, 'playlist_id'))
     return
 
 
