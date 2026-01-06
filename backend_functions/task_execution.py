@@ -69,6 +69,9 @@ def task_executioner(force_task_name=None, force_task=False):
         ############################################################
         if task.get("api_function") is None or task.get("api_function") == 'N/A':
             pf_t0 = start_timer()
+            independent_logging_functions = ['playlist_sync_seeds',
+                                             'playlist_sync_one_time',
+                                             'playlist_sync_auto']
             try:
 
                 local_function_str = task.get("python_function")
@@ -76,16 +79,18 @@ def task_executioner(force_task_name=None, force_task=False):
                 module = importlib.import_module(module_name)
                 local_function = getattr(module, svc_function_name)
                 local_function()
-                task_log(task.get("task_name"),
-                         e_time=None,
-                         l_time=None,
-                         t_time=elapsed_ms(pf_t0))
+                if svc_function_name not in independent_logging_functions:
+                    task_log(task.get("task_name"),
+                             e_time=None,
+                             l_time=None,
+                             t_time=elapsed_ms(pf_t0))
                 execution_ctr += 1
 
                 update_task_through_date(task_name)
                 print(f"Logging Success fpr {task_name}")
             except Exception as e:
                 print(f"Logging Failure for {task_name}: {e}")
+
                 task_log(task.get("task_name"),
                          e_time=None,
                          l_time=None,
