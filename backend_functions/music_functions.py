@@ -4,20 +4,38 @@ from backend_functions.database_functions import get_conn, sql_to_list, elapsed_
 from backend_functions.logging_functions import log_app_event, start_timer
 from backend_functions.service_logins import get_spotify_client
 from backend_functions.task_execution import json_loading, task_log
+from time import time
 
 
-def playlist_to_db(client=None, list_id=None):
+
+def get_playlist_list(list_type=None):
+
+    if list_type == 'seeds':
+        sql = """SELECT DISTINCT playlist_id from music.playlist_config WHERE
+        seeds_only"""
+    elif list_type == 'once':
+        sql = """SELECT DISTINCT playlist_id from music.playlist_config
+            WHERE NOT seeds_only and NOT auto_shuffle and NOT make_recs AND is_active"""
+    else:
+        sql = """SELECT DISTINCT playlist_id from music.playlist_config WHERE
+                is_active AND (auto_shuffle or make_recs) and track_count > 0"""
+
+    return sql_to_list(sql)
+
+
+def playlist_to_db(client=None, list_id=None, list_type=None):
     # Connects to Spotify API and downloads all tracks
     # Uploads JSON to DB, which is then processed via stored procedure.
 
     # Monitor performance, start the timer
     t0 = start_timer()
 
+    if not list_type:
+        list_type = 'auto'
+
     # Put the single (or multiple) playlist into a list
     if not list_id:
-        sql = """SELECT DISTINCT playlist_id from music.playlist_config WHERE
-        is_active AND (auto_shuffle or make_recs) and track_count > 0"""
-        playlists = sql_to_list(sql)
+        playlists = get_playlist_list(list_type)
     else:
         playlists = [list_id]
 
@@ -34,6 +52,8 @@ def playlist_to_db(client=None, list_id=None):
     e=None
     # Iterate through list of playlists
     for l in playlists:
+        if l != playlists[0]:
+            time.sleep(2)
         try:
             results = sp.playlist_items(playlist_id=l, additional_types=['track'])
         except Exception as e:
@@ -74,9 +94,12 @@ def playlist_to_db(client=None, list_id=None):
     # Integrate Results
     t0 = start_timer()
     try:
-        sql = "CALL staging.flatten_playlist_details();"
+        sql = f"CALL staging.flatten_playlist_details({list_type});"
         qec(sql)
         transform_ms = elapsed_ms(t0)
+
+
+
     except Exception as e:
         task_log('playlist_details',
                  e_time=extract_ms,
@@ -93,3 +116,13 @@ def playlist_to_db(client=None, list_id=None):
              fail_type=None,
              fail_text=None)
     return client
+
+
+def playlist_sync_auto(client=None):
+    return playlist_to_db(client=client, list_id=None, list_type='auto')
+
+def playlist_sync_seeds(client=None):
+    return playlist_to_db(client=client, list_id=None, list_type='seeds')
+
+def playlist_sync_one_time(client=None):
+    return playlist_to_db(client=client, list_id=None, list_type='once')
