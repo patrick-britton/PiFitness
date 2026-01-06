@@ -102,6 +102,17 @@ def sql_to_dict(query_str):
     return rows
 
 
+def sql_to_list(query_str):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(query_str)
+    values = [row[0] for row in cur.fetchall()] # list of dicts if using RealDictCursor
+    cur.close()
+    conn.close()
+    return values
+
+
+
 def get_sproc_list(append_option=None):
     # Returns the known api services as a list
     sql="""SELECT 
