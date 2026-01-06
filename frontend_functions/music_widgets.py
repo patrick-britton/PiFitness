@@ -27,6 +27,7 @@ def playlist_config_table():
     max_songs = int(ss.pc_df["track_count"].max())
 
     cols = ['playlist_name',
+            'track_count',
             'auto_shuffle',
             'make_recs',
             'seeds_only',
@@ -67,6 +68,7 @@ def playlist_config_table():
                    num_rows="fixed",
                    column_order=cols,
                    column_config=col_config,
+                   hide_index=True,
                    args=(ss.pc_df, key_val, 'playlist_id'))
     return
 
