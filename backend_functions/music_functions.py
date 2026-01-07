@@ -34,7 +34,6 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
     if not list_type:
         list_type = 'auto'
 
-
     if list_type == 'once':
         task_name = 'One-time Seed Generation'
     elif list_type == 'seeds':
@@ -185,7 +184,14 @@ def ensure_playlist_relationships(client):
             child_playlist_type)
             VALUES
             ('{id}', '{new_id}', '{playlist_type}');"""
-            qec(ins_sql)
+            try:
+                qec(ins_sql)
+                print('success')
+                print(ins_sql)
+            except Exception as e:
+                print('ERROR')
+                print(ins_sql)
+                print(e)
         if rec:
             name = f"{name} (r)"
             desc = f"Auto-Recommendations for {name}."
@@ -197,7 +203,14 @@ def ensure_playlist_relationships(client):
                         child_playlist_type)
                         VALUES
                         ('{id}', '{new_id}', '{playlist_type}');"""
-            qec(ins_sql)
+            try:
+                qec(ins_sql)
+                print('success')
+                print(ins_sql)
+            except Exception as e:
+                print('ERROR')
+                print(ins_sql)
+                print(e)
 
     return client
 
@@ -210,4 +223,5 @@ def gen_playlist(client, name, description):
                                            name=name,
                                            public=False,
                                            description=description)
-    return client, playlist
+    playlist_id = playlist["id"]
+    return client, playlist_id

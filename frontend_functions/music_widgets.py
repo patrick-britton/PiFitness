@@ -11,12 +11,7 @@ from frontend_functions.streamlit_helpers import sync_df_from_data_editor
 
 
 def playlist_config_table(is_selection=False):
-    sql = """SELECT * FROM music.playlist_config
-            ORDER BY is_active DESC, 
-            seeds_only asc,
-            auto_shuffle DESC,
-            make_recs DESC,
-            track_count DESC;"""
+    sql = """SELECT * FROM music.vw_playlist_config"""
 
     ss.pc_df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
     # Convert entire dataframe to JSON-serializable types
@@ -109,7 +104,7 @@ def playlist_config_table(is_selection=False):
 def render_shuffle_df(rcw, rtw, rnw, mts):
     # Renders & rerenders the dataframe as adjustments are made
     if "shuffle_df" not in ss or ss.shuffle_df.empty:
-        return
+        return None
 
     df = ss.shuffle_df.copy()
     max_dur = int(df['duration_s'].max())
@@ -120,7 +115,8 @@ def render_shuffle_df(rcw, rtw, rnw, mts):
             'ratings_pct',
             'random_pct',
             'duration_s',
-            'track_id']
+            'track_id',
+            'target_playlist_id']
 
     col_config = {
         'track_artist': st.column_config.TextColumn(label='Song',
@@ -144,7 +140,8 @@ def render_shuffle_df(rcw, rtw, rnw, mts):
                                                      max_value=max_dur,
                                                      width=30,
                                                      format='%d'),
-        'track_id': None}
+        'track_id': None,
+        'target_playlist_id': None}
 
     # Update Dataframe order
     df['play_score'] = ((df['ratings_pct'] * rtw) +
