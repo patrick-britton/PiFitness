@@ -237,7 +237,7 @@ def auto_shuffle_playlists():
     playlists = sql_to_list(sql)
     client=None
     for l in playlists:
-        sql = f"""SELECT DISTINCT target_playlist_id, track_id FROM music.vw_vw_playlist_isrc_stats WHERE playlist_id = '{l}'
+        sql = f"""SELECT DISTINCT target_playlist_id, track_id FROM music.vw_playlist_isrc_stats WHERE playlist_id = '{l}'
             ORDER BY default_new_order asc;"""
         df = pd.read_sql(sql, get_conn(alchemy=True))
         if df.empty:
