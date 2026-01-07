@@ -1,6 +1,6 @@
 import pandas as pd
 
-from backend_functions.database_functions import get_conn, sql_to_list, elapsed_ms, qec
+from backend_functions.database_functions import get_conn, sql_to_list, elapsed_ms, qec, sql_to_dict
 from backend_functions.logging_functions import log_app_event, start_timer
 from backend_functions.service_logins import get_spotify_client
 from backend_functions.task_execution import json_loading, task_log
@@ -132,3 +132,97 @@ def playlist_sync_seeds(client=None):
 
 def playlist_sync_one_time(client=None):
     return playlist_to_db(client=client, list_id=None, list_type='once')
+
+def playlist_reset(client=None, list_id=None):
+    if not list_id:
+        return client
+
+    client = get_spotify_client(client)
+    sp = client.get("client")
+    sp.playlist_replace_items(list_id, [])
+    return client
+
+def playlist_upload(client=None, list_id=None, track_list=None):
+    if not list_id or not track_list:
+        return client
+
+    client = get_spotify_client(client)
+    sp = client.get("client")
+    num_songs = len(track_list)
+    if num_songs < 100:
+        batch_size = num_songs
+    else:
+        batch_size = 100
+
+    for i in range(0, len(track_list), batch_size):
+        batch = track_list[i:i + batch_size]
+        if len(batch) > 0:
+            sp.playlist_add_items(list_id, batch)
+    return client
+
+def ensure_playlist_relationships(client):
+    sql = """SELECT * from music.missing_relationships"""
+    d = sql_to_dict(sql)
+    if not d:
+        return
+
+    client = get_spotify_client(client)
+
+    for item in d:
+        id = item.get("playlist_id")
+        name = item.get("playlist_name")
+        auto = item.get("needs_auto")
+        man = item.get("needs_manual")
+        rec = item.get("needs_recs")
+        if auto or man:
+            name = f"{name} (a)"
+            desc = f"Auto-shuffled copy of {name}."
+            playlist_type = 'auto' if auto else 'manual'
+            client, new_id = gen_playlist(client, name, desc)
+            ins_sql = f"""INSERT INTO music.playlist_relationships (
+            parent_playlist_id,
+            child_playlist_id,
+            child_playlist_type)
+            VALUES
+            ('{id}', '{new_id}', '{playlist_type}');"""
+        if rec:
+            name = f"{name} (r)"
+            desc = f"Auto-Recommendations for {name}."
+            playlist_type = 'recommendation'
+            client, new_id = gen_playlist(client, name, desc)
+            ins_sql = f"""INSERT INTO music.playlist_relationships (
+                        parent_playlist_id,
+                        child_playlist_id,
+                        child_playlist_type)
+                        VALUES
+                        ('{id}', '{new_id}', '{playlist_type}');"""
+
+    return client
+
+
+def gen_playlist(client, name, description):
+    sp = client.get("client")
+    user_id = sp.me()["id"]
+    playlist = client.user_playlist_create(user=user_id,
+                                           name=name,
+                                           public=False,
+                                           description=description)
+    return client, playlist
+
+
+
+        for idx, row in df.iterrows():
+            child_type = row['childType']
+            parent_name = row['playlistName']
+            parent_id = row['playlistId']
+            if child_type == 'recommendation':
+                child_name = parent_name + ' (r)'
+                description = f"Playlist for dynamically generated recommendations for {parent_name}"
+            elif child_type == 'watch':
+                child_name = parent_name + ' (d)'
+                description = f"Dynamically sorted version of {parent_name}"
+            else:
+                child_name = parent_name + ' (u)'
+                description = f"Unknown how the playlist for {parent_name} was generated"
+
+            child_id = playlist["id"]

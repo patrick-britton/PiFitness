@@ -7,6 +7,8 @@ import psycopg2.extensions
 import pandas as pd
 import numpy as np
 
+from backend_functions.music_functions import ensure_playlist_relationships
+
 # Register numpy types with psycopg2
 psycopg2.extensions.register_adapter(np.int64, lambda x: int(x))
 psycopg2.extensions.register_adapter(np.int32, lambda x: int(x))
@@ -264,5 +266,17 @@ def sync_df_from_data_editor(df=None, key_val=None, pk_col=None):
             pk_value = df.loc[row_idx, pk_col]
             upd_sql = f"""UPDATE music.playlist_config SET {col_name} = {new_value} WHERE {pk_col} = '{pk_value}';"""
             qec(upd_sql)
+
+    ensure_playlist_relationships(None)
+    return
+
+
+def ss_pop(var_list):
+    if isinstance(var_list, str):
+        var_list = [var_list]
+
+    for var in var_list:
+        if var in ss:
+            del ss[var]
 
     return
