@@ -208,21 +208,3 @@ def gen_playlist(client, name, description):
                                            public=False,
                                            description=description)
     return client, playlist
-
-
-
-        for idx, row in df.iterrows():
-            child_type = row['childType']
-            parent_name = row['playlistName']
-            parent_id = row['playlistId']
-            if child_type == 'recommendation':
-                child_name = parent_name + ' (r)'
-                description = f"Playlist for dynamically generated recommendations for {parent_name}"
-            elif child_type == 'watch':
-                child_name = parent_name + ' (d)'
-                description = f"Dynamically sorted version of {parent_name}"
-            else:
-                child_name = parent_name + ' (u)'
-                description = f"Unknown how the playlist for {parent_name} was generated"
-
-            child_id = playlist["id"]
