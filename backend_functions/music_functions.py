@@ -185,6 +185,7 @@ def ensure_playlist_relationships(client):
             child_playlist_type)
             VALUES
             ('{id}', '{new_id}', '{playlist_type}');"""
+            qec(ins_sql)
         if rec:
             name = f"{name} (r)"
             desc = f"Auto-Recommendations for {name}."
@@ -196,6 +197,7 @@ def ensure_playlist_relationships(client):
                         child_playlist_type)
                         VALUES
                         ('{id}', '{new_id}', '{playlist_type}');"""
+            qec(ins_sql)
 
     return client
 
