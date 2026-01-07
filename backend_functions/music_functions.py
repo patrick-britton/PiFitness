@@ -230,3 +230,22 @@ def gen_playlist(client, name, description):
                                            description=description)
     playlist_id = playlist["id"]
     return client, playlist_id
+
+
+def auto_shuffle_playlists():
+    sql = "SELECT DISTINCT playlist_id from music.playlist_config WHERE is_active and auto_shuffle"
+    playlists = sql_to_list(sql)
+    client=None
+    for l in playlists:
+        sql = f"""SELECT DISTINCT target_playlist_id, track_id FROM music.vw_vw_playlist_isrc_stats WHERE playlist_id = '{l}'
+            ORDER BY default_new_order asc;"""
+        df = pd.read_sql(sql, get_conn(alchemy=True))
+        if df.empty:
+            continue
+
+        id = df['target_playlist_id'].iloc[0]
+        track_list = df['track_id'].to_list()
+        client = playlist_reset(None, id)
+        client = playlist_upload(client, id, track_list)
+        continue
+    return
