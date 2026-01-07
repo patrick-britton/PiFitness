@@ -72,10 +72,10 @@ def render_playlist_shuffle():
     row = ss.pl_selection
     row_index = row[0]
     id = ss.pc_df.iloc[row_index]["playlist_id"]
-    ratings_weight = ss.pc_df.iloc[row_index]["ratings_weight"]
-    recency_weight = ss.pc_df.iloc[row_index]["recency_weight"]
-    randomness_weight = ss.pc_df.iloc[row_index]["randomness_weight"]
-    minutes_to_sync = ss.pc_df.iloc[row_index]["minutes_to_sync"]
+    ratings_weight = int(ss.pc_df.iloc[row_index]["ratings_weight"])
+    recency_weight = int(ss.pc_df.iloc[row_index]["recency_weight"])
+    randomness_weight = int(ss.pc_df.iloc[row_index]["randomness_weight"])
+    minutes_to_sync = int(ss.pc_df.iloc[row_index]["minutes_to_sync"])
 
     rating_col, recency_col, rand_col, minutes_col = st.columns(spec=[1,1,1,1], gap="small")
 
