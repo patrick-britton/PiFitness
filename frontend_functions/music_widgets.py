@@ -119,31 +119,29 @@ def render_shuffle_df(rcw, rtw, rnw, mts):
             'duration_s',
             'track_id']
 
-    col_config = {'new_track_order': st.column_config.NumberColumn(label='#',
-                                                                   pinned=True,
-                                                                   width=10,
-                                                                   disabled=True),
-                  'track_artist': st.column_config.TextColumn(label='Song',
-                                                              pinned=False,
-                                                              width="medium",
-                                                              disabled=True),
-                  'recency_pct': st.column_config.ProgressColumn(label=":material/event_repeat:",
-                                                                 min_value=0,
-                                                                 max_value=1,
-                                                                 width=30),
-            'ratings_pct': st.column_config.ProgressColumn(label=":material/star_rate_half:",
-                                                           min_value=0,
-                                                           max_value=1,
-                                                           width=30),
-            'random_pct': st.column_config.ProgressColumn(label=":material/wand_stars:",
-                                                          min_value=0,
-                                                          max_value=1,
-                                                          width=30),
-            'duration_s':st.column_config.ProgressColumn(label=":material/clock_loader_60:",
-                                                         min_value=0,
-                                                         max_value=max_dur,
-                                                         width=30),
-            'track_id': None}
+    col_config = {
+        'track_artist': st.column_config.TextColumn(label='Song',
+                                                    pinned=False,
+                                                    width="medium",
+                                                    disabled=True),
+        'recency_pct': st.column_config.ProgressColumn(label="Last Heard",
+                                                       min_value=0,
+                                                       max_value=1,
+                                                       width=30),
+        'ratings_pct': st.column_config.ProgressColumn(label="Rating",
+                                                       min_value=0,
+                                                       max_value=1,
+                                                       width=30),
+        'random_pct': st.column_config.ProgressColumn(label="Random",
+                                                      min_value=0,
+                                                      max_value=1,
+                                                      width=30),
+        'duration_s':st.column_config.ProgressColumn(label="Duration",
+                                                     min_value=0,
+                                                     max_value=max_dur,
+                                                     width=30,
+                                                     format='%d'),
+        'track_id': None}
 
     # Update Dataframe order
     df['play_score'] = ((df['ratings_pct'] * rtw) +
@@ -158,7 +156,8 @@ def render_shuffle_df(rcw, rtw, rnw, mts):
 
     st.dataframe(data=df,
                  column_order=cols,
-                 column_config=col_config)
+                 column_config=col_config,
+                 hide_index=True)
 
     return df
 
