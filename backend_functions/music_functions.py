@@ -160,6 +160,11 @@ def playlist_upload(client=None, list_id=None, track_list=None):
     return client
 
 def ensure_playlist_relationships(client):
+    del_sql = """DELETE FROM music.playlist_relationships pr
+                WHERE pr.child_playlist_id in
+                 (SELECT DISTINCT playlist_id FROM music.playlist_config WHERE not is_active)"""
+    qec(del_sql)
+
     sql = """SELECT * from music.missing_relationships"""
     d = sql_to_dict(sql)
     if not d:
