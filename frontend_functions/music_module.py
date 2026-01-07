@@ -34,7 +34,7 @@ def render_music():
     elif nav_selection == 'list_config':
         render_playlist_config(music_nav_key)
     elif nav_selection == 'list_shuffle':
-        st.info(f"{nav_selection} module not yet built")
+        render_playlist_shuffle()
     elif nav_selection == 'track_ratings':
         st.info(f"{nav_selection} module not yet built")
     elif nav_selection == 'isrc_clean':
