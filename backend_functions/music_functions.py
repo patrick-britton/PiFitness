@@ -201,9 +201,10 @@ def ensure_playlist_relationships(client):
 
 
 def gen_playlist(client, name, description):
+    client = get_spotify_client(client)
     sp = client.get("client")
     user_id = sp.me()["id"]
-    playlist = client.user_playlist_create(user=user_id,
+    playlist = sp.user_playlist_create(user=user_id,
                                            name=name,
                                            public=False,
                                            description=description)
