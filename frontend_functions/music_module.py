@@ -126,10 +126,11 @@ def render_playlist_shuffle():
 
     if st.button(':material/cloud_upload: Send to Spotify'):
         track_list = df['track_id'].to_list()
+        target_list_id = df['target_playlist_id'].iloc[0]
         client = playlist_reset(client=None,
-                                list_id=id)
+                                list_id=target_list_id)
         client = playlist_upload(client=client,
-                                 list_id=id,
+                                 list_id=target_list_id,
                                  track_list=track_list)
 
         update_sql = f"""UPDATE music.playlist_config SET
