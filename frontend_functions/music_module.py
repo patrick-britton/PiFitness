@@ -2,13 +2,15 @@ import pandas as pd
 import streamlit as st
 from streamlit import session_state as ss
 
-from backend_functions.database_functions import get_conn
+from backend_functions.database_functions import get_conn, qec
+from backend_functions.music_functions import playlist_reset, playlist_upload
 from backend_functions.task_execution import task_executioner
 from frontend_functions.music_widgets import playlist_config_table, render_shuffle_df
 from frontend_functions.nav_buttons import nav_button
+from frontend_functions.streamlit_helpers import ss_pop
 
 
-        # # Music Page
+# # Music Page
         # 'music': {'now_playing': {'icon': 'radio', 'label': 'Now Playing'},
         #           'listen_history': {'icon': 'download', 'label': 'Sync History'},
         #           'list_config': {'icon': 'tune', 'label': 'Playlist Config'},
@@ -124,6 +126,23 @@ def render_playlist_shuffle():
 
     if st.button(':material/cloud_upload: Send to Spotify'):
         track_list = df['track_id'].to_list()
-        st.info('Upload Not built yet.')
+        client = playlist_reset(client=None,
+                                list_id=id)
+        client = playlist_upload(client=client,
+                                 list_id=id,
+                                 track_list=track_list)
 
+        update_sql = f"""UPDATE music.playlist_config SET
+                        ratings_weight = {rtw},
+                        recency_weight={rcw},
+                        randomness_weight={rnw},
+                        minutes_to_sync={mts}
+                        WHERE playlist_id = '{id}';"""
+        qec(update_sql)
+        pop_list = ['shuffle_df',
+                    'pl_selection',
+                    'pc_df']
+        ss_pop(pop_list)
+        st.rerun()
+    return
 
