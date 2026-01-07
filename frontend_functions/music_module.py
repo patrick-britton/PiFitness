@@ -85,7 +85,7 @@ def render_playlist_shuffle():
                                              max_value=50,
                                              step=1,
                                              format='%d',
-                                             placeholder=ratings_weight)
+                                             value=ratings_weight)
 
     with recency_col:
         new_recency_weight = st.number_input(label='Recency Weight',
@@ -93,7 +93,7 @@ def render_playlist_shuffle():
                                              max_value=50,
                                              step=1,
                                              format='%d',
-                                             placeholder=recency_weight)
+                                             value=recency_weight)
 
     with rand_col:
         new_randomness_weight = st.number_input(label='Randomness Weight',
@@ -101,7 +101,7 @@ def render_playlist_shuffle():
                                              max_value=50,
                                              step=1,
                                              format='%d',
-                                             placeholder=randomness_weight)
+                                             value=randomness_weight)
 
     with minutes_col:
         new_minutes_to_sync = st.number_input(label='Minutes to Sync',
@@ -109,7 +109,7 @@ def render_playlist_shuffle():
                                              max_value=9999,
                                              step=15,
                                              format='%d',
-                                             placeholder=minutes_to_sync)
+                                             value=minutes_to_sync)
 
     rtw = new_ratings_weight if new_ratings_weight else ratings_weight
     rcw = new_recency_weight if new_recency_weight else recency_weight
