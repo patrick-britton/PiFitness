@@ -60,7 +60,7 @@ def render_playlist_config(nav_key):
 
 def render_playlist_shuffle():
     # Forces users to pick a playlist, then gives them weighting options
-    if "pl_selection" not in ss and ss.pl_selection is not None:
+    if ss.get("pl_selection") is None:
         key_val = 'de_playlist_config_df_selection'
         selection_value = ss.get(key_val)
         if not selection_value:
