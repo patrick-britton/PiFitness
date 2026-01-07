@@ -162,8 +162,7 @@ def render_shuffle_df(rcw, rtw, rnw, mts):
 
     st.dataframe(data=df,
                  column_order=cols,
-                 column_config=col_config,
-                 disabled=True)
+                 column_config=col_config)
 
     return df
 
