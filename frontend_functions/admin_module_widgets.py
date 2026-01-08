@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -67,10 +68,17 @@ def task_execution_chart():
                                                            y_max=max_elt)}
 
     st.write(f"__{task_count}__ tasks with history in last 30 days")
-    if isinstance(df['etl_time_s'].iloc[0], str):
-        df['etl_time_s'] = df['etl_time_s'].apply(
-            lambda x: [float(i) for i in x.replace('{', '').replace('}', '').split(',')]
-        )
+    def force_numeric_list(x):
+        if isinstance(x, list):
+            return [float(i) for i in x]
+        if isinstance(x, str):
+            # 1. Remove curly braces
+            clean_str = re.sub(r'[{}]', '', x)
+            # 2. Split by comma and convert to float, ignoring empty strings
+            return [float(i) for i in clean_str.split(',') if i.strip()]
+        return []
+
+    df['etl_time_s'] = df['etl_time_s'].apply(force_numeric_list)
     st.dataframe(data=df,
                  column_order=cols,
                  column_config=col_config,
