@@ -67,14 +67,8 @@ def task_execution_chart():
                                                            y_max=max_elt)}
 
     st.write(f"__{task_count}__ tasks with history in last 30 days")
-    df_agg = df.groupby('task_name').agg({
-        'success_pct': 'mean',
-        'median_extract_s': 'median',
-        'median_load_s': 'median',
-        'median_transform_s': 'median',
-        'etl_time_s': lambda x: list(x)  # This creates the list for the BarChart
-    })
-    st.dataframe(data=df_agg,
+
+    st.dataframe(data=df,
                  column_order=cols,
                  column_config=col_config,
                  height=dynamic_height,
