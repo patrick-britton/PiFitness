@@ -9,7 +9,7 @@ from streamlit import session_state as ss
 
 
 def task_execution_chart():
-    sql = "SELECT * FROM logging.vw_task_executions_v2"
+    sql = "SELECT * FROM logging.vw_task_executions"
     df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
     if df.empty:
         return
