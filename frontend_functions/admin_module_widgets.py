@@ -61,8 +61,7 @@ def task_execution_chart():
                                                            width="large",
                                                           color="auto-inverse",
                                                            y_min=0,
-                                                           y_max=max_elt,
-                                                                format="%.2f")}
+                                                           y_max=max_elt)}
 
     st.write(f"__{task_count}__ tasks with history in last 30 days")
     st.dataframe(data=df,
