@@ -14,8 +14,11 @@ def task_execution_chart():
         return
 
     # width = 250 if ss.is_mobile else 700
-    # row_height = 5
+    row_height = 5
     task_count = df["task_name"].nunique()
+    dynamic_height = task_count * row_height + 20
+    if dynamic_height > 10000:
+        dynamic_height = 9999
     max_extract = int(df['max_extract'].iloc[0])+1
     max_load = int(df['max_load'].iloc[0])+1
     max_transform = int(df['max_transform'].iloc[0])+1
@@ -67,7 +70,7 @@ def task_execution_chart():
     st.dataframe(data=df,
                  column_order=cols,
                  column_config=col_config,
-                 height="content",
+                 height=dynamic_height,
                  hide_index=True
                  )
     return
