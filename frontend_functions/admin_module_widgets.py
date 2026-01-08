@@ -67,7 +67,10 @@ def task_execution_chart():
                                                            y_max=max_elt)}
 
     st.write(f"__{task_count}__ tasks with history in last 30 days")
-
+    if isinstance(df['etl_time_history'].iloc[0], str):
+        df['etl_time_history'] = df['etl_time_history'].apply(
+            lambda x: [float(i) for i in x.replace('{', '').replace('}', '').split(',')]
+        )
     st.dataframe(data=df,
                  column_order=cols,
                  column_config=col_config,
