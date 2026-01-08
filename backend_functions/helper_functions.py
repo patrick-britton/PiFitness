@@ -1,3 +1,4 @@
+import math
 from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 import numpy as np
@@ -192,3 +193,10 @@ def convert_to_json_serializable(x):
     elif isinstance(x, np.bool_):
         return bool(x)
     return x
+
+def safe_float(value):
+    try:
+        v = float(value)
+        return 0.0 if math.isnan(v) else v
+    except (TypeError, ValueError):
+        return 0.0
