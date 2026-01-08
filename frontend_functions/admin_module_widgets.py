@@ -8,13 +8,13 @@ from streamlit import session_state as ss
 
 
 def task_execution_chart():
-    sql = "SELECT * FROM logging.vw_task_executions"
+    sql = "SELECT * FROM logging.vw_task_executions_v2"
     df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
     if df.empty:
         return
 
     # width = 250 if ss.is_mobile else 700
-    row_height = 5
+    row_height = 15
     task_count = df["task_name"].nunique()
     dynamic_height = task_count * row_height + 20
     if dynamic_height > 10000:
@@ -67,7 +67,14 @@ def task_execution_chart():
                                                            y_max=max_elt)}
 
     st.write(f"__{task_count}__ tasks with history in last 30 days")
-    st.dataframe(data=df,
+    df_agg = df.groupby('task_name').agg({
+        'success_pct': 'mean',
+        'median_extract_s': 'median',
+        'median_load_s': 'median',
+        'median_transform_s': 'median',
+        'etl_time_s': lambda x: list(x)  # This creates the list for the BarChart
+    })
+    st.dataframe(data=df_agg,
                  column_order=cols,
                  column_config=col_config,
                  height=dynamic_height,
