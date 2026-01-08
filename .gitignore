@@ -213,3 +213,11 @@ __marimo__/
 # All SQL
 /sql_pages
 *.sql
+
+# Local storage
+/local_storage/
+
+# Pictures
+*.svg
+*.png
+
