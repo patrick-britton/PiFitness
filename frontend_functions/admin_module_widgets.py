@@ -13,64 +13,62 @@ def task_execution_chart():
     if df.empty:
         return
 
-    chart_width = 250 if ss.is_mobile else 700
-    row_height = 5
-    pass_color = "white" if ss.is_dark_mode else "darkslategrey"
-    max_etl = df["etl_time_s"].max()
+    # width = 250 if ss.is_mobile else 700
+    # row_height = 5
     task_count = df["task_name"].nunique()
-    x_min = df["event_time_utc"].min()
-    x_max = datetime.now(timezone.utc)
-    total_height = (task_count * row_height) + 10
-    chart = (
-        alt.Chart(df)
-        .mark_bar()
-        .encode(
-            x=alt.X(
-                "event_time_utc:T",
-                scale=alt.Scale(domain=[x_min, x_max]),
-                axis=alt.Axis(title=None, labels=False, ticks=False),
-            ),
-            y=alt.Y(
-                "etl_time_s:Q",
-                scale=alt.Scale(domain=[0, max_etl]),
-                axis=alt.Axis(title=None, labels=False, ticks=False),
-            ),
-            color=alt.condition(
-                alt.datum.is_failure,
-                alt.value("red"),
-                alt.value(pass_color),
-            ),
-            row=alt.Row(
-                "task_name:N",
-                header=alt.Header(
-                    title=None,
-                    labelAngle=0,
-                    labelAlign="left",
-                    # labelOrient="left",
-                    labelAnchor="start",
-                    labelPadding=1
-                ),
-                sort=alt.SortField(
-                    field="task_rank",
-                    order="ascending")
-            ),
-            tooltip=[
-                "task_name:N",
-                "event_time_utc:T",
-                "etl_time_s:Q",
-                "is_failure:N",
-            ],
-        )
-        .properties(
-            width=chart_width,
-            height=total_height,
-        )
-        .configure_view(stroke=None)
-        .configure_axis(grid=False)
-        .configure_facet(spacing=5)
-    )
-    box = st.container(border=True)
-    with box:
-        st.write("__Task Executions__:")
-        st.altair_chart(chart)
+    max_extract = int(df['max_extract'].iloc[0])+1
+    max_load = int(df['max_load'].iloc[0])+1
+    max_transform = int(df['max_transform'].iloc[0])+1
+    max_elt = int(df['max_elt'].iloc[0])+1
+
+    cols = ['task_name',
+            'success_pct',
+            'median_extract_s',
+            'median_load_s',
+            'median_transform_s',
+            'etl_time_s']
+
+    col_config = {'task_name': st.column_config.TextColumn(label='Name',
+                                                           pinned=True,
+                                                           disabled=True),
+            'success_pct': st.column_config.ProgressColumn(label='Success%',
+                                                           pinned=False,
+                                                           width=20,
+                                                           min_value=0,
+                                                           max_value=1,
+                                                           format="%.2f%%"),
+            'median_extract_s': st.column_config.ProgressColumn(label='E',
+                                                           pinned=False,
+                                                           width=20,
+                                                           min_value=0,
+                                                           max_value=max_extract,
+                                                                format="%.2f"
+                                                                ),
+            'median_load_s': st.column_config.ProgressColumn(label='L',
+                                                           pinned=False,
+                                                           width=20,
+                                                           min_value=0,
+                                                           max_value=max_load,
+                                                                format="%.2f"),
+            'median_transform_s': st.column_config.ProgressColumn(label='T',
+                                                           pinned=False,
+                                                           width=20,
+                                                           min_value=0,
+                                                           max_value=max_transform,
+                                                                format="%.2f"),
+            'etl_time_s': st.column_config.BarChartColumn(label=None,
+                                                           pinned=False,
+                                                           width="large",
+                                                          color="auto-inverse",
+                                                           y_min=0,
+                                                           y_max=max_elt,
+                                                                format="%.2f")}
+
+    st.write(f"__{task_count}__ tasks with history in last 30 days")
+    st.dataframe(data=df,
+                 column_order=cols,
+                 column_config=col_config,
+                 height="content",
+                 hide_index=True
+                 )
     return
