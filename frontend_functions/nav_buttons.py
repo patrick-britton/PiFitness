@@ -15,12 +15,15 @@ def nav_dictionary():
                   },
 
         # Admin Page
-        'admin': {"passwords": {'icon': "key_vertical"},
-                    "tasks": {'icon': "checklist"},
-                    "services": {'icon': "api"},
-                    "db_backup": {'icon': "database_upload"}
-                    },
+        'admin': {"admin_charting": {'icon': 'show_chart'},
+                  "task_mgmt": {'icon': "discover_tune", 'label': 'Task Mgmt'},
+                  "task_exec": {'icon': "motion_play", 'label': 'Task Exec'},
+                  "passwords": {'icon': "key_vertical", 'label': 'Passwords'},
+                  "services": {'icon': "api", 'label': 'API Mgmt'}
+                  },
 
+        'admin_charting': {'task_summary': {'icon': 'checklist', 'label': 'Tasks'},
+                           'db_size': {'icon': 'database', 'label': 'DB Size'}},
         # Music Page
         'music': {'now_playing': {'icon': 'radio', 'label': 'Now Playing'},
                   'listen_history': {'icon': 'download', 'label': 'Sync History'},
@@ -55,32 +58,6 @@ def build_options(d):
     return opts
 
 
-
-def nav_button(page_name=None):
-    if not page_name:
-        return
-
-    all_d = nav_dictionary()
-    nav_dict = all_d.get(page_name)
-
-    if not nav_dict:
-        st.error('Navigation dictionary unassigned')
-        time.sleep(5)
-        return
-
-    opts = build_options(nav_dict)
-    key_val = f"key_{page_name}_nav_{ss.n_counter}"
-    prior_val = f"{page_name}_current"
-    st.segmented_control(label='',
-                         label_visibility='hidden',
-                         options=opts,
-                         default=ss.get(prior_val),
-                         key=key_val,
-                         on_change=update_nav,
-                         args=(page_name, key_val))
-    return
-
-
 def update_nav(pn=None, key_val=None):
     if not pn:
         return
@@ -101,6 +78,8 @@ def decode_nav(pn):
     d = nav_dictionary()
     nav_dict = d.get(pn)
     btn_selection = ss[f"{pn}_active"]
+    if not btn_selection:
+        return None
     icon = btn_selection.split(':material/')[1].split(':')[0]
     for key, item in nav_dict.items():
         if icon == item.get("icon"):
@@ -115,4 +94,40 @@ def inc_nav_counter():
         return
 
     ss.n_counter += 1
+    return
+
+
+def nav_widget(nav_key, nav_title):
+
+    nav_button(nav_key, nav_title)
+
+    return ss.get(f"{nav_key}_active_decode")
+
+def nav_button(page_name=None, nav_title=None):
+    if not page_name:
+        return
+
+    all_d = nav_dictionary()
+    nav_dict = all_d.get(page_name)
+
+    if not nav_dict:
+        st.error('Navigation dictionary unassigned')
+        time.sleep(5)
+        return
+    if nav_title:
+        nav_title = f"__{nav_title}__:"
+        nav_vis = 'visible'
+    else:
+        nav_title = ''
+        nav_vis = 'collapsed'
+    opts = build_options(nav_dict)
+    key_val = f"key_{page_name}_nav_{ss.n_counter}"
+    prior_val = f"{page_name}_current"
+    st.segmented_control(label=nav_title,
+                         label_visibility=nav_vis,
+                         options=opts,
+                         default=ss.get(prior_val),
+                         key=key_val,
+                         on_change=update_nav,
+                         args=(page_name, key_val))
     return
