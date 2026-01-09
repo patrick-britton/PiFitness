@@ -28,8 +28,11 @@ def render_music():
     # nav_selection = ss.get(f"{music_nav_key}_active_decode")
     nav_selection = nav_widget('music', 'Music Controls')
 
+    # Set Default
     if not nav_selection:
         nav_selection='now_playing'
+
+
     if nav_selection == 'now_playing':
         st.info(f"{nav_selection} module not yet built")
     elif nav_selection == 'listen_history':
@@ -45,11 +48,11 @@ def render_music():
     elif nav_selection == 'sync_playlists':
         st.info(f"{nav_selection} module not yet built")
     else:
-        st.error(f"Uncaught nav exception for __{music_nav_key}__")
+        st.error(f"Uncaught nav exception for music: {nav_selection}")
     return
 
 
-def render_playlist_config(nav_key):
+def render_playlist_config():
     # Allow for manual loading of playlist headers
     if st.button(label=':material/sync: Sync Playlists'):
         task_name = 'Playlist Header Sync'
