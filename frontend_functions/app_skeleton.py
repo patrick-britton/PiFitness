@@ -11,26 +11,18 @@ from frontend_functions.streamlit_helpers import ss_debug
 
 def init_session():
     st.set_page_config(layout="wide")
-    # if "is_dark_mode" not in ss:
-    ss.is_dark_mode = st.context.theme.type == "dark"
-    device = st.query_params.to_dict().get("device")
-    ss.is_mobile = False
-    if device:
-        ss.is_mobile = device == 'mobile'
+    if "is_dark_mode" not in ss:
+        ss.is_dark_mode = st.context.theme.type == "dark"
+        device = st.query_params.to_dict().get("device")
+        ss.is_mobile = False
+        if device:
+            ss.is_mobile = device == 'mobile'
     return
 
 
 def render_skeleton():
+    t0= start_timer()
     init_session()
-    #
-    # nav_key = 'main'
-    # lbl_col, nav_col = st.columns(spec=[1,5], gap="small")
-    # with lbl_col:
-    #     st.write('__Modules__:')
-    # with nav_col:
-    #     nav_button(nav_key)
-    #
-    # nav_selection = ss.get(f"{nav_key}_active_decode")
 
     nav_selection = nav_widget(nav_key='main', nav_title='Modules')
 
@@ -56,6 +48,9 @@ def render_skeleton():
         st.info('FOOD NOT YET BUILT')
     else:
         st.error('Uncaught navigation selection')
+
+
+    st.write(f":gray[*Rendered in {elapsed_ms(t0)} ms*]")
 
     ss.qgp = st.query_params.to_dict()
     debug_var_list = ['de_playlist_config_df_selection',
