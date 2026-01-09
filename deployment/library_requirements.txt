@@ -9,3 +9,4 @@ dotenv
 cryptography
 pathlib
 garminconnect
+matplotlib
