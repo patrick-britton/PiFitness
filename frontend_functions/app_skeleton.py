@@ -5,7 +5,7 @@ from backend_functions.logging_functions import log_app_event, start_timer, elap
 from frontend_functions.admin_module import render_admin_module
 from frontend_functions.homepage import render_homepage
 from frontend_functions.music_module import render_music
-from frontend_functions.nav_buttons import nav_button
+from frontend_functions.nav_buttons import nav_button, nav_widget
 from frontend_functions.streamlit_helpers import ss_debug
 
 
@@ -22,11 +22,18 @@ def init_session():
 
 def render_skeleton():
     init_session()
+    #
+    # nav_key = 'main'
+    # lbl_col, nav_col = st.columns(spec=[1,5], gap="small")
+    # with lbl_col:
+    #     st.write('__Modules__:')
+    # with nav_col:
+    #     nav_button(nav_key)
+    #
+    # nav_selection = ss.get(f"{nav_key}_active_decode")
 
-    nav_key = 'main'
-    nav_button(nav_key)
+    nav_selection = nav_widget(nav_key='main', nav_title='Modules')
 
-    nav_selection = ss.get(f"{nav_key}_active_decode")
     if not nav_selection:
         nav_selection='home'
 

@@ -7,53 +7,63 @@ import time
 from backend_functions.backend_tasks import backup_database
 from backend_functions.credential_management import encrypt_dict
 from backend_functions.database_functions import get_conn, qec, sql_to_dict, get_sproc_list, get_log_data, \
-    get_log_tables
+    get_log_tables, sql_to_list
 from backend_functions.helper_functions import reverse_key_lookup, list_to_dict_by_key, set_keys_to_none, \
     add_time_ago_column, col_value
 from backend_functions.logging_functions import log_app_event, start_timer, elapsed_ms
 from backend_functions.service_logins import test_login, get_service_list
 from backend_functions.task_execution import task_executioner
+from backend_functions.viz_factory.db_size import render_db_size_dashboard
+from backend_functions.viz_factory.task_summary import render_task_summary_dashboard
+from frontend_functions.nav_buttons import nav_button, nav_widget
 from frontend_functions.streamlit_helpers import reconcile_with_postgres
 
-
-def admin_button_dict():
-    d = {"passwords": ":material/key_vertical:",
-         "tasks": ":material/checklist:",
-         "services": ":material/api:",
-         "db_backup": ":material/database_upload:"}
-    return d
+# Admin Page
+# 'admin': {"admin_charting": {'icon': 'show_chart'},
+#           "task_mgmt": {'icon': "discover_tune", 'label': 'Task Mgmt'},
+#           "task_exec": {'icon': "motion_play", 'label': 'Task Exec'},
+#           "passwords": {'icon': "key_vertical", 'label': 'Passwords'},
+#           "services": {'icon': "api", 'label': 'API Mgmt'}
+#           },
+#
+# 'admin_charting': {'task_summary': {'icon': 'checklist', 'label': 'Tasks'},
+#                    'db_size': {'icon': 'database', 'label': 'DB Size'}},
 
 
 def render_admin_module():
-    st.write("Admin Module")
-    abd = admin_button_dict()
-    ss.admin_nav_selection = st.pills(label="top_nav_selection",
-                                    label_visibility="hidden",
-                                    options=list(set(abd.values())),
-                                    default=abd.get("home"))
+    nav_selection = nav_widget('admin', 'Admin Options:')
 
-    simple_selection = reverse_key_lookup(abd, ss.admin_nav_selection)
-    if simple_selection == 'passwords':
+    if not nav_selection:
+        nav_selection = 'admin_charting'
+
+    if nav_selection == 'admin_charting':
+        render_admin_charting()
+    elif nav_selection == 'passwords':
         render_password_submodule()
-    elif simple_selection == 'tasks':
-        render_task_submodule()
-    elif simple_selection == 'services':
+    elif nav_selection == 'task_mgmt':
+        render_task_mgmt_submodule()
+    elif nav_selection == 'task_exec':
+        render_task_exec_submodule()
+    elif nav_selection == 'services':
         render_service_submodule()
-    elif simple_selection == 'db_backup':
-        render_db_backup()
+    else:
+        st.error('Uncaught admin nav selection')
+    return
 
-def render_db_backup():
-    if st.button("Create a backup of the database"):
-        t0 = start_timer()
-        try:
-            backup_database()
-            log_app_event(cat='DB', desc='Backup Created', exec_time=elapsed_ms(t0))
-            st.success("Backup Created")
 
-            time.sleep(1.5)
-        except Exception as e:
-            st.error(f"DB Backup failed: {e}")
-            log_app_event(cat='DB', desc='Backup Created', exec_time=elapsed_ms(t0), err=e)
+def render_admin_charting():
+    nav_selection = nav_widget('admin_charting', 'Chart Options')
+
+    if not nav_selection:
+        nav_selection = 'task_summary'
+
+    if nav_selection == 'task_summary':
+        render_task_summary_dashboard(is_dark_mode=ss.get("is_dark_mode"), is_mobile=ss.get("is_mobile"))
+    elif nav_selection == 'db_size':
+        render_db_size_dashboard(is_dark_mode=ss.get("is_dark_mode"), is_mobile=ss.get("is_mobile"))
+    else:
+        st.error(f'Uncaught admin charting navigation: {nav_selection}')
+    return
 
 
 def render_service_submodule():
@@ -78,9 +88,6 @@ def render_service_submodule():
                        on_change=reconcile_with_postgres,
                        args=('service_df', "service_editor", 'api_services.api_service_list', 'api_service_name', col_config)
         )
-
-
-
 
 
 def render_password_submodule():
@@ -146,7 +153,7 @@ def render_password_submodule():
     return None
 
 
-def render_task_submodule():
+def render_task_mgmt_submodule():
     st.write("__Task Configuration__")
     t0 = None
     if "existing tasks" not in ss:
@@ -285,18 +292,22 @@ def render_task_submodule():
                             'task_name',
                             sched_col_config)
     )
+    return
 
-    st.divider()
-    st.write("Force Task Execution")
-    task_list = ss.existing_tasks_df['task_name'].to_list()
-    # Sort the task list
-    sorted_tasks = sorted(task_list)
+
+def render_task_exec_submodule():
+    st.write("__Select a task to execute:__")
+    task_list = sql_to_list('SELECT DISTINCT task_name FROM tasks.vw_task_execution ORDER by task_name')
+
+    if not task_list:
+        st.info('No tasks found')
+        return
 
     # Create rows with maximum 5 columns each
     max_cols = 5
-    for row_start in range(0, len(sorted_tasks), max_cols):
+    for row_start in range(0, len(task_list), max_cols):
         # Get tasks for this row (up to 5)
-        row_tasks = sorted_tasks[row_start:row_start + max_cols]
+        row_tasks = task_list[row_start:row_start + max_cols]
 
         # Create columns for this row
         cols = st.columns(len(row_tasks))
@@ -310,178 +321,3 @@ def render_task_submodule():
 
 
     return
-
-
-def log_display():
-    if "table_list" not in ss:
-        ss.table_list = get_log_tables(as_list=True)
-
-    if "table_selection" not in ss:
-        ss.table_selection = 'task_executions'
-        df = get_log_data(ss.table_selection)
-        ss.log_table_df = add_time_ago_column(df, 'event_time_utc', 'time_ago')
-
-    log_config = {"event_time_utc": None,
-                      # st.column_config.DatetimeColumn(label='Time',
-                      #                                               disabled=True,
-                      #                                               pinned=True),
-                  "event_age": st.column_config.TextColumn(label='Age',
-                                                          pinned=True,
-                                                          disabled=True,
-                                                          width="small"),
-                  "api_service_name": st.column_config.TextColumn(label="API",
-                                                                  pinned=False,
-                                                                  disabled=True,
-                                                          width="small"),
-                  "event_category": st.column_config.TextColumn(label="Category",
-                                                            pinned=False,
-                                                            disabled=True),
-                  "event_description": st.column_config.TextColumn(label="Desc",
-                                                            pinned=False,
-                                                            disabled=True),
-                  "event_name": st.column_config.TextColumn(label="Event",
-                                                            pinned=False,
-                                                            disabled=True),
-                  "table_name": st.column_config.TextColumn(label="Table",
-                                                            pinned=False,
-                                                            disabled=True),
-                  "maintenance_type": st.column_config.TextColumn(label="Type",
-                                                                  pinned=False,
-                                                                  disabled=True),
-                  "task_name": st.column_config.TextColumn(label="Task",
-                                                           pinned=False,
-                                                           disabled=True),
-                  "execution_time_ms": st.column_config.ProgressColumn(label="Execution Time",
-                                                                       min_value=col_value(df=ss.log_table_df,
-                                                                                           col="execution_time_ms",
-                                                                                           return_type='min'),
-                                                                       max_value=col_value(df=ss.log_table_df,
-                                                                                           col="execution_time_ms",
-                                                                                           return_type='max'),
-                                                                       format='%d',
-                                                                        pinned=False
-                                                                       ),
-                  "size_before_mb": st.column_config.ProgressColumn(label='Size Before',
-                                                                    min_value=col_value(df=ss.log_table_df,
-                                                                                        col="size_before_mb",
-                                                                                        return_type='min'),
-                                                                    max_value=col_value(df=ss.log_table_df,
-                                                                                        col="size_before_mb",
-                                                                                        return_type='max'),
-                                                                    format='plain',
-                                                                    pinned=False),
-                  "size_after_mb": st.column_config.ProgressColumn(label='Size After',
-                                                                   min_value=col_value(df=ss.log_table_df,
-                                                                                       col="size_after_mb",
-                                                                                       return_type='min'),
-                                                                   max_value=col_value(df=ss.log_table_df,
-                                                                                       col="size_after_mb",
-                                                                                       return_type='max'),
-                                                                    format='plain',
-                                                                    pinned=False),
-                  "maintenance_time_ms": st.column_config.ProgressColumn(label='Maint. Time',
-                                                                         min_value=col_value(df=ss.log_table_df,
-                                                                                             col="maintenance_time_ms",
-                                                                                             return_type='min'),
-                                                                         max_value=col_value(df=ss.log_table_df,
-                                                                                             col="maintenance_time_ms",
-                                                                                             return_type='max'),
-                                                                   format='%d',
-                                                                   pinned=False),
-                  "total_time_ms": st.column_config.ProgressColumn(label='Total Time',
-                                                                   min_value=col_value(df=ss.log_table_df,
-                                                                                       col="total_time_ms",
-                                                                                       return_type='min'),
-                                                                   max_value=col_value(df=ss.log_table_df,
-                                                                                       col="total_time_ms",
-                                                                                       return_type='max'),
-                                                                   format='%d',
-                                                                   pinned=False),
-                  "record_id": None,
-                  "extract_time_ms": st.column_config.ProgressColumn(label="Extract",
-                                                                     min_value=col_value(df=ss.log_table_df,
-                                                                                         col="extract_time_ms",
-                                                                                         return_type='min'),
-                                                                     max_value=col_value(df=ss.log_table_df,
-                                                                                         col="extract_time_ms",
-                                                                                         return_type='max'),
-                                                                 format='%d',
-                                                            pinned=False),
-                  "load_time_ms": st.column_config.ProgressColumn(label="Load",
-                                                                  min_value=col_value(df=ss.log_table_df,
-                                                                                      col="load_time_ms",
-                                                                                      return_type='min'),
-                                                                  max_value=col_value(df=ss.log_table_df,
-                                                                                      col="load_time_ms",
-                                                                                      return_type='max'),
-                                                                     format='%d',
-                                                                     pinned=False),
-                  "transform_time_ms": st.column_config.ProgressColumn(label="Transform/Execute",
-                                                                       min_value=col_value(df=ss.log_table_df,
-                                                                                           col="transform_time_ms",
-                                                                                           return_type='min'),
-                                                                       max_value=col_value(df=ss.log_table_df,
-                                                                                           col="transform_time_ms",
-                                                                                           return_type='max'),
-                                                                     format='%d',
-                                                                     pinned=False),
-                  "token_age_s": st.column_config.ProgressColumn(label="Token Age",
-                                                                 min_value=col_value(df=ss.log_table_df,
-                                                                                     col="token_age_s",
-                                                                                     return_type='min'),
-                                                                 max_value=col_value(df=ss.log_table_df,
-                                                                                     col="token_age_s",
-                                                                                     return_type='max'),
-                                                                 format='%d',
-                                                            pinned=False),
-                  "total_size_mb": st.column_config.ProgressColumn(label='Total Size',
-                                                                   min_value=col_value(df=ss.log_table_df,
-                                                                                       col="total_size_mb",
-                                                                                       return_type='min'),
-                                                                   max_value=col_value(df=ss.log_table_df,
-                                                                                       col="total_size_mb",
-                                                                                       return_type='max'),
-                                                                   format="plain",
-                                                            pinned=False),
-                  "table_size_mb": st.column_config.ProgressColumn(label='Tables',
-                                                                   min_value=col_value(df=ss.log_table_df,
-                                                                                       col="table_size_mb",
-                                                                                       return_type='min'),
-                                                                   max_value=col_value(df=ss.log_table_df,
-                                                                                       col="table_size_mb",
-                                                                                       return_type='max'),
-                                                                   format="plain",
-                                                                   pinned=False),
-                  "index_size_mb": st.column_config.ProgressColumn(label='Indexes',
-                                                                   min_value=col_value(df=ss.log_table_df,
-                                                                                       col="index_size_mb",
-                                                                                       return_type='min'),
-                                                                   max_value=col_value(df=ss.log_table_df,
-                                                                                       col="index_size_mb",
-                                                                                       return_type='max'),
-                                                                   format="plain",
-                                                                   pinned=False),
-                  "failure_type": st.column_config.TextColumn(label="Error",
-                                                            pinned=False,
-                                                            disabled=True),
-                  "error_text": st.column_config.TextColumn(label="Error",
-                                                            pinned=False,
-                                                            disabled=True)}
-
-    if "log_table_df" in ss and ss.log_table_df is not None:
-        st.write(f"Log Table: __{ss.table_selection}__")
-        st.data_editor(ss.log_table_df, hide_index=True,
-                       column_config=log_config)
-    else:
-        ss.log_table_df = get_log_data(ss.table_selection)
-        st.rerun()
-
-    cols = st.columns(len(ss.table_list))
-    for idx, table in enumerate(ss.table_list):
-        with cols[idx]:
-            button_type = "primary" if table == ss.table_selection else "secondary"
-            if st.button(table, key=f"btn_{table}", type=button_type):
-                if table != ss.table_selection:  # Only reload if different
-                    ss.table_selection = table
-                    ss.log_table_df = get_log_data(ss.table_selection)
-                    st.rerun()

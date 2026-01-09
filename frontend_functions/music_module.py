@@ -6,7 +6,7 @@ from backend_functions.database_functions import get_conn, qec
 from backend_functions.music_functions import playlist_reset, playlist_upload
 from backend_functions.task_execution import task_executioner
 from frontend_functions.music_widgets import playlist_config_table, render_shuffle_df
-from frontend_functions.nav_buttons import nav_button
+from frontend_functions.nav_buttons import nav_button, nav_widget
 from frontend_functions.streamlit_helpers import ss_pop
 
 
@@ -21,11 +21,12 @@ from frontend_functions.streamlit_helpers import ss_pop
         #             },
 
 def render_music():
-    music_nav_key = 'music'
-    nav_button(music_nav_key)
-    st.subheader("Spotify Controls")
-
-    nav_selection = ss.get(f"{music_nav_key}_active_decode")
+    # music_nav_key = 'music'
+    # nav_button(music_nav_key)
+    # st.subheader("Spotify Controls")
+    #
+    # nav_selection = ss.get(f"{music_nav_key}_active_decode")
+    nav_selection = nav_widget('music', 'Music Controls')
 
     if not nav_selection:
         nav_selection='now_playing'
@@ -34,7 +35,7 @@ def render_music():
     elif nav_selection == 'listen_history':
         st.info(f"{nav_selection} module not yet built")
     elif nav_selection == 'list_config':
-        render_playlist_config(music_nav_key)
+        render_playlist_config()
     elif nav_selection == 'list_shuffle':
         render_playlist_shuffle()
     elif nav_selection == 'track_ratings':
