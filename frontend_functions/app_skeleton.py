@@ -11,12 +11,12 @@ from frontend_functions.streamlit_helpers import ss_debug
 
 def init_session():
     st.set_page_config(layout="wide")
-    if "is_dark_mode" not in ss:
-        ss.is_dark_mode = st.context.theme.type == "dark"
-        device = st.query_params.to_dict().get("device")
-        ss.is_mobile = False
-        if device:
-            ss.is_mobile = device == 'mobile'
+    # if "is_dark_mode" not in ss:
+    ss.is_dark_mode = st.context.theme.type == "dark"
+    device = st.query_params.to_dict().get("device")
+    ss.is_mobile = False
+    if device:
+        ss.is_mobile = device == 'mobile'
     return
 
 
@@ -51,7 +51,8 @@ def render_skeleton():
         st.error('Uncaught navigation selection')
 
     ss.qgp = st.query_params.to_dict()
-    debug_var_list = ['de_playlist_config_df_selection'
+    debug_var_list = ['de_playlist_config_df_selection',
+                      'is_dark_mode'
                       ]
     ss_debug(debug_var_list)
     return
