@@ -21,4 +21,10 @@ def save_artifact(subdir=None, filename=None, content=None, extension=None):
 
     return file_path
 
+def album_art_path():
+    project_root = Path(__file__).resolve().parent.parent
+    storage_root = project_root / "local_storage/album_art"
+    storage_root.mkdir(parents=True, exist_ok=True)
+    return storage_root
+
 

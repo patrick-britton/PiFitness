@@ -58,7 +58,7 @@ def build_options(d):
     return opts
 
 
-def update_nav(pn=None, key_val=None):
+def update_nav(pn=None, key_val=None, custom_dict=None):
     if not pn:
         return
 
@@ -70,13 +70,16 @@ def update_nav(pn=None, key_val=None):
     if new_value != old_value:
         ss[selected_var_name] = new_value
         ss[curr_value_var] = new_value
-        ss[f"{pn}_active_decode"] = decode_nav(pn)
+        ss[f"{pn}_active_decode"] = decode_nav(pn, custom_dict)
     return
 
 
-def decode_nav(pn):
-    d = nav_dictionary()
-    nav_dict = d.get(pn)
+def decode_nav(pn, custom_dict=None):
+    if custom_dict:
+        nav_dict = custom_dict
+    else:
+        d = nav_dictionary()
+        nav_dict = d.get(pn)
     btn_selection = ss[f"{pn}_active"]
     if not btn_selection:
         return None
@@ -97,23 +100,27 @@ def inc_nav_counter():
     return
 
 
-def nav_widget(nav_key, nav_title):
+def nav_widget(nav_key, nav_title, custom_dict=None):
 
-    nav_button(nav_key, nav_title)
+    nav_button(nav_key, nav_title, custom_dict)
 
     return ss.get(f"{nav_key}_active_decode")
 
-def nav_button(page_name=None, nav_title=None):
+def nav_button(page_name=None, nav_title=None, custom_dict=None):
     if not page_name:
         return
 
-    all_d = nav_dictionary()
-    nav_dict = all_d.get(page_name)
+    if custom_dict:
+        nav_dict = custom_dict
+    else:
+        all_d = nav_dictionary()
+        nav_dict = all_d.get(page_name)
 
     if not nav_dict:
         st.error('Navigation dictionary unassigned')
         time.sleep(5)
         return
+
     if nav_title:
         nav_title = f"__{nav_title}__:"
         nav_vis = 'visible'
@@ -129,5 +136,5 @@ def nav_button(page_name=None, nav_title=None):
                          default=ss.get(prior_val),
                          key=key_val,
                          on_change=update_nav,
-                         args=(page_name, key_val))
+                         args=(page_name, key_val, custom_dict))
     return
