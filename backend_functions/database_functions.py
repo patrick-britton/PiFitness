@@ -55,7 +55,7 @@ def con_cur():
 def qec(t_sql=None, p=None, auto_commit=False):
     # takes in sql, connects, executes, commits, and closes
     if not t_sql:
-        return
+        return None
     try:
         conn, cur = con_cur()
         if auto_commit:
@@ -68,12 +68,12 @@ def qec(t_sql=None, p=None, auto_commit=False):
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"Query Execution failure: {e}")
-        print(f"Failing SQL: {t_sql}")
-        print(f"Failing Params: {p}")
+        msg1=f"Query Execution failure: {e}"
+        msg2=f"Failing SQL: {t_sql}"
+        msg3=f"Failing Params: {p}"
+        return [msg1, msg2, msg3]
 
-
-    return
+    return None
 
 
 def one_sql_result(sql=None):

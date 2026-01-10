@@ -53,7 +53,7 @@ def render_skeleton():
     st.write(f":gray[*Rendered in {elapsed_ms(t0)} ms*]")
 
     ss.qgp = st.query_params.to_dict()
-    debug_var_list = ['de_playlist_config_df_selection',
+    debug_var_list = ['np_action_choice',
                       'is_dark_mode'
                       ]
     ss_debug(debug_var_list)
