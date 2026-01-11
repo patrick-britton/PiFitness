@@ -7,7 +7,7 @@ import time
 from backend_functions.backend_tasks import backup_database
 from backend_functions.credential_management import encrypt_dict
 from backend_functions.database_functions import get_conn, qec, sql_to_dict, get_sproc_list, get_log_data, \
-    get_log_tables, sql_to_list
+    get_log_tables, sql_to_list, performance_profiling
 from backend_functions.helper_functions import reverse_key_lookup, list_to_dict_by_key, set_keys_to_none, \
     add_time_ago_column, col_value
 from backend_functions.logging_functions import log_app_event, start_timer, elapsed_ms
@@ -58,7 +58,9 @@ def render_admin_charting():
         nav_selection = 'task_summary'
 
     if nav_selection == 'task_summary':
-        render_task_summary_dashboard(is_dark_mode=ss.get("is_dark_mode"), is_mobile=ss.get("is_mobile"))
+        with st.spinner('v2', show_time=True):
+            render_task_summary_dashboard(is_dark_mode=ss.get("is_dark_mode"), is_mobile=ss.get("is_mobile"))
+
     elif nav_selection == 'db_size':
         render_db_size_dashboard(is_dark_mode=ss.get("is_dark_mode"), is_mobile=ss.get("is_mobile"))
     else:
