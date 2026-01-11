@@ -267,12 +267,24 @@ def get_now_playing(client=None):
     track = playback["item"]
 
     # Send song information to database
-    json_loading(playback, 'now_playing')
-    qec("call staging.flatten_now_playing();")
+    try:
+        json_loading(playback, 'now_playing')
+        print('JSON loaded')
+    except Exception as e:
+        print(f'JSON Failed to load: {e}')
+        return
+
+    try:
+        result = qec("call staging.flatten_now_playing();")
+        print(f'JSON Flattened')
+    except Exception as e:
+        result = f"JSON failed to flatten: {e}"
+
+    print(result)
 
     # Extract track-level info
     track_id = track["id"]
-
+    track_isrc = track['external_ids'].get('isrc')
     # timestamp = track["timestamp"]
     t0 = start_timer()
     progress = playback["progress_ms"]
@@ -295,7 +307,8 @@ def get_now_playing(client=None):
     # Look up ISRC ratings from sql
     sql= f"SELECT isrc FROM music.vw_track_id_to_isrc WHERE track_id = '{track_id}';"
     isrc = one_sql_result(sql)
-
+    print(f"From API: {track_isrc}")
+    print(f"From SQL: {isrc}")
     duration_ms = track.get("duration_ms")
     complete_at = t0 + (duration_ms - progress)
     done_in_s = round((duration_ms-progress)/1000,1)
@@ -322,32 +335,29 @@ def get_now_playing(client=None):
 
     # Get rating & playlist info
     elo = 1500
-
+    child_id = None
+    parent_id = None
+    playlist_type = None
     if playlist_name:
         sql = f"""SELECT child_playlist_id, parent_playlist_id, child_playlist_type FROM
                 music.playlist_relationships
                  WHERE child_playlist_id = '{playlist_id}';"""
-        playlist_dict = sql_to_dict(sql)[0]
-        if playlist_dict:
-            parent_id = playlist_dict.get("parent_playlist_id")
-            playlist_type = playlist_dict.get("child_playlist_type")
-            print(f"Playlist Type 1 : {playlist_type} : eval {playlist_type == 'recommendation'}")
-        else:
-            child_id = None
-            parent_id = None
-            playlist_type = None
-        fetch_id = parent_id if parent_id else playlist_id
-        if playlist_type == 'recommendation':
-            sql = f"""SELECT elo_track_predicted as elo_rating FROM music.track_recommendations
-                    WHERE isrc='{isrc}' and playlist_id='{fetch_id}'"""
-        else:
-            sql = f"""SELECT elo_rating from music.ratings
-                    WHERE isrc='{isrc}' and playlist_id='{fetch_id}';"""
-        elo = one_sql_result(sql)
-    else:
-        child_id = None
-        parent_id = None
-        playlist_type = None
+        temp_d = sql_to_dict(sql)
+        if temp_d:
+            playlist_dict = temp_d[0]
+            if playlist_dict:
+                parent_id = playlist_dict.get("parent_playlist_id")
+                playlist_type = playlist_dict.get("child_playlist_type")
+                print(f"Playlist Type 1 : {playlist_type} : eval {playlist_type == 'recommendation'}")
+            fetch_id = parent_id if parent_id else playlist_id
+            if playlist_type == 'recommendation':
+                sql = f"""SELECT elo_track_predicted as elo_rating FROM music.track_recommendations
+                        WHERE isrc='{isrc}' and playlist_id='{fetch_id}'"""
+            else:
+                sql = f"""SELECT elo_rating from music.ratings
+                        WHERE isrc='{isrc}' and playlist_id='{fetch_id}';"""
+            elo = one_sql_result(sql)
+
     # print(f"Playlist Type 2 : {playlist_type} : eval {playlist_type == 'recommendation'}")
     if playlist_id == '':
         playlist_id = None

@@ -243,7 +243,14 @@ def task_executioner(force_task_name=None, force_task=False):
             else:
                 # non-range task, update task with today
                 update_task_through_date(task_name)
-
+    try:
+        if execution_ctr + failure_ctr > 0:
+            sql = """REFRESH MATERIALIZED VIEW tasks.vw_task_summary_chart_materialized"""
+            qec(sql)
+    except Exception as e:
+        log_app_event(cat="Task Executioner",
+                      desc=f"Staging View Did not refresh: {e}",
+                      exec_time=elapsed_ms(all_task_start))
 
     all_task_time = elapsed_ms(all_task_start)
     msg = f"Attempts: E: {execution_ctr} F: {failure_ctr} || Skips: T: {timing_ctr} R: {recency_ctr}  "
