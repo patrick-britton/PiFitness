@@ -1,130 +1,169 @@
-from backend_functions.database_functions import get_conn
-import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
-import re
-import io
-import base64
-from backend_functions.logging_functions import start_timer, elapsed_ms
+import streamlit as st
+import altair as alt
 
-
-def get_theme(is_dark_mode=False, is_mobile=False):
-    # Colors for high contrast and executive feel
-    colors = {
-        "text_main": "#e5e7eb" if is_dark_mode else "#0f172a",
-        "text_sub": "#9ca3af" if is_dark_mode else "#64748b",
-        "stack": ["#3b82f6", "#f0690f", "#B7B7B7"],
-        "spark": "#475569",
-        "border": "#334155" if is_dark_mode else "#e2e8f0"
-    }
-    sizes = {
-        "font_main": 6,
-        "font_sub": 6,
-        "px_width": 450 if is_mobile else 750,
-        "row_height_inches": 0.2  # Very tight height
-    }
-    return {**colors, **sizes}
-
-
-def render_row_to_base64(row, max_median_sum, max_history_val, theme):
-    # fig_w remains fixed to prevent scaling
-    fig_w = theme["px_width"] / 100
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(fig_w, theme["row_height_inches"]),
-                                        gridspec_kw={'width_ratios': [2, 1, 6]})
-    fig.patch.set_alpha(0)
-
-    # --- Column 1: Text ---
-    ax1.axis('off')
-
-    # ADJUSTED: Moved from 0.60 to 0.70 to clear the bottom line
-    ax1.text(0, 0.80, row['task_name'],
-             fontsize=theme["font_main"],
-             weight='700',
-             color=theme["text_main"],
-             va='center',
-             ha='left',
-             transform=ax1.transAxes)
-
-    # ADJUSTED: Moved from 0.20 to 0.15 to add whitespace buffer
-    ax1.text(0, 0.01, row['age_label'],
-             fontsize=theme["font_sub"],
-             style='italic',
-             color=theme["text_sub"],
-             va='center',
-             ha='left',
-             transform=ax1.transAxes)
-
-    # --- Column 2: Stacked Bar ---
-    ax2.axis('off')
-    # Use a small vertical offset to center the bar relative to the two lines of text
-    e, l, t = row['median_extract_s'], row['median_load_s'], row['median_transform_s']
-    ax2.barh(0.4, e, color=theme["stack"][0], height=0.4)
-    ax2.barh(0.4, l, left=e, color=theme["stack"][1], height=0.4)
-    ax2.barh(0.4, t, left=e + l, color=theme["stack"][2], height=0.4)
-    ax2.set_xlim(0, max_median_sum * 1.05)
-    ax2.set_ylim(0, 1)  # Lock y-axis to keep bar centered
-
-    # --- Column 3: Sparkline ---
-    ax3.axis('off')
-    history = row['etl_time_s']
-    if len(history) > 0:
-        x = np.arange(len(history))
-        ax3.bar(x, history, color=theme["spark"], width=4)
-        ax3.bar(x[-1], history[-1], color=theme["stack"][0], width=0.7)
-    ax3.set_ylim(0, max_history_val)
-
-    buf = io.BytesIO()
-    # Ensure no clipping of the adjusted text
-    fig.savefig(buf, format="png", bbox_inches='tight', pad_inches=0.00, dpi=360)
-    plt.close(fig)
-    return base64.b64encode(buf.getvalue()).decode()
+# Ensure you have your db connection import
+from backend_functions.database_functions import get_conn
 
 
 def clean_pg_array(val):
-    # Data Cleaning
     if isinstance(val, list): return val
-    clean = re.sub(r'[{}]', '', str(val))
-    return [float(x) for x in clean.split(',') if x.strip()]
+    if not val or val == '{}': return []
+    # Remove braces and split
+    return [float(x) for x in str(val).strip('{}').split(',') if x]
+
 
 def render_task_summary_dashboard(is_dark_mode=True, is_mobile=False):
     st.write("__Task Summary__")
 
-    # Database retrieval (replace with your actual connection)
     df = pd.read_sql("SELECT * FROM tasks.vw_task_summary_chart", con=get_conn(alchemy=True))
     if df.empty: return
 
     df['etl_time_s'] = df['etl_time_s'].apply(clean_pg_array)
-    df['total_median'] = df['median_extract_s'] + df['median_load_s'] + df['median_transform_s']
+    df['row_index'] = range(len(df))
 
-    global_max_median = df['total_median'].max() or 1
-    global_max_history = df['max_elt'].max() or 1
-    theme = get_theme(is_dark_mode, is_mobile)
+    # Convert numeric columns to float to avoid Decimal issues
+    numeric_cols = ['median_extract_s', 'median_load_s', 'median_transform_s', 'max_elt']
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = df[col].astype(float)
 
-    # Build the HTML block
-    # Using a 1px border-bottom for the separators
+    # Prepare text labels
+    text_data = []
+    for idx, row in df.iterrows():
+        text_data.append({
+            'row_index': idx,
+            'task_name': row['task_name'],
+            'age_label': row['age_label'],
+        })
+    text_df = pd.DataFrame(text_data)
 
-    rows_html = ""
-    for _, row in df.iterrows():
-        img_b64 = render_row_to_base64(row, global_max_median, global_max_history, theme)
-        rows_html += f"""
-        <div style="border-bottom: 1px solid {theme['border']}; padding: 3px 0; width: {theme['px_width']}px;">
-            <img src="data:image/png;base64,{img_b64}" style="width: {theme['px_width']}px; display: block;">
-        </div>
-        """
-    # Wrap the entire thing in a fixed-width container
-    container_html = f"""
-    <div style="width: {theme['px_width']}px; font-family: sans-serif; margin: 0; padding: 0;">
-        {rows_html}
-    </div>
-    """
+    # Prepare stacked bar data
+    stack_data = []
+    for idx, row in df.iterrows():
+        stack_data.extend([
+            {'row_index': idx, 'type': 'Extract', 'value': float(row['median_extract_s']), 'order': 0},
+            {'row_index': idx, 'type': 'Load', 'value': float(row['median_load_s']), 'order': 1},
+            {'row_index': idx, 'type': 'Transform', 'value': float(row['median_transform_s']), 'order': 2}
+        ])
+    stack_df = pd.DataFrame(stack_data)
 
+    # Explode sparkline data with adjusted y-position
+    spark_data = []
+    max_val = float(df['max_elt'].max())
 
-    # Use components.html to lock the width and height
-    # We calculate height roughly as (row_count * 45px)
-    calculated_height = len(df) * 45
-    components.html(container_html, height=calculated_height, width=theme['px_width'] + 20)
+    for idx, row in df.iterrows():
+        history = row['etl_time_s']
+        for i, val in enumerate(history):
+            val_float = float(val)
+            normalized_val = (val_float / max_val) * 0.8
+            spark_data.append({
+                'row_index': idx,
+                'position': i,
+                'y_bottom': idx,
+                'y_top': idx + normalized_val,
+                'is_last': i == len(history) - 1
+            })
+    spark_df = pd.DataFrame(spark_data)
 
+    # Theme colors
+    text_color = "#e5e7eb" if is_dark_mode else "#0f172a"
+    sub_text_color = "#9ca3af" if is_dark_mode else "#64748b"
+    border_color = "#334155" if is_dark_mode else "#e2e8f0"
+
+    width = 450 if is_mobile else 750
+    row_height = 35
+    total_height = row_height * len(df)
+    sparkline_width = 400
+
+    # Column 1: Task names
+    # Calculate the max character length across both text fields
+    max_task_chars = df['task_name'].str.len().max()
+    max_age_chars = df['age_label'].str.len().max()
+
+    # Use the larger of the two
+    max_chars = max(max_task_chars, max_age_chars)
+
+    # 7px is a good estimate for size 11 bold,
+    # but you might want to add a small buffer (e.g., +10px) for the 'dx' offset
+    dynamic_width = (max_chars * 1) + 0
+    task_labels = alt.Chart(text_df).mark_text(
+        align='left',
+        baseline='bottom',
+        dx=0,
+        dy=-2,
+        fontSize=11,
+        fontWeight=700
+    ).encode(
+        y=alt.Y('row_index:O', axis=None),
+        text='task_name:N',
+        color=alt.value(text_color)
+    ).properties(width=dynamic_width, height=total_height)
+
+    # Age labels
+    age_labels = alt.Chart(text_df).mark_text(
+        align='left',
+        baseline='top',
+        dx=0,
+        dy=2,
+        fontSize=9,
+        fontStyle='italic'
+    ).encode(
+        y=alt.Y('row_index:O', axis=None),
+        text='age_label:N',
+        color=alt.value(sub_text_color)
+    ).properties(width=dynamic_width, height=total_height)
+
+    text_column = (task_labels + age_labels)
+
+    # Column 2: Stacked bars
+    bars = alt.Chart(stack_df).mark_bar(size=15).encode(
+        x=alt.X('value:Q', stack='zero', axis=None),
+        y=alt.Y('row_index:O', axis=None),
+        color=alt.Color('type:N',
+                        scale=alt.Scale(domain=['Extract', 'Load', 'Transform'],
+                                        range=['#3b82f6', '#f0690f', '#B7B7B7']),
+                        legend=None),
+        order='order:O'
+    ).properties(width=100, height=total_height)
+
+    # Column 3: Sparklines
+    sparks = alt.Chart(spark_df).mark_rect().encode(
+        x=alt.X('position:O', axis=None),
+        y=alt.Y('y_bottom:Q', axis=None, scale=alt.Scale(domain=[-0.1, len(df)])),
+        y2='y_top:Q',
+        color=alt.condition(
+            alt.datum.is_last,
+            alt.value('#3b82f6'),
+            alt.value('#475569')
+        )
+    ).properties(width=sparkline_width, height=total_height)
+
+    # Add row separators (same width as sparklines)
+    separators = alt.Chart(pd.DataFrame({'y': range(1, len(df))})).mark_rule(
+        strokeWidth=1,
+        color=border_color
+    ).encode(
+        y=alt.Y('y:Q', axis=None, scale=alt.Scale(domain=[-0.1, len(df)]))
+    ).properties(width=sparkline_width, height=total_height)
+
+    # Combine sparklines and separators
+    sparkline_column = sparks + separators
+
+    # Combine all columns
+    chart = alt.hconcat(
+        text_column,
+        bars,
+        sparkline_column,
+        spacing=15 # Adjust for horizontal gap between columns
+    ).configure_view(
+        strokeWidth=0
+    ).configure_concat(
+        spacing=0
+    ).configure(
+        # VITAL: This removes the "halo" of white space around the entire chart
+        padding={"left": -20, "top": 0, "right": 0, "bottom": 0}
+    )
+
+    st.altair_chart(chart, use_container_width=False)
     return
-

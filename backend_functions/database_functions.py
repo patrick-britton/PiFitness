@@ -162,3 +162,9 @@ def get_table_row_count(pg_schema, pg_table):
     return one_sql_result(q_sql)
 
 
+def performance_profiling(segment=None, code=None, time_ms=None):
+    sql = "INSERT INTO staging.temp_performance_profiling (segment, code, time_ms) VALUES (%s, %s, %s);"
+    params=(segment, code, int(time_ms))
+    qec(sql, params)
+    # print(rf)
+    return start_timer()
