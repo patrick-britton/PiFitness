@@ -2,6 +2,9 @@ import time
 import streamlit as st
 from streamlit import session_state as ss
 
+from frontend_functions.streamlit_helpers import ss_pop
+
+
 def nav_dictionary():
     d = {
         # Home page
@@ -11,6 +14,7 @@ def nav_dictionary():
              "running": {'icon': "sprint"},
              "food": {'icon': "local_dining"},
              "admin": {'icon':"shield_person"},
+             "health": {'icon': "cardiology"}
 
                   },
 
@@ -36,8 +40,13 @@ def nav_dictionary():
 
         # Running
         'running': {},
+        # Food page
+        'food': {},
 
-        'food': {}
+        # Health Page
+        'health': {'health_charting': {'icon': 'show_chart'},
+                   'photo_intake': {'icon': 'photo_camera' },
+                   'dimension_intake': {'icon': 'pregnancy'}}
     }
     return d
 
@@ -137,4 +146,14 @@ def nav_button(page_name=None, nav_title=None, custom_dict=None):
                          key=key_val,
                          on_change=update_nav,
                          args=(page_name, key_val, custom_dict))
+    return
+
+def clear_nav(page_name):
+    var_list = [f"{page_name}_current", f"{page_name}_active_decode", f"{page_name}_active"]
+    ss_pop(var_list)
+    return
+
+def clear_nav_and_rerun(page_name):
+    clear_nav(page_name)
+    st.rerun()
     return

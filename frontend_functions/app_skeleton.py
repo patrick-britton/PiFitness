@@ -3,6 +3,7 @@ from streamlit import session_state as ss
 from backend_functions.helper_functions import reverse_key_lookup
 from backend_functions.logging_functions import log_app_event, start_timer, elapsed_ms
 from frontend_functions.admin_module import render_admin_module
+from frontend_functions.health_module import render_health_module
 from frontend_functions.homepage import render_homepage
 from frontend_functions.music_module import render_music
 from frontend_functions.nav_buttons import nav_button, nav_widget
@@ -46,8 +47,10 @@ def render_skeleton():
         st.info('RUNNING NOT YET BUILT')
     elif nav_selection == 'food':
         st.info('FOOD NOT YET BUILT')
+    elif nav_selection == 'health':
+        render_health_module()
     else:
-        st.error('Uncaught navigation selection')
+        st.error(f'Uncaught skeleton navigation selection: {nav_selection}')
 
 
     st.write(f":gray[*Rendered in {elapsed_ms(t0)} ms*]")
