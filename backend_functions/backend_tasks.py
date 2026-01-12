@@ -65,7 +65,7 @@ def nightly_maintenance(days_to_keep=365):
 
         # 4. Log results
         tsql = """INSERT INTO logging.db_size_log (table_name, total_size_mb, table_size_mb, index_size_mb) 
-                SELECT * FROM logging.vw_db_size"""
+                SELECT table_name, total_size_mb, table_size_mb, index_size_mb FROM logging.vw_db_size"""
         qec(tsql)
 
         tsql = "SELECT SUM(total_size_mb) from logging.vw_db_size"
