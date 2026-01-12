@@ -70,7 +70,7 @@ def process_photo(front_file=None, side_file=None):
         ext = ext.lower().lstrip(".")
 
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        fn = f"{timestamp}_{photo_type}.{ext}"
+        fn = f"{photo_type}_{timestamp}.{ext}"
         fp = body_photo_path()
         save_path = os.path.join(fp,fn)
 
