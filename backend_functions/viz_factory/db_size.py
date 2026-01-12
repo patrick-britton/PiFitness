@@ -43,9 +43,11 @@ def render_db_size_dashboard(is_dark_mode=True, is_mobile=False):
     domain = ['table_size_mb', 'index_size_mb', 'other_size_mb']
 
     chart_width = 400 if is_mobile else 650
+    bar_size = chart_width / (len(df_hist_melted)/2.5)
+    bar_size = 1 if bar_size<1 else bar_size
 
     # --- PART 1: TOP CHART (GROWTH) ---
-    growth_chart = alt.Chart(df_hist_melted).mark_bar(width={'band': 0.2}).encode(
+    growth_chart = alt.Chart(df_hist_melted).mark_bar(size=bar_size, width={'band': 0.2}).encode(
         x=alt.X('date_utc:T', axis=alt.Axis(orient='bottom', format='%m-%d', title=None, grid=False, labelColor=sub_text_color)),
         y=alt.Y('sum(MB):Q', axis=alt.Axis(title=None, grid=False, labelColor=sub_text_color, offset=0)),
         color=alt.Color('Type:N', scale=alt.Scale(domain=domain, range=palette), legend=None),
@@ -69,11 +71,11 @@ def render_db_size_dashboard(is_dark_mode=True, is_mobile=False):
     size_labels = base_break.transform_calculate(
         label_text="format(datum.total_size_mb, ',.1f') + ' MB'"
     ).mark_text(
-        align='right', dx=-15, dy=12, fontSize=9, fontStyle='italic', color=sub_text_color
+        align='right', dx=-15, dy=9, fontSize=9, fontStyle='italic', color=sub_text_color
     ).encode(text='label_text:N')
 
     # Stacked Bars
-    break_bars = alt.Chart(df_break_melted).mark_bar(height=14).encode(
+    break_bars = alt.Chart(df_break_melted).mark_bar(height=10).encode(
         y=alt.Y('table_name:N', sort=None, axis=None),
         x=alt.X('sum(MB):Q', axis=None),
         color=alt.Color('Type:N', scale=alt.Scale(domain=domain, range=palette), legend=None),

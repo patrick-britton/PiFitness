@@ -27,4 +27,10 @@ def album_art_path():
     storage_root.mkdir(parents=True, exist_ok=True)
     return storage_root
 
+def body_photo_path():
+    project_root = Path(__file__).resolve().parent.parent
+    storage_root = project_root / "local_storage/body_photos"
+    storage_root.mkdir(parents=True, exist_ok=True)
+    return storage_root
+
 
