@@ -30,14 +30,14 @@ def render_health_charting():
 
 def render_photo_intake():
     st.file_uploader(label='__Front Image__:',
-                     type=None,
+                     type=["jpg", "jpeg", "png"],
                      accept_multiple_files=False,
                      key='key_front_photo',
                      on_change=process_photo,
                      args=('front',),
                      width = 400)
     st.file_uploader(label='__Side Image__:',
-                     type=None,
+                     type=["jpg", "jpeg", "png"],
                      accept_multiple_files=False,
                      key='key_side_photo',
                      on_change=process_photo,
