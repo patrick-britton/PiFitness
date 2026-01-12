@@ -8,19 +8,19 @@ from frontend_functions.nav_buttons import nav_widget, clear_nav_and_rerun
 
 
 def render_health_module():
-    nav_selection = nav_widget('health', 'Health Controls')
+    health_selection = nav_widget('health', 'Health Controls')
 
-    if nav_selection is None:
-        nav_selection == 'health_charting'
+    if not health_selection:
+        health_selection = 'health_charting'
 
-    if nav_selection == 'health_charting':
+    if health_selection == 'health_charting':
         render_health_charting()
-    elif nav_selection == 'photo_intake':
+    elif health_selection == 'photo_intake':
         render_photo_intake()
-    elif nav_selection == 'dimension_intake':
+    elif health_selection == 'dimension_intake':
         render_dimension_intake()
     else:
-        st.info(f'Uncaught health navigation choice: {nav_selection}')
+        st.info(f'Uncaught health navigation choice: {health_selection}')
     return
 
 def render_health_charting():

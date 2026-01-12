@@ -7,6 +7,7 @@ from frontend_functions.health_module import render_health_module
 from frontend_functions.homepage import render_homepage
 from frontend_functions.music_module import render_music
 from frontend_functions.nav_buttons import nav_button, nav_widget
+from frontend_functions.running_module import render_running_module
 from frontend_functions.streamlit_helpers import ss_debug
 
 
@@ -44,7 +45,7 @@ def render_skeleton():
     elif nav_selection == 'music':
         render_music()
     elif nav_selection == 'running':
-        st.info('RUNNING NOT YET BUILT')
+        render_running_module()
     elif nav_selection == 'food':
         st.info('FOOD NOT YET BUILT')
     elif nav_selection == 'health':
