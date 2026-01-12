@@ -29,52 +29,64 @@ def render_health_charting():
 
 
 def render_photo_intake():
-    st.file_uploader(label='__Front Image__:',
+
+    uff = st.file_uploader(label=f'__Front Image__:',
                      type=["jpg", "jpeg", "png"],
                      accept_multiple_files=False,
                      key='key_front_photo',
-                     on_change=process_photo,
-                     args=('front',),
                      width = 400)
-    st.file_uploader(label='__Side Image__:',
-                     type=["jpg", "jpeg", "png"],
-                     accept_multiple_files=False,
-                     key='key_side_photo',
-                     on_change=process_photo,
-                     args=('side',),
-                     width=400)
+
+    if uff is None:
+        return
+
+    ufs = st.file_uploader(label=f'__Side Image__:',
+                          type=["jpg", "jpeg", "png"],
+                          accept_multiple_files=False,
+                          key='key_side_photo',
+                          width=400)
+
+    if ufs is None:
+        return
+
+    if st.button(':material/save: Save images'):
+        process_photo(uff, ufs)
+        st.toast(f"Image saved successfully", duration=3)
+        uff = None
+        ufs = None
+        st.rerun()
+
     return
 
-def process_photo(photo_type=None):
-    if not photo_type:
+def process_photo(front_file=None, side_file=None):
+
+    if not front_file or not side_file:
         return
 
-    key_val = f"key_{photo_type}_photo"
+    file_list = [front_file, side_file]
+    photo_type = 'front'
+    for uploaded_file in [front_file, side_file]:
+        # ---------- Extension extraction ----------
+        _, ext = os.path.splitext(uploaded_file.name)
+        ext = ext.lower().lstrip(".")
 
-    uploaded_file = ss.get(key_val)
-    if not uploaded_file:
-        return
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        fn = f"{timestamp}_{photo_type}.{ext}"
+        fp = body_photo_path()
+        save_path = os.path.join(fp,fn)
 
-    # ---------- Extension extraction ----------
-    _, ext = os.path.splitext(uploaded_file.name)
-    ext = ext.lower().lstrip(".")
+        # ---------- Save file byte-for-byte ----------
+        file_bytes = uploaded_file.getbuffer()
 
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    fn = f"{timestamp}_{photo_type}.{ext}"
-    fp = body_photo_path()
-    save_path = os.path.join(fp,fn)
+        with open(save_path, "wb") as f:
+            f.write(file_bytes)
 
-    # ---------- Save file byte-for-byte ----------
-    file_bytes = uploaded_file.getbuffer()
+        ins_sql = f"""INSERT INTO health.photo_metadata (photo_type, file_name)
+                        VALUES (%s, %s)"""
+        params = [photo_type, fn]
+        qec(ins_sql,params)
+        st.toast(f"{photo_type} saved to {save_path}", duration=3)
+        photo_type = 'side'
 
-    with open(save_path, "wb") as f:
-        f.write(file_bytes)
-
-    ins_sql = f"""INSERT INTO health.photo_metadata (photo_type, file_name)
-                    VALUES (%s, %s)"""
-    params = [photo_type, fn]
-    qec(ins_sql,params)
-    st.toast(f"{photo_type} saved to {save_path}", duration=3)
     return
 
 def render_dimension_intake():
