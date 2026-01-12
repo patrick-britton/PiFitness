@@ -18,7 +18,11 @@ def get_playlist_list(list_type=None):
             WHERE NOT seeds_only and NOT auto_shuffle and NOT make_recs AND is_active and track_count > 0"""
     else:
         sql = """SELECT DISTINCT playlist_id from music.playlist_config WHERE
-                is_active AND (auto_shuffle or make_recs) and track_count > 0"""
+                is_active AND (auto_shuffle or make_recs or manual_shuffle) and track_count > 0
+                UNION
+                SELECT distinct child_playlist_id as playlist_id from music.playlist_relationships pr 
+                INNER JOIN music.playlist_config pc on pc.playlist_id = pr.parent_playlist_id and (pc.auto_shuffle or pc.manual_shuffle)
+                WHERE pr.child_playlist_type in ('auto','manual')"""
 
     return sql_to_list(sql)
 
