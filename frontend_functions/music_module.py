@@ -9,11 +9,12 @@ from streamlit import session_state as ss
 from backend_functions.database_functions import get_conn, qec, sql_to_list
 from backend_functions.file_handlers import album_art_path
 from backend_functions.music_functions import playlist_reset, playlist_upload, get_now_playing, add_isrc_to_local, \
-    record_recommendation_decision, remove_recommendation, add_into_current_ratings, save_matchup_results
+    record_recommendation_decision, remove_recommendation, add_into_current_ratings, save_matchup_results, \
+    playlist_to_db
 from backend_functions.service_logins import get_spotify_client
 from backend_functions.task_execution import task_executioner
 from frontend_functions.music_widgets import playlist_config_table, render_shuffle_df
-from frontend_functions.nav_buttons import nav_button, nav_widget
+from frontend_functions.nav_buttons import nav_button, nav_widget, clear_nav
 from frontend_functions.streamlit_helpers import ss_pop
 
 
@@ -71,13 +72,13 @@ def render_playlist_config():
     return
 
 
-def render_playlist_shuffle():
+def render_playlist_shuffle(list_id=None):
     # Forces users to pick a playlist, then gives them weighting options
     if ss.get("pl_selection") is None:
         key_val = 'de_playlist_config_df_selection'
         selection_value = ss.get(key_val)
         if not selection_value:
-            playlist_config_table(is_selection=True)
+            playlist_config_table(is_selection=True, list_id=list_id)
             return
         else:
             ss.pl_selection = selection_value["selection"]["rows"]
@@ -135,25 +136,31 @@ def render_playlist_shuffle():
 
     df = render_shuffle_df(rcw, rtw, rnw, mts)
 
-    if st.button(':material/cloud_upload: Send to Spotify'):
+    if st.button(f':material/cloud_upload: Send to Spotify :gray[*{df['target_playlist_id'].iloc[0]}*]'):
         track_list = df['track_id'].to_list()
         target_list_id = df['target_playlist_id'].iloc[0]
-        client = playlist_reset(client=None,
-                                list_id=target_list_id)
-        client = playlist_upload(client=client,
-                                 list_id=target_list_id,
-                                 track_list=track_list)
+        with st.spinner('Sending new order to Spotify', show_time=True):
+            client = playlist_reset(client=None,
+                                    list_id=target_list_id)
+            client = playlist_upload(client=client,
+                                     list_id=target_list_id,
+                                     track_list=track_list)
 
-        update_sql = f"""UPDATE music.playlist_config SET
-                        ratings_weight = {rtw},
-                        recency_weight={rcw},
-                        randomness_weight={rnw},
-                        minutes_to_sync={mts}
-                        WHERE playlist_id = '{id}';"""
-        qec(update_sql)
+        with st.spinner('Updating DB play order & config settings', show_time=True):
+            playlist_to_db(client=client, list_id=target_list_id, list_type=None)
+            update_sql = f"""UPDATE music.playlist_config SET
+                            ratings_weight = {rtw},
+                            recency_weight={rcw},
+                            randomness_weight={rnw},
+                            minutes_to_sync={mts}
+                            WHERE playlist_id = '{id}';"""
+            qec(update_sql)
         pop_list = ['shuffle_df',
                     'pl_selection',
-                    'pc_df']
+                    'pc_df',
+                    'listens_df','new_run_synced']
+        clear_nav('running')
+        clear_nav('music')
         ss_pop(pop_list)
         st.rerun()
     return

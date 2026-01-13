@@ -139,9 +139,8 @@ def task_executioner(force_task_name=None, force_task=False):
                 else:
                     cal_col = task.get("last_calendar_field")
                     if cal_col:
-                        pg_schema_table, pg_field_name = cal_col.rsplit('.', 1)
-                        pg_schema_name, pg_table_name = pg_schema_table.rsplit('.', 1)
-                        rc_before = get_table_row_count(pg_schema_name, pg_table_name)
+                        pg_schema, pg_table, ts_col, fact_col = cal_col.split(',')
+                        rc_before = get_table_row_count(pg_schema, pg_table, fact_col)
                     else:
                         rc_before = 0
 
@@ -221,14 +220,14 @@ def task_executioner(force_task_name=None, force_task=False):
                 if cal_col:
                     print(f"Sending Updated value to task.config")
                     print(f"Range Used: {date_list}")
-                    pg_schema_table, pg_field_name = cal_col.rsplit('.', 1)
-                    pg_schema_name, pg_table_name = pg_schema_table.rsplit('.', 1)
-                    rc_after = get_table_row_count(pg_schema_name, pg_table_name)
+                    pg_schema, pg_table, ts_col, fact_col = cal_col.split(',')
+
+                    rc_after = get_table_row_count(pg_schema, pg_table, fact_col)
                     if rc_after > rc_before:
                         print(f"Row Delta {rc_after-rc_before} : {rc_before}-->{rc_after}")
                         update_sql = f"""UPDATE tasks.task_config
-                                    SET updated_through_date = (SELECT MAX({pg_field_name}) FROM {pg_schema_table}) 
-                                    WHERE task_name = '{task_name}';"""
+                                    SET updated_through_date = (SELECT MAX({ts_col}) FROM {pg_schema}.{pg_table}) 
+                                    WHERE task_name = '{task_name}' AND {fact_col} IS NOT NULL;"""
                         qec(update_sql)
                         print(update_sql)
                     else:
