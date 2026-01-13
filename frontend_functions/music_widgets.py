@@ -10,8 +10,10 @@ from backend_functions.helper_functions import convert_to_json_serializable
 from frontend_functions.streamlit_helpers import sync_df_from_data_editor
 
 
-def playlist_config_table(is_selection=False):
+def playlist_config_table(is_selection=False, list_id=None):
     sql = """SELECT * FROM music.vw_playlist_config"""
+    if list_id:
+        sql = sql + f" WHERE playlist_id = '{list_id}';"
 
     ss.pc_df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
     # Convert entire dataframe to JSON-serializable types

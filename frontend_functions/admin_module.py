@@ -90,6 +90,8 @@ def render_service_submodule():
                        on_change=reconcile_with_postgres,
                        args=('service_df', "service_editor", 'api_services.api_service_list', 'api_service_name', col_config)
         )
+    return
+
 
 
 def render_password_submodule():

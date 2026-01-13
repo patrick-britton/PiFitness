@@ -157,8 +157,8 @@ def get_log_data(table_name):
     return df
 
 
-def get_table_row_count(pg_schema, pg_table):
-    q_sql = f"""SELECT COUNT(*) FROM {pg_schema}.{pg_table};"""
+def get_table_row_count(pg_schema, pg_table, fact_col):
+    q_sql = f"""SELECT COUNT(*) FROM {pg_schema}.{pg_table} WHERE {fact_col} IS NOT NULL;"""
     return one_sql_result(q_sql)
 
 
