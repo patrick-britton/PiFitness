@@ -31,13 +31,6 @@ def render_skeleton():
     if not nav_selection:
         nav_selection='home'
 
-    # Current options:
-    # {"home": {'icon': "home"},
-    #  'music': {'icon': "music_cast"},
-    #  "running": {'icon': "sprint"},
-    #  "food": {'icon': "local_dining"},
-    #  "admin": {'icon': "shield_person"}
-
     if nav_selection == 'home':
         render_homepage()
     elif nav_selection == 'admin':

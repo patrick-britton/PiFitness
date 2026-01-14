@@ -222,7 +222,12 @@ def gen_playlist(client, name, description):
 def auto_shuffle_playlists():
     sql = "SELECT DISTINCT playlist_id from music.playlist_config WHERE is_active and auto_shuffle"
     playlists = sql_to_list(sql)
-    client=None
+    client=get_spotify_client(None)
+    #only execute with a valid client
+    if client.get("client") is None:
+        log_app_event(cat='Playlist Shuffling', desc='Could not shuffle, bad client')
+        return
+
     for l in playlists:
         sql = f"""SELECT DISTINCT target_playlist_id, track_id,
             default_new_order 
@@ -234,8 +239,10 @@ def auto_shuffle_playlists():
 
         id = df['target_playlist_id'].iloc[0]
         track_list = df['track_id'].to_list()
-        client = playlist_reset(None, id)
+        client = playlist_reset(client, id)
+        time.sleep(1)
         client = playlist_upload(client, id, track_list)
+        log_app_event(cat='Playlist Shuffling', desc=f"Id = {id}")
         continue
     return
 

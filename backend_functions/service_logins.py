@@ -95,7 +95,7 @@ def get_spotify_client(incoming_token=None):
             log_api_event('Spotify', 'Token reuse: client still active', token_age=token_age)
             return incoming_token
         except Exception as e:
-            new_spotify_token=spotify_rate_limit_detection(log_msg='New Token from expired', token_age=token_age)
+            new_spotify_token=spotify_rate_limit_detection(log_msg=f'New Token from expired: {e}', token_age=token_age)
             return new_spotify_token
     else:
         log_api_event('Spotify', 'Token Reuse, check skipped', token_age=token_age)
@@ -121,13 +121,13 @@ def spotify_rate_limit_detection(log_msg, token_age):
     if is_rate_limited:
         new_spotify_token = insert_client(new_spotify_token, None)
         log_rate_limitation()
-        return new_spotify_token, True
+        return new_spotify_token
     else:
         sp = spotipy.Spotify(auth=new_spotify_token["token"])
         is_rate_limited, sleep_interval = rate_limit_test(sp)
         if is_rate_limited:
             new_spotify_token = insert_client(new_spotify_token, None)
-            update_sql = f""""UPDATE TABLE api_services.api_service LIST 
+            update_sql = f""""UPDATE api_services.api_service_list 
                             SET rate_limit_detected_utc = CURRENT_TIMESTAMP,
                             rate_limit_cleared_utc = CURRENT_TIMESTAMP + Interval '%s seconds'
                             WHERE api_service_name = 'Spotify';
@@ -135,11 +135,11 @@ def spotify_rate_limit_detection(log_msg, token_age):
             params = [sleep_interval,]
             qec(update_sql, params)
             log_api_event(service='Spotify', event='New rate limitations detected', token_age=0)
-            return new_spotify_token, True
+            return new_spotify_token
         else:
             new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
             log_api_event(service='Spotify', event=log_msg, token_age=token_age)
-            return new_spotify_token, False
+            return new_spotify_token
     return
 
 def rate_limit_test(sp):
