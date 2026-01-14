@@ -1,6 +1,8 @@
 import importlib
 import os
 import time
+
+import requests
 import spotipy
 from dotenv import load_dotenv
 from garminconnect import Garmin, GarminConnectAuthenticationError, GarminConnectTooManyRequestsError, \
@@ -118,48 +120,78 @@ def spotify_rate_limit_detection(log_msg, token_age):
                 WHERE api_service_name = 'Spotify'"""
     is_rate_limited = sql_rate_limited()
     new_spotify_token = get_spotify_token()
+    # SQL knows I'm already rate-limited
     if is_rate_limited:
         new_spotify_token = insert_client(new_spotify_token, None)
         log_rate_limitation()
         return new_spotify_token
-    else:
-        sp = spotipy.Spotify(auth=new_spotify_token["token"])
-        is_rate_limited, sleep_interval = rate_limit_test(sp)
-        if is_rate_limited:
-            new_spotify_token = insert_client(new_spotify_token, None)
-            update_sql = f""""UPDATE api_services.api_service_list 
-                            SET rate_limit_detected_utc = CURRENT_TIMESTAMP,
-                            rate_limit_cleared_utc = CURRENT_TIMESTAMP + Interval '%s seconds'
-                            WHERE api_service_name = 'Spotify';
-                            """
-            params = [sleep_interval,]
-            qec(update_sql, params)
-            log_api_event(service='Spotify', event='New rate limitations detected', token_age=0)
-            return new_spotify_token
-        else:
-            new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
-            log_api_event(service='Spotify', event=log_msg, token_age=token_age)
-            return new_spotify_token
+
+    # Test if any new rate limitations are in effect
+    is_rate_limited, sleep_interval = rate_limit_test(new_spotify_token["token"])
+    if is_rate_limited:
+        new_spotify_token = insert_client(new_spotify_token, None)
+        update_sql = f""""UPDATE api_services.api_service_list 
+                        SET rate_limit_detected_utc = CURRENT_TIMESTAMP,
+                        rate_limit_cleared_utc = CURRENT_TIMESTAMP + Interval '%s seconds'
+                        WHERE api_service_name = 'Spotify';
+                        """
+        params = [sleep_interval,]
+        qec(update_sql, params)
+        log_api_event(service='Spotify', event='New rate limitations detected', token_age=0)
+        return new_spotify_token
+
+    # Otherwise return a new token.
+    new_spotify_token = insert_client(new_spotify_token, sp_client(new_spotify_token))
+    log_api_event(service='Spotify', event=log_msg, token_age=token_age)
+    return new_spotify_token
     return
 
-def rate_limit_test(sp):
-    try:
-        # Fastest, cheapest authenticated call
-        sp.current_user()
+def sp_client(t):
+    c= spotipy.Spotify(
+        auth=t["token"],
+        retries=0,
+        status_retries=0,
+        requests_timeout=5,
+    )
+    return c
 
+
+def rate_limit_test(sp_token):
+    # 1. Get the token from your existing client
+    token = sp_token["token"]
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    # 2. Make the raw call (using the same endpoint Spotipy uses)
+    # Using a fake playlist or a known one. A GET request is safer/cheaper than replace_items.
+    playlist_id = '1zhLhV1j8y08gIH387MA2p'
+    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
+
+    try:
+        # We send an empty list to 'replace'—this is the same as your sp.playlist_replace_items
+        # Spotify's API uses PUT for replacing all items.
+        response = requests.put(url, headers=headers, json={"uris": []}, timeout=10)
+
+        # 3. Capture the 429 and the Retry-After header
+        if response.status_code == 429:
+            # requests.headers is case-insensitive
+            retry_after = response.headers.get("Retry-After")
+
+            if retry_after:
+                return True, int(retry_after)
+
+            # If 429 exists but header is missing, Spotify is being non-compliant.
+            return True, 120
+
+            # If 200, 201, or 404/403 (e.g. invalid playlist ID), you are NOT rate limited
         return False, None
 
-    except SpotifyException as e:
-        if e.http_status == 429:
-            retry_after = e.headers.get("Retry-After")
-
-            try:
-                sleep_seconds = int(retry_after)
-            except (TypeError, ValueError):
-                sleep_seconds = 5  # conservative fallback
-
-            return True, sleep_seconds
-    raise
+    except Exception as e:
+        print(f"Network error: {e}")
+        return True, 60
 
 def get_spotify_token():
     # Retrieve the Spotify credentials from the database

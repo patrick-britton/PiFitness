@@ -132,17 +132,23 @@ def playlist_upload(client=None, list_id=None, track_list=None):
     if not list_id or not track_list:
         return client
 
-    client = get_spotify_client(client)
     sp = client.get("client")
-    num_songs = len(track_list)
-    if num_songs < 100:
-        batch_size = num_songs
-    else:
-        batch_size = 100
 
-    for i in range(0, len(track_list), batch_size):
-        batch = track_list[i:i + batch_size]
-        if len(batch) > 0:
+    # 1. Take the first 100 tracks
+    first_batch = track_list[:100]
+    remaining_tracks = track_list[100:]
+
+    # 2. ATOMIC REPLACE: This clears the playlist AND adds the first 100 in ONE call.
+    # This is the lowest-cost "reset" possible.
+    sp.playlist_replace_items(list_id, first_batch)
+
+    # 3. Add remaining tracks in batches of 100 (POST requests)
+    if remaining_tracks:
+        for i in range(0, len(remaining_tracks), 100):
+            batch = remaining_tracks[i:i + 100]
+            # A 2-second sleep is usually enough between batches if you aren't doing
+            # dozens of playlists at once.
+            time.sleep(2)
             sp.playlist_add_items(list_id, batch)
     return client
 
@@ -239,8 +245,8 @@ def auto_shuffle_playlists():
 
         id = df['target_playlist_id'].iloc[0]
         track_list = df['track_id'].to_list()
-        client = playlist_reset(client, id)
-        time.sleep(1)
+        if l != playlists[0]:
+            time.sleep(5)
         client = playlist_upload(client, id, track_list)
         log_app_event(cat='Playlist Shuffling', desc=f"Id = {id}")
         continue
