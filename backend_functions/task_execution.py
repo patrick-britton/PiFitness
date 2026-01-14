@@ -104,7 +104,7 @@ def task_executioner(force_task_name=None, force_task=False):
                 execution_ctr += 1
 
                 update_task_through_date(task_name)
-                print(f"Logging Success fpr {task_name}")
+                print(f"Logging Success for {task_name}")
             except Exception as e:
                 print(f"Logging Failure for {task_name}: {e}")
 
