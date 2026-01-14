@@ -108,9 +108,9 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
         return client
 
     for l in playlists:
-        up_sql = "UPDATE music.playlist_config SET last_updated_utc = CURRENT_TIMESTAMP where playlist_id = %s"
-        parms = [l,]
-        qec(up_sql, parms)
+        up_sql = "UPDATE music.playlist_config SET last_synced = CURRENT_TIMESTAMP where playlist_id = %s"
+        params = [l,]
+        qec(up_sql, params)
 
     task_log(task_name=task_name,
              e_time=extract_ms,
