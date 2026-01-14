@@ -22,6 +22,7 @@ def rate_limit_widget():
         sql = "SELECT rate_limit_cleared_utc from api_services.api_service_list where api_service_name = 'Spotify'"
         until = one_sql_result(sql)
         st.write(f'Expires at: {until}')
+        ss.rate_limited = True
 
 
 

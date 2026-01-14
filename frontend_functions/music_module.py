@@ -40,6 +40,10 @@ def render_music():
     if not nav_selection:
         nav_selection='now_playing'
 
+    if ss.rate_limited and nav_selection in ('now_playing', 'listen_history', 'list_shuffle', 'sync_playlists'):
+        st.warning(':material/brightness_alert: Spotify currently rate limited')
+        return
+
     if nav_selection == 'now_playing':
         render_now_playing()
     elif nav_selection == 'listen_history':
@@ -168,6 +172,10 @@ def render_playlist_shuffle(list_id=None):
 
 def render_now_playing():
     # Intialize the client, if needed
+    if ss.rate_limited:
+        st.warning(':material/brightness_alert: Spotify currently rate limited')
+        return
+
     if "spotify_client" not in ss:
         ss.spotify_client = get_spotify_client()
 
