@@ -147,7 +147,7 @@ def render_playlist_shuffle(list_id=None):
                                      track_list=track_list)
 
         with st.spinner('Updating DB play order & config settings', show_time=True):
-            playlist_to_db(client=client, list_id=target_list_id, list_type=None)
+            playlist_to_db(client=client, list_id=target_list_id)
             update_sql = f"""UPDATE music.playlist_config SET
                             ratings_weight = {rtw},
                             recency_weight={rcw},

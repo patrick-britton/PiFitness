@@ -9,13 +9,11 @@ import time
 
 
 def get_playlist_list(list_type=None):
-
     sql = "SELECT * FROM music.vw_playlist_detail_sync_logic"
-
     return sql_to_list(sql)
 
 
-def playlist_to_db(client=None, list_id=None, list_type=None):
+def playlist_to_db(client=None, list_id=None):
     # Connects to Spotify API and downloads all tracks
     # Uploads JSON to DB, which is then processed via stored procedure.
 
@@ -23,18 +21,10 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
     t0 = start_timer()
 
     task_name = 'Playlist Detail Sync'
-    if not list_type:
-        list_type = 'auto'
-
-    if list_type == 'once':
-        task_name = 'One-time Seed Generation'
-    elif list_type == 'seeds':
-        task_name = 'Dynamic Seed Generation'
-
 
     # Put the single (or multiple) playlist into a list
     if not list_id:
-        playlists = get_playlist_list(list_type)
+        playlists = get_playlist_list()
     else:
         playlists = [list_id]
 
@@ -94,7 +84,7 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
     # Integrate Results
     t0 = start_timer()
     try:
-        sql = f"CALL staging.flatten_playlist_details('{list_type}');"
+        sql = f"CALL staging.flatten_playlist_details();"
         qec(sql)
         transform_ms = elapsed_ms(t0)
 
@@ -123,10 +113,10 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
 
 
 def playlist_sync_auto(client=None):
-    return playlist_to_db(client=client, list_id=None, list_type='auto')
+    return playlist_to_db(client=client, list_id=None)
 
 def playlist_sync_seeds(client=None):
-    return playlist_to_db(client=client, list_id=None, list_type='seeds')
+    return playlist_to_db(client=client, list_id=None)
 
 
 def playlist_reset(client=None, list_id=None):
