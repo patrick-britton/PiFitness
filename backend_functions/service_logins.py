@@ -5,10 +5,10 @@ import spotipy
 from dotenv import load_dotenv
 from garminconnect import Garmin, GarminConnectAuthenticationError, GarminConnectTooManyRequestsError, \
     GarminConnectConnectionError
-from spotipy import SpotifyOAuth
+from spotipy import SpotifyOAuth, SpotifyException
 from pathlib import Path
 from backend_functions.credential_management import decrypt_dict
-from backend_functions.database_functions import one_sql_result, get_conn
+from backend_functions.database_functions import one_sql_result, get_conn, qec
 from backend_functions.logging_functions import log_api_event, log_app_event, start_timer, elapsed_ms
 
 load_dotenv()
@@ -70,25 +70,23 @@ def garmin_creds():
 def get_spotify_client(incoming_token=None):
     # tests validity of incoming token and returns a client & token
     if incoming_token is None:
-        new_spotify_token = get_spotify_token()
-        new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
-        log_api_event('Spotify', 'New Token from none', token_age=0)
+        new_spotify_token=spotify_rate_limit_detection(log_msg='New Token, no preexisting provided', token_age=0)
         return new_spotify_token
 
-    if "token" not in incoming_token or "token_time" not in incoming_token:
-        new_spotify_token = get_spotify_token()
-        new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
-        log_api_event('Spotify', 'New Token from malformed dictionary', token_age=0)
+    if "token" not in incoming_token:
+        new_spotify_token=spotify_rate_limit_detection(log_msg='New Token from malformed dictionary (token)', token_age=0)
+        return new_spotify_token
+
+    if "token_age" not in incoming_token:
+        new_spotify_token=spotify_rate_limit_detection(log_msg='New Token from malformed dictionary (token age)', token_age=0)
         return new_spotify_token
 
     if incoming_token.get("client") is None:
-        new_spotify_token = get_spotify_token()
-        new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
-        log_api_event('Spotify', 'New Token from missing/none client', token_age=0)
+        new_spotify_token=spotify_rate_limit_detection(log_msg='New Token from missing/none client', token_age=0)
         return new_spotify_token
 
 
-    token_age = time.time() - incoming_token["token_time"]
+    token_age = time.time() - incoming_token["token_age"]
     max_age = 1800 # seconds
     if token_age > max_age: #test token validity
         try:
@@ -97,15 +95,71 @@ def get_spotify_client(incoming_token=None):
             log_api_event('Spotify', 'Token reuse: client still active', token_age=token_age)
             return incoming_token
         except Exception as e:
-            # dbf.log_entry(cat="API Login", desc=f"Token invalid @ {round(token_age / 60, 0)}m old.")
-            new_spotify_token = get_spotify_token()
-            new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
-            log_api_event('Spotify', 'New Token from expired', token_age=token_age)
+            new_spotify_token=spotify_rate_limit_detection(log_msg='New Token from expired', token_age=token_age)
             return new_spotify_token
     else:
         log_api_event('Spotify', 'Token Reuse, check skipped', token_age=token_age)
         return incoming_token
 
+
+def sql_rate_limited():
+    test_sql = """SELECT COALESCE(CURRENT_TIMESTAMP < rate_limit_cleared_utc, 1=0) as rate_limited
+                FROM api_services.api_service_list
+                WHERE api_service_name = 'Spotify'"""
+    return one_sql_result(test_sql)
+
+def log_rate_limitation():
+    log_api_event(service='Spotify', event='Under rate limitations', token_age=0)
+    return
+
+def spotify_rate_limit_detection(log_msg, token_age):
+    test_sql = """SELECT COALESCE(CURRENT_TIMESTAMP < rate_limit_cleared_utc, 1=0) as rate_limited
+                FROM api_services.api_service_list
+                WHERE api_service_name = 'Spotify'"""
+    is_rate_limited = sql_rate_limited()
+    new_spotify_token = get_spotify_token()
+    if is_rate_limited:
+        new_spotify_token = insert_client(new_spotify_token, None)
+        log_rate_limitation()
+        return new_spotify_token, True
+    else:
+        sp = spotipy.Spotify(auth=new_spotify_token["token"])
+        is_rate_limited, sleep_interval = rate_limit_test(sp)
+        if is_rate_limited:
+            new_spotify_token = insert_client(new_spotify_token, None)
+            update_sql = f""""UPDATE TABLE api_services.api_service LIST 
+                            SET rate_limit_detected_utc = CURRENT_TIMESTAMP,
+                            rate_limit_cleared_utc = CURRENT_TIMESTAMP + Interval '%s seconds'
+                            WHERE api_service_name = 'Spotify';
+                            """
+            params = [sleep_interval,]
+            qec(update_sql, params)
+            log_api_event(service='Spotify', event='New rate limitations detected', token_age=0)
+            return new_spotify_token, True
+        else:
+            new_spotify_token = insert_client(new_spotify_token, spotipy.Spotify(auth=new_spotify_token["token"]))
+            log_api_event(service='Spotify', event=log_msg, token_age=token_age)
+            return new_spotify_token, False
+    return
+
+def rate_limit_test(sp):
+    try:
+        # Fastest, cheapest authenticated call
+        sp.current_user()
+
+        return False, None
+
+    except SpotifyException as e:
+        if e.http_status == 429:
+            retry_after = e.headers.get("Retry-After")
+
+            try:
+                sleep_seconds = int(retry_after)
+            except (TypeError, ValueError):
+                sleep_seconds = 5  # conservative fallback
+
+            return True, sleep_seconds
+    raise
 
 def get_spotify_token():
     # Retrieve the Spotify credentials from the database
@@ -153,7 +207,7 @@ def get_spotify_token():
         log_api_event(service='Spotify', event='login with New Token')
         final_token = {"client": None,
                        "token": access_token,
-                       "token_time": login_time}
+                       "token_age": login_time}
         return final_token
     except Exception as e:
         log_api_event(service='Spotify', event='token acquisition failure', err=e)
@@ -184,7 +238,7 @@ def garmin_login():
     try:
         client = Garmin(email, password)
         client.login()
-        log_api_event(service='Garmin', event='login')
+        log_api_event(service='Garmin', event='Official login')
         return client
     except GarminConnectAuthenticationError as e:
         log_api_event(service='Garmin', event='login failure, authentication', err=e)
@@ -220,6 +274,7 @@ def get_garmin_client(incoming_token=None):
         new_token = {"client": garmin_login(),
                      "token": None,
                      "token_age": time.time()}
+        log_api_event('Garmin', 'Client was in token, but was None', token_age=0)
         return new_token
 
     token_age = time.time() - incoming_token["token_age"]

@@ -12,14 +12,15 @@ def nav_dictionary():
             {"home": {'icon': "home"},
              'music': {'icon':"music_cast"},
              "running": {'icon': "sprint"},
-             "food": {'icon': "local_dining"},
+             "health": {'icon': "cardiology"},
              "admin": {'icon':"shield_person"},
-             "health": {'icon': "cardiology"}
+             "food": {'icon': "local_dining"}
 
                   },
 
         # Admin Page
         'admin': {"admin_charting": {'icon': 'show_chart'},
+                  "service_status": {'icon': 'bigtop_updates'},
                   "task_mgmt": {'icon': "discover_tune", 'label': 'Task Mgmt'},
                   "task_exec": {'icon': "motion_play", 'label': 'Task Exec'},
                   "passwords": {'icon': "key_vertical", 'label': 'Passwords'},

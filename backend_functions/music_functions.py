@@ -42,6 +42,7 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
     if not playlists:
         return client
 
+    log_app_event(cat='Playlist Detail Sync', desc=f"Syncing songs from {len(playlists)}", exec_time=elapsed_ms(t0))
     # Refresh the client, if needed
     client = get_spotify_client(client)
     sp = client.get("client")
@@ -52,7 +53,7 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
     # Iterate through list of playlists
     for l in playlists:
         if l != playlists[0]:
-            time.sleep(10)
+            time.sleep(10) # Sleep for 10 seconds between playlists
         try:
             results = sp.playlist_items(playlist_id=l, additional_types=['track'])
         except Exception as e:
