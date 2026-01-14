@@ -4,6 +4,7 @@ from streamlit import session_state as ss
 import pandas as pd
 import time
 
+from backend_functions.admin_functions import get_runtime_status
 from backend_functions.backend_tasks import backup_database
 from backend_functions.credential_management import encrypt_dict
 from backend_functions.database_functions import get_conn, qec, sql_to_dict, get_sproc_list, get_log_data, \
@@ -38,6 +39,8 @@ def render_admin_module():
 
     if nav_selection == 'admin_charting':
         render_admin_charting()
+    elif nav_selection == 'service_status':
+        render_service_status()
     elif nav_selection == 'passwords':
         render_password_submodule()
     elif nav_selection == 'task_mgmt':
@@ -325,3 +328,27 @@ def render_task_exec_submodule():
 
 
     return
+
+
+def render_service_status():
+    status = get_runtime_status()
+    if status["mode"] == "local":
+        st.success(status["message"])
+
+    elif status["mode"] == "pi5":
+        st.subheader("Timer Status")
+        st.text(status["timer"].get("Active:", "Active: not found"))
+        st.text(status["timer"].get("Trigger:", "Trigger: not found"))
+
+        st.subheader("Service Status")
+        st.text(status["service"].get("Loaded:", "Loaded: not found"))
+        st.text(status["service"].get("Active:", "Active: not found"))
+
+        st.subheader("Recent Logs")
+        for line in status["service_logs"]:
+            st.text(line)
+
+    else:
+        st.error(status["message"])
+    return
+

@@ -9,9 +9,7 @@ from psycopg2.extras import execute_values
 from backend_functions.database_functions import sql_to_dict, qec, con_cur, get_table_row_count
 from backend_functions.helper_functions import get_sync_dates, get_last_date
 from backend_functions.logging_functions import start_timer, log_app_event, elapsed_ms
-
-
-
+from backend_functions.service_logins import sql_rate_limited
 
 
 def task_executioner(force_task_name=None, force_task=False):
@@ -30,11 +28,22 @@ def task_executioner(force_task_name=None, force_task=False):
         ###################################
         task_name = task.get('task_name')
         if force_task and force_task_name is not None and force_task_name != task_name:
+            msg = f"{task_name} skipped during force launch of {force_task_name}"
+            log_app_event(cat="Task Executioner", desc=msg, exec_time=elapsed_ms(all_task_start))
             continue
+
+        # If it's a Spotify task and we're under rate limitations, skip:
+        if task.get('api_service_name') == 'Spotify':
+            if sql_rate_limited():
+                msg = f"{task_name} skipped due to rate limitation"
+                log_app_event(cat="Task Executioner", desc=msg, exec_time=elapsed_ms(all_task_start))
+                continue
 
         if force_task and task_name == force_task_name:
             execution_type = 'forced'
             print(f"Forced execution of {force_task_name}")
+            msg = f"{task_name} forcibly launched"
+            log_app_event(cat="Task Executioner", desc=msg, exec_time=elapsed_ms(all_task_start))
         elif task.get("task_frequency") == 'Retired':
             execution_type = 'Retired'
         else:
@@ -44,12 +53,16 @@ def task_executioner(force_task_name=None, force_task=False):
         # Skip any retired/inactive tasks
         if execution_type == 'Retired':
             print(f"Skipping {task_name} : retired")
+            msg = f"{task_name} skipped as retired"
+            log_app_event(cat="Task Executioner", desc=msg, exec_time=elapsed_ms(all_task_start))
             continue
 
         # Skip the too-recently-executed tasks
         if execution_type == 'recency':
             recency_ctr += 1
             print(f"Skipping {task_name} : Recency")
+            msg = f"{task_name} skipped due to recency"
+            log_app_event(cat="Task Executioner", desc=msg, exec_time=elapsed_ms(all_task_start))
             continue
 
         # Skip tasks with too many consecutive failures
@@ -63,10 +76,14 @@ def task_executioner(force_task_name=None, force_task=False):
         if execution_type == 'timing' and not task.get("do_execute"):
             timing_ctr += 1
             print(f"Skipping {task_name} : scheduling")
+            msg = f"{task_name} skipped due to scheduling"
+            log_app_event(cat="Task Executioner", desc=msg, exec_time=elapsed_ms(all_task_start))
             continue
         ############################################################
         # Execute the prescribed function (e.g. database cleanup)
         ############################################################
+        msg = f"{task_name} execution beginning"
+        log_app_event(cat="Task Executioner", desc=msg, exec_time=elapsed_ms(all_task_start))
         if task.get("api_function") is None or task.get("api_function") == 'N/A':
             pf_t0 = start_timer()
             independent_logging_functions = ['playlist_sync_seeds',
@@ -114,6 +131,12 @@ def task_executioner(force_task_name=None, force_task=False):
                 svc_function = getattr(module, svc_function_name)
                 client_dict = svc_function(client_dict)
                 client = client_dict.get("client")
+                # skip task if there's an invalid client
+                if not client:
+                    task_log(task.get("task_name"),
+                         fail_type='Connection', fail_text='No Valid client')
+                    continue
+
                 loop_type = task.get("api_loop_type")
                 print(f"DEBUG: Loop type: {loop_type}")
 
