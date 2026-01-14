@@ -40,8 +40,10 @@ def process_new_run():
 
     # Sync All activities
     if ss.get("new_run_synced") is None:
-        task_executioner('Sync Garmin Activities')
-        ss.new_run_synced = True
+        with st.spinner('Making sure I have all known activities', show_time=True):
+            task_executioner('Sync Garmin Activities')
+            ss.new_run_synced = True
+
 
     # Get most recent activity details
     if ss.get("listens_df") is None:
@@ -59,9 +61,12 @@ def process_new_run():
         st.write(':gray[*make your selection above*]')
         return
 
+    if sel == 'No playlist':
+        st.info('What did you even come here for?')
+        return
+
 
     filtered_df = df[df['playlist_name'] == sel].copy()
-
     cols = ['track_order', 'track_name_clean', 'artist_display_name', 'played_at_utc']
     col_config = {'track_order': st.column_config.NumberColumn(label='#',
                                                                pinned=True,
