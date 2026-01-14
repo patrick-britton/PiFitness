@@ -10,19 +10,7 @@ import time
 
 def get_playlist_list(list_type=None):
 
-    if list_type == 'seeds':
-        sql = """SELECT DISTINCT playlist_id from music.playlist_config WHERE
-        seeds_only and track_count >0 """
-    elif list_type == 'once':
-        sql = """SELECT DISTINCT playlist_id from music.playlist_config
-            WHERE NOT seeds_only and NOT auto_shuffle and NOT make_recs AND is_active and track_count > 0"""
-    else:
-        sql = """SELECT DISTINCT playlist_id from music.playlist_config WHERE
-                is_active AND (auto_shuffle or make_recs or manual_shuffle) and track_count > 0
-                UNION
-                SELECT distinct child_playlist_id as playlist_id from music.playlist_relationships pr 
-                INNER JOIN music.playlist_config pc on pc.playlist_id = pr.parent_playlist_id and (pc.auto_shuffle or pc.manual_shuffle)
-                WHERE pr.child_playlist_type in ('auto','manual')"""
+    sql = "SELECT * FROM music.vw_playlist_detail_sync_logic"
 
     return sql_to_list(sql)
 
@@ -64,7 +52,7 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
     # Iterate through list of playlists
     for l in playlists:
         if l != playlists[0]:
-            time.sleep(2)
+            time.sleep(10)
         try:
             results = sp.playlist_items(playlist_id=l, additional_types=['track'])
         except Exception as e:
@@ -109,6 +97,7 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
         qec(sql)
         transform_ms = elapsed_ms(t0)
 
+
     except Exception as e:
         task_log(task_name=task_name,
                  e_time=extract_ms,
@@ -117,6 +106,11 @@ def playlist_to_db(client=None, list_id=None, list_type=None):
                  fail_type='No playlist items',
                  fail_text=f"{len(playlists)} playlist(s) attempted: {e}")
         return client
+
+    for l in playlists:
+        up_sql = "UPDATE music.playlist_config SET last_updated_utc = CURRENT_TIMESTAMP where playlist_id = %s"
+        parms = [l,]
+        qec(up_sql, parms)
 
     task_log(task_name=task_name,
              e_time=extract_ms,
@@ -133,8 +127,6 @@ def playlist_sync_auto(client=None):
 def playlist_sync_seeds(client=None):
     return playlist_to_db(client=client, list_id=None, list_type='seeds')
 
-def playlist_sync_one_time(client=None):
-    return playlist_to_db(client=client, list_id=None, list_type='once')
 
 def playlist_reset(client=None, list_id=None):
     if not list_id:
