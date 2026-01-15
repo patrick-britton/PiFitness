@@ -228,26 +228,45 @@ def gen_playlist(client, name, description):
 def auto_shuffle_playlists():
     sql = "SELECT DISTINCT playlist_id from music.playlist_config WHERE is_active and auto_shuffle"
     playlists = sql_to_list(sql)
+    print('Starting AUtoshuffle')
+    if not playlists:
+        print('No Playlists found to shuffle')
+        return
+
+    print(f"{len(playlists)} Playlists to shuffle")
+
     client=get_spotify_client(None)
     #only execute with a valid client
     if client.get("client") is None:
         log_app_event(cat='Playlist Shuffling', desc='Could not shuffle, bad client')
+        print('Client bad, cannot shuffle')
         return
 
     for l in playlists:
+        print(f'Pulling new order for list: {l}')
         sql = f"""SELECT DISTINCT target_playlist_id, track_id,
             default_new_order 
             FROM music.vw_playlist_isrc_stats WHERE playlist_id = '{l}'
             ORDER BY default_new_order asc;"""
         df = pd.read_sql(sql, get_conn(alchemy=True))
         if df.empty:
+            print(f'No songs found for list: {l}')
             continue
 
         id = df['target_playlist_id'].iloc[0]
+        print(f"Target Playlist ID: {id} -- sourced from {l}")
         track_list = df['track_id'].to_list()
+        if not track_list:
+            print(f'No tracks found for list {id}')
+        else:
+            print(f"{len(track_list)} tracks found for list {id}")
+
         if l != playlists[0]:
+            print(f"Sleeping for 5 seconds to avoid rate limits")
             time.sleep(5)
+        print('Sending track list to Spotify')
         client = playlist_upload(client, id, track_list)
+        print(f"List {l}/{id} successfully shuffled.")
         log_app_event(cat='Playlist Shuffling', desc=f"Id = {id}")
         continue
     return

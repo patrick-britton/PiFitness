@@ -100,8 +100,15 @@ def get_spotify_client(incoming_token=None):
             new_spotify_token=spotify_rate_limit_detection(log_msg=f'New Token from expired: {e}', token_age=token_age)
             return new_spotify_token
     else:
-        log_api_event('Spotify', 'Token Reuse, check skipped', token_age=token_age)
-        return incoming_token
+        try:
+            cl = incoming_token.get("client")
+            cl.current_user()
+            log_api_event('Spotify', 'Token reuse: client still active', token_age=token_age)
+            return incoming_token
+        except Exception as e:
+            new_spotify_token=spotify_rate_limit_detection(log_msg=f'New Token, non-timing error: {e}', token_age=token_age)
+            return new_spotify_token
+
 
 
 def sql_rate_limited():
@@ -156,9 +163,15 @@ def sp_client(t):
     return c
 
 
-def rate_limit_test(sp_token):
+def rate_limit_test(sp_token=None):
     # 1. Get the token from your existing client
+
+    # Build token if not passed
+    if not sp_token:
+        sp_token = get_spotify_token()
+
     token = sp_token["token"]
+
 
     headers = {
         "Authorization": f"Bearer {token}",

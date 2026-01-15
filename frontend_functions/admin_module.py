@@ -66,6 +66,9 @@ def render_admin_charting():
 
     elif nav_selection == 'db_size':
         render_db_size_dashboard(is_dark_mode=ss.get("is_dark_mode"), is_mobile=ss.get("is_mobile"))
+
+    elif nav_selection == 'log_review':
+        render_log_file()
     else:
         st.error(f'Uncaught admin charting navigation: {nav_selection}')
     return
@@ -352,3 +355,62 @@ def render_service_status():
         st.error(status["message"])
     return
 
+def render_log_file():
+    st.write("__Log Display__")
+    base_sql = "SELECT * FROM logging.vw_all_event_history WHERE 1=1 "
+
+    search_col, type_col, ig_skip_col = st.columns(spec=[2,2,1], border=False, gap="small")
+
+    with search_col:
+        search_val = st.text_input("Search for:", value=None)
+
+
+    with ig_skip_col:
+        errors_only = st.checkbox(label='Errors only', value=False)
+        ignore_skips = st.checkbox(label='Ignore Skips', value=False)
+
+    with type_col:
+        type_val = st.segmented_control(label='Event Type',
+                                        options=['Login', 'App Event', 'Task Execution', 'All'],
+                                        default='All')
+
+    if search_val and len(search_val) > 2:
+        base_sql = f"""{base_sql} AND event_type || description || error_text LIKE '%%{search_val}%%' """
+
+    if errors_only:
+        base_sql = f"{base_sql} AND is_error "
+
+    if ignore_skips:
+        base_sql = f"{base_sql} AND not_skip_row  "
+
+    if type_val and type_val!= 'All':
+        base_sql = f"{base_sql} AND event_type = '{type_val}' "
+
+    base_sql = f"{base_sql} LIMIT 250"
+    print(base_sql)
+    df = pd.read_sql(base_sql, con=get_conn(alchemy=True))
+
+    if df.empty:
+        st.info('No events found')
+        return
+
+
+    cols = ['event_time_utc', 'event_type', 'description', 'error_text']
+    col_config = {'event_time_utc': st.column_config.DatetimeColumn(label='@',
+                                                                    format='distance',
+                                                                    pinned=True,
+                                                                    disabled=True,
+                                                                    width="small"),
+                  'event_type': st.column_config.TextColumn(label='Event Type',
+                                                            pinned=False,
+                                                            disabled=True,
+                                                            width="small"),
+                  'description': st.column_config.TextColumn(label='Description',
+                                                             width="large",
+                                                             disabled=True),
+                  'error_text': st.column_config.TextColumn(label='Error Text',
+                                                             width="large",
+                                                             disabled=True
+                                                            )}
+    st.dataframe(df, column_order=cols, column_config=col_config, hide_index=True, on_select="ignore")
+    return
