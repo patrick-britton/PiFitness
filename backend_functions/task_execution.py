@@ -249,9 +249,11 @@ def task_executioner(force_task_name=None, force_task=False):
 
                     print(f"Row Delta {rc_after-rc_before} : {rc_before}-->{rc_after}")
                     update_sql = f"""UPDATE tasks.task_config
-                                SET updated_through_date = (SELECT MAX({ts_col}::DATE) FROM {pg_schema}.{pg_table} WHERE {fact_col} IS NOT NULL;) 
+                                SET updated_through_date = (SELECT MAX({ts_col}::DATE) FROM {pg_schema}.{pg_table} WHERE {fact_col} IS NOT NULL) 
                                 WHERE task_name = '{task_name}';"""
-                    qec(update_sql)
+                    rf = qec(update_sql)
+                    print(f"DEBUG: SQL used: {update_sql}")
+                    print(f"DEBUG: Update returns: {rf}")
 
                     print("Update Complete")
             else:
