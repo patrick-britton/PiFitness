@@ -246,21 +246,13 @@ def task_executioner(force_task_name=None, force_task=False):
                     pg_schema, pg_table, ts_col, fact_col = cal_col.split(',')
 
                     rc_after = get_table_row_count(pg_schema, pg_table, fact_col)
-                    if rc_after > rc_before:
-                        print(f"Row Delta {rc_after-rc_before} : {rc_before}-->{rc_after}")
-                        update_sql = f"""UPDATE tasks.task_config
-                                    SET updated_through_date = (SELECT MAX({ts_col}) FROM {pg_schema}.{pg_table}) 
-                                    WHERE task_name = '{task_name}' AND {fact_col} IS NOT NULL;"""
-                        qec(update_sql)
-                        print(update_sql)
-                    else:
-                        print(f"Row Delta {rc_after - rc_before} : {rc_before}-->{rc_after}")
-                        through_date = get_last_date(date_list)
-                        update_sql = f"""UPDATE tasks.task_config 
-                                    SET updated_through_date = %s::DATE 
-                                    WHERE task_name = %s"""
-                        params = (through_date, task_name)
-                        qec(update_sql, params)
+
+                    print(f"Row Delta {rc_after-rc_before} : {rc_before}-->{rc_after}")
+                    update_sql = f"""UPDATE tasks.task_config
+                                SET updated_through_date = (SELECT MAX({ts_col}::DATE) FROM {pg_schema}.{pg_table} WHERE {fact_col} IS NOT NULL;) 
+                                WHERE task_name = '{task_name}';"""
+                    qec(update_sql)
+
                     print("Update Complete")
             else:
                 # non-range task, update task with today
