@@ -47,7 +47,7 @@ def render_music():
     if nav_selection == 'now_playing':
         render_now_playing()
     elif nav_selection == 'listen_history':
-        st.info(f"{nav_selection} module not yet built")
+        render_recent_plays()
     elif nav_selection == 'list_config':
         render_playlist_config()
     elif nav_selection == 'list_shuffle':
@@ -449,3 +449,61 @@ def album_image_retrieval(album_id):
         f.write(resp.content)
 
     return filepath
+
+
+def render_recent_plays():
+    title_col, num_col = st.columns(spec=[3,1], border=False, gap="small")
+    with title_col:
+        st.write("__Recent Plays__")
+
+    with num_col:
+        num_tracks = st.number_input(label='', label_visibility='collapsed',
+                                     min_value=10,
+                                     max_value=100,
+                                     value=20,
+                                     step=10)
+
+    sql = f"""SELECT * FROM (SELECT * FROM music.vw_recent_plays) LIMIT {num_tracks}"""
+    df = pd.read_sql(sql, con=get_conn(alchemy=True))
+    cols = ['last_played_at_utc',
+            'track_artist',
+            'rating',
+            'playcount_last_30',
+            'playcount_total']
+
+    max_pc_30 = int(df['max_playcount_last_30'].iloc[0])
+    max_pc = int(df['max_playcount_total'].iloc[0])
+    max_elo = int(df['max_elo'].iloc[0])
+    min_elo = int(df['min_elo'].iloc[0])
+
+    col_config = {'last_played_at_utc': st.column_config.DatetimeColumn(label='@',
+                                                                        pinned=True,
+                                                                        format='distance',
+                                                                        width="small",
+                                                                        disabled=True),
+                  'track_artist': st.column_config.TextColumn(label='Track / Artist / Playlist',
+                                                           pinned=False,
+                                                           disabled=True,
+                                                           width="large"),
+                  'rating': st.column_config.ProgressColumn(label='Rating',
+                                                            width="small",
+                                                            min_value=min_elo,
+                                                            max_value=max_elo,
+                                                            format='%d'),
+                  'playcount_last_30': st.column_config.ProgressColumn(label='# Last 30',
+                                                                       min_value=0,
+                                                                       max_value=max_pc_30,
+                                                            format='%d',
+                                                                       width="small"),
+                  'playcount_total': st.column_config.ProgressColumn(label='Total Plays',
+                                                                       min_value=0,
+                                                                       max_value=max_pc,
+                                                            format='%d',
+                                                                       width="small")
+                  }
+
+    st.dataframe(df,
+                 column_order=cols,
+                 column_config=col_config,
+                 hide_index=True,
+                 on_select="ignore")

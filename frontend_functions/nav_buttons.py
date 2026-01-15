@@ -28,10 +28,11 @@ def nav_dictionary():
                   },
 
         'admin_charting': {'task_summary': {'icon': 'checklist', 'label': 'Tasks'},
+                           'log_review': {'icon': 'browse_activity', 'label': 'Log'},
                            'db_size': {'icon': 'database', 'label': 'DB Size'}},
         # Music Page
         'music': {'now_playing': {'icon': 'radio', 'label': 'Now Playing'},
-                  'listen_history': {'icon': 'download', 'label': 'Sync History'},
+                  'listen_history': {'icon': 'download', 'label': 'Recently Heard'},
                   'list_config': {'icon': 'tune', 'label': 'Playlist Config'},
                   'list_shuffle': {'icon': 'shuffle', 'label': 'Playlist Shuffle'},
                   'track_ratings': {'icon': 'voting_chip', 'label': 'Ratings'},
