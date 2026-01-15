@@ -127,7 +127,7 @@ def spotify_rate_limit_detection(log_msg, token_age):
         return new_spotify_token
 
     # Test if any new rate limitations are in effect
-    is_rate_limited, sleep_interval = rate_limit_test(new_spotify_token["token"])
+    is_rate_limited, sleep_interval = rate_limit_test(new_spotify_token)
     if is_rate_limited:
         new_spotify_token = insert_client(new_spotify_token, None)
         update_sql = f""""UPDATE api_services.api_service_list 

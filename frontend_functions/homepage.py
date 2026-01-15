@@ -23,6 +23,8 @@ def rate_limit_widget():
         until = one_sql_result(sql)
         st.write(f'Expires at: {until}')
         ss.rate_limited = True
+    else:
+        ss.rate_limited = False
 
 
 
