@@ -122,7 +122,7 @@ def get_sproc_list(append_option=None):
             routine_definition,
             routine_schema
         FROM information_schema.routines
-        WHERE routine_type = 'PROCEDURE'
+        WHERE routine_type = 'PROCEDURE' and routine_schema = 'staging'
         ORDER BY routine_name"""
     conn = get_conn()
     cursor = conn.cursor()

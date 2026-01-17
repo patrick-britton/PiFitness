@@ -16,6 +16,7 @@ from backend_functions.service_logins import test_login, get_service_list
 from backend_functions.task_execution import task_executioner
 from backend_functions.viz_factory.db_size import render_db_size_dashboard
 from backend_functions.viz_factory.task_summary import render_task_summary_dashboard
+from frontend_functions.admin_task_management import render_task_id_management
 from frontend_functions.nav_buttons import nav_button, nav_widget
 from frontend_functions.streamlit_helpers import reconcile_with_postgres
 
@@ -49,8 +50,12 @@ def render_admin_module():
         render_task_exec_submodule()
     elif nav_selection == 'services':
         render_service_submodule()
+    elif nav_selection == 'task_management':
+        render_task_id_management()
     else:
         st.error('Uncaught admin nav selection')
+
+
     return
 
 
