@@ -1,6 +1,6 @@
 import time
 
-from fsspec.registry import default
+
 from streamlit import session_state as ss, column_config
 import streamlit as st
 import pandas as pd
