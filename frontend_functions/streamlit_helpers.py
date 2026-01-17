@@ -280,3 +280,16 @@ def ss_pop(var_list):
             del ss[var]
 
     return
+
+def sse(var, bool_flag=False):
+    if var not in ss:
+        return False
+
+    var_val = ss.get(var)
+    if var_val is None:
+       return False
+
+    if bool_flag and not var_val:
+        return False
+
+    return True

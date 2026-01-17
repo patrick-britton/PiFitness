@@ -24,7 +24,8 @@ def nav_dictionary():
                   "task_mgmt": {'icon': "discover_tune", 'label': 'Task Mgmt'},
                   "task_exec": {'icon': "motion_play", 'label': 'Task Exec'},
                   "passwords": {'icon': "key_vertical", 'label': 'Passwords'},
-                  "services": {'icon': "api", 'label': 'API Mgmt'}
+                  "services": {'icon': "api", 'label': 'API Mgmt'},
+                  "task_management": {'icon': 'tune', 'label': 'BETA TASK MGMT'}
                   },
 
         'admin_charting': {'task_summary': {'icon': 'checklist', 'label': 'Tasks'},
@@ -50,7 +51,12 @@ def nav_dictionary():
         # Health Page
         'health': {'health_charting': {'icon': 'show_chart'},
                    'photo_intake': {'icon': 'photo_camera' },
-                   'dimension_intake': {'icon': 'pregnancy'}}
+                   'dimension_intake': {'icon': 'pregnancy'}},
+
+        # Task Management
+        'task_management': {'create_task': {'icon': 'add_circle', 'label': 'New Task'},
+                            'edit_task': {'icon': 'edit', 'label': 'Edit Task'},
+                            'task_reset': {'icon': 'reset_settings'}}
     }
     return d
 
