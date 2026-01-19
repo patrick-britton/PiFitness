@@ -31,6 +31,7 @@ def ultimate_task_executioner(force_task_name=None):
         return
 
     for task_dict in task_list:
+        task_t0 = start_timer()
         task_id = task_dict.get('task_id')
         task_name = task_dict.get('task_name')
         continue_execution = verify_execution(task_id, task_dict, force_task_name)
@@ -45,7 +46,14 @@ def ultimate_task_executioner(force_task_name=None):
         run_python = python_function and python_function != 'N/A'
 
         if run_elt:
-            json_blob, client_dict = extract_json(task_dict.get('json'), client_dict)
+            try:
+                extract_t0 = start_timer()
+                json_blob, client_dict = extract_json(task_dict.get('json'), client_dict)
+                extract_time_ms = elapsed_ms(extract_t0)
+            except Exception as e:
+                print(f"{task_name}: Load failure: {e}")
+                task_log(task_name, )
+                load_t0 = start_timer()
             json_loading(json_blob, task_id)
             # postgres_flattening()
 
@@ -160,16 +168,18 @@ def valid_hour(hour, d):
     return d.get('task_start_hour') <= hour <= d.get('task_end_hour')
 
 
-def task_log(task_name=None, e_time=None, l_time=None, t_time=None, fail_type=None, fail_text=None):
+def task_log(task_id=None, e_time=None, l_time=None, t_time=None, i_time=None, f_time=None, fail_type=None, fail_text=None):
     insert_sql = """INSERT INTO logging.task_executions (
-                              task_name,
+                              task_id,
                               extract_time_ms,
                               load_time_ms,
                               transform_time_ms,
+                              interpolation_time_ms,
+                              forecast_time_ms,
                               failure_type,
                               error_text) VALUES (
-     %s, %s, %s, %s, %s, %s)"""
-    params = (task_name, e_time, l_time, t_time, fail_type, fail_text)
+                                   %s, %s, %s, %s, %s, %s, %s, %s)"""
+    params = (task_id, e_time, l_time, t_time, i_time, f_time, fail_type, fail_text)
     qec(insert_sql, params)
     return
 
