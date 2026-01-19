@@ -156,9 +156,10 @@ def render_playlist_shuffle(list_id=None):
                             ratings_weight = {rtw},
                             recency_weight={rcw},
                             randomness_weight={rnw},
-                            minutes_to_sync={mts}
-                            WHERE playlist_id = '{id}';"""
-            qec(update_sql)
+                            minutes_to_sync={mts},
+                            last_auto_shuffled_utc = CURRENT_TIMESTAMP
+                            WHERE playlist_id in (%s, %s);"""
+            qec(update_sql, p=[id, target_list_id])
         pop_list = ['shuffle_df',
                     'pl_selection',
                     'pc_df',

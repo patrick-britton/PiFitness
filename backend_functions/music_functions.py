@@ -226,9 +226,9 @@ def gen_playlist(client, name, description):
 
 
 def auto_shuffle_playlists():
-    sql = "SELECT DISTINCT playlist_id from music.playlist_config WHERE is_active and auto_shuffle"
+    sql = "SELECT DISTINCT playlist_id from music.vw_playlist_shuffle_eligibility "
     playlists = sql_to_list(sql)
-    print('Starting AUtoshuffle')
+    print('Starting Autoshuffle')
     if not playlists:
         print('No Playlists found to shuffle')
         return
@@ -267,6 +267,9 @@ def auto_shuffle_playlists():
         print('Sending track list to Spotify')
         client = playlist_upload(client, id, track_list)
         print(f"List {l}/{id} successfully shuffled.")
+        up_sql = f"""UPDATE music.playlist_config SET last_auto_shuffled_utc = CURRENT_TIMESTAMP
+                    WHERE playlist_id in (%s, %s)"""
+        qec(up_sql, p=[l, id])
         log_app_event(cat='Playlist Shuffling', desc=f"Id = {id}")
         continue
     return
