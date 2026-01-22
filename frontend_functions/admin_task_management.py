@@ -108,7 +108,24 @@ def insta_task_create():
     ins_sql = "INSERT INTO tasks.task_configuration (task_name) VALUES (%s)"
     qec(ins_sql,['placeholder_task',])
     st.rerun()
+    return
 
+
+def inst_staging_create(d):
+    task_id = int(d.get("task_id"))
+    sel_sql = f"""SELECT MIN(staging_id) 
+                FROM tasks.staging_configuration
+                where staging_name = 'placeholder' and task_id = {task_id};"""
+    id_val = one_sql_result(sel_sql)
+
+    if id_val:
+        ss.selected_staging_id = id_val[0]
+        st.rerun()
+
+    ins_sql = "INSERT INTO tasks.staging_configuration (task_id, staging_name) VALUES (%s, %s)"
+    qec(ins_sql, [task_id, 'placeholder'])
+    st.rerun()
+    return
 
 
 def render_task_edit(task_id):
@@ -141,11 +158,11 @@ def render_task_edit(task_id):
             if not is_failure:
                 msg = f"{msg}Last Failed: {d.get('last_failed_utc')}  \n"
             else:
-                msg = f"{msg}:red[__"
-            msg = f"{msg}Most recent failure: {d.get('last_failure_message')}  \n"
-            msg = f"{msg}Consecutive Failures: {d.get('consecutive_failures')} "
+                msg = f"{msg}:red["
+            msg = f"{msg}__Most recent failure: {d.get('last_failure_message')}__  \n"
+            msg = f"{msg}__Consecutive Failures: {d.get('consecutive_failures')}__ "
             if is_failure:
-                msg = f"{msg}__]"
+                msg = f"{msg}]"
         else:
             msg = f"{msg} No recorded failures"
 
@@ -201,7 +218,7 @@ def render_task_edit(task_id):
                 task_stop_hour=23
 
     with st.container(border=True):
-        st.write('__:material/rebase: Data Processing__')
+        st.write('__:material/file_json: Extraction__')
         col1, col2 = st.columns(spec=[1,3], gap="medium", border=False)
         with col1:
             api_service_name = st.segmented_control(label='API Service',
@@ -217,21 +234,10 @@ def render_task_edit(task_id):
             api_parameters = st.text_input(label='API Parameters',
                                            value=d.get('api_parameters'))
 
-
-        api_post_processing_sproc = st.segmented_control(label='API Post-Processing',
-                                                         options=ss.sproc_list,
-                                                         default=d.get('api_post_processing_sproc'))
-        cross_join_condition = st.text_input(label='Cross join condition:',
-                                             value=d.get('cross_join_condition'))
-        filter_condition = st.text_input(label='Filter Condition:',
-                                             value=d.get('filter_condition'))
-        timestamp_extraction_sql = st.text_input(label='Timestamp Extraction SQL:',
-                                         value=d.get('timestamp_extraction_sql'))
-
     if len(task_name) < 4:
         st.info("Name must be more than 4 characters")
     else:
-        if st.button(':material/Save: Save Changes'):
+        if st.button(':material/Save: Save Changes', type="primary"):
             update_sql = """UPDATE tasks.task_configuration SET 
                             task_name = %s,
                             display_icon = %s,
@@ -244,12 +250,8 @@ def render_task_edit(task_id):
                             api_service_name = %s,
                             api_function_name = %s,
                             api_loop_type = %s,
-                            api_post_processing_sproc = %s,
                             api_parameters = %s,
-                            python_function = %s,
-                            cross_join_condition = %s,
-                            filter_condition = %s,
-                            timestamp_extraction_sql = %s
+                            python_function = %s
                             WHERE task_id = %s
                             """
             params = [task_name,
@@ -263,34 +265,105 @@ def render_task_edit(task_id):
                       api_service_name,
                       api_function_name,
                       api_loop_type,
-                      api_post_processing_sproc,
                       api_parameters,
                       python_function,
-                      cross_join_condition,
-                      filter_condition,
-                      timestamp_extraction_sql,
                       int(task_id)]
             returns = qec(update_sql, params)
             st.write(returns)
-            # st.write(params)
-            # ss_pop("selected_task_id")
-            # st.rerun()
-    st.divider()
-    st.write(f"__Fact Management__")
-    render_fact_management(task_id)
+
+    if api_service_name:
+        render_staging_config(d)
+
 
     return
 
+def render_staging_config(task_dict):
+    task_id = task_dict.get('task_id')
+    staging_sql = f"SELECT * FROM tasks.staging_configuration WHERE task_id = {task_id} ORDER BY staging_id"
+    staging_dict = sql_to_dict(staging_sql)
 
-def render_fact_management(task_id):
+    # if st.button(':material/add: Add Staging Step:')
+    if staging_dict:
+        render_iterative_staging(staging_dict)
+
+    if st.button(':material/add_circle: Add new staging step'):
+        inst_staging_create(task_dict)
+
+    if sse('selected_task_id') and sse('selected_staging_id'):
+        render_fact_management(ss.selected_task_id, ss.selected_staging_id)
+    return
+
+
+def update_staging(col_id, key_prefix, stg_d):
+    key_str = f"{key_prefix}_{col_id}"
+    key_val = ss.get(key_str)
+    if not key_val:
+        key_val = 'N/A'
+
+    up_sql = f"""UPDATE tasks.staging_configuration SET {col_id} = %s WHERE task_id = %s and staging_id = %s"""
+    params = [key_val, int(stg_d.get('task_id')), int(stg_d.get('staging_id'))]
+    qec(up_sql, params)
+    st.toast(f"{col_id} saved", duration=3)
+    st.rerun()
+    return
+
+
+def render_iterative_staging(staging_dict):
+    stage_count = 0
+    for s in staging_dict:
+        stage_count += 1
+        with st.container(border=True, key=f"cont_staging_{s.get('staging_name')}"):
+            msg= f":blue[#{stage_count}]: __{s.get('staging_name')}__"
+            st.write(msg)
+            key_prefix = f"{s.get('task_id')}_{s.get('staging_id')}_"
+            st.write(f"Key Prefix: {key_prefix}")
+            st.write(ss.get(f"{key_prefix}_staging_name"))
+            st.text_input(label='Name:',
+                         value=s.get('staging_name'),
+                         on_change=update_staging,
+                         args=('staging_name', key_prefix, s),
+                         key=f"{key_prefix}_staging_name")
+            st.text_area(label='Description:',
+                         value=s.get('staging_description'),
+                         on_change=update_staging,
+                         args=('staging_description', key_prefix, s),
+                         key=f"{key_prefix}_staging_description")
+            st.text_input(label='Destination Table:',
+                          value=s.get('destination_table'),
+                          on_change=update_staging,
+                          args=('destination_table', key_prefix, s),
+                          key=f"{key_prefix}_destination_table")
+            st.text_input(label='Cross join condition:',
+                          value=s.get('cross_join_condition'),
+                          key=f"{key_prefix}_cross_join_condition",
+                          on_change=update_staging,
+                          args=('cross_join_condition', key_prefix, s))
+            st.text_input(label='Filter Condition:',
+                          value=s.get('filter_condition'),
+                          key=f"{key_prefix}_filter_condition",
+                          on_change=update_staging,
+                          args=('filter_condition', key_prefix, s))
+            st.text_input(label='Timestamp Extraction SQL:',
+                          value=s.get('timestamp_extraction_sql'),
+                          key=f"{key_prefix}_timestamp_extraction_sql",
+                          on_change=update_staging,
+                          args=('timestamp_extraction_sql', key_prefix, s))
+            if st.button(':material/convert_to_text: Load relevant facts'):
+                ss.selected_task_id = s.get('task_id')
+                ss.selected_staging_id = s.get('staging_id')
+    return
+
+def render_fact_management(task_id, staging_id):
     if not task_id:
         st.error('Cannot render subtasks without task_id')
         return
 
-    sel_query = f"""SELECT * FROM tasks.fact_configuration WHERE task_id = {task_id}"""
+    if not staging_id:
+        st.error('Cannot render subtasks without staging_id')
+        return
+
+    sel_query = f"""SELECT * FROM tasks.fact_configuration WHERE task_id = {task_id} and staging_id = {staging_id}"""
     ss.fact_df = pd.read_sql(sel_query, con=get_conn(alchemy=True))
-
-
 
     cols = ['fact_id',
             'fact_name',
@@ -303,7 +376,7 @@ def render_fact_management(task_id):
         ss.fact_df = pd.DataFrame(columns=cols)
 
     col_config = {'fact_id': st.column_config.NumberColumn(label='ID',
-                                                     width=20,
+                                                     width=40,
                                                      pinned=True,
                                                      disabled=True),
                   'fact_name': st.column_config.TextColumn(label='Name',
@@ -328,22 +401,29 @@ def render_fact_management(task_id):
                     key='fact_df_updates',
                    hide_index=True,
                    )
-    st.write(ss.get('fact_df_updates'))
-    if st.button(':material/save: Save Fact Changes'):
-        update_fact_df(task_id)
 
+    if st.button(':material/save: Save Fact Changes'):
+        update_fact_df(task_id, staging_id)
+    st.write(ss.get('fact_df_updates'))
     return
 
-def update_fact_df(task_id):
+def update_fact_df(task_id, staging_id):
     d = ss.get('fact_df_updates')
+    updates = ['added_rows', 'edited_rows', 'deleted_rows']
+    dr = d.get('deleted_rows')
+    er = d.get('edited_rows')
     ar = d.get('added_rows')
-    st.write('Added Rows:')
-    st.write(ar)
+
+    if dr:
+        for row in dr:
+            fact_id = ss.fact_df['fact_id'].iloc[row]
+            sql = f"""DELETE FROM tasks.fact_configuration WHERE fact_id = {int(fact_id)};"""
+            qec(sql)
     if ar:
         for col in ar:
-            ins_sql = "INSERT INTO tasks.fact_configuration (task_id "
-            values_sql = "VALUES (%s"
-            params = [task_id]
+            ins_sql = "INSERT INTO tasks.fact_configuration (task_id, staging_id"
+            values_sql = "VALUES (%s, %s"
+            params = [task_id, staging_id]
             for key, key_val in col.items():
                 ins_sql = ins_sql + f", {key}"
                 values_sql = values_sql + ", %s"
@@ -352,6 +432,22 @@ def update_fact_df(task_id):
             rf = qec(final_sql, params)
             st.write(rf)
 
+    if er:
+          for col in er:
+            up_sql = "UPDATE tasks.fact_configuration SET "
+            values_sql = ''
+            where_sql = "WHERE task_id = %s and staging_id = %s;"
+            params=[]
+            for key, key_val in col.items():
+                values_sql = f"{values_sql}{key} = %s, "
+                params.append(key_val)
+            params.append(task_id)
+            params.append(staging_id)
+            if values_sql.endswith(', '):
+                values_sql = values_sql[:-2]
+            final_sql = f"{up_sql} {values_sql} {where_sql};"
+            rf = qec(final_sql, params)
+            st.write(rf)
 
     ss_pop(ss.fact_df)
     st.success('Values saved!')
