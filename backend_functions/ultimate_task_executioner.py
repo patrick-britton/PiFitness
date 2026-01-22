@@ -1,6 +1,7 @@
 import importlib
 import json
 import time
+from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
 import pytz
@@ -44,23 +45,95 @@ def ultimate_task_executioner(force_task_name=None):
         run_elt = api_service_name and api_service_name != 'N/A'
         python_function = task_dict.get('python_function')
         run_python = python_function and python_function != 'N/A'
-
+        task_fail = False
         if run_elt:
+            sub_t0 = start_timer()
             try:
-                extract_t0 = start_timer()
                 json_blob, client_dict = extract_json(task_dict.get('json'), client_dict)
-                extract_time_ms = elapsed_ms(extract_t0)
+                extract_time_ms = elapsed_ms(sub_t0)
+            except Exception as e:
+                print(f"{task_name}: Extract failure: {e}")
+                task_log(task_name, e_time=elapsed_ms(sub_t0), fail_type='Extract', fail_text=e)
+                task_fail=True
+                continue
+            sub_t0 = start_timer()
+            try:
+                json_loading(json_blob, task_id)
+                load_time_ms = elapsed_ms(sub_t0)
             except Exception as e:
                 print(f"{task_name}: Load failure: {e}")
-                task_log(task_name, )
-                load_t0 = start_timer()
-            json_loading(json_blob, task_id)
+                task_log(task_name, e_time=extract_time_ms, l_time=elapsed_ms(sub_t0), fail_type='Load', fail_text=e)
+                task_fail = True
+                continue
+            sub_t0 = start_timer()
+            try:
+                json_flattening(task_dict)
+                transform_time_ms = elapsed_ms(sub_t0)
+            except Exception as e:
+                print(f"{task_name}: Load failure: {e}")
+                task_log(task_name,
+                         e_time=extract_time_ms,
+                         l_time=transform_time_ms,
+                         t_Time=elapsed_ms(sub_t0),
+                         fail_type='Load', fail_text=e)
+                task_fail = True
+                continue
             # postgres_flattening()
 
 
 
         print(task_dict)
     return
+
+def json_flattening(task_dict):
+    # Get the fact dictionary
+    task_id = int(task_dict.get('task_id'))
+    staging_sql = f"SELECT * FROM tasks.staging_configuration where task_id = {task_id}"
+    staging_dict = sql_to_dict(staging_sql)
+
+    for s in staging_dict:
+
+        staging_id = int(s.get('staging_id'))
+        fact_sql = f"SELECT * FROM tasks.fact_configuration where task_id = {task_id} and staging_id = {staging_id}"
+        fact_dict_list = sql_to_dict(fact_sql)
+
+        destination_table = s.get('destination_table')
+        timestamp_extraction_sql = s.get('timestamp_extraction_sql')
+        ins_sql = f"""INSERT INTO {destination_table} (ts_utc"""
+        select_sql = f") SELECT {timestamp_extraction_sql} as ts_utc "
+        create_sql = f"CREATE TABLE IF NOT EXISTS {destination_table} (ts_utc TIMESTAMPTZ PRIMARY KEY"
+
+        do_sql = "DO UPDATE SET"
+        conflict_where = "WHERE ("
+        for fact_dict in fact_dict_list:
+            col_name = fact_dict.get('fact_name')
+            ins_sql = f"{ins_sql}, {col_name} "
+            extraction_sql = fact_dict.get('extraction_sql')
+            data_type = fact_dict.get('data_type')
+            create_sql = f"{create_sql}, {col_name} {data_type} "
+            select_sql = f"{select_sql}, {extraction_sql}::{data_type} as {col_name} "
+            do_sql = f"{do_sql} {col_name}=EXCLUDED.{col_name},"
+            conflict_where = f"{conflict_where} {destination_table}.{col_name} IS DISTINCT FROM EXCLUDED.{col_name},"
+        create_sql = f"{create_sql});"
+        do_sql = do_sql[:-1]
+        conflict_where = conflict_where[:-1]
+        conflict_where = f"{conflict_where});"
+        cj_sql = s.get('cross_join_condition')
+        filter_sql = s.get('filter_condition')
+        from_sql = f"FROM staging.api_imports{cj_sql}" if cj_sql else "FROM staging.api_imports"
+        final_sql = f"""{ins_sql} {select_sql} {from_sql} WHERE task_id = {task_id}"""
+        if filter_sql:
+            final_sql = f"{final_sql} AND {filter_sql} "
+        final_sql = f"{final_sql} ON CONFLICT(ts_utc) {do_sql} {conflict_where}"
+        # qec(create_sql)
+        # qec(final_sql)
+        print(final_sql)
+        print(create_sql)
+
+
+
+
+
 
 
 def extract_json(d, client_dict):
