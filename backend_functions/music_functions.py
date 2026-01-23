@@ -126,6 +126,7 @@ def playlist_reset(client=None, list_id=None):
     client = get_spotify_client(client)
     sp = client.get("client")
     sp.playlist_replace_items(list_id, [])
+    log_app_event(cat="Playlist Reset", desc=f"id: {list_id}")
     return client
 
 def playlist_upload(client=None, list_id=None, track_list=None):
@@ -150,6 +151,7 @@ def playlist_upload(client=None, list_id=None, track_list=None):
             # dozens of playlists at once.
             time.sleep(2)
             sp.playlist_add_items(list_id, batch)
+    log_app_event(cat="Playlist Upload", desc=f"id: {list_id}, songs= {len(track_list)}")
     return client
 
 def ensure_playlist_relationships(client):
@@ -242,6 +244,8 @@ def auto_shuffle_playlists():
         print('Client bad, cannot shuffle')
         return
 
+    # Playlist is a list of 'parent' playlists with autoshuffle enabled
+    # The target_playlist_id returned is the child autoshuffle version of that playlist.
     for l in playlists:
         print(f'Pulling new order for list: {l}')
         sql = f"""SELECT DISTINCT target_playlist_id, track_id,
@@ -546,3 +550,25 @@ def elo_update(home_elo, away_elo, result, k=100):
     awayNewELO = round(away_elo + k * margin_multiplier * (actual_away - expected_away),0)
 
     return homeNewELO, awayNewELO
+
+def remove_track_from_spotify_playlist(isrc, list_id, client):
+
+    # Remove from specified list
+    playlist_family = sql_to_list(f"""SELECT DISTINCT child_playlist_id FROM music.vw_playlist_families WHERE playlist_id = '{list_id}'""")
+
+    sql = f"SELECT DISTINCT track_id FROM music.all_tracks where track_isrc = '{isrc}';"
+    track_list = sql_to_list(sql)
+
+    for id in playlist_family:
+        del_sql = "DELETE FROM music.playlist_isrcs WHERE playlist_id = %s and isrc = %s"
+        params = (id, isrc)
+        qec(del_sql, params)
+        exclude_sql = "INSERT INTO music.playlist_recommendation_exclusions (playlist_id, isrc) VALUES (%s, %s) ON CONFLICT (playlist_id, isrc) DO NOTHING;"
+        qec(exclude_sql, params)
+
+        if not track_list:
+            continue
+        sp = client.get("client")
+        sp.playlist_remove_all_occurrences_of_items(list_id, track_list)
+        log_app_event(cat='Playlist Track Removal', desc=f"List: {id} || ISRC: {isrc}, {len(track_list)} potential tracks")
+    return

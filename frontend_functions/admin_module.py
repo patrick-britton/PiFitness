@@ -380,7 +380,7 @@ def render_log_file():
                                         default='All')
 
     if search_val and len(search_val) > 2:
-        base_sql = f"""{base_sql} AND event_type || description || error_text LIKE '%%{search_val}%%' """
+        base_sql = f"""{base_sql} AND COALESCE(event_type,'') || COALESCE(description,'') || COALESCE(error_text,'') LIKE '%%{search_val}%%' """
 
     if errors_only:
         base_sql = f"{base_sql} AND is_error "
