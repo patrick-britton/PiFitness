@@ -8,9 +8,9 @@ from streamlit import session_state as ss
 
 from backend_functions.database_functions import get_conn, qec, sql_to_list
 from backend_functions.file_handlers import album_art_path
-from backend_functions.music_functions import playlist_reset, playlist_upload, get_now_playing, add_isrc_to_local, \
+from backend_functions.music_functions import playlist_upload, get_now_playing, add_isrc_to_local, \
     record_recommendation_decision, remove_recommendation, add_into_current_ratings, save_matchup_results, \
-    playlist_to_db
+    playlist_to_db, remove_track_from_spotify_playlist
 from backend_functions.service_logins import get_spotify_client
 from backend_functions.task_execution import task_executioner
 from frontend_functions.music_widgets import playlist_config_table, render_shuffle_df
@@ -143,15 +143,15 @@ def render_playlist_shuffle(list_id=None):
     if st.button(f':material/cloud_upload: Send to Spotify :gray[*{df['target_playlist_id'].iloc[0]}*]'):
         track_list = df['track_id'].to_list()
         target_list_id = df['target_playlist_id'].iloc[0]
+        spotify_client_init()
         with st.spinner('Sending new order to Spotify', show_time=True):
-            client = playlist_reset(client=None,
-                                    list_id=target_list_id)
-            client = playlist_upload(client=client,
+            ss.spotify_client = playlist_upload(client=ss.spotify_client,
                                      list_id=target_list_id,
                                      track_list=track_list)
+            time.sleep(2)
 
         with st.spinner('Updating DB play order & config settings', show_time=True):
-            playlist_to_db(client=client, list_id=target_list_id)
+            playlist_to_db(client=ss.spotify_client, list_id=target_list_id)
             update_sql = f"""UPDATE music.playlist_config SET
                             ratings_weight = {rtw},
                             recency_weight={rcw},
@@ -329,10 +329,8 @@ def render_now_playing():
 
     elif action_choice == "remove":
         # Remove the track from spotify and local playlist details
-        del_sql = f"""DELETE FROM music.playlist_isrcs where playlist_id = %s and isrc = %s"""
-        params = (playlist_id, isrc)
-        qec(del_sql, params)
-        remove_track_from_spotify_playlist(isrc, playlist_id)
+        spotify_client_init()
+        remove_track_from_spotify_playlist(isrc, playlist_id, ss.spotify_client)
         ss.np_action_choice = None
         ss[f"{action_key}_current"] = None
         ss[f"{action_key}_active_decode"] = None
@@ -413,15 +411,7 @@ def add_item(tid, pid):
     sp.playlist_add_items(pid, [tid])
     return
 
-def remove_track_from_spotify_playlist(isrc, list_id):
-    sql = f"SELECT DISTINCT track_id FROM music.all_tracks where track_isrc = '{isrc}';"
-    track_list = sql_to_list(sql)
-    if not track_list:
-        return
 
-    sp = spotify_client_init()
-    sp.playlist_remove_all_occurrences_of_items(list_id, track_list)
-    return
 
 def album_image_retrieval(album_id):
     # Returns the path of an album image -- downloading it if necessary
