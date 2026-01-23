@@ -82,7 +82,7 @@ def render_task_id_management():
         return
 
     if nav_selection == 'task_reset':
-        ss_pop("selected_task_id")
+        ss_pop(["selected_task_id", 'selected_staging_id'])
         st.info("Select above to create or edit a task")
         return
 
@@ -135,6 +135,8 @@ def render_task_edit(task_id):
 
     if not sse("sproc_list"):
         ss.sproc_list = get_sproc_list(append_option='N/A')
+
+    if not sse('service_list'):
         ss.service_list = get_service_list(append_option='N/A')
 
     sel_sql = f"SELECT * FROM tasks.task_configuration where task_id = {task_id}"
@@ -316,8 +318,6 @@ def render_iterative_staging(staging_dict):
             msg= f":blue[#{stage_count}]: __{s.get('staging_name')}__"
             st.write(msg)
             key_prefix = f"{s.get('task_id')}_{s.get('staging_id')}_"
-            st.write(f"Key Prefix: {key_prefix}")
-            st.write(ss.get(f"{key_prefix}_staging_name"))
             st.text_input(label='Name:',
                          value=s.get('staging_name'),
                          on_change=update_staging,
@@ -343,11 +343,6 @@ def render_iterative_staging(staging_dict):
                           key=f"{key_prefix}_filter_condition",
                           on_change=update_staging,
                           args=('filter_condition', key_prefix, s))
-            st.text_input(label='Timestamp Extraction SQL:',
-                          value=s.get('timestamp_extraction_sql'),
-                          key=f"{key_prefix}_timestamp_extraction_sql",
-                          on_change=update_staging,
-                          args=('timestamp_extraction_sql', key_prefix, s))
             if st.button(':material/convert_to_text: Load relevant facts'):
                 ss.selected_task_id = s.get('task_id')
                 ss.selected_staging_id = s.get('staging_id')
@@ -369,6 +364,7 @@ def render_fact_management(task_id, staging_id):
             'fact_name',
             'data_type',
             'extraction_sql',
+            'is_unique_constraint',
             'infer_values',
             'forecast_values']
 
@@ -388,6 +384,9 @@ def render_fact_management(task_id, staging_id):
                   'extraction_sql': st.column_config.TextColumn(label='Extraction SQL',
                                                            pinned=False,
                                                            disabled=False),
+                  'is_unique_constraint': st.column_config.CheckboxColumn(label='PK?',
+                                                                          width=40,
+                                                                          disabled=False),
                   'infer_values': st.column_config.CheckboxColumn(label='Infer before interpolation?',
                                                                   disabled=False, width="small"),
                   'forecast_values': st.column_config.CheckboxColumn(label='Forecast Values?',
@@ -404,12 +403,20 @@ def render_fact_management(task_id, staging_id):
 
     if st.button(':material/save: Save Fact Changes'):
         update_fact_df(task_id, staging_id)
+    # fu = ss.get('fact_df_updates')
+    # er = fu.get('edited_rows')
+    # for row_index, updates in er.items():
+    #     st.write(row_index)
+    #     st.write(updates)
+    #     for key, key_val in updates.items():
+    #         st.write(key)
+    #         st.write(key_val)
+
     st.write(ss.get('fact_df_updates'))
     return
 
 def update_fact_df(task_id, staging_id):
     d = ss.get('fact_df_updates')
-    updates = ['added_rows', 'edited_rows', 'deleted_rows']
     dr = d.get('deleted_rows')
     er = d.get('edited_rows')
     ar = d.get('added_rows')
@@ -430,28 +437,30 @@ def update_fact_df(task_id, staging_id):
                 params.append(key_val)
             final_sql = f"{ins_sql}) {values_sql});"
             rf = qec(final_sql, params)
-            st.write(rf)
+            if rf:
+                st.write(rf)
 
     if er:
-          for col in er:
+        for row_index, updates in er.items():
+            fact_id = ss.fact_df['fact_id'].iloc[row_index]
             up_sql = "UPDATE tasks.fact_configuration SET "
             values_sql = ''
-            where_sql = "WHERE task_id = %s and staging_id = %s;"
+            where_sql = "WHERE fact_id = %s"
             params=[]
-            for key, key_val in col.items():
-                values_sql = f"{values_sql}{key} = %s, "
-                params.append(key_val)
-            params.append(task_id)
-            params.append(staging_id)
+            for key, key_val in updates.items():
+                  values_sql = f"{values_sql}{key} = %s, "
+                  params.append(key_val)
+            params.append(int(fact_id))
             if values_sql.endswith(', '):
                 values_sql = values_sql[:-2]
             final_sql = f"{up_sql} {values_sql} {where_sql};"
             rf = qec(final_sql, params)
-            st.write(rf)
+            if rf:
+                st.write(rf)
 
     ss_pop(ss.fact_df)
     st.success('Values saved!')
-    time.sleep(1)
+    time.sleep(10)
     st.rerun()
 
 

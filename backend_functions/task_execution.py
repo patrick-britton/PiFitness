@@ -18,6 +18,7 @@ def task_executioner(force_task_name=None, force_task=False):
     all_task_start = start_timer()
 
     client_dict = None
+    svc_function_name = None
     recency_ctr = 0
     failure_ctr = 0
     timing_ctr = 0
@@ -126,8 +127,12 @@ def task_executioner(force_task_name=None, force_task=False):
             ############################################################
             try:
                 # Establish the client
+                old_svc_function = svc_function_name
                 module_name, svc_function_name = raw_api_function .rsplit('.', 1)
+
                 module = importlib.import_module(module_name)
+                if old_svc_function != svc_function_name:
+                    client_dict = None
                 svc_function = getattr(module, svc_function_name)
                 client_dict = svc_function(client_dict)
                 client = client_dict.get("client")

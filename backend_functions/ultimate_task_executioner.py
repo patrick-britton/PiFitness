@@ -94,37 +94,62 @@ def json_flattening(task_dict):
     for s in staging_dict:
 
         staging_id = int(s.get('staging_id'))
-        fact_sql = f"SELECT * FROM tasks.fact_configuration where task_id = {task_id} and staging_id = {staging_id}"
+        fact_sql = f"SELECT *, "
+        fact_sql = f"{fact_sql} COUNT(CASE WHEN is_unique_constraint then fact_id else NULL END)"
+        fact_sql = f"{fact_sql} OVER (PARTITION BY task_id, staging_id) as pk_count"
+        fact_sql = f"{fact_sql} FROM tasks.fact_configuration where task_id = {task_id} and staging_id = {staging_id}"
+        fact_sql = f"{fact_sql} ORDER BY is_primary_key DESC, is_unique_constraint DESC, fact_id;"
         fact_dict_list = sql_to_dict(fact_sql)
 
         destination_table = s.get('destination_table')
-        timestamp_extraction_sql = s.get('timestamp_extraction_sql')
-        ins_sql = f"""INSERT INTO {destination_table} (ts_utc"""
-        select_sql = f") SELECT {timestamp_extraction_sql} as ts_utc "
-        create_sql = f"CREATE TABLE IF NOT EXISTS {destination_table} (ts_utc TIMESTAMPTZ PRIMARY KEY"
-
+        ins_sql = f"""INSERT INTO {destination_table} ("""
+        select_sql = f") SELECT "
+        create_sql = f"CREATE TABLE IF NOT EXISTS {destination_table} ("
+        pk_list = []
+        pk_count = int(fact_dict_list[0].get('pk_count'))
+        print(f"pk_count: {pk_count}")
         do_sql = "DO UPDATE SET"
         conflict_where = "WHERE ("
         for fact_dict in fact_dict_list:
             col_name = fact_dict.get('fact_name')
-            ins_sql = f"{ins_sql}, {col_name} "
+            is_unique = fact_dict.get('is_unique_constraint')
+            ins_sql = f"{ins_sql} {col_name},"
             extraction_sql = fact_dict.get('extraction_sql')
             data_type = fact_dict.get('data_type')
-            create_sql = f"{create_sql}, {col_name} {data_type} "
-            select_sql = f"{select_sql}, {extraction_sql}::{data_type} as {col_name} "
-            do_sql = f"{do_sql} {col_name}=EXCLUDED.{col_name},"
-            conflict_where = f"{conflict_where} {destination_table}.{col_name} IS DISTINCT FROM EXCLUDED.{col_name},"
-        create_sql = f"{create_sql});"
+            create_sql = f"{create_sql} {col_name} {data_type}"
+            if pk_count == 1 and is_unique:
+                create_sql = f"{create_sql} PRIMARY KEY,"
+            else:
+                create_sql = f"{create_sql},"
+            if pk_count > 0 and is_unique:
+                pk_list.append(col_name)
+            else:
+                do_sql = f"{do_sql} {col_name}=EXCLUDED.{col_name},"
+                conflict_where = f"{conflict_where} {destination_table}.{col_name} IS DISTINCT FROM EXCLUDED.{col_name} OR"
+            select_sql = f"{select_sql} {extraction_sql}::{data_type} as {col_name},"
+
+        # Remove trailing commas
+        ins_sql = ins_sql[:-1]
+        create_sql = create_sql[:-1]
+        select_sql = select_sql[:-1]
         do_sql = do_sql[:-1]
-        conflict_where = conflict_where[:-1]
+        conflict_where = conflict_where[:-3]
+
+        #Build final sql
+        create_sql = f"{create_sql});"
         conflict_where = f"{conflict_where});"
         cj_sql = s.get('cross_join_condition')
         filter_sql = s.get('filter_condition')
-        from_sql = f"FROM staging.api_imports{cj_sql}" if cj_sql else "FROM staging.api_imports"
-        final_sql = f"""{ins_sql} {select_sql} {from_sql} WHERE task_id = {task_id}"""
+        from_sql = f"FROM staging.api_imports src {cj_sql}" if cj_sql else "FROM staging.api_imports src"
+        final_sql = f"""{ins_sql} {select_sql} {from_sql} WHERE src.task_id = {task_id}"""
         if filter_sql:
             final_sql = f"{final_sql} AND {filter_sql} "
-        final_sql = f"{final_sql} ON CONFLICT(ts_utc) {do_sql} {conflict_where}"
+        if pk_count > 0:
+            final_sql = f"{final_sql} ON CONFLICT("
+            for pk in pk_list:
+                final_sql = f"{final_sql} {pk},"
+            final_sql = final_sql[:-1]
+            final_sql = f"{final_sql}) {do_sql} {conflict_where}"
         # qec(create_sql)
         # qec(final_sql)
         print(final_sql)
