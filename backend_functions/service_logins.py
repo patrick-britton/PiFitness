@@ -180,7 +180,7 @@ def rate_limit_test(sp_token=None):
 
     # 2. Make the raw call (using the same endpoint Spotipy uses)
     # Using a fake playlist or a known one. A GET request is safer/cheaper than replace_items.
-    playlist_id = '1zhLhV1j8y08gIH387MA2p'
+    playlist_id = '0OGtAcLTRWGdO4S8tuudyD'
     url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks"
 
     try:

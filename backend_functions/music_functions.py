@@ -46,6 +46,7 @@ def playlist_to_db(client=None, list_id=None):
             time.sleep(10) # Sleep for 10 seconds between playlists
         try:
             results = sp.playlist_items(playlist_id=l, additional_types=['track'])
+            log_app_event(cat='Playlist item Fetch', desc=f"ID: {l}", err=e)
         except Exception as e:
             log_app_event(cat='Playlist Fetch Failure', desc=f"ID: {l}", err=e)
             continue
