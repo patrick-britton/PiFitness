@@ -221,7 +221,7 @@ def render_task_edit(task_id):
 
     with st.container(border=True):
         st.write('__:material/file_json: Extraction__')
-        col1, col2 = st.columns(spec=[1,3], gap="medium", border=False)
+        col1, col2, col3 = st.columns(spec=[1,2,1], gap="medium", border=False)
         with col1:
             api_service_name = st.segmented_control(label='API Service',
                                             options=ss.service_list,
@@ -229,6 +229,11 @@ def render_task_edit(task_id):
             api_loop_type = st.segmented_control(label='API Loop Type',
                                                  options=['Day', 'Range', 'Next', 'N/A'],
                                                  default=d.get('api_loop_type'))
+        with col3:
+            interpolate_values = st.checkbox(label='Interpolate Values?',
+                                             value=d.get('interpolate_values'))
+            forecast_values = st.checkbox(label='Forecast? Values',
+                                             value=d.get('forecast_values'))
 
         with col2:
             api_function_name = st.text_input(label='API Function',
@@ -253,7 +258,9 @@ def render_task_edit(task_id):
                             api_function_name = %s,
                             api_loop_type = %s,
                             api_parameters = %s,
-                            python_function = %s
+                            python_function = %s,
+                            interpolate_values = %s,
+                            forecast_values = %s
                             WHERE task_id = %s
                             """
             params = [task_name,
@@ -269,6 +276,8 @@ def render_task_edit(task_id):
                       api_loop_type,
                       api_parameters,
                       python_function,
+                      interpolate_values,
+                      forecast_values,
                       int(task_id)]
             returns = qec(update_sql, params)
             st.write(returns)
@@ -328,6 +337,11 @@ def render_iterative_staging(staging_dict):
                          on_change=update_staging,
                          args=('staging_description', key_prefix, s),
                          key=f"{key_prefix}_staging_description")
+            st.text_input(label='Source Table:',
+                          value=s.get('source_table'),
+                          on_change=update_staging,
+                          args=('source_table', key_prefix, s),
+                          key=f"{key_prefix}_source_table")
             st.text_input(label='Destination Table:',
                           value=s.get('destination_table'),
                           on_change=update_staging,
@@ -343,7 +357,7 @@ def render_iterative_staging(staging_dict):
                           key=f"{key_prefix}_filter_condition",
                           on_change=update_staging,
                           args=('filter_condition', key_prefix, s))
-            if st.button(':material/convert_to_text: Load relevant facts'):
+            if st.button(':material/convert_to_text: Load relevant facts', key=f'btn_{s.get("task_id")}_{s.get("staging_id")}'):
                 ss.selected_task_id = s.get('task_id')
                 ss.selected_staging_id = s.get('staging_id')
     return
@@ -365,7 +379,10 @@ def render_fact_management(task_id, staging_id):
             'data_type',
             'extraction_sql',
             'is_unique_constraint',
+            'interpolate_values',
             'infer_values',
+            'interpolation_ts',
+            'interpolation_destination_table',
             'forecast_values']
 
     if ss.fact_df.empty:
@@ -384,11 +401,17 @@ def render_fact_management(task_id, staging_id):
                   'extraction_sql': st.column_config.TextColumn(label='Extraction SQL',
                                                            pinned=False,
                                                            disabled=False),
+                  'interpolate_values': st.column_config.CheckboxColumn(label='Interpolate?',
+                                                                          width=40,
+                                                                          disabled=False),
                   'is_unique_constraint': st.column_config.CheckboxColumn(label='PK?',
                                                                           width=40,
                                                                           disabled=False),
+                  'interpolation_ts': st.column_config.CheckboxColumn(label='Timestamp Column?',
+                                                                  disabled=False, width="small"),
                   'infer_values': st.column_config.CheckboxColumn(label='Infer before interpolation?',
                                                                   disabled=False, width="small"),
+                  'interpolation_destination_table': st.column_config.TextColumn(label='Interpolation Destination Table'),
                   'forecast_values': st.column_config.CheckboxColumn(label='Forecast Values?',
                                                                   disabled=False, width="small")
                   }

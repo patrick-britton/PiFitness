@@ -71,6 +71,9 @@ def qec(t_sql=None, p=None, auto_commit=False):
         msg1=f"Query Execution failure: {e}"
         msg2=f"Failing SQL: {t_sql}"
         msg3=f"Failing Params: {p}"
+        print(msg1)
+        print(msg2)
+        print(msg3)
         return [msg1, msg2, msg3]
 
     return None
