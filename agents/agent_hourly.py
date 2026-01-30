@@ -2,7 +2,6 @@
 import sys
 from pathlib import Path
 
-from backend_functions.ultimate_task_executioner import ultimate_task_executioner
 
 # Add project root to sys.path
 sys.path.append(str(Path(__file__).parent.parent))  # /home/god/PiFitness
