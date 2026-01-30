@@ -18,7 +18,8 @@ from backend_functions.viz_factory.db_size import render_db_size_dashboard
 from backend_functions.viz_factory.task_summary import render_task_summary_dashboard
 from frontend_functions.admin_task_management import render_task_id_management
 from frontend_functions.nav_buttons import nav_button, nav_widget
-from frontend_functions.streamlit_helpers import reconcile_with_postgres
+from frontend_functions.streamlit_helpers import reconcile_with_postgres, ss_pop
+
 
 # Admin Page
 # 'admin': {"admin_charting": {'icon': 'show_chart'},
@@ -81,7 +82,7 @@ def render_admin_charting():
 
 def render_service_submodule():
     # Read in any existing services
-    st.subheader("API Service Management")
+    st.write("__API Service Management__")
     t0 = None
     ss.service_df = pd.read_sql('SELECT * FROM api_services.api_service_list', get_conn(alchemy=True))
     if not ss.service_df.empty:
@@ -101,7 +102,99 @@ def render_service_submodule():
                        on_change=reconcile_with_postgres,
                        args=('service_df', "service_editor", 'api_services.api_service_list', 'api_service_name', col_config)
         )
+        render_function_library()
+    else:
+        new_service_name = st.text_input('Name your first service')
+        if new_service_name:
+            if st.button(f':material/save: Save {new_service_name}'):
+                ins_sql = f"""INSERT INTO api_services.api_service_list (api_service_name) VALUES (%s)"""
+                qec(ins_sql, [new_service_name,])
+                st.rerun()
+
+
+
     return
+
+def render_function_library():
+    st.write('__Function Library__')
+    ss.function_library_df = pd.read_sql("""SELECT * FROM api_services.function_library
+                                        ORDER BY api_service_name, python_extraction_function, friendly_name""",
+                                         get_conn(alchemy=True))
+    svc_list = sql_to_list("SELECT DISTINCT api_service_name FROM api_services.api_service_list ")
+    cols = ['friendly_name', 'api_service_name', 'api_function_name', 'python_extraction_function', 'flatten_sproc',
+            'interpolation_sproc', 'forecasting_sproc']
+    col_config = {'friendly_name': st.column_config.TextColumn(label='Name', disabled=False),
+                  'api_service_name': st.column_config.SelectboxColumn(label='API', options=svc_list, disabled=False),
+                  'api_function_name': st.column_config.TextColumn(label='API Function', disabled=False),
+                  'python_extraction_function': st.column_config.TextColumn(label='Python Extraction', disabled=False),
+                  'flatten_sproc': st.column_config.TextColumn(label='Flatten SPROC', disabled=False),
+                  'interpolation_sproc': st.column_config.TextColumn(label='Interpolation SPROC', disabled=False),
+                  'forecasting_sproc': st.column_config.TextColumn(label='Forecasting SPROC', disabled=False),}
+    if ss.function_library_df.empty:
+        ss.function_library_df = pd.DataFrame(columns=cols)
+
+    st.data_editor(ss.function_library_df,
+                   column_order=cols,
+                   column_config=col_config,
+                   num_rows="dynamic",
+                   key='function_libarary_df_updates',
+                   hide_index=True,
+                   )
+
+    if st.button(':material/save: Save Function Changes'):
+        update_function_library_df()
+    return
+
+def update_function_library_df():
+
+    d = ss.get('function_libarary_df_updates')
+    dr = d.get('deleted_rows')
+    er = d.get('edited_rows')
+    ar = d.get('added_rows')
+
+    if dr:
+        for row in dr:
+            pk = ss.function_library_df['friendly_name'].iloc[row]
+            sql = f"""DELETE FROM api_services.function_library WHERE friendly_name = %s;"""
+            qec(sql, [pk,])
+    if ar:
+        for col in ar:
+            ins_sql = "INSERT INTO api_services.function_library ("
+            values_sql = "VALUES ("
+            params = []
+            for key, key_val in col.items():
+                ins_sql = ins_sql + f"{key}, "
+                values_sql = values_sql + "%s, "
+                params.append(key_val)
+            ins_sql = ins_sql[:-2]
+            values_sql = values_sql[:-2]
+            final_sql = f"{ins_sql}) {values_sql});"
+            rf = qec(final_sql, params)
+            if rf:
+                st.write(rf)
+
+    if er:
+        for row_index, updates in er.items():
+            pk = ss.function_library_df['friendly_name'].iloc[row_index]
+            up_sql = "UPDATE api_services.function_library SET "
+            values_sql = ''
+            where_sql = "WHERE friendly_name = %s"
+            params=[]
+            for key, key_val in updates.items():
+                  values_sql = f"{values_sql}{key} = %s, "
+                  params.append(key_val)
+            params.append(pk)
+            if values_sql.endswith(', '):
+                values_sql = values_sql[:-2]
+            final_sql = f"{up_sql} {values_sql} {where_sql};"
+            rf = qec(final_sql, params)
+            if rf:
+                st.write(rf)
+
+    ss_pop(ss.function_library_df)
+    st.toast('Values saved!', duration=5)
+    time.sleep(2)
+    st.rerun()
 
 
 

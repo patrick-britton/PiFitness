@@ -1,12 +1,14 @@
 import time
-
-
+from sqlalchemy import text
+from prometheus_client.decorator import append
 from streamlit import session_state as ss, column_config
 import streamlit as st
 import pandas as pd
 
-from backend_functions.database_functions import sql_to_dict, one_sql_result, qec, get_sproc_list, get_conn
+from backend_functions.database_functions import sql_to_dict, one_sql_result, qec, get_sproc_list, get_conn, \
+    get_api_function_list
 from backend_functions.service_logins import get_service_list
+from backend_functions.ultimate_task_executioner import ultimate_task_executioner, reconcile_task_dates
 from frontend_functions.nav_buttons import nav_widget
 from frontend_functions.streamlit_helpers import sse, ss_pop
 
@@ -78,8 +80,8 @@ def render_task_id_management():
     nav_selection = nav_widget('task_management', 'Task Options')
 
     if not nav_selection:
-        st.info("Select above to create or edit a task")
-        return
+        nav_selection = 'edit_task'
+
 
     if nav_selection == 'task_reset':
         ss_pop(["selected_task_id", 'selected_staging_id'])
@@ -90,11 +92,15 @@ def render_task_id_management():
         insta_task_create()
         return
 
-    if not sse("selected_task_id"):
-        render_task_selection()
-        return
 
-    render_task_edit(ss.selected_task_id)
+        return
+    if nav_selection == 'edit_task':
+        if not sse("selected_task_id"):
+            render_task_selection()
+            return
+        render_task_edit(ss.selected_task_id)
+    elif nav_selection == 'reschedule_tasks':
+        render_task_rescheduling()
     return
 
 def insta_task_create():
@@ -111,23 +117,6 @@ def insta_task_create():
     return
 
 
-def inst_staging_create(d):
-    task_id = int(d.get("task_id"))
-    sel_sql = f"""SELECT MIN(staging_id) 
-                FROM tasks.staging_configuration
-                where staging_name = 'placeholder' and task_id = {task_id};"""
-    id_val = one_sql_result(sel_sql)
-
-    if id_val:
-        ss.selected_staging_id = id_val[0]
-        st.rerun()
-
-    ins_sql = "INSERT INTO tasks.staging_configuration (task_id, staging_name) VALUES (%s, %s)"
-    qec(ins_sql, [task_id, 'placeholder'])
-    st.rerun()
-    return
-
-
 def render_task_edit(task_id):
     if not task_id:
         st.error('Somehow editing with no task id')
@@ -139,36 +128,49 @@ def render_task_edit(task_id):
     if not sse('service_list'):
         ss.service_list = get_service_list(append_option='N/A')
 
+    if not sse('function_list'):
+        ss.function_list = get_api_function_list(append_option='N/A')
+
     sel_sql = f"SELECT * FROM tasks.task_configuration where task_id = {task_id}"
     d = sql_to_dict(sel_sql)[0]
 
     if d.get('task_name') == 'placeholder_task':
         msg = f":blue[###New task creation###: :gray[*ID# {task_id}*]"
         default_name = None
+        st.write(msg)
     else:
-        default_name = d.get('task_name')
-        msg = f":blue[Editing: __{d.get("task_name")}__] :gray[*ID# {task_id}*]  \n"
-        msg = f"{msg}Last Executed: {d.get('last_executed_utc')}  \n"
-        if d.get('last_executed_utc') == d.get('last_success_utc'):
-            is_failure = False
+        header_col, execute_col = st.columns(spec=[1,2 ], gap="small", border=False)
+        with header_col:
+            default_name = d.get('task_name')
+            msg = f":blue[Editing: __{d.get("task_name")}__] :gray[*ID# {task_id}*]  \n"
+            msg = f"{msg}Last Executed: {d.get('last_executed_utc')}  \n"
+            if d.get('last_executed_utc') == d.get('last_succeeded_utc'):
+                is_failure = False
 
-        else:
-            is_failure = True
-            msg = f"{msg}Last Executed: {d.get('last_succeeded_utc')}  \n"
-        msg = f"{msg}Next planned execution: {d.get('next_planned_execution_utc')}  \n"
-        if d.get('last_failed_utc'):
-            if not is_failure:
-                msg = f"{msg}Last Failed: {d.get('last_failed_utc')}  \n"
             else:
-                msg = f"{msg}:red["
-            msg = f"{msg}__Most recent failure: {d.get('last_failure_message')}__  \n"
-            msg = f"{msg}__Consecutive Failures: {d.get('consecutive_failures')}__ "
-            if is_failure:
-                msg = f"{msg}]"
-        else:
-            msg = f"{msg} No recorded failures"
-
-    st.write(msg)
+                is_failure = True
+                msg = f"{msg}Last Succeeded: {d.get('last_succeeded_utc')}  \n"
+            msg = f"{msg}Next planned execution: {d.get('next_planned_execution_utc')}  \n"
+            if d.get('last_failed_utc'):
+                if not is_failure:
+                    msg = f"{msg}Last Failed: {d.get('last_failed_utc')}  \n"
+                else:
+                    msg = f"{msg}:red["
+                    msg = f"{msg}__Most recent failure: {d.get('last_failure_message')}__  \n"
+                    msg = f"{msg}__Consecutive Failures: {d.get('consecutive_failures')}__ "
+                if is_failure:
+                    msg = f"{msg}]"
+            else:
+                msg = f"{msg} No recorded failures"
+            st.write(msg)
+        with execute_col:
+            if st.button(':material/motion_play: Run Task Now', type='primary'):
+                ss.show_df=False
+                with st.spinner('Executing Task...', show_time=True):
+                    ultimate_task_executioner(force_task_id=task_id)
+                st.toast('Completed', duration=5)
+                time.sleep(3)
+                st.rerun()
 
     basic_col, schedule_col = st.columns(spec=[2,1], border=False, gap="small")
 
@@ -184,8 +186,8 @@ def render_task_edit(task_id):
             if display_icon:
                 st.write(f"__:material/{display_icon}:__")
 
-            python_function = st.text_input(label='Python function?',
-                                            value=d.get('python_function'))
+            python_execution_function = st.text_input(label='Python function?',
+                                            value=d.get('python_execution_function'))
 
     with schedule_col:
         schedule_cont = st.container(border=True)
@@ -221,25 +223,10 @@ def render_task_edit(task_id):
 
     with st.container(border=True):
         st.write('__:material/file_json: Extraction__')
-        col1, col2, col3 = st.columns(spec=[1,2,1], gap="medium", border=False)
-        with col1:
-            api_service_name = st.segmented_control(label='API Service',
-                                            options=ss.service_list,
-                                            default=d.get('api_service_name'))
-            api_loop_type = st.segmented_control(label='API Loop Type',
-                                                 options=['Day', 'Range', 'Next', 'N/A'],
-                                                 default=d.get('api_loop_type'))
-        with col3:
-            interpolate_values = st.checkbox(label='Interpolate Values?',
-                                             value=d.get('interpolate_values'))
-            forecast_values = st.checkbox(label='Forecast? Values',
-                                             value=d.get('forecast_values'))
+        api_function_name = st.segmented_control(label='Data Extraction (API Function)',
+                                        options=ss.function_list,
+                                        default=d.get('api_function_name'))
 
-        with col2:
-            api_function_name = st.text_input(label='API Function',
-                                              value=d.get('api_function_name'))
-            api_parameters = st.text_input(label='API Parameters',
-                                           value=d.get('api_parameters'))
 
     if len(task_name) < 4:
         st.info("Name must be more than 4 characters")
@@ -254,13 +241,8 @@ def render_task_edit(task_id):
                             task_start_hour = %s,
                             task_stop_hour = %s,
                             task_interval = %s,
-                            api_service_name = %s,
                             api_function_name = %s,
-                            api_loop_type = %s,
-                            api_parameters = %s,
-                            python_function = %s,
-                            interpolate_values = %s,
-                            forecast_values = %s
+                            python_execution_function = %s
                             WHERE task_id = %s
                             """
             params = [task_name,
@@ -271,172 +253,21 @@ def render_task_edit(task_id):
                       int(task_start_hour),
                       int(task_stop_hour),
                       int(task_interval),
-                      api_service_name,
                       api_function_name,
-                      api_loop_type,
-                      api_parameters,
-                      python_function,
-                      interpolate_values,
-                      forecast_values,
+                      python_execution_function,
                       int(task_id)]
             returns = qec(update_sql, params)
-            st.write(returns)
+            if returns:
+                st.warning(returns)
+            else:
+                st.toast('Saved Successfully', duration=5)
+                time.sleep(3)
+                st.rerun()
 
-    if api_service_name:
-        render_staging_config(d)
-
-
-    return
-
-def render_staging_config(task_dict):
-    task_id = task_dict.get('task_id')
-    staging_sql = f"SELECT * FROM tasks.staging_configuration WHERE task_id = {task_id} ORDER BY staging_id"
-    staging_dict = sql_to_dict(staging_sql)
-
-    # if st.button(':material/add: Add Staging Step:')
-    if staging_dict:
-        render_iterative_staging(staging_dict)
-
-    if st.button(':material/add_circle: Add new staging step'):
-        inst_staging_create(task_dict)
-
-    if sse('selected_task_id') and sse('selected_staging_id'):
-        render_fact_management(ss.selected_task_id, ss.selected_staging_id)
+    recent_execution_log(task_id)
     return
 
 
-def update_staging(col_id, key_prefix, stg_d):
-    key_str = f"{key_prefix}_{col_id}"
-    key_val = ss.get(key_str)
-    if not key_val:
-        key_val = 'N/A'
-
-    up_sql = f"""UPDATE tasks.staging_configuration SET {col_id} = %s WHERE task_id = %s and staging_id = %s"""
-    params = [key_val, int(stg_d.get('task_id')), int(stg_d.get('staging_id'))]
-    qec(up_sql, params)
-    st.toast(f"{col_id} saved", duration=3)
-    st.rerun()
-    return
-
-
-def render_iterative_staging(staging_dict):
-    stage_count = 0
-    for s in staging_dict:
-        stage_count += 1
-        with st.container(border=True, key=f"cont_staging_{s.get('staging_name')}"):
-            msg= f":blue[#{stage_count}]: __{s.get('staging_name')}__"
-            st.write(msg)
-            key_prefix = f"{s.get('task_id')}_{s.get('staging_id')}_"
-            st.text_input(label='Name:',
-                         value=s.get('staging_name'),
-                         on_change=update_staging,
-                         args=('staging_name', key_prefix, s),
-                         key=f"{key_prefix}_staging_name")
-            st.text_area(label='Description:',
-                         value=s.get('staging_description'),
-                         on_change=update_staging,
-                         args=('staging_description', key_prefix, s),
-                         key=f"{key_prefix}_staging_description")
-            st.text_input(label='Source Table:',
-                          value=s.get('source_table'),
-                          on_change=update_staging,
-                          args=('source_table', key_prefix, s),
-                          key=f"{key_prefix}_source_table")
-            st.text_input(label='Destination Table:',
-                          value=s.get('destination_table'),
-                          on_change=update_staging,
-                          args=('destination_table', key_prefix, s),
-                          key=f"{key_prefix}_destination_table")
-            st.text_input(label='Cross join condition:',
-                          value=s.get('cross_join_condition'),
-                          key=f"{key_prefix}_cross_join_condition",
-                          on_change=update_staging,
-                          args=('cross_join_condition', key_prefix, s))
-            st.text_input(label='Filter Condition:',
-                          value=s.get('filter_condition'),
-                          key=f"{key_prefix}_filter_condition",
-                          on_change=update_staging,
-                          args=('filter_condition', key_prefix, s))
-            if st.button(':material/convert_to_text: Load relevant facts', key=f'btn_{s.get("task_id")}_{s.get("staging_id")}'):
-                ss.selected_task_id = s.get('task_id')
-                ss.selected_staging_id = s.get('staging_id')
-    return
-
-def render_fact_management(task_id, staging_id):
-    if not task_id:
-        st.error('Cannot render subtasks without task_id')
-        return
-
-    if not staging_id:
-        st.error('Cannot render subtasks without staging_id')
-        return
-
-    sel_query = f"""SELECT * FROM tasks.fact_configuration WHERE task_id = {task_id} and staging_id = {staging_id}"""
-    ss.fact_df = pd.read_sql(sel_query, con=get_conn(alchemy=True))
-
-    cols = ['fact_id',
-            'fact_name',
-            'data_type',
-            'extraction_sql',
-            'is_unique_constraint',
-            'interpolate_values',
-            'infer_values',
-            'interpolation_ts',
-            'interpolation_destination_table',
-            'forecast_values']
-
-    if ss.fact_df.empty:
-        ss.fact_df = pd.DataFrame(columns=cols)
-
-    col_config = {'fact_id': st.column_config.NumberColumn(label='ID',
-                                                     width=40,
-                                                     pinned=True,
-                                                     disabled=True),
-                  'fact_name': st.column_config.TextColumn(label='Name',
-                                                           pinned=True,
-                                                           disabled=False),
-                  'data_type': st.column_config.TextColumn(label='Data Type',
-                                                           pinned=False,
-                                                           disabled=False),
-                  'extraction_sql': st.column_config.TextColumn(label='Extraction SQL',
-                                                           pinned=False,
-                                                           disabled=False),
-                  'interpolate_values': st.column_config.CheckboxColumn(label='Interpolate?',
-                                                                          width=40,
-                                                                          disabled=False),
-                  'is_unique_constraint': st.column_config.CheckboxColumn(label='PK?',
-                                                                          width=40,
-                                                                          disabled=False),
-                  'interpolation_ts': st.column_config.CheckboxColumn(label='Timestamp Column?',
-                                                                  disabled=False, width="small"),
-                  'infer_values': st.column_config.CheckboxColumn(label='Infer before interpolation?',
-                                                                  disabled=False, width="small"),
-                  'interpolation_destination_table': st.column_config.TextColumn(label='Interpolation Destination Table'),
-                  'forecast_values': st.column_config.CheckboxColumn(label='Forecast Values?',
-                                                                  disabled=False, width="small")
-                  }
-
-    st.data_editor(ss.fact_df,
-                 column_order=cols,
-                 column_config=col_config,
-                 num_rows="dynamic",
-                    key='fact_df_updates',
-                   hide_index=True,
-                   )
-
-    if st.button(':material/save: Save Fact Changes'):
-        update_fact_df(task_id, staging_id)
-    # fu = ss.get('fact_df_updates')
-    # er = fu.get('edited_rows')
-    # for row_index, updates in er.items():
-    #     st.write(row_index)
-    #     st.write(updates)
-    #     for key, key_val in updates.items():
-    #         st.write(key)
-    #         st.write(key_val)
-
-    st.write(ss.get('fact_df_updates'))
-    return
 
 def update_fact_df(task_id, staging_id):
     d = ss.get('fact_df_updates')
@@ -485,8 +316,59 @@ def update_fact_df(task_id, staging_id):
     st.success('Values saved!')
     time.sleep(10)
     st.rerun()
+    return
 
 
+def recent_execution_log(task_id):
+    sel_sql = f"""SELECT * FROM logging.application_events
+                    where event_category like '%Task #{task_id}%'
+                    order by event_time_utc desc
+                    LIMIT 10"""
+    recent_df = pd.read_sql(text(sel_sql), con=get_conn(alchemy=True))
+    if not recent_df.empty:
+        max_time = int(recent_df['execution_time_ms'].max())
+        max_time = 1 if max_time == 0 else max_time
+        cols = ['event_time_utc', 'event_description', 'execution_time_ms', 'error_text']
+        col_config = {'event_time_utc': st.column_config.DatetimeColumn(label='Age', format='distance', width="small"),
+                      'event_description': st.column_config.TextColumn(label='Desc', width="medium"),
+                      'execution_time_ms': st.column_config.ProgressColumn(label='ms',
+                                                                           min_value=0,
+                                                                           max_value=max_time,
+                                                                           format='%d', width=40
+                                                                           ),
+                      'error_text': st.column_config.TextColumn(label='Error', width='medium')}
+        st.dataframe(recent_df, column_order=cols, column_config=col_config, hide_index=True)
+    return
 
 
+def render_task_rescheduling():
+    if st.button(':material/recycling: Reschedule all active tasks', type='primary'):
+        task_reschedule()
+        st.rerun()
+
+    st.write(f"__Current Schedule__")
+    task_sql = """SELECT 
+                task_name,
+                last_executed_utc,
+                next_planned_execution_utc
+                FROM tasks.task_configuration
+                ORDER BY next_planned_execution_utc asc"""
+
+    task_df = pd.read_sql(text(task_sql), con=get_conn(alchemy=True))
+    column_config = {'task_name': st.column_config.TextColumn(label='Name'),
+                     'last_executed_utc': st.column_config.DatetimeColumn(label='Last', format='distance'),
+                     'next_planned_execution_utc': st.column_config.DatetimeColumn(label='Next', format='distance')}
+    st.dataframe(task_df, column_config=column_config, hide_index=True)
+    return
+
+
+def task_reschedule():
+    sql = "SELECT * FROM tasks.vw_task_info WHERE task_frequency != 'Inactive'"
+    sql = f"{sql} ORDER BY api_service_name, next_planned_execution_utc"
+
+    task_list = sql_to_dict(sql)
+    with st.spinner(f"Rescheduling {len(task_list)} tasks...", show_time=True):
+        for task_dict in task_list:
+            reconcile_task_dates(task_dict)
+    st.toast('Rescheduling Complete', duration=3)
     return

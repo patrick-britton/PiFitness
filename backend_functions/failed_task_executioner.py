@@ -15,24 +15,30 @@ from backend_functions.service_logins import sql_rate_limited
 
 
 
+# def api_function_dictionary:
+#     {'Heartrate': {'service': 'Garmin',
+#                    'api_function': 'get_heartrate',}}
+
+
+
 def ultimate_task_executioner(force_task_name=None, force_task_id=None):
     t0 = start_timer()
     client_dict = None
 
     #Obtain the list of tasks
-    sql = "SELECT * FROM tasks.vw_task_info"
+    sql = "SELECT * FROM tasks.task_configuration"
     if force_task_id:
         sql = f"{sql} WHERE task_id = {force_task_id} "
     elif force_task_name:
         sql = f"{sql} WHERE task_name LIKE '%{force_task_name}%' "
+    else:
+        sql = f"{sql} WHERE task_frequency != 'Inactive' and  CURRENT_TIMESTAMP > next_planned_execution"
 
-    sql = f"{sql} ORDER BY api_service_name, next_planned_execution_utc"
+    sql = f"{sql} ORDER BY api_service_name, task_priority"
 
     task_list = sql_to_dict(sql)
     print(f"{len(task_list)} tasks found : {task_list}")
 
-    # Default the api service name to none -- will trigger a fresh login
-    api_service_name = None
     if not task_list:
         return
 
@@ -40,272 +46,152 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
         task_t0 = start_timer()
         task_id = task_dict.get('task_id')
         task_name = task_dict.get('task_name')
-        print(f"Starting task #{task_id} : {task_name}")
-        run_elt= task_dict.get('run_extract')
-        run_interpolation = task_dict.get('run_interpolation')
-        run_forecasting = task_dict.get('run_forecasting')
-        run_python = task_dict.get('run_python')
-        run_parsing = task_dict.get('run_parsing')
+        task_freq = task_dict.get('task_frequency')
+        continue_execution = verify_execution(task_id, task_dict, force_task_name)
 
+        if not continue_execution:
+            continue
+
+        # Determine what type of execution
+        api_service_name = task_dict.get('api_service_name')
+        run_elt = api_service_name and api_service_name != 'N/A'
+        python_function = task_dict.get('python_function')
+        run_python = python_function and python_function != 'N/A'
         task_fail = False
         fail_msg=None
         if run_elt:
-            if api_service_name != task_dict.get('api_service_name'):
-                client_dict = None
-                api_service_name = task_dict.get('api_service_name')
+            sub_t0 = start_timer()
 
-            module_function = task_dict.get('python_login_function')
-            print(f"Refreshing client for {api_service_name}")
+            ##########################
+            ## EXTRACTION
+            ##########################
             try:
-                module_name, login_function_name = module_function.rsplit('.', 1)
-                module = importlib.import_module(module_name)
-                login_function = getattr(module, login_function_name)
-                client_dict = login_function(client_dict)
+                json_blob, client_dict = extract_json(task_dict, client_dict)
+                extract_time_ms = elapsed_ms(sub_t0)
             except Exception as e:
-                log_app_event(cat=f"Task #{task_id}: {task_name}",
-                              desc='Failed to establish client',
-                              err=e)
-                reconcile_task_dates(task_dict, task_fail=True, e=e)
-                client_dict = None
-                print(f"Failed client initialization for task #{task_id}: {task_name}")
+                fail_msg = f"{task_name}: Extract failure: {e}"
+                print(fail_msg)
+                task_log(task_id, e_time=elapsed_ms(sub_t0), fail_type='Extract', fail_text=fail_msg)
+                task_fail=True
+                reconcile_task_dates(task_dict, task_fail, fail_msg)
+                continue
+            ##########################
+            ## LOADING
+            ##########################
+            sub_t0 = start_timer()
+            try:
+                json_loading(json_blob, task_id)
+                load_time_ms = elapsed_ms(sub_t0)
+            except Exception as e:
+                fail_msg = f"{task_name}: Load failure: {e}"
+                print(fail_msg)
+                task_log(task_id, e_time=extract_time_ms, l_time=elapsed_ms(sub_t0), fail_type='Load', fail_text=fail_msg)
+                task_fail = True
+                reconcile_task_dates(task_dict, task_fail, fail_msg)
+                continue
+            ##########################
+            ## FLATTENING
+            ##########################
+            sub_t0 = start_timer()
+            try:
+                json_flattening(task_dict)
+                transform_time_ms = elapsed_ms(sub_t0)
+            except Exception as e:
+                fail_msg = f"{task_name}: Flatten failure: {e}"
+                print(fail_msg)
+                task_log(task_id,
+                         e_time=extract_time_ms,
+                         l_time=load_time_ms,
+                         t_time=elapsed_ms(sub_t0),
+                         fail_type='Flatten', fail_text=fail_msg)
+                task_fail = True
+                reconcile_task_dates(task_dict, task_fail, fail_msg)
                 continue
 
-            task_fail, client_dict = extract_load_flatten(client_dict, task_dict)
+            ##########################
+            ## INTERPOLATION
+            ##########################
 
-        if run_parsing and not task_fail:
-            task_fail = execute_sproc(d=task_dict, sproc_type='parsing')
+            sub_t0 = start_timer()
+            try:
+                metric_interpolation(task_dict)
+                interpolation_time_ms = elapsed_ms(sub_t0)
+            except Exception as e:
+                fail_msg = f"{task_name}: Interpolation failure: {e}"
+                print(fail_msg)
+                task_log(task_id,
+                         e_time=extract_time_ms,
+                         l_time=transform_time_ms,
+                         t_time=transform_time_ms,
+                         i_time=elapsed_ms(sub_t0),
+                         fail_type='Load', fail_text=fail_msg)
+                task_fail = True
+                reconcile_task_dates(task_dict, task_fail, fail_msg)
+                continue
 
-        if run_interpolation and not task_fail:
-            task_fail = execute_sproc(d=task_dict, sproc_type='interpolation')
+            ##########################
+            ## FINAL LOGGING
+            ##########################
+            if not task_fail:
+                print(f"{task_name}: Finished successfully")
+                task_log(task_id,
+                         e_time=extract_time_ms,
+                         l_time=transform_time_ms,
+                         t_time=transform_time_ms,
+                         i_time=interpolation_time_ms)
+                log_app_event(cat='Task Execution', desc=f"{task_name} complete success", exec_time=elapsed_ms(t0))
 
-        if run_forecasting and not task_fail:
-            task_fail = execute_sproc(d=task_dict, sproc_type='forecasting')
-
-        if run_python and not task_fail:
-            task_fail = execute_python(d=task_dict)
-
-
-        if not task_fail:
-            print(f"{task_name}: Successful")
-            log_app_event(cat=f"Task #{task_id}: {task_name}",
-                          desc=f"Successful Completion",
-                          exec_time=elapsed_ms(task_t0))
-            reconcile_task_dates(task_dict)
-
-    print('Execution Complete')
+            else:
+                print(f"Soft Failure for : {task_name}")
+                log_app_event(cat='Task Execution', desc=f"{task_name} complete success", exec_time=elapsed_ms(t0), err='Soft Failure')
+            reconcile_task_dates(task_dict, task_fail, fail_msg)
     return
 
 
-def extract_load_flatten(cd, td):
-    # Ensure client is established
-    if not cd:
-        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                      desc=f"Failed Extraction",
-                      err='No Client dictionary')
-        reconcile_task_dates(td, task_fail=True, e='No Client Dictionary')
-        return True, None
-
-    if not cd.get('client'):
-        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                      desc=f"Failed Extraction",
-                      err='No client within dictionary')
-        reconcile_task_dates(td, task_fail=True, e='No Client within client dictionary')
-        return True, None
-
-    extract_function_name = td.get('python_extraction_function')
-    module_name = 'backend_functions.json_extractors'
-
-
-    try:
-        module = importlib.import_module(module_name)
-        local_function = getattr(module, extract_function_name)
-    except Exception as e:
-        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                      desc=f"Failed to get extraction function",
-                      exec_time=0,
-                      err=e)
-        reconcile_task_dates(td, task_fail=True, e=f"Failed To get extraction Function {e}")
-        return True, cd
-
-    # Extract JSON
-    print(f"Extracting data for Task #{td.get('task_id')}: {td.get('task_name')}: Function: {local_function}")
-    t0=start_timer()
-    try:
-        json_data = local_function(client=cd.get('client'), td=td)
-        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                      desc=f"Valid Extraction",
-                      exec_time=elapsed_ms(t0))
-        print(f"Data Extraction Success for Task #{td.get('task_id')}: {td.get('task_name')}")
-    except Exception as e:
-        print(f"Data Extraction Failed for Task #{td.get('task_id')}: {td.get('task_name')} : {e}")
-        json_data = None
-        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                      desc=f"Failed Extraction",
-                      exec_time=elapsed_ms(t0),
-                      err=f"Extraction error: {e}")
-        reconcile_task_dates(td, task_fail=True, e=f"Failed Extraction {e}")
-        return True, cd
-
-    if not json_data:
-        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                      desc=f"Loading ignored",
-                      exec_time=0,
-                      err='No API response to load')
-        # reconcile_task_dates(td, task_fail=True, e='No API response to load')
-        return True, cd
-
-    print(f"Loading data for Task #{td.get('task_id')}: {td.get('task_name')}")
-    t0 = start_timer()
-    try:
-        json_loading(json_data, td)
-        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                      desc=f"Successful Load",
-                      exec_time=elapsed_ms(t0),
-                      err=None)
-    except Exception as e:
-        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                  desc=f"Failed Load",
-                  exec_time=elapsed_ms(t0),
-                  err=e)
-        reconcile_task_dates(td, task_fail=True, e=f"Failed TO Load {e}")
-        return True, cd
-
-    t0 = start_timer()
-    flatten_failure = execute_sproc(d=td, sproc_type='flatten')
-
-    return flatten_failure, cd
-
-
-def execute_sproc(d, sproc_type):
-    print(f"Starting SPROC {sproc_type} for #{d.get('task_id')}: {d.get('task_name')}")
-    retrieval_key = f"{sproc_type}_sproc"
-    sproc_sql = d.get(retrieval_key)
-    fail = False
-    if not sproc_sql:
-        fail = True
-    elif sproc_sql in ['None', 'N/A', '']:
-        fail = True
-
-    if fail:
-        log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
-                      desc=f"SPROC Failure: {sproc_type}",
-                      exec_time=0,
-                      err=f'Failed to extract key: {retrieval_key}')
-        reconcile_task_dates(d, task_fail=True, e=f'Failed to SPROC key: {retrieval_key}')
-        return True
-    t0 = start_timer()
-    sql = f"CALL {sproc_sql};"
-    returns = qec(sql)
-    if returns:
-        log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
-                      desc=f"SPROC Failure: {sproc_type}",
-                      exec_time=elapsed_ms(t0),
-                      err=returns)
-        reconcile_task_dates(d, task_fail=True, e=f'Failed to execute sql: {returns}')
-        return True
-    else:
-        log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
-                      desc=f"SPROC Success: {sproc_type}",
-                      exec_time=elapsed_ms(t0))
-        return False
-
-
-def execute_python(d=None):
-    print(f"Starting Python Execution for #{d.get('task_id')}: {d.get('task_name')}")
-    module_function = d.get('python_execution_function')
-    module_name, svc_function_name = module_function.rsplit('.', 1)
-    try:
-        module = importlib.import_module(module_name)
-        local_function = getattr(module, svc_function_name)
-    except Exception as e:
-        log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
-                      desc=f"Python Function Failure",
-                      exec_time=0,
-                      err=e)
-        reconcile_task_dates(d, task_fail=True, e=f"Python Failure: {e}")
-        return True
-
-    t0 = start_timer()
-    try:
-        local_function()
-        log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
-                      desc=f"Python Function Completion",
-                      exec_time=elapsed_ms(t0))
-        return False
-
-    except Exception as e:
-        log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
-                      desc=f"Python Function Failure",
-                      exec_time=elapsed_ms(t0),
-                      err=e)
-        reconcile_task_dates(d, task_fail=True, e=f"Python Function Failure {e}")
-        return True
-
-
-def reconcile_task_dates(task_dict, task_fail=False, e=None):
-
-    task_id = int(task_dict.get('task_id'))
-
+def reconcile_task_dates(task_dict, task_fail, e):
     if task_fail:
         # e= e.replace("'", "")
-        cons_failures = int(task_dict.get('consecutive_failures')) + 1
         up_sql = f"""UPDATE tasks.task_configuration SET
                 last_executed_utc = CURRENT_TIMESTAMP,
                 last_failed_utc = CURRENT_TIMESTAMP,
-                next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '{cons_failures*60} Minutes',
+                next_planned_execution = CURRENT_TIMESTAMP + INTERVAL '30 Minutes',
                 last_failure_message = %s,
                 consecutive_failures = consecutive_failures + 1
-                WHERE task_id = %s;
+                WHERE task_id = {task_dict.get('task_id')};
                 """
-        params = [e, task_id]
     else:
         freq = task_dict.get('task_frequency')
-        friendly_name = task_dict.get('friendly_name')
-        is_extract = task_dict.get('python_extraction_function') is not None
-        if is_extract:
-            value_current_sql = f"""SELECT CURRENT_TIMESTAMP::DATE = (SELECT MAX(value_recency) FROM api_services.function_library
-                                WHERE friendly_name = '{friendly_name}')::DATE"""
-            value_current = one_sql_result(value_current_sql)
-        else:
-            value_current = True
+        value_current_sql = f"""SELECT CURRENT_TIMESTAMP::DATE = (SELECT MAX(value_recency) FROM tasks.fact_configuration
+                            WHERE task_id = {task_dict.get('task_id')})"""
+        value_current = one_sql_result(value_current_sql)
         if not value_current:
-            # Run again in an hour because values aren't current.
-            int_sql = f"next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '60 minutes'"
+            int_sql = f"next_planned_execution = next_planned_execution + INTERVAL '60 minutes'"
         elif freq == 'Hourly':
-            # Run again in {interval} hours
-            int_sql = f"next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '{task_dict.get('task_interval')} hours'"
+            int_sql = f"next_planned_execution = next_planned_execution + INTERVAL '{task_dict.get('task_interval')} hours'"
         elif freq == 'Daily':
-            # Run again tomorrow at the interval
-            int_sql = f"""next_planned_execution_utc = 
-                    (date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '1 day') 
-                    + INTERVAL '{task_dict.get('task_interval')} hours')
+            int_sql = f"""next_planned_execution = 
+                    date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '1 day') 
+                    + INTERVAL '{task_dict.get('task_interval')} hours'
                     AT TIME ZONE 'America/Los_Angeles'"""
         elif freq == 'Weekly':
-            # Run again in 7 days at the interval
-            int_sql = f"""next_planned_execution_utc = 
-                                (date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '7 days') 
-                                + INTERVAL '{task_dict.get('task_interval')} hours')
+            int_sql = f"""next_planned_execution = 
+                                date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '7 days') 
+                                + INTERVAL '{task_dict.get('task_interval')} hours'
                                 AT TIME ZONE 'America/Los_Angeles'"""
         elif freq == 'Monthly':
-            # Run again in 30 days at the interval.
-            int_sql = f"""next_planned_execution_utc = 
-                                (date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '30 days') 
-                                + INTERVAL '{task_dict.get('task_interval')} hours')
+            int_sql = f"""next_planned_execution = 
+                                date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '30 days') 
+                                + INTERVAL '{task_dict.get('task_interval')} hours'
                                 AT TIME ZONE 'America/Los_Angeles'"""
-        else:
-            int_sql = """next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '60 minutes'"""
-
         up_sql = f"""UPDATE tasks.task_configuration SET
                         last_executed_utc = CURRENT_TIMESTAMP,
-                        last_succeeded_utc = CURRENT_TIMESTAMP,
+                        last_succeeded = CURRENT_TIMESTAMP,
                         {int_sql},
-                        consecutive_failures = 0
-                        WHERE task_id = %s;
+                        last_failure_message = %s,
+                        consecutive_failures = 0,
+                        WHERE task_id = {task_dict.get('task_id')};
                         """
-        params = [task_id,]
-
-    qec(up_sql, params)
-    return
+    qec(up_sql, [e,])
 
 
 def metric_interpolation(task_dict):
@@ -541,7 +427,6 @@ def metric_interpolation(task_dict):
             conn.close()
     return
 
-
 def json_flattening(task_dict):
     # Get the fact dictionary
     task_id = int(task_dict.get('task_id'))
@@ -635,6 +520,12 @@ def json_flattening(task_dict):
             ts_sql = f"""UPDATE tasks.fact_configuration set value_recency = 
                         (SELECT MAX({ts_col}) FROM {destination_table}) WHERE task_id = {task_id};"""
             qec(ts_sql)
+
+
+
+
+
+
 
 
 def extract_json(d, client_dict):
@@ -873,7 +764,10 @@ def json_date_loop(client, function, loop_type, date_list, api_parameters=None):
 
     return all_json
 
-
+def default_range():
+    d2 = date.today()
+    d1 = d2 - timedelta(days=1)
+    return d1, d2
 
 def to_params(param_list=None, search_val=None, replace_val=None, return_type='list'):
     if isinstance(param_list, list):
@@ -895,8 +789,8 @@ def to_params(param_list=None, search_val=None, replace_val=None, return_type='l
     else:
         return ", ".join(rb_list)
 
-def json_loading(json_data, d):
-    task_id = d.get("task_id")
+def json_loading(json_data, task_id):
+
     if isinstance(json_data, dict):
         json_data = [json_data]
 
