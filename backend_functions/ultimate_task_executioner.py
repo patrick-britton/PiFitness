@@ -262,7 +262,7 @@ def execute_python(d=None):
                       desc=f"Python Function Failure",
                       err=f"Module Error: {e}",
                       task_id=d.get('task_id'),
-                      data_event='Python Module Error'
+                      data_event='Python'
                       )
         reconcile_task_dates(d, task_fail=True, e=f"Python Failure: {e}")
         return True
