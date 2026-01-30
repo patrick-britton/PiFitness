@@ -78,7 +78,7 @@ def build_options(d):
     return opts
 
 
-def update_nav(pn=None, key_val=None, custom_dict=None):
+def update_nav(pn=None, key_val=None, custom_dict=None, force_change=False):
     if not pn:
         return
 
@@ -87,7 +87,9 @@ def update_nav(pn=None, key_val=None, custom_dict=None):
     selected_var_name = f"{pn}_active"
     new_value = ss.get(key_val)
 
-    if new_value != old_value:
+    if new_value != old_value or force_change:
+        if force_change:
+            ss[f"{pn}_active"] = None
         ss[selected_var_name] = new_value
         ss[curr_value_var] = new_value
         ss[f"{pn}_active_decode"] = decode_nav(pn, custom_dict)

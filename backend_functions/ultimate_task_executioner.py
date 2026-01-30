@@ -276,7 +276,7 @@ def reconcile_task_dates(task_dict, task_fail=False, e=None):
             value_current = True
         if not value_current:
             # Run again in an hour because values aren't current.
-            int_sql = f"next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '60 minutes'"
+            int_sql = f"next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '2 hours'"
         elif freq == 'Hourly':
             # Run again in {interval} hours
             int_sql = f"next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '{task_dict.get('task_interval')} hours'"
@@ -284,22 +284,22 @@ def reconcile_task_dates(task_dict, task_fail=False, e=None):
             # Run again tomorrow at the interval
             int_sql = f"""next_planned_execution_utc = 
                     (date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '1 day') 
-                    + INTERVAL '{task_dict.get('task_interval')} hours')
+                    + INTERVAL '{task_dict.get('task_start_hour')} hours')
                     AT TIME ZONE 'America/Los_Angeles'"""
         elif freq == 'Weekly':
             # Run again in 7 days at the interval
             int_sql = f"""next_planned_execution_utc = 
                                 (date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '7 days') 
-                                + INTERVAL '{task_dict.get('task_interval')} hours')
+                                + INTERVAL '{task_dict.get('task_start_hour')} hours')
                                 AT TIME ZONE 'America/Los_Angeles'"""
         elif freq == 'Monthly':
             # Run again in 30 days at the interval.
             int_sql = f"""next_planned_execution_utc = 
                                 (date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '30 days') 
-                                + INTERVAL '{task_dict.get('task_interval')} hours')
+                                + INTERVAL '{task_dict.get('task_start_hour')} hours')
                                 AT TIME ZONE 'America/Los_Angeles'"""
         else:
-            int_sql = """next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '60 minutes'"""
+            int_sql = """next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '24 hours'"""
 
         up_sql = f"""UPDATE tasks.task_configuration SET
                         last_executed_utc = CURRENT_TIMESTAMP,
