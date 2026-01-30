@@ -8,7 +8,7 @@ from backend_functions.database_functions import sql_to_dict, one_sql_result, qe
     get_api_function_list
 from backend_functions.service_logins import get_service_list
 from backend_functions.ultimate_task_executioner import ultimate_task_executioner, reconcile_task_dates
-from frontend_functions.nav_buttons import nav_widget
+from frontend_functions.nav_buttons import nav_widget, update_nav, clear_nav
 from frontend_functions.streamlit_helpers import sse, ss_pop
 
 
@@ -19,6 +19,7 @@ def render_task_selection():
     if sse("selected_task_id"):
         return
 
+    st.info('Select a task below')
     sql = "SELECT task_id, task_name, display_icon, task_frequency FROM tasks.task_configuration order by task_name"
     task_dict_list = sql_to_dict(sql)
 
@@ -76,17 +77,28 @@ def render_task_selection():
     return
 
 def render_task_id_management():
-    nav_selection = nav_widget('task_management', 'Task Options')
+    if sse('bypass_task_mgmt_nav', bool_flag=True):
+        nav_selection = 'edit_task'
+        ss_pop(["selected_task_id", 'selected_staging_id'])
+        clear_nav('task_management')
+        ss.bypass_task_mgmt_nav = False
+    else:
+        nav_selection = nav_widget('task_management', 'Task Options')
 
     if not nav_selection:
         nav_selection = 'edit_task'
 
-
     if nav_selection == 'task_reset':
-        ss_pop(["selected_task_id", 'selected_staging_id'])
-        st.info("Select above to create or edit a task")
-        return
+        ss.bypass_task_mgmt_nav = True
 
+        ss[f"task_management_active"] = ':material/edit:'
+        key_val = f"key_task_management_nav_{ss.n_counter}"
+        update_nav(pn='task_management', key_val=key_val, custom_dict=None, force_change=True)
+        # st.info("Select above to create or edit a task")
+        nav_selection = 'edit_task'
+        st.rerun()
+
+    st.write(nav_selection, ss.get(f"task_management_active"))
     if nav_selection == 'create_task' and not sse("selected_task_id"):
         insta_task_create()
         return
@@ -100,6 +112,8 @@ def render_task_id_management():
         render_task_edit(ss.selected_task_id)
     elif nav_selection == 'reschedule_tasks':
         render_task_rescheduling()
+
+
     return
 
 def insta_task_create():
