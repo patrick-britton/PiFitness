@@ -45,6 +45,10 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
         task_id = task_dict.get('task_id')
         task_name = task_dict.get('task_name')
         print(f"Starting task #{task_id} : {task_name}")
+        log_app_event(cat=f"Task #{task_id}: {task_name}",
+                      desc='Task Started',
+                      task_id=task_id,
+                      data_event='Begin')
         run_elt= task_dict.get('run_extract')
         run_interpolation = task_dict.get('run_interpolation')
         run_forecasting = task_dict.get('run_forecasting')
@@ -64,11 +68,19 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
                 module_name, login_function_name = module_function.rsplit('.', 1)
                 module = importlib.import_module(module_name)
                 login_function = getattr(module, login_function_name)
+                l_t0 = start_timer()
                 client_dict = login_function(client_dict)
+                log_app_event(cat=f"Task #{task_id}: {task_name}",
+                              desc='Login Success',
+                              task_id=task_id,
+                              exec_time=elapsed_ms(l_t0),
+                              data_event='Login')
             except Exception as e:
                 log_app_event(cat=f"Task #{task_id}: {task_name}",
                               desc='Failed to establish client',
-                              err=e)
+                              task_id=task_id,
+                              err=f"Client error: {e}",
+                              data_event='Login')
                 reconcile_task_dates(task_dict, task_fail=True, e=e)
                 client_dict = None
                 print(f"Failed client initialization for task #{task_id}: {task_name}")
@@ -93,7 +105,9 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
             print(f"{task_name}: Successful")
             log_app_event(cat=f"Task #{task_id}: {task_name}",
                           desc=f"Successful Completion",
-                          exec_time=elapsed_ms(task_t0))
+                          exec_time=elapsed_ms(task_t0),
+                          task_id=task_id,
+                          data_event='Complete')
             reconcile_task_dates(task_dict)
 
     log_app_event(cat='Task Executioner',
@@ -107,14 +121,18 @@ def extract_load_flatten(cd, td):
     if not cd:
         log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
                       desc=f"Failed Extraction",
-                      err='No Client dictionary')
+                      err='No Client dictionary',
+                      task_id=td.get('task_id'),
+                      data_event='Login')
         reconcile_task_dates(td, task_fail=True, e='No Client Dictionary')
         return True, None
 
     if not cd.get('client'):
         log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
                       desc=f"Failed Extraction",
-                      err='No client within dictionary')
+                      err='No client within dictionary',
+                      task_id=td.get('task_id'),
+                      data_event='Login')
         reconcile_task_dates(td, task_fail=True, e='No Client within client dictionary')
         return True, None
 
@@ -129,7 +147,9 @@ def extract_load_flatten(cd, td):
         log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
                       desc=f"Failed to get extraction function",
                       exec_time=0,
-                      err=e)
+                      err=f"Module Error: {e}",
+                      task_id=td.get('task_id'),
+                      data_event='Module')
         reconcile_task_dates(td, task_fail=True, e=f"Failed To get extraction Function {e}")
         return True, cd
 
@@ -140,23 +160,28 @@ def extract_load_flatten(cd, td):
         json_data = local_function(client=cd.get('client'), td=td)
         log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
                       desc=f"Valid Extraction",
-                      exec_time=elapsed_ms(t0))
+                      exec_time=elapsed_ms(t0),
+                      task_id=td.get('task_id'),
+                      data_event='Extract')
         print(f"Data Extraction Success for Task #{td.get('task_id')}: {td.get('task_name')}")
     except Exception as e:
         print(f"Data Extraction Failed for Task #{td.get('task_id')}: {td.get('task_name')} : {e}")
         json_data = None
         log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
                       desc=f"Failed Extraction",
-                      exec_time=elapsed_ms(t0),
-                      err=f"Extraction error: {e}")
+                      err=f"Extraction error: {e}",
+                      task_id=td.get('task_id'),
+                      data_event='Extract')
         reconcile_task_dates(td, task_fail=True, e=f"Failed Extraction {e}")
         return True, cd
 
     if not json_data:
         log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
                       desc=f"Loading ignored",
-                      exec_time=0,
-                      err='No API response to load')
+                      err='No API response to load',
+                      task_id=td.get('task_id'),
+                      data_event='No data from API'
+                      )
         # reconcile_task_dates(td, task_fail=True, e='No API response to load')
         return True, cd
 
@@ -167,12 +192,15 @@ def extract_load_flatten(cd, td):
         log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
                       desc=f"Successful Load",
                       exec_time=elapsed_ms(t0),
-                      err=None)
+                      task_id=td.get('task_id'),
+                      data_event='Load')
     except Exception as e:
         log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                  desc=f"Failed Load",
-                  exec_time=elapsed_ms(t0),
-                  err=e)
+                      desc=f"Failed Load",
+                      exec_time=elapsed_ms(t0),
+                      err=f"Load Failure: {e}",
+                      task_id=td.get('task_id'),
+                      data_event='Load')
         reconcile_task_dates(td, task_fail=True, e=f"Failed TO Load {e}")
         return True, cd
 
@@ -192,11 +220,13 @@ def execute_sproc(d, sproc_type):
     elif sproc_sql in ['None', 'N/A', '']:
         fail = True
 
+    sproc_type = sproc_type.capitalize()
     if fail:
         log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
                       desc=f"SPROC Failure: {sproc_type}",
-                      exec_time=0,
-                      err=f'Failed to extract key: {retrieval_key}')
+                      err=f'Failed to extract key: {retrieval_key}',
+                      task_id=d.get('task_id'),
+                      data_event=sproc_type)
         reconcile_task_dates(d, task_fail=True, e=f'Failed to SPROC key: {retrieval_key}')
         return True
     t0 = start_timer()
@@ -205,14 +235,18 @@ def execute_sproc(d, sproc_type):
     if returns:
         log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
                       desc=f"SPROC Failure: {sproc_type}",
-                      exec_time=elapsed_ms(t0),
-                      err=returns)
+                      err=returns,
+                      task_id=d.get('task_id'),
+                      data_event=sproc_type
+                      )
         reconcile_task_dates(d, task_fail=True, e=f'Failed to execute sql: {returns}')
         return True
     else:
         log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
                       desc=f"SPROC Success: {sproc_type}",
-                      exec_time=elapsed_ms(t0))
+                      exec_time=elapsed_ms(t0),
+                      task_id=d.get('task_id'),
+                      data_event=sproc_type)
         return False
 
 
@@ -226,8 +260,10 @@ def execute_python(d=None):
     except Exception as e:
         log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
                       desc=f"Python Function Failure",
-                      exec_time=0,
-                      err=e)
+                      err=f"Module Error: {e}",
+                      task_id=d.get('task_id'),
+                      data_event='Python Module Error'
+                      )
         reconcile_task_dates(d, task_fail=True, e=f"Python Failure: {e}")
         return True
 
@@ -236,14 +272,18 @@ def execute_python(d=None):
         local_function()
         log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
                       desc=f"Python Function Completion",
-                      exec_time=elapsed_ms(t0))
+                      exec_time=elapsed_ms(t0),
+                      task_id=d.get('task_id'),
+                      data_event='Python')
         return False
 
     except Exception as e:
         log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
                       desc=f"Python Function Failure",
                       exec_time=elapsed_ms(t0),
-                      err=e)
+                      err=f"Python Failure: {e}",
+                      task_id=d.get('task_id'),
+                      data_event='Python')
         reconcile_task_dates(d, task_fail=True, e=f"Python Function Failure {e}")
         return True
 
