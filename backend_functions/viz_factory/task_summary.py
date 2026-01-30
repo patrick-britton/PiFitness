@@ -33,18 +33,21 @@ def render_task_summary_dashboard(is_dark_mode=True, is_mobile=False):
     text_data = []
     stack_data = []
     recency_data = []
+    exec_data = []
     row_idx = -1
     one_day = -24*60
     day_half = -36 * 60
     lower_range = -48 * 60
     upper_range = 48 * 60
+    max_exec = task_list[0].get('max_executions')
+    max_exec = -10 if max_exec < -10 else max_exec
     for task in task_list:
         row_idx += 1
         if not task.get('is_active_failure'):
             text_data.append({
                 'row_index': row_idx,
                 'task_name': task.get('task_name'),
-                'err_msg': f"Valid: {task.get('time_ago_execution')}",
+                'err_msg': f"Last: {task.get('time_ago_execution')}, Next: {task.get('time_ago_next')}, Value: {task.get('time_ago_value')}",
                 'color': 'black'
             })
         else:
@@ -64,6 +67,9 @@ def render_task_summary_dashboard(is_dark_mode=True, is_mobile=False):
             {'row_index': row_idx, 'type': 'Forecast', 'value': float(task.get('forecasting_ms') or 0), 'order': 6, 'value_sec': round(float(task.get('forecasting_ms') or 0)/1000,1)},
             {'row_index': row_idx, 'type': 'Python', 'value': float(task.get('python_ms') or 0), 'order': 7, 'value_sec': round(float(task.get('python_ms') or 0)/1000,1)},
             {'row_index': row_idx, 'type': 'Admin', 'value': float(task.get('admin_ms') or 0), 'order': 8, 'value_sec': round(float(task.get('admin_ms') or 0)/1000,1)}
+        ])
+        exec_data.extend([
+            {'row_index': row_idx, 'type': 'Executions', 'color': 'gray', 'value': -float(task.get('execution_count') or 0)}
         ])
         last_val = float(task.get('execution_minutes_ago') or 0)
         value_val = float(task.get('value_recency_minutes_ago') or 0)
@@ -99,6 +105,7 @@ def render_task_summary_dashboard(is_dark_mode=True, is_mobile=False):
     text_df = pd.DataFrame(text_data)
     stack_df = pd.DataFrame(stack_data)
     recency_df = pd.DataFrame(recency_data)
+    exec_df = pd.DataFrame(exec_data)
 
 
     # Theme colors
@@ -151,6 +158,20 @@ def render_task_summary_dashboard(is_dark_mode=True, is_mobile=False):
     ).properties(width=dynamic_width, height=total_height)
 
     text_column = (task_labels + age_labels)
+
+
+    # Colum 1B - execution count
+    exec_width = 25
+    exec_bar = alt.Chart(exec_df).mark_bar(size=10).encode(
+        x=alt.X('value:Q', stack='zero', axis=None, scale=alt.Scale(domain=[max_exec,0])),
+        y=alt.Y('row_index:O', axis=None),
+        color=alt.Color('color:N', scale=None),
+        tooltip=[
+            alt.Tooltip('value:Q', title='# Executions', format='.0f')
+        ]
+    ).properties(width=exec_width, height=total_height)
+
+
     # --- COLUMN 2: Recency (Bar + Ticks) ---
     recency_width = 100
     # Fixed scale: +/- 2 Days (48 hours * 60 mins = 2880)
@@ -230,7 +251,7 @@ def render_task_summary_dashboard(is_dark_mode=True, is_mobile=False):
             alt.Tooltip('type:N', title='Task Phase'),
             alt.Tooltip('value_sec:Q', title='Duration (s)', format='.1f')
         ]
-    ).properties(width=100, height=total_height)
+    ).properties(width=50, height=total_height)
 
 
     # Add row separators (same width as sparklines)
@@ -244,10 +265,12 @@ def render_task_summary_dashboard(is_dark_mode=True, is_mobile=False):
 
     # Combine all columns
     chart = alt.hconcat(
+
+        exec_bar,
         text_column,
         recency_column,
         bars,
-        spacing=15 # Adjust for horizontal gap between columns
+        spacing=1 # Adjust for horizontal gap between columns
     ).configure_view(
         strokeWidth=0
     ).configure_concat(
