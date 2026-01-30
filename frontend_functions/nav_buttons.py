@@ -56,6 +56,7 @@ def nav_dictionary():
         # Task Management
         'task_management': {'create_task': {'icon': 'add_circle', 'label': 'New Task'},
                             'edit_task': {'icon': 'edit', 'label': 'Edit Task'},
+                            'reschedule_tasks': {'icon': 'recycling', 'label': 'Reset Schedules'},
                             'task_reset': {'icon': 'reset_settings'}}
     }
     return d

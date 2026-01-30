@@ -135,6 +135,19 @@ def get_sproc_list(append_option=None):
         sproc_list.append(append_option)
     return sproc_list
 
+def get_api_function_list(append_option='N/A'):
+    sql = """SELECT DISTINCT
+                friendly_name,
+                api_service_name
+            FROM api_services.function_library
+            ORDER BY api_service_name"""
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute(sql)
+    l = [row[0] for row in cursor.fetchall()]
+    if append_option:
+        l.append(append_option)
+    return l
 
 
 def get_log_tables(as_list=False):

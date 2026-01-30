@@ -9,7 +9,7 @@ import time
 
 
 def get_playlist_list(list_type=None):
-    sql = "SELECT * FROM music.vw_playlist_detail_sync_logic"
+    sql = "SELECT DISTINCT PLAYLIST_ID FROM music.vw_playlist_detail_sync_logic"
     return sql_to_list(sql)
 
 
