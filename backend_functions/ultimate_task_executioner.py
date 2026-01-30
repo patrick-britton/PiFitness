@@ -32,6 +32,8 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
 
     task_list = sql_to_dict(sql)
     print(f"{len(task_list)} tasks found : {task_list}")
+    log_app_event(cat='Task Executioner',
+                  desc=f'Planned execution of {len(task_list)} tasks')
 
     # Default the api service name to none -- will trigger a fresh login
     api_service_name = None
@@ -94,7 +96,9 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
                           exec_time=elapsed_ms(task_t0))
             reconcile_task_dates(task_dict)
 
-    print('Execution Complete')
+    log_app_event(cat='Task Executioner',
+                  desc=f'Execution complete {len(task_list)} tasks',
+                  exec_time=elapsed_ms(t0))
     return
 
 
