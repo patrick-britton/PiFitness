@@ -25,6 +25,8 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
         sql = f"{sql} WHERE task_id = {force_task_id} "
     elif force_task_name:
         sql = f"{sql} WHERE task_name LIKE '%{force_task_name}%' "
+    else:
+        sql = f"{sql} WHERE should_execute "
 
     sql = f"{sql} ORDER BY api_service_name, next_planned_execution_utc"
 
