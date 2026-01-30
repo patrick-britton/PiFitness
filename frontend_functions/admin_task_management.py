@@ -1,6 +1,5 @@
 import time
 from sqlalchemy import text
-from prometheus_client.decorator import append
 from streamlit import session_state as ss, column_config
 import streamlit as st
 import pandas as pd
