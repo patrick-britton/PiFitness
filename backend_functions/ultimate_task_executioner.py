@@ -361,7 +361,14 @@ def reconcile_task_dates(task_dict, task_fail=False, e=None):
 def metric_interpolation(task_dict):
     # only continue when interpolating
     if not task_dict.get('interpolation_sproc'):
-        return
+        log_app_event(cat=f"Task #{task_dict.get('task_id')}: {task_dict.get('task_name')}",
+                      desc=f"No Interpolation SPROC",
+                      err=f"task.get() returned None",
+                      task_id=task_dict.get('task_id'),
+                      data_event='Interpolation'
+                      )
+        reconcile_task_dates(task_dict, task_fail=True, e=f'Interpolation task.get() returned None')
+        return True
     it0 = start_timer()
 
     src_table_schema = task_dict.get('interpolation_sproc')
@@ -389,12 +396,26 @@ def metric_interpolation(task_dict):
                             'int')"""
 
     numeric_cols = sql_to_dict(sql)
-    success=True
+    if not numeric_cols:
+        print(f"No interpolation columns for Task #{task_dict.get('task_id')}: {task_dict.get('task_name')}")
+        log_app_event(cat=f"Task #{task_dict.get('task_id')}: {task_dict.get('task_name')}",
+                      desc=f"Interpolation Failure",
+                      err='No Interpolation columns found',
+                      task_id=task_dict.get('task_id'),
+                      data_event='Interpolation'
+                      )
+        reconcile_task_dates(task_dict, task_fail=True, e=f'No Interpolation Columns')
+        return True
+    print(f"Starting interpolation Task #{task_dict.get('task_id')}: {task_dict.get('task_name')}")
+    print(f"{len(numeric_cols)} numeric columns: {numeric_cols}")
     for col in numeric_cols:
-        sproc_sql = f"CALL metrics.interpolate_metric({col.get('src_schema')}, {col.get('src_table')}, {col.get('src_col')}, {col.get('src_ts_col')}, {infer})"
+
+        sproc_sql = f"""CALL metrics.interpolate_metric('{col.get('src_schema')}', '{col.get('src_table')}', '{col.get('src_col')}', '{col.get('src_ts_col')}', {infer})"""
+        print(f"Interpolating: {col.get('src_col')} :{sproc_sql}")
         t0 = start_timer()
         returns = qec(sproc_sql)
         if returns:
+            print(f'Interpolation returns: {returns}')
             log_app_event(cat=f"Task #{task_dict.get('task_id')}: {task_dict.get('task_name')}",
                           desc=f"Interpolation Failure: {col.get('src_col')}",
                           err=returns,
@@ -402,21 +423,20 @@ def metric_interpolation(task_dict):
                           data_event='Interpolation'
                           )
             reconcile_task_dates(task_dict, task_fail=True, e=f'Failed to execute sql: {returns}')
-            success=False
-            break
+            return True
         else:
             log_app_event(cat=f"Task #{task_dict.get('task_id')}: {task_dict.get('task_name')}",
                           desc=f"Interpolation Success: {col.get('src_col')}",
                           exec_time=elapsed_ms(t0),
                           task_id=task_dict.get('task_id'),
                           data_event='PartialInterpolation')
-            continue
+
     log_app_event(cat=f"Task #{task_dict.get('task_id')}: {task_dict.get('task_name')}",
                   desc=f"Interpolation Success",
                   exec_time=elapsed_ms(it0),
                   task_id=task_dict.get('task_id'),
                   data_event='PartialInterpolation')
-    return success
+    return False
 
 
 
