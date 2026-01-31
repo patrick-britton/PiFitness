@@ -98,7 +98,6 @@ def render_task_id_management():
         nav_selection = 'edit_task'
         st.rerun()
 
-    st.write(nav_selection, ss.get(f"task_management_active"))
     if nav_selection == 'create_task' and not sse("selected_task_id"):
         insta_task_create()
         return

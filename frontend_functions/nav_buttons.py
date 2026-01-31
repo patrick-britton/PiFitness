@@ -21,11 +21,10 @@ def nav_dictionary():
         # Admin Page
         'admin': {"admin_charting": {'icon': 'show_chart'},
                   "service_status": {'icon': 'bigtop_updates'},
-                  "task_mgmt": {'icon': "discover_tune", 'label': 'Task Mgmt'},
-                  "task_exec": {'icon': "motion_play", 'label': 'Task Exec'},
-                  "passwords": {'icon': "key_vertical", 'label': 'Passwords'},
+                  "task_management": {'icon': "discover_tune", 'label': 'Task Mgmt'},
                   "services": {'icon': "api", 'label': 'API Mgmt'},
-                  "task_management": {'icon': 'tune', 'label': 'BETA TASK MGMT'}
+                  "passwords": {'icon': "key_vertical", 'label': 'Passwords'}
+
                   },
 
         'admin_charting': {'task_summary': {'icon': 'checklist', 'label': 'Tasks'},
