@@ -92,7 +92,7 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
             task_fail = execute_sproc(d=task_dict, sproc_type='parsing')
 
         if run_interpolation and not task_fail:
-            task_fail = execute_sproc(d=task_dict, sproc_type='interpolation')
+            task_fail = metric_interpolation(task_dict)
 
         if run_forecasting and not task_fail:
             task_fail = execute_sproc(d=task_dict, sproc_type='forecasting')
@@ -356,236 +356,57 @@ def reconcile_task_dates(task_dict, task_fail=False, e=None):
 
 def metric_interpolation(task_dict):
     # only continue when interpolating
-    if not task_dict.get('interpolate_values'):
+    if not task_dict.get('interpolation_sproc'):
         return
+    t0 = start_timer()
+    src_table_schema = task_dict.get('interpolation_sproc')
+    sch, tab, infer = src_table_schema.split('.')
 
-    task_id = int(task_dict.get('task_id'))
-    # Get the staging dictionary only for tasks that have interpolation requirements
-    sel_sql = f"SELECT sc.* from tasks.staging_configuration sc"
-    sel_sql = f"{sel_sql} INNER JOIN tasks.fact_configuration fc on fc.staging_id = sc.staging_id and fc.task_id = sc.task_id"
-    sel_sql = f"{sel_sql} where sc.task_id = {task_id} AND fc.interpolate_values"
+    sql = f"""WITH ts_col as 
+            (SELECT column_name from information_schema.columns
+            WHERE table_schema = '{sch}' and table_name = '{tab}'
+            AND data_type = 'timestamp with time zone'
+            ORDER BY ordinal_position LIMIT 1)
+            
+            
+            select 
+            table_schema as src_schema,
+            table_name as src_table,
+            column_name as src_col,
+            (SELECT * FROM ts_col) as src_ts_col
+            FROM information_schema.columns
+            WHERE table_schema = '{sch}' and table_name = '{tab}'
+            and data_type in ('numeric',
+                            'bigint',
+                            'smallint',
+                            'double precision',
+                            'integer',
+                            'int')"""
 
-    stg_list = sql_to_dict(sel_sql)
-    print(f'{len(stg_list)} interpolation stages for task #{task_id}')
-    # Loop through staging events
-    for s in stg_list:
-        stg_id = int(s.get('staging_id'))
-        sel_sql = f"SELECT * from tasks.fact_configuration WHERE task_id = {task_id} and staging_id = {stg_id};"
-        fact_list = sql_to_dict(sel_sql)
-
-        # identify the timestamp column
-        ts_col = None
-        int_dict_list = []
-        for f in fact_list:
-            if f.get('interpolation_ts'):
-                ts_col = f.get('fact_name')
-            if f.get('interpolate_values'):
-                int_dict_list.append(f)
-
-        # stop if no ts col is identified
-        if not ts_col:
+    numeric_cols = sql_to_dict(sql)
+    success=True
+    for col in numeric_cols:
+        sproc_sql = f"CALL metrics.interpolate_metric({col.get('src_schema')}, {col.get('src_table')}, {col.get('src_col')}, {col.get('src_ts_col')}, {infer})"
+        returns = qec(sql)
+        if returns:
+            log_app_event(cat=f"Task #{task_dict.get('task_id')}: {task_dict.get('task_name')}",
+                          desc=f"Interpolation Failure",
+                          err=returns,
+                          task_id=task_dict.get('task_id'),
+                          data_event='Interpolation'
+                          )
+            reconcile_task_dates(task_dict, task_fail=True, e=f'Failed to execute sql: {returns}')
+            success=False
+            break
+        else:
+            log_app_event(cat=f"Task #{task_dict.get('task_id')}: {task_dict.get('task_name')}",
+                          desc=f"Interpolation Success",
+                          exec_time=elapsed_ms(t0),
+                          task_id=task_dict.get('task_id'),
+                          data_event='Interpolation')
             continue
 
-        # stop if there are no interpolatable columns
-        if not int_dict_list:
-            continue
-
-        # Pull the list of interpolation columns
-        for int_d in int_dict_list:
-            src = s.get('destination_table')
-            dest = int_d.get('interpolation_destination_table')
-            sch = dest.split(".")[0]
-            tb = dest.split(".")[1]
-            int_col = int_d.get('fact_name')
-            data_type = int_d.get('data_type')
-            infer_values = int_d.get('infer_values')
-            precision = 0 if data_type == 'INTEGER' else int(data_type[data_type.find(',') + 1 : data_type.find(')')])
-            is_max = False
-            col_list = sql_to_list(f"""SELECT DISTINCT column_name from information_schema.columns
-                                                    WHERE table_schema = '{sch}' and table_name = '{tb}'""")
-            conn = get_conn()
-            cur = conn.cursor()
-            if int_col not in col_list:
-                a_sql = f"ALTER TABLE {dest} ADD COLUMN {int_col} {data_type};"
-                cur.execute(a_sql)
-                conn.commit()
-
-            cur.execute(f"TRUNCATE staging.interpolation_anchors")
-            conn.commit()
-
-            cur.execute(f"ALTER TABLE staging.interpolation_anchors ALTER COLUMN load_value TYPE {data_type}")
-            conn.commit()
-
-            cur.execute(f"ALTER TABLE staging.interpolation_anchors ALTER COLUMN prev_value TYPE {data_type}")
-            conn.commit()
-
-            cur.execute(f"ALTER TABLE staging.interpolation_anchors ALTER COLUMN next_value TYPE {data_type}")
-            conn.commit()
-
-            cur.execute(f"TRUNCATE staging.interpolation_load_values")
-            conn.commit()
-
-            cur.execute(f"ALTER TABLE staging.interpolation_load_values ALTER COLUMN load_value TYPE {data_type}")
-            conn.commit()
-            cur.close()
-            conn.close()
-            ts_to_old = None
-            default_interval = 48
-
-            while not is_max:
-                # --1 Get the time Boundaries
-                conn = get_conn()
-                cur = conn.cursor()
-                t0= start_timer()
-                from_sql = f"""SELECT MAX(COALESCE({ts_col}, '2026-01-01'::TIMESTAMPTZ) - INTERVAL '6 hours')
-                 FROM {dest} WHERE {int_col} IS NOT NULL;"""
-                ts_from = one_sql_result(from_sql)
-                if not ts_from:
-                    ts_from = one_sql_result(f"SELECT MIN({ts_col}) FROM {src}")
-                to_sql = f"""SELECT MAX(
-                               CASE WHEN {ts_col} < '{ts_from}'::TIMESTAMPTZ + INTERVAL '{default_interval} hours'
-                                THEN {ts_col}
-                                ELSE NULL END) as to_ts_window,
-                                 MAX({ts_col}) as to_ts_max FROM {src};"""
-                to_dict = sql_to_dict(to_sql)
-                ts_to = to_dict[0].get('to_ts_window')
-                is_max = ts_to == to_dict[0].get('to_ts_max')
-                while ts_to == ts_to_old and not is_max:
-                    default_interval += 48
-
-                    to_sql = f"""SELECT MAX(
-                               CASE WHEN {ts_col} < '{ts_from}'::TIMESTAMPTZ + INTERVAL '{default_interval} hours'
-                                THEN {ts_col}
-                                ELSE NULL END) as to_ts_window,
-                                 MAX({ts_col}) as to_ts_max FROM {src};"""
-                    to_dict = sql_to_dict(to_sql)
-                    ts_to = to_dict[0].get('to_ts_window')
-                ts_to_old = ts_to
-                default_interval = 48
-                is_max = ts_to == to_dict[0].get('to_ts_max')
-                # Re-load the interpolation table with second-by-second information
-                cur.execute("TRUNCATE staging.interpolation")
-                conn.commit()
-                cur.execute(f"""INSERT INTO staging.interpolation (ts_utc) 
-                    SELECT generate_series('{ts_from}'::TIMESTAMPTZ, '{ts_to}'::TIMESTAMPTZ, '1 second'::interval);""")
-                conn.commit()
-                # Calculate Inferred values, if necessary
-
-                cur.execute(f"TRUNCATE staging.interpolation_load_values")
-                conn.commit()
-
-
-                inf_query = f"""INSERT INTO staging.interpolation_load_values 
-                                (ts_utc, load_value) 
-                                SELECT 
-                                b.ts_utc,"""
-                if infer_values:
-                    inf_query = f"""{inf_query} 
-                                    CASE WHEN b.infer_value THEN COALESCE({int_col}, d30_val, d90_val, d_val)
-                                    ELSE {int_col}
-                                    END as load_value"""
-                    footer_sql = f"""LEFT JOIN (
-                                    SELECT 
-                                    extract(HOUR FROM {ts_col}) * 60 + EXTRACT(MINUTE from {ts_col}) as dm,
-                                    ROUND(avg(CASE 
-                                    WHEN {ts_col} > CURRENT_TIMESTAMP - INTERVAL '30 days'
-                                    THEN {int_col}
-                                    ELSE NULL END),{precision})::{data_type} as d30_val,
-                                    ROUND(avg(CASE 
-                                    WHEN {ts_col} > CURRENT_TIMESTAMP - INTERVAL '90 days'
-                                    THEN {int_col}
-                                    ELSE NULL END),{precision})::{data_type} as d90_val,
-                                    ROUND(avg({int_col}), {precision})::{data_type} as d_val
-                                    FROM {src} WHERE {int_col} IS NOT NULL
-                                    GROUP BY
-                                    extract(HOUR FROM {ts_col}) * 60 + EXTRACT(MINUTE from {ts_col})) t on t.dm = b.minute_of_day"""
-                else:
-                    inf_query = f"""{inf_query} 
-                                    {int_col} as load_value"""
-                    footer_sql = ''
-
-                inf_query = f"""{inf_query} 
-                            FROM staging.vw_interpolation b
-                                LEFT JOIN {src} src on src.{ts_col} = b.ts_utc
-                                {footer_sql};"""
-                ms = start_timer()
-                cur.execute(inf_query)
-                conn.commit()
-                ms = start_timer()
-                cur.execute("CREATE INDEX IF NOT EXISTS idx_stg_load_ts ON staging.interpolation_load_values (ts_utc);")
-                conn.commit()
-                # Load the anchors table
-                ms = start_timer()
-                cur.execute(f"TRUNCATE staging.interpolation_anchors")
-                conn.commit()
-
-
-                ins_sql = f"""
-                            WITH forward_pass AS (
-                                SELECT 
-                                    ts_utc,
-                                    load_value,
-                                    -- Standard Forward Scan for PREVIOUS values
-                                    MAX(load_value) OVER (ORDER BY ts_utc) as prev_value,
-                                    MAX(ts_utc) FILTER (WHERE load_value IS NOT NULL) OVER (ORDER BY ts_utc) as prev_ts
-                                FROM staging.interpolation_load_values
-                            ),
-                            backward_pass AS (
-                                SELECT 
-                                    ts_utc,
-                                    -- Reverse Scan for NEXT values (Using DESC sort turns "Future" into "Past")
-                                    MIN(load_value) OVER (ORDER BY ts_utc DESC) as next_value,
-                                    MIN(ts_utc) FILTER (WHERE load_value IS NOT NULL) OVER (ORDER BY ts_utc DESC) as next_ts
-                                FROM staging.interpolation_load_values
-                            )
-                            INSERT INTO staging.interpolation_anchors
-                            (ts_utc, load_value, prev_value, prev_ts, next_value, next_ts)
-                            SELECT
-                                f.ts_utc,
-                                f.load_value,
-                                f.prev_value,
-                                f.prev_ts,
-                                b.next_value,
-                                b.next_ts
-                            FROM forward_pass f
-                            JOIN backward_pass b ON f.ts_utc = b.ts_utc;
-                        """
-                cur.execute(ins_sql)
-                conn.commit()
-                # Ensure the column exists on the destination table
-
-
-                # Interpolate and load into destination table
-                load_sql = f"""INSERT INTO {dest} (ts_utc, {int_col})
-                               SELECT 
-                               date_trunc('hour', ts_utc) + (extract(minute from ts_utc)::int / 30) * interval '30 minutes' as ts_utc,
-                               ROUND(avg(CASE
-                                    WHEN load_value IS NOT NULL THEN load_value
-                                    WHEN prev_value IS NULL OR next_value IS NULL THEN NULL
-                                    ELSE
-                                        prev_value +
-                                        (
-                                            (EXTRACT(EPOCH FROM (ts_utc - prev_ts)) /
-                                             EXTRACT(EPOCH FROM (next_ts - prev_ts)))
-                                            * (next_value - prev_value)
-                                        )
-                                END), {precision})::{data_type} AS {int_col}
-                                FROM staging.interpolation_anchors
-                                GROUP BY date_trunc('hour', ts_utc) + (extract(minute from ts_utc)::int / 30) * interval '30 minutes'
-                                ON CONFLICT ({ts_col}) DO UPDATE
-                                SET {int_col} = EXCLUDED.{int_col}
-                                WHERE {dest}.{int_col} IS DISTINCT FROM EXCLUDED.{int_col}"""
-                # print(f"Load Sql: {load_sql}")
-
-
-                cur.execute(load_sql)
-                conn.commit()
-                cur.close()
-                conn.close()
-
-            cur.close()
-            conn.close()
-    return
+    return success
 
 
 def json_flattening(task_dict):
