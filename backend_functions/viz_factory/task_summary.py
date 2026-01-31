@@ -54,7 +54,7 @@ def render_task_summary_dashboard(is_dark_mode=True, is_mobile=False):
             text_data.append({
                 'row_index': row_idx,
                 'task_name': f"{task.get('task_name')}",
-                'err_msg': f"{task.get('last_failure_msg')}",
+                'err_msg': f"{task.get('last_failure_message')}",
                 'color': 'red'
             })
         stack_data.extend([
