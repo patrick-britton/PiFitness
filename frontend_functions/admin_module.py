@@ -122,12 +122,13 @@ def render_function_library():
                                          get_conn(alchemy=True))
     svc_list = sql_to_list("SELECT DISTINCT api_service_name FROM api_services.api_service_list ")
     cols = ['friendly_name', 'api_service_name', 'api_function_name', 'python_extraction_function', 'flatten_sproc',
-            'interpolation_sproc', 'forecasting_sproc']
+            'parsing_sproc', 'interpolation_sproc', 'forecasting_sproc']
     col_config = {'friendly_name': st.column_config.TextColumn(label='Name', disabled=False),
                   'api_service_name': st.column_config.SelectboxColumn(label='API', options=svc_list, disabled=False),
                   'api_function_name': st.column_config.TextColumn(label='API Function', disabled=False),
                   'python_extraction_function': st.column_config.TextColumn(label='Python Extraction', disabled=False),
                   'flatten_sproc': st.column_config.TextColumn(label='Flatten SPROC', disabled=False),
+                  'parsing_sproc': st.column_config.TextColumn(label='Parsing SPROC', disabled=False),
                   'interpolation_sproc': st.column_config.TextColumn(label='Interpolation SPROC', disabled=False),
                   'forecasting_sproc': st.column_config.TextColumn(label='Forecasting SPROC', disabled=False),}
     if ss.function_library_df.empty:
