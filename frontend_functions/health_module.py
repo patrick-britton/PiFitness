@@ -1,10 +1,14 @@
 import os
 import streamlit as st
-from streamlit import session_state as ss
+from streamlit import session_state as ss, column_config
 from datetime import datetime
-from backend_functions.database_functions import qec
+from backend_functions.database_functions import qec, get_conn
 from backend_functions.file_handlers import body_photo_path
+from backend_functions.viz_factory.body_comp import render_weight_viz
 from frontend_functions.nav_buttons import nav_widget, clear_nav_and_rerun
+import pandas as pd
+
+from frontend_functions.streamlit_helpers import data_editor_reconcile
 
 
 def render_health_module():
@@ -19,12 +23,96 @@ def render_health_module():
         render_photo_intake()
     elif health_selection == 'dimension_intake':
         render_dimension_intake()
+    elif health_selection == 'weight_target':
+        render_weight_target()
     else:
         st.info(f'Uncaught health navigation choice: {health_selection}')
     return
 
+def render_weight_target():
+    tgt_sql = 'SELECT ts_utc, round(weight_total_g*0.00220462,1) as weight_lb FROM health.weight_target order by ts_utc desc'
+    ss.tgt_df = pd.read_sql_query(tgt_sql, con=get_conn(alchemy=True))
+    cols = ['ts_utc', 'weight_lb']
+    if ss.tgt_df.empty:
+        st.info('No weight targets yet')
+        ss.tgt_df = pd.DataFrame(columns=cols)
+
+
+    st.write('Add new target:')
+    date = st.date_input('Date')
+    weight = st.number_input('Weight', min_value=150, max_value=300, value=None)
+    if date or weight:
+        if st.button(':material/save: Save New Target'):
+            date = str(date)
+            weight = int(round(weight/0.00220462,0))
+            sql = f"""INSERT INTO health.weight_target (ts_utc, weight_total_g)
+                        VALUES (%s::TIMESTAMPTZ, %s)
+                        ON CONFLICT (ts_utc) DO UPDATE SET
+                        weight_total_g = EXCLUDED.weight_total_g;"""
+            returns = qec(sql,[date,weight])
+            st.write(returns)
+
+
+    # data_editor_reconcile(df_key=None, chg_key=None, dest_table=None, pk_col=None)
+    return
+
+
+
 def render_health_charting():
-    st.info('No health charting yet')
+    col1, col2, col3 = st.columns(spec=[3,2,1], gap=None, border=False)
+    with col1:
+        chart_scale = st.segmented_control(label='Scale',
+                                  options=['YoY', 'Last 30', 'Last 90', 'Composition'],
+                                   default='YoY')
+    with col2:
+        chart_measure = st.segmented_control(label='Measure',
+                                           options=['Total', 'Fat', 'Muscle'],
+                                           default='Total')
+    with col3:
+        history_limit = st.number_input('Periods',
+                                        min_value=1,
+                                        max_value=10,
+                                        value=4,
+                                        step=1)
+
+
+    if chart_measure == 'Total':
+        yaxis = ['total_lb', 'tgt_lb']
+        ylabel = 'Weight (lb)'
+    elif chart_measure == 'Fat':
+        yaxis = ['fat_lb']
+        ylabel = 'Fat (lb)'
+    elif chart_measure == 'Muscle':
+        yaxis = ['muscle_lb']
+        ylabel = 'Muscle (lb)'
+    else:
+        yaxis = ['total_lb', 'tgt_lb']
+        ylabel = 'Weight (lb)'
+
+    if chart_scale == 'YoY':
+        xaxis = 'day_of_year'
+        xlimit = 'relative_year'
+    elif chart_scale == 'Last 30':
+        xaxis = 'dm30'
+        xlimit = 'relative_30'
+    elif chart_scale == 'Last 90':
+        xaxis = 'dm90'
+        xlimit = 'relative_90'
+    else:
+        xaxis = 'date_val'
+        xlimit = 'relative_day'
+        history_limit = 90
+        yaxis = ['muscle_lb', 'fat_lb', 'bone_lb', 'water_lb']
+
+    sql = f"SELECT {xaxis}, {xlimit}"
+    for y in yaxis:
+        sql = f"{sql}, {y}"
+
+    sql = f"{sql} FROM health.vw_weight_viz WHERE {xlimit} > -{history_limit} ORDER BY {xlimit} ASC"
+    # st.write(sql)
+    # st.write(xaxis, xlimit, yaxis, ylabel)
+    render_weight_viz(sql, chart_scale, xaxis, xlimit, history_limit, yaxis, ylabel)
+
     return
 
 

@@ -280,7 +280,7 @@ def render_task_summary_dashboard(is_dark_mode=True, is_mobile=False):
         padding={"left": -20, "top": 0, "right": 0, "bottom": 0}
     )
 
-    st.altair_chart(chart, use_container_width=False)
+    st.altair_chart(chart,  width="stretch")
     return
 
 

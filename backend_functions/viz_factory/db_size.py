@@ -105,6 +105,6 @@ def render_db_size_dashboard(is_dark_mode=True, is_mobile=False):
         ticks=False
     ).resolve_scale(y='independent')
 
-    st.altair_chart(growth_chart, use_container_width=False)
-    st.altair_chart(breakdown_layout, use_container_width=False)
+    st.altair_chart(growth_chart,  width="stretch")
+    st.altair_chart(breakdown_layout,  width="stretch")
     return

@@ -50,7 +50,8 @@ def nav_dictionary():
         # Health Page
         'health': {'health_charting': {'icon': 'show_chart'},
                    'photo_intake': {'icon': 'photo_camera' },
-                   'dimension_intake': {'icon': 'pregnancy'}},
+                   'dimension_intake': {'icon': 'pregnancy'},
+                   'weight_target': {'icon': 'strategy'}},
 
         # Task Management
         'task_management': {'create_task': {'icon': 'add_circle', 'label': 'New Task'},
