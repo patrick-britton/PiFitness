@@ -293,3 +293,55 @@ def sse(var, bool_flag=False):
         return False
 
     return True
+
+
+def data_editor_reconcile(df_key=None, chg_key=None, dest_table=None, pk_col=None):
+    df = ss.get(df_key)
+    d = ss.get(chg_key)
+    dr = d.get('deleted_rows')
+    er = d.get('edited_rows')
+    ar = d.get('added_rows')
+
+    if dr:
+        for row in dr:
+            pk = ss.function_library_df[pk_col].iloc[row]
+            sql = f"""DELETE FROM {dest_table} WHERE {pk_col} = %s;"""
+            qec(sql, [pk, ])
+    if ar:
+        for col in ar:
+            ins_sql = f"INSERT INTO {dest_table} ("
+            values_sql = "VALUES ("
+            params = []
+            for key, key_val in col.items():
+                ins_sql = ins_sql + f"{key}, "
+                values_sql = values_sql + "%s, "
+                params.append(key_val)
+            ins_sql = ins_sql[:-2]
+            values_sql = values_sql[:-2]
+            final_sql = f"{ins_sql}) {values_sql});"
+            rf = qec(final_sql, params)
+            if rf:
+                st.write(rf)
+
+    if er:
+        for row_index, updates in er.items():
+            pk = ss.function_library_df[pk_col].iloc[row_index]
+            up_sql = f"UPDATE {dest_table} SET "
+            values_sql = ''
+            where_sql = f"WHERE {pk_col} = %s"
+            params = []
+            for key, key_val in updates.items():
+                values_sql = f"{values_sql}{key} = %s, "
+                params.append(key_val)
+            params.append(pk)
+            if values_sql.endswith(', '):
+                values_sql = values_sql[:-2]
+            final_sql = f"{up_sql} {values_sql} {where_sql};"
+            rf = qec(final_sql, params)
+            if rf:
+                st.write(rf)
+    if ar or er or dr:
+        ss_pop(df_key)
+        st.toast('Values saved!', duration=5)
+        time.sleep(2)
+        st.rerun()
