@@ -6,11 +6,11 @@ import requests
 import streamlit as st
 from streamlit import session_state as ss
 
-from backend_functions.database_functions import get_conn, qec, sql_to_list
+from backend_functions.database_functions import get_conn, qec, sql_to_list, sql_to_dict
 from backend_functions.file_handlers import album_art_path
 from backend_functions.music_functions import playlist_upload, get_now_playing, add_isrc_to_local, \
     record_recommendation_decision, remove_recommendation, add_into_current_ratings, save_matchup_results, \
-    playlist_to_db, remove_track_from_spotify_playlist
+    playlist_to_db, remove_track_from_spotify_playlist, get_matchup_dictionary, elo_update
 from backend_functions.service_logins import get_spotify_client
 from backend_functions.task_execution import task_executioner
 from frontend_functions.music_widgets import playlist_config_table, render_shuffle_df
@@ -53,7 +53,7 @@ def render_music():
     elif nav_selection == 'list_shuffle':
         render_playlist_shuffle()
     elif nav_selection == 'track_ratings':
-        st.info(f"{nav_selection} module not yet built")
+        render_ratings()
     elif nav_selection == 'isrc_clean':
         st.info(f"{nav_selection} module not yet built")
     elif nav_selection == 'sync_playlists':
@@ -498,3 +498,99 @@ def render_recent_plays():
                  column_config=col_config,
                  hide_index=True,
                  on_select="ignore")
+
+
+def render_ratings():
+    with st.spinner('Getting matchup...', show_time=True):
+        d = get_matchup_dictionary()
+
+    if not d:
+        st.info('No songs to rate at this time')
+        return
+
+    playlist_id = d.get('playlist_id')
+    playlist_name = d.get('playlist_name')
+    st.write(f"For Playlist: __{playlist_name}__ :gray[*{playlist_id}*]")
+
+    # Get ISRC Info
+    isrc= d.get('isrc')
+    isrc_elo = d.get('isrc_elo')
+    isrc_track = d.get('isrc_track')
+    isrc_artist = d.get('isrc_artist')
+    isrc_album_id = d.get('isrc_album_id')
+
+    # Get Challenger Info
+    isrc_vs = d.get('isrc_vs')
+    isrc_vs_elo = d.get('isrc_vs_elo')
+    isrc_vs_track = d.get('isrc_vs_track')
+    isrc_vs_artist = d.get('isrc_vs_artist')
+    isrc_vs_album_id = d.get('isrc_vs_album_id')
+
+    red_corner, blue_corner, ref_corder = st.columns(spec=[1,1,2], gap="small", border=False)
+
+    with red_corner :
+        st.image(album_image_retrieval(isrc_album_id), width="stretch")
+        st.write(f"__{isrc_track}__ by __{isrc_artist}__")
+        st.write(f":gray[*{isrc}*]")
+
+
+    with blue_corner:
+        st.image(album_image_retrieval(isrc_vs_album_id), width="stretch")
+        st.write(f"__{isrc_vs_track}__ by __{isrc_vs_artist}__")
+        st.write(f":gray[*{isrc_vs}*]")
+
+    st.segmented_control(label='scoring',
+                                      label_visibility='collapsed',
+                                      key=f'key_score_{isrc}',
+                                      options=[-5,-4,-3,-2,-1, 1, 2, 3, 4, 5],
+                                      default=None,
+                                   on_change=update_rating,
+                                   args=(d,))
+
+    return
+
+def update_rating(d):
+    margin = ss.get(f'key_score_{d.get('isrc')}')
+    if not margin:
+        return
+
+    home_new_elo, away_new_elo = elo_update(d.get('isrc_elo'), d.get('isrc_vs_elo'), margin)
+
+    hist_sql = f"""INSERT INTO music.ratings_history (
+                playlist_id,
+                isrc,
+                isrc_vs,
+                elo_old,
+                elo_new,
+                rating_result)
+                VALUES (%s, %s, %s, %s, %s, %s);
+                """
+
+    home_params = [d.get('playlist_id'), d.get('isrc'), d.get('isrc_vs'), d.get('isrc_elo'), home_new_elo, -margin]
+    away_params = [d.get('playlist_id'), d.get('isrc_vs'), d.get('isrc'), d.get('isrc_vs_elo'), away_new_elo, margin]
+
+    qec(hist_sql, home_params)
+    qec(hist_sql, away_params)
+
+    update_sql = f"""INSERT INTO music.ratings (
+                    playlist_id,
+                    isrc,
+                    elo_rating,
+                    rating_count,
+                    rating_wins,
+                    rating_losses,
+                    last_rated_utc
+                    )
+                    SELECT * FROM music.vw_rating_update
+                    ON CONFLICT (playlist_id, isrc)
+                    DO UPDATE SET
+                    elo_rating = EXCLUDED.elo_rating,
+                    rating_count = EXCLUDED.rating_count,
+                    rating_wins = EXCLUDED.rating_wins,
+                    rating_losses = EXCLUDED.rating_losses,
+                    last_rated_utc = EXCLUDED.last_rated_utc
+                    WHERE music.ratings.last_rated_utc < EXCLUDED.last_rated_utc;
+                    """
+    qec(update_sql)
+    # st.rerun()
+

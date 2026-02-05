@@ -1,6 +1,8 @@
 import time
 from datetime import date, timedelta, datetime
 import pytz
+
+from backend_functions.database_functions import sql_to_dict
 from backend_functions.helper_functions import get_sync_dates
 from backend_functions.logging_functions import log_app_event
 from backend_functions.music_functions import get_playlist_list
@@ -77,9 +79,6 @@ def extract_json_playlist_details(client=None, td=None, list_id=None):
             results = client.next(results)
             time.sleep(1)
     return all_items
-
-
-
 
 
 def extract_with_args(client=None, td=None, args=None):
@@ -177,3 +176,47 @@ def to_params(param_list=None, search_val=None, replace_val=None, return_type='l
         return dict(p.split("=", 1) for p in rb_list)
     else:
         return ", ".join(rb_list)
+
+
+def extract_json_run_details(client=None, td=None, aid=None):
+
+    # Connects to Spotify API and downloads all tracks
+    # Uploads JSON to DB, which is then processed via stored procedure.
+
+    # Monitor performance, start the timer
+
+    task_name = 'Running Detail Sync'
+
+    # Put the single (or multiple) playlist into a list
+    if not aid:
+        activities = sql_to_dict(query_str="SELECT * FROM activities.vw_activity_ids_to_sync")
+    else:
+        activities = [{'activity_id': aid, 'max_points': 99999}]
+
+    # Ensure we actually have playlists
+    if not activities:
+        return client
+
+    log_app_event(cat='Activity Detail Sync',
+                  desc=f"{len(activities)} activities to download")
+
+    # Initialize Results
+    all_items = []
+
+    # Iterate through list of playlists
+    for a in activities:
+        if a != activities[0]:
+            time.sleep(2)  # Sleep for 10 seconds between playlists
+        print(f'Syncing activity: {a.get('activity_id')}')
+        results = client.get_activity_details(activity_id=int(a.get('activity_id')),
+                                                                maxchart=int(a.get('max_points')),
+                                                                maxpoly=int(a.get('max_points')))
+
+        # Get the next page of results
+        if results:
+            all_items.append(results)
+            print('Info Appended.')
+
+    return all_items
+
+
