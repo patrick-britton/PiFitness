@@ -12,8 +12,18 @@ from backend_functions.viz_factory.db_size import render_db_size_dashboard
 
 def render_homepage():
     rate_limit_widget()
-    st.info('Wow, such empty :(')
+    ratings_widget()
+
     return
+
+
+def ratings_widget():
+    sql = "SELECT COUNT(*) FROM music.vw_rating_eligible"
+    isrc_count = one_sql_result(sql)
+    if isrc_count >0:
+        st.info(f"{isrc_count} tracks eligible for ratings")
+    return
+
 
 
 def rate_limit_widget():

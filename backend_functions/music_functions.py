@@ -573,3 +573,87 @@ def remove_track_from_spotify_playlist(isrc, list_id, client):
         sp.playlist_remove_all_occurrences_of_items(list_id, track_list)
         log_app_event(cat='Playlist Track Removal', desc=f"List: {id} || ISRC: {isrc}, {len(track_list)} potential tracks")
     return
+
+def get_matchup_dictionary():
+    sql = "SELECT isrc, playlist_id FROM music.vw_rating_eligible LIMIT 1"
+    id = sql_to_dict(sql)
+    if not id:
+        return None
+
+    if not id[0]:
+        return None
+
+    isrc = id[0]["isrc"]
+    playlist_id = id[0]["playlist_id"]
+
+    matchup_sql = f"""
+                    SELECT 
+                        sub.playlist_id,
+                        pc.playlist_name,
+                        sub.isrc,
+                        sub.isrc_elo,
+                        at1.track_name_clean as isrc_track,
+                        at1.artist_display_name as isrc_artist,
+                        at1.album_id as isrc_album_id,
+                        sub.isrc_vs,
+                        sub.isrc_vs_elo,
+                        at2.track_name_clean as isrc_vs_track,
+                        at2.artist_display_name as isrc_vs_artist,
+                        at2.album_id as isrc_vs_album_id
+                        FROM (
+                            SELECT 
+                                i.isrc,
+                                COALESCE(ri2.elo_rating,1500) as isrc_elo,
+                                i.playlist_id,
+                                i2.isrc as isrc_vs,
+                                COALESCE(ri2.elo_rating,1500) as isrc_vs_elo,
+                                ROW_NUMBER() OVER (PARTITION BY i.playlist_id ORDER BY abs(COALESCE(ri.elo_rating,1500)-COALESCE(ri2.elo_rating,1500))) as row_num
+                            FROM music.playlist_isrcs i 
+                                LEFT JOIN music.ratings ri on ri.isrc = i.isrc and ri.playlist_id = i.playlist_id
+                                INNER JOIN music.playlist_isrcs i2 on i.playlist_id = i2.playlist_id and i2.isrc != '{isrc}'
+                                LEFT JOIN music.ratings ri2 on ri2.isrc = i2.isrc and ri2.playlist_id = i2.playlist_id
+                            WHERE i.playlist_id = '{playlist_id}' and i.isrc = '{isrc}'
+                                ) sub
+                            INNER JOIN music.playlist_config pc on pc.playlist_id = sub.playlist_id
+                            INNER JOIN music.vw_best_track_id bt1 on bt1.isrc = sub.isrc
+                            INNER JOIN music.all_tracks at1 on at1.track_isrc = bt1.isrc
+                            INNER JOIN music.vw_best_track_id bt2 on bt2.isrc = sub.isrc_vs
+                            INNER JOIN music.all_tracks at2 on at2.track_isrc = bt2.isrc
+                        WHERE row_num = 1
+
+            """
+
+    matchup_dict = sql_to_dict(matchup_sql)
+    if not matchup_dict:
+        return None
+
+    if not matchup_dict[0]:
+        return None
+
+    return matchup_dict[0]
+
+
+def elo_update(home_elo, away_elo, result, k=100):
+    # Takes in the starting ratings & match result, spits out the new ratings
+
+    # Expected scores based on ELO difference
+    expected_home = 1 / (1 + 10 ** ((away_elo - home_elo) / 400))
+    expected_away = 1 - expected_home
+
+    # Scale result to [0,1], where 0 = home lost, 1 = home won
+    # matchResult = 0 gives 0.5 (draw)
+    if result < 0:
+        actual_home = (abs(result) + 5) / 10
+        actual_away = 1 - actual_home
+    else:
+        actual_away = (abs(result) + 5) / 10
+        actual_home = 1-actual_away
+
+    # Scale adjustment by margin of victory
+    margin_multiplier = 1 + (abs(result) / 5)  # between 1x and 2x impact
+
+    # Update ratings
+    hne = round(home_elo + k * margin_multiplier * (actual_home - expected_home),0)
+    ane = round(away_elo + k * margin_multiplier * (actual_away - expected_away),0)
+
+    return hne, ane

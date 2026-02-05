@@ -184,3 +184,50 @@ def performance_profiling(segment=None, code=None, time_ms=None):
     qec(sql, params)
     # print(rf)
     return start_timer()
+
+
+def reinterpolate(schema, tables):
+    for table in tables:
+        infer = True if table != 'body_composition_raw' else False
+        numeric_col_sql = f"""WITH ts_col as 
+                (SELECT column_name from information_schema.columns
+                WHERE table_schema = '{schema}' and table_name = '{table}'
+                AND data_type = 'timestamp with time zone'
+                ORDER BY ordinal_position LIMIT 1)
+    
+    
+                select 
+                table_schema as src_schema,
+                table_name as src_table,
+                column_name as src_col,
+                (SELECT * FROM ts_col) as src_ts_col
+                FROM information_schema.columns
+                WHERE table_schema = '{schema}' and table_name = '{table}'
+                and data_type in ('numeric',
+                                'bigint',
+                                'smallint',
+                                'double precision',
+                                'integer',
+                                'int')"""
+
+        numeric_cols = sql_to_dict(numeric_col_sql)
+
+        for col in numeric_cols:
+            sproc_sql = f"""CALL metrics.interpolate_metric('{col.get('src_schema')}', '{col.get('src_table')}', '{col.get('src_col')}', '{col.get('src_ts_col')}', {infer})"""
+            ctr = 0
+            max = 365 * 5 + 200
+            while ctr < max:
+                if ctr > 0:
+                    dv = one_sql_result(sql=f"SELECT MAX(ts_utc) from metrics.daily where {col.get('src_col')} IS NOT NULL;")
+                    print(f"{start_timer()}:  {table}.{col.get('src_col')}: {round(ctr / max * 100, 0)}%: {dv}")
+                else:
+                    print(f"{start_timer()}: {table}.{col.get('src_col')}")
+                    dv = None
+                returns = qec(sproc_sql)
+                ctr += 90
+                if returns:
+                    print(returns)
+                    break
+
+                if dv == one_sql_result(sql=f"SELECT MAX(ts_utc) from metrics.daily where {col.get('src_col')} IS NOT NULL;"):
+                    break
