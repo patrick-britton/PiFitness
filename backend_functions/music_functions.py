@@ -657,3 +657,9 @@ def elo_update(home_elo, away_elo, result, k=100):
     ane = round(away_elo + k * margin_multiplier * (actual_away - expected_away),0)
 
     return hne, ane
+
+
+def nightly_track_id_maintenance():
+
+    qec('CALL music.isrc_duplicate_finder();')
+    return
