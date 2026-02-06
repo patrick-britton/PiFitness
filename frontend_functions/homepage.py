@@ -13,6 +13,7 @@ from backend_functions.viz_factory.db_size import render_db_size_dashboard
 def render_homepage():
     rate_limit_widget()
     ratings_widget()
+    dupe_widget()
 
     return
 
@@ -24,6 +25,12 @@ def ratings_widget():
         st.info(f"{isrc_count} tracks eligible for ratings")
     return
 
+def dupe_widget():
+    sql = "SELECT COUNT(*) FROM music.vw_isrc_dupe_review"
+    isrc_count = one_sql_result(sql)
+    if isrc_count >0:
+        st.info(f"{int(isrc_count/2)} potential duplicate isrcs found")
+    return
 
 
 def rate_limit_widget():

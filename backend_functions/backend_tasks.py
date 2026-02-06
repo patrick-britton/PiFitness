@@ -40,6 +40,7 @@ def nightly_maintenance(days_to_keep=365):
         tsql = "SELECT SUM(total_size_mb) from logging.vw_db_size"
         size_before = one_sql_result(tsql)
 
+        cursor.execute('CALL music.isrc_duplicate_finder();')
 
         # 3. Vacuum
         maint_start = start_timer()

@@ -120,7 +120,7 @@ def insta_task_create():
     id_val = one_sql_result(sel_sql)
 
     if id_val:
-        ss.selected_task_id = id_val[0]
+        ss.selected_task_id = id_val
         st.rerun()
 
     ins_sql = "INSERT INTO tasks.task_configuration (task_name) VALUES (%s)"
@@ -147,7 +147,7 @@ def render_task_edit(task_id):
     d = sql_to_dict(sel_sql)[0]
 
     if d.get('task_name') == 'placeholder_task':
-        msg = f":blue[###New task creation###: :gray[*ID# {task_id}*]"
+        msg = f":blue[__New task creation__]: :gray[*ID# {task_id}*]"
         default_name = None
         st.write(msg)
     else:

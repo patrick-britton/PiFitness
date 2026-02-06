@@ -6,7 +6,7 @@ import requests
 import streamlit as st
 from streamlit import session_state as ss
 
-from backend_functions.database_functions import get_conn, qec, sql_to_list, sql_to_dict
+from backend_functions.database_functions import get_conn, qec, sql_to_list, sql_to_dict, one_sql_result
 from backend_functions.file_handlers import album_art_path
 from backend_functions.music_functions import playlist_upload, get_now_playing, add_isrc_to_local, \
     record_recommendation_decision, remove_recommendation, add_into_current_ratings, save_matchup_results, \
@@ -55,11 +55,110 @@ def render_music():
     elif nav_selection == 'track_ratings':
         render_ratings()
     elif nav_selection == 'isrc_clean':
-        st.info(f"{nav_selection} module not yet built")
+        render_isrc_dupe_resolve()
     elif nav_selection == 'sync_playlists':
         st.info(f"{nav_selection} module not yet built")
     else:
         st.error(f"Uncaught nav exception for music: {nav_selection}")
+    return
+
+
+def render_isrc_dupe_resolve():
+    sql = "SELECT COUNT(*) FROM music.vw_isrc_dupe_review"
+    isrc_count = one_sql_result(sql)
+    if isrc_count > 0:
+        st.info(f"{int(isrc_count / 2)} potential duplicate isrcs found")
+    else:
+        st.info("No duplicate isrcs found")
+        return
+
+    if st.button(':material/search: Look for new matches'):
+        with st.spinner('Takes about 25 seconds...', show_time=True):
+            qec("CALL music.isrc_duplicate_finder();")
+        st.rerun()
+
+    match_icon = f":material/hotel_class:"
+    matchup = sql_to_dict("SELECT * FROM music.vw_isrc_dupe_review LIMIT 1")
+    d = matchup[0]
+
+    st.write(f':blue[__Overall__]: __{d.get('match_score')}__')
+
+    if d.get('track_name1') == d.get('track_name2'):
+        msg = f":blue[__Track__]: {match_icon} __{d.get('track_name1')}__ {match_icon} "
+    else:
+        msg = f":blue[__Track__]: __{round(d.get('track_score')*100)}%__ : __{d.get('track_name1')}__ vs __{d.get('track_name2')}__"
+
+    st.write(msg)
+
+    if d.get('artist_name1') == d.get('artist_name2'):
+        msg = f":blue[__Artist__]: {match_icon}  __{d.get('artist_name1')}__ {match_icon}"
+    else:
+        msg = f":blue[__Artist__]: __{round(d.get('artist_score')*100)}%__ : __{d.get('artist_name1')}__ vs __{d.get('artist_name2')}__"
+
+    st.write(msg)
+
+    if d.get('album_name1') == d.get('album_name2'):
+        msg = f":blue[__Album__]: {match_icon}  __{d.get('album_name1')}__ {match_icon}"
+    else:
+        msg = f":blue[__Album__]: __{round(d.get('album_score')*100)}%__ : __{d.get('album_name1')}__ vs __{d.get('album_name2')}__"
+
+    st.write(msg)
+
+    if int(d.get('duration_score')) == 1:
+        msg = f":blue[__Duration__]: {match_icon}"
+    else:
+        msg = f":blue[__Duration__]: __{d.get('duration_score')}__"
+
+    st.write(msg)
+
+    a_col, r_col, f_col = st.columns(spec=[1,1,4], gap=None, border=False)
+
+    with a_col:
+        if st.button(':green[__ACCEPT__]'):
+            process_isrc_dupe(d,True)
+            st.toast('Match accepted', duration=3)
+            st.rerun()
+
+    with r_col:
+        if st.button(':red[__REJECT__]'):
+            process_isrc_dupe(d, False)
+            st.toast('Match rejected', duration=3)
+            st.rerun()
+
+    return
+
+
+def process_isrc_dupe(d, accept_match):
+    if accept_match:
+        tn = 'isrc_swaps'
+        conflict = 'original_isrc'
+    else:
+        tn = 'isrc_non_swaps'
+        conflict = 'original_isrc, mapped_isrc'
+
+    insert_sql = f"""INSERT INTO music.{tn} (
+                    original_isrc,
+                    mapped_isrc,
+                    mapping_time_utc)
+                    VALUES 
+                    (%s, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT
+                    ({conflict})
+                    DO UPDATE SET
+                    mapped_isrc = %s,
+                    mapping_time_utc = CURRENT_TIMESTAMP;
+                    """
+
+    param1 = [d.get('isrc1'), d.get('preferred_isrc'), d.get('preferred_isrc')]
+    param2 = [d.get('isrc2'), d.get('preferred_isrc'), d.get('preferred_isrc')]
+    qec(insert_sql, param1)
+    qec(insert_sql, param2)
+
+    del_sql = f"""DELETE FROM music.isrc_possible_dupes
+                WHERE (isrc1 = %s and isrc2 = %s)
+                OR (isrc1 = %s and isrc2 = %s)"""
+    params = [d.get('isrc1'), d.get('isrc2'), d.get('isrc2'), d.get('isrc1')]
+    qec(del_sql,params)
     return
 
 

@@ -1,8 +1,9 @@
+import hashlib
 import time
 from datetime import date, timedelta, datetime
 import pytz
 
-from backend_functions.database_functions import sql_to_dict
+from backend_functions.database_functions import sql_to_dict, qec, sql_to_list
 from backend_functions.helper_functions import get_sync_dates
 from backend_functions.logging_functions import log_app_event
 from backend_functions.music_functions import get_playlist_list
@@ -218,5 +219,75 @@ def extract_json_run_details(client=None, td=None, aid=None):
             print('Info Appended.')
 
     return all_items
+
+
+def extract_json_isrc_search(client=None, td=None, aid=None):
+    # Takes 50 isrcs at a time and pulls any and all track information
+    batch_size = 50
+    isrc_list = sql_to_list(f"SELECT track_isrc FROM music.vw_track_id_finder LIMIT {batch_size}")
+    results = []
+    getnum = 0
+    for isrc in isrc_list:
+        if isrc == isrc_list[0]:
+            time.sleep(1)
+        print(f'Searching for isrc: {isrc}')
+        getnum += 1
+        seen_hashes = set()
+        offset = 0
+        limit = 50
+        market_val = None
+        isrc_results = []  # Track results for this specific ISRC
+
+        while True:
+            try:
+                query = f"isrc:{isrc}"
+                # Perform the search for this specific ISRC
+                response = client.search(q=query, type='track', limit=limit, offset=offset, market=market_val)
+                if not response:
+                    print(f'No response, breaking {isrc}')
+                    break
+
+                tracks_data = response.get('tracks', {})
+                tracks = tracks_data.get('items', [])
+                num_returned = len(tracks)
+
+                batch_hash = hashlib.md5(str([t['id'] for t in tracks]).encode()).hexdigest() if tracks else None
+                if batch_hash in seen_hashes:
+                    print(f"Duplicate batch detected at offset {offset}, breaking.")
+                    break
+                if batch_hash:
+                    seen_hashes.add(batch_hash)
+
+                if tracks:
+                    isrc_results.append(tracks)
+                else:
+                    break
+
+                # did we find less track than the limit?
+                if num_returned < limit:
+                    print('Acceptable break: under limit')
+                    break
+
+                offset += limit
+                if offset >= 1000 and market_val is None:
+                    seen_hashes = set()
+                    offset = 0
+                    limit = 50
+                    market_val = 'US'
+                    print(f"Reset batch, searching again for just US")
+                elif offset >= 1000:
+                    print(f'US search results also exceed 1000')
+                    break
+
+            except Exception as e:
+                print(f'Error searching ISRC: {isrc} err={e}')
+                break
+
+        # Handle fallback scenarios
+        if isrc_results:
+            results.extend(isrc_results)
+            qec(f"""UPDATE music.all_tracks set id_synced_at_utc = CURRENT_TIMESTAMP where track_isrc = '{isrc}'""")
+
+    return results
 
 
