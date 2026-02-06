@@ -38,7 +38,7 @@ def render_music():
 
     # Set Default
     if not nav_selection:
-        nav_selection='now_playing'
+        nav_selection=rating_display_module()
 
     if ss.rate_limited and nav_selection in ('now_playing', 'listen_history', 'list_shuffle', 'sync_playlists'):
         st.warning(':material/brightness_alert: Spotify currently rate limited')
@@ -53,6 +53,7 @@ def render_music():
     elif nav_selection == 'list_shuffle':
         render_playlist_shuffle()
     elif nav_selection == 'track_ratings':
+        rating_display_module()
         render_ratings()
     elif nav_selection == 'isrc_clean':
         render_isrc_dupe_resolve()
@@ -61,6 +62,19 @@ def render_music():
     else:
         st.error(f"Uncaught nav exception for music: {nav_selection}")
     return
+
+def rating_display_module():
+    sql = "SELECT COUNT(*) FROM music.vw_rating_eligible"
+    isrc_count = one_sql_result(sql)
+    if isrc_count == 1:
+        st.info('1 Track to rate')
+        nav_selection = 'track_ratings'
+    elif isrc_count > 1:
+        st.info(f"{isrc_count} Tracks to rate")
+        nav_selection = 'track_ratings'
+    else:
+        nav_selection = 'now_playing'
+    return nav_selection
 
 
 def render_isrc_dupe_resolve():
@@ -668,8 +682,8 @@ def update_rating(d):
     home_params = [d.get('playlist_id'), d.get('isrc'), d.get('isrc_vs'), d.get('isrc_elo'), home_new_elo, -margin]
     away_params = [d.get('playlist_id'), d.get('isrc_vs'), d.get('isrc'), d.get('isrc_vs_elo'), away_new_elo, margin]
 
-    qec(hist_sql, home_params)
-    qec(hist_sql, away_params)
+    returns1 = qec(hist_sql, home_params)
+    returns2 = qec(hist_sql, away_params)
 
     update_sql = f"""INSERT INTO music.ratings (
                     playlist_id,
@@ -690,6 +704,11 @@ def update_rating(d):
                     last_rated_utc = EXCLUDED.last_rated_utc
                     WHERE music.ratings.last_rated_utc < EXCLUDED.last_rated_utc;
                     """
-    qec(update_sql)
-    # st.rerun()
+    returns3 = qec(update_sql)
 
+    msg = f"1: {returns1} if returns1 else ''"
+    msg = f"{msg} 2: {returns2}" if returns2 else msg
+    msg = f"{msg} 3: {returns3}" if returns3 else msg
+    # st.write(msg)
+    # st.rerun()
+    return
