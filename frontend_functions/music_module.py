@@ -626,15 +626,15 @@ def render_ratings():
     isrc_vs_album_id = d.get('isrc_vs_album_id')
 
     red_corner, blue_corner, ref_corder = st.columns(spec=[1,1,2], gap="small", border=False)
-
+    w = 100 if ss.is_mobile else 300
     with red_corner :
-        st.image(album_image_retrieval(isrc_album_id), width="stretch")
+        st.image(album_image_retrieval(isrc_album_id), width=w)
         st.write(f"__{isrc_track}__ by __{isrc_artist}__")
         st.write(f":gray[*{isrc}*]")
 
 
     with blue_corner:
-        st.image(album_image_retrieval(isrc_vs_album_id), width="stretch")
+        st.image(album_image_retrieval(isrc_vs_album_id), width=w)
         st.write(f"__{isrc_vs_track}__ by __{isrc_vs_artist}__")
         st.write(f":gray[*{isrc_vs}*]")
 
