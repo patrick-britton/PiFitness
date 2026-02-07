@@ -31,18 +31,23 @@ def render_course_list():
         bounds = trajectory.bounds
         center_lon = (bounds[0] + bounds[2]) / 2
         center_lat = (bounds[1] + bounds[3]) / 2
-        zoom = get_auto_zoom(trajectory, 3)
-
+        zoom = get_auto_zoom(trajectory, 2.)
+        zoom = max(1, min(zoom, 18))
 
         lons, lats = zip(*[(lon, lat) for lon, lat, *_ in trajectory.coords])
 
+        if len(lons) > 1000:
+            # Downsample to every nth point
+            step = len(lons) // 500
+            lons = lons[::step]
+            lats = lats[::step]
 
         # Create plotly figure
         fig = go.Figure(go.Scattermapbox(
             mode='lines',
-            lon=lons,
-            lat=lats,
-            line=dict(width=3, color='blue'),
+            lon=list(lons),
+            lat=list(lats),
+            line=dict(width=2, color='blue'),
             hoverinfo='skip'
         ))
 
@@ -55,8 +60,8 @@ def render_course_list():
             margin=dict(l=0, r=0, t=0, b=0),
             autosize=False,
             showlegend=False,
-            height=150,
-            width=150
+            height=200,
+            width=200
         )
 
         st.plotly_chart(fig, key=f"pc_{r.get('activity_id')}",
@@ -77,24 +82,36 @@ def render_course_list():
 
 
 def get_auto_zoom(geometry, padding=0.1):
-    """Get optimal zoom from shapely geometry"""
-    bounds = geometry.bounds  # (minx, miny, maxx, maxy)
+    """Get optimal zoom from shapely geometry with safety checks"""
+    try:
+        bounds = geometry.bounds  # (minx, miny, maxx, maxy)
 
-    lon_span = (bounds[2] - bounds[0]) * (1 + padding)
-    lat_span = (bounds[3] - bounds[1]) * (1 + padding)
+        lon_span = (bounds[2] - bounds[0]) * (1 + padding)
+        lat_span = (bounds[3] - bounds[1]) * (1 + padding)
 
-    # Handle edge case of single point or very small area
-    if lon_span < 0.0001:
-        lon_span = 0.001
-    if lat_span < 0.0001:
-        lat_span = 0.001
+        # Handle edge case of single point or very small area
+        if lon_span < 0.0001:
+            lon_span = 0.001
+        if lat_span < 0.0001:
+            lat_span = 0.001
 
-    zoom = min(
-        math.log2(360 / lon_span),
-        math.log2(180 / lat_span)
-    )
+        # Prevent overflow/underflow
+        if lon_span > 360:
+            lon_span = 360
+        if lat_span > 180:
+            lat_span = 180
 
-    return zoom
+        zoom_lon = math.log2(360 / lon_span) if lon_span > 0 else 15
+        zoom_lat = math.log2(180 / lat_span) if lat_span > 0 else 15
+
+        zoom = min(zoom_lon, zoom_lat)
+
+        # Clamp to valid range (some map styles break outside this)
+        return max(1, min(zoom, 18))
+
+    except Exception as e:
+        # Fallback to middle zoom
+        return 13
 
 
 def update_course_name(id, key_val):
