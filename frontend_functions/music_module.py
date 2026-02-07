@@ -84,12 +84,13 @@ def render_isrc_dupe_resolve():
         st.info(f"{int(isrc_count / 2)} potential duplicate isrcs found")
     else:
         st.info("No duplicate isrcs found")
+        if st.button(':material/search: Look for new matches'):
+            with st.spinner('Takes about 25 seconds...', show_time=True):
+                qec("CALL music.isrc_duplicate_finder();")
+            st.rerun()
         return
 
-    if st.button(':material/search: Look for new matches'):
-        with st.spinner('Takes about 25 seconds...', show_time=True):
-            qec("CALL music.isrc_duplicate_finder();")
-        st.rerun()
+
 
     match_icon = f":material/hotel_class:"
     matchup = sql_to_dict("SELECT * FROM music.vw_isrc_dupe_review LIMIT 1")
