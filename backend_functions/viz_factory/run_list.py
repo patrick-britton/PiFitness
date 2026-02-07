@@ -13,11 +13,9 @@ def render_course_list():
     rd = sql_to_dict(sql)
 
     max_runs = len(rd)
-    offset = st.number_input("Offset", value=0, min_value=0, max_value=len(rd), step=10)
+    offset = st.number_input("Offset", value=0, min_value=0, max_value=len(rd), step=5)
     ctr = offset
-    while ctr < min(max_runs, offset+10):
-        if ctr-offset <2:
-            time.sleep(.1)
+    while ctr < min(max_runs, offset+5):
 
         r = rd[ctr]
 
@@ -77,7 +75,7 @@ def render_course_list():
                             'height': 150,
                             'width': 150
                         },
-                        use_container_width=False
+                        width='content'
                         )
         ctr += 1
         st.divider()
