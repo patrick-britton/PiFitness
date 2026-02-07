@@ -59,9 +59,12 @@ def render_course_list():
         st.plotly_chart(fig, key=f"pc_{r.get('activity_id')}",
                         config={
                             'displayModeBar': False,  # Hide toolbar on mobile
-                            'staticPlot': False,  # Keep interactive
-                            'responsive': True  # Ensure responsiveness
-                        }
+                            'staticPlot': True,  # Keep interactive
+                            'responsive': True,
+                            'height': 150,
+                            'width': 150
+                        },
+                        use_container_width=False
                         )
         ctr += 1
         st.divider()
