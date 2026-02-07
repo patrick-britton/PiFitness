@@ -4,6 +4,7 @@ import pandas as pd
 
 from backend_functions.database_functions import get_conn, qec
 from backend_functions.task_execution import task_executioner
+from backend_functions.viz_factory.run_list import render_course_list
 from frontend_functions.music_module import render_playlist_shuffle
 from frontend_functions.music_widgets import playlist_config_table
 from frontend_functions.nav_buttons import nav_widget
@@ -21,9 +22,17 @@ def render_running_module():
         process_new_run()
     elif nav_selection == 'run_forecast':
         render_run_forecast()
+    elif nav_selection == 'browse_runs':
+        browse_runs()
     else:
         st.info(f'Uncaught run navigation: {nav_selection}')
     return
+
+
+def browse_runs():
+    render_course_list()
+    return
+
 
 
 def render_run_charting():
