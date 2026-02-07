@@ -10,3 +10,5 @@ cryptography
 pathlib
 garminconnect
 matplotlib
+plotly
+shapely
