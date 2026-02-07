@@ -13,13 +13,17 @@ def render_course_list():
     rd = sql_to_dict(sql)
 
     max_runs = len(rd)
-    offset = st.number_input("Offset", value=0, min_value=0, max_value=len(rd), step=5)
+    step_val = 10
+    offset = st.number_input("Offset", value=0, min_value=0, max_value=len(rd), step=step_val)
     ctr = offset
-    while ctr < min(max_runs, offset+5):
+
+
+
+    while ctr < min(max_runs, offset+step_val):
 
         r = rd[ctr]
 
-        course_name = st.text_input(f"Course # {r.get('course_id')}",
+        st.text_input(f"Course # {r.get('course_id')}",
                                     value=r.get('course_name'),
                                     key=f'new_course_name_{r.get('activity_id')}',
                                     on_change=update_course_name,
@@ -37,12 +41,15 @@ def render_course_list():
         zoom = max(1, min(zoom, 18))
 
         lons, lats = zip(*[(lon, lat) for lon, lat, *_ in trajectory.coords])
-
-        if len(lons) > 1000:
+        if ss.is_mobile:
             # Downsample to every nth point
-            step = len(lons) // 500
+            step = len(lons) // 150
             lons = lons[::step]
             lats = lats[::step]
+            ui_rev = 'static'
+        else:
+            ui_rev = 'default'
+
 
         # Create plotly figure
         fig = go.Figure(go.Scattermapbox(
@@ -53,9 +60,15 @@ def render_course_list():
             hoverinfo='skip'
         ))
 
+        fig.update_traces(
+            line=dict(width=2),
+            connectgaps=False
+        )
+
         fig.update_layout(
             mapbox=dict(
                 style='carto-positron',
+                uirevision=ui_rev,
                 center=dict(lat=center_lat, lon=center_lon),
                 zoom=zoom
             ),
@@ -72,6 +85,7 @@ def render_course_list():
                             'staticPlot': True,  # Keep interactive
                             'responsive': False,
                             'doubleClick': False,
+                            'scrollZoom': False,
                             'height': 150,
                             'width': 150
                         },
