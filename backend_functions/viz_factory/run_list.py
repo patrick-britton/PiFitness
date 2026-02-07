@@ -13,7 +13,7 @@ def render_course_list():
     rd = sql_to_dict(sql)
 
     max_runs = len(rd)
-    step_val = 10
+    step_val = 6
     offset = st.number_input("Offset", value=0, min_value=0, max_value=len(rd), step=step_val)
     ctr = offset
 
