@@ -1,4 +1,5 @@
 import math
+import time
 
 from backend_functions.database_functions import sql_to_dict, qec
 from shapely import wkb
@@ -15,6 +16,9 @@ def render_course_list():
     offset = st.number_input("Offset", value=0, min_value=0, max_value=len(rd), step=10)
     ctr = offset
     while ctr < min(max_runs, offset+10):
+        if ctr-offset <2:
+            time.sleep(.1)
+
         r = rd[ctr]
 
         course_name = st.text_input(f"Course # {r.get('course_id')}",
