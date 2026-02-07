@@ -15,7 +15,7 @@ def render_homepage():
     rate_limit_widget()
     rating_display_module()
     dupe_widget()
-
+    new_course_alert()
     return
 
 
@@ -25,6 +25,15 @@ def dupe_widget():
     if isrc_count >0:
         st.info(f"{int(isrc_count/2)} potential duplicate isrcs found")
     return
+
+
+def new_course_alert():
+    sql = """SELECT count(*) FROM activities.courses where course_name like '%Course Created%'"""
+    cc = one_sql_result(sql)
+    if cc >0:
+        st.info(f"{cc} new courses found")
+    return
+
 
 
 def rate_limit_widget():
