@@ -42,7 +42,8 @@ def render_course_list():
             mode='lines',
             lon=lons,
             lat=lats,
-            line=dict(width=3, color='blue')
+            line=dict(width=3, color='blue'),
+            hoverinfo='skip'
         ))
 
         fig.update_layout(
@@ -52,6 +53,8 @@ def render_course_list():
                 zoom=zoom
             ),
             margin=dict(l=0, r=0, t=0, b=0),
+            autosize=False,
+            showlegend=False,
             height=150,
             width=150
         )
@@ -60,7 +63,8 @@ def render_course_list():
                         config={
                             'displayModeBar': False,  # Hide toolbar on mobile
                             'staticPlot': True,  # Keep interactive
-                            'responsive': True,
+                            'responsive': False,
+                            'doubleClick': False,
                             'height': 150,
                             'width': 150
                         },
