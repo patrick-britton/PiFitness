@@ -44,7 +44,7 @@ def nav_dictionary():
         'running': {'run_charting': {'icon': 'show_chart'},
                     'new_run_process': {'icon': 'directory_sync'},
                     'run_forecast': {'icon': 'planet'},
-                    'browse_runs': {'icon': 'folder_eye', 'label':'Browse Runs'},
+                    'segment_compare': {'icon': 'conversion_path', 'label': 'Courses & Segments'},
                     },
         # Food page
         'food': {},

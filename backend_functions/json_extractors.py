@@ -179,7 +179,7 @@ def to_params(param_list=None, search_val=None, replace_val=None, return_type='l
         return ", ".join(rb_list)
 
 
-def extract_json_run_details(client=None, td=None, aid=None):
+def extract_json_activity_details(client=None, td=None, aid=None):
 
     # Connects to Spotify API and downloads all tracks
     # Uploads JSON to DB, which is then processed via stored procedure.
