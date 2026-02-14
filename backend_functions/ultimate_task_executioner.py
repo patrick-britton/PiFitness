@@ -464,7 +464,8 @@ def json_loading(json_data, d):
         cur.execute(
             """
             INSERT INTO staging.api_imports (task_id, payload)
-            VALUES (%s, %s);
+            VALUES (%s, %s)
+            ON CONFLICT (task_id, payload) DO NOTHING;
             """,
             values[0],
         )
