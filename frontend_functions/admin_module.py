@@ -43,6 +43,9 @@ def render_admin_module():
         render_admin_charting()
     elif nav_selection == 'service_status':
         render_service_status()
+    elif nav_selection == 'db_sessions':
+        render_db_sessions()
+
     elif nav_selection == 'passwords':
         render_password_submodule()
     elif nav_selection == 'task_mgmt':
@@ -512,4 +515,15 @@ def render_log_file():
                                                              disabled=True
                                                             )}
     st.dataframe(df, column_order=cols, column_config=col_config, hide_index=True, on_select="ignore")
+    return
+
+
+def render_db_sessions():
+    sql = """SELECT pid, usename, state, query,
+            current_timestamp-backend_start as run_length
+            FROM pg_stat_activity
+            WHERE state != 'idle'
+            ORDER BY query_start;"""
+    df = pd.read_sql(sql, con=get_conn(alchemy=True))
+    st.dataframe(df, hide_index=True)
     return
