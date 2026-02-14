@@ -1,5 +1,4 @@
 import streamlit as st
-from fsspec.registry import default
 from streamlit import session_state as ss
 import pandas as pd
 
