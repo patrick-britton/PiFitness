@@ -520,10 +520,23 @@ def render_log_file():
 
 def render_db_sessions():
     sql = """SELECT pid, usename, state, query,
-            current_timestamp-backend_start as run_length
-            FROM pg_stat_activity
-            WHERE state != 'idle'
-            ORDER BY query_start;"""
+        current_timestamp-query_start as run_length
+        FROM pg_stat_activity
+        WHERE state != 'idle' and query NOT LIKE 'SELECT pid%'
+        ORDER BY query_start;"""
     df = pd.read_sql(sql, con=get_conn(alchemy=True))
+    if df.empty:
+        st.info('No events found')
+        return
+
     st.dataframe(df, hide_index=True)
+
+    id_to_kill = st.number_input("Kill ID", value=0)
+
+    if id_to_kill > 0:
+        if st.button(":material/content_cut: Kill ID"):
+            sql =  f"""SELECT pg_terminate_backend({int(id_to_kill)});"""
+            qec(sql)
+            return
+
     return
