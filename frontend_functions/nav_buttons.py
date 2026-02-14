@@ -23,7 +23,8 @@ def nav_dictionary():
                   "service_status": {'icon': 'bigtop_updates'},
                   "task_management": {'icon': "discover_tune", 'label': 'Task Mgmt'},
                   "services": {'icon': "api", 'label': 'API Mgmt'},
-                  "passwords": {'icon': "key_vertical", 'label': 'Passwords'}
+                  "passwords": {'icon': "key_vertical", 'label': 'Passwords'},
+                  'db_sessions': {'icon': 'table_eye', 'label': 'Active SQL'}
 
                   },
 
