@@ -208,7 +208,27 @@ def course_review():
 
 
 def render_run_charting():
-    st.info('Run Charting not yet built')
+    baseline = st.segmented_control('Select the baseline:',
+                                    options=['Most Recent', 'Best in Cycle', 'Best of Year', 'All-Time'],
+                                    value='Most Recent')
+
+    base_sql = f"""SELECT
+     """
+    
+    
+    if baseline == 'Most Recent':
+        abbr = 'mr'
+    elif baseline == 'Best in Cycle':
+        abbr = 'bc'
+    elif baseline == 'Best of Year':
+        abbr = 'bc'
+    elif baseline == 'Best All-Time':
+        abbr = 'bc'
+    else:
+        return
+    
+    
+        
     return
 
 

@@ -16,6 +16,7 @@ from backend_functions.service_logins import test_login, get_service_list
 from backend_functions.task_execution import task_executioner
 from backend_functions.viz_factory.db_size import render_db_size_dashboard
 from backend_functions.viz_factory.task_summary import render_task_summary_dashboard
+from frontend_functions.admin_control_panel import render_systemd_control_panel
 from frontend_functions.admin_task_management import render_task_id_management
 from frontend_functions.nav_buttons import nav_button, nav_widget
 from frontend_functions.streamlit_helpers import reconcile_with_postgres, ss_pop
@@ -42,7 +43,12 @@ def render_admin_module():
     if nav_selection == 'admin_charting':
         render_admin_charting()
     elif nav_selection == 'service_status':
-        render_service_status()
+        # render_service_status()
+        status = get_runtime_status()
+        if status["mode"] == "local":
+            st.success(status["message"])
+        else:
+            render_systemd_control_panel()
     elif nav_selection == 'db_sessions':
         render_db_sessions()
 
@@ -519,17 +525,20 @@ def render_log_file():
 
 
 def render_db_sessions():
-    sql = """SELECT pid, usename, state, query,
+    sql = """SELECT pid, state, query,
         current_timestamp-query_start as run_length
         FROM pg_stat_activity
         WHERE state != 'idle' and query NOT LIKE 'SELECT pid%'
         ORDER BY query_start;"""
-    df = pd.read_sql(sql, con=get_conn(alchemy=True))
-    if df.empty:
+    df = sql_to_dict(sql)
+
+    if not df:
         st.info('No events found')
         return
 
-    st.dataframe(df, hide_index=True)
+    for q in df:
+        msg=f"PID: {q['pid']} | Q: {q['query']} : :gray[*{q.run_length}]*] "
+        st.write(msg)
 
     id_to_kill = st.number_input("Kill ID", value=0)
 
