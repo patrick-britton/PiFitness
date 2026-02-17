@@ -3,6 +3,7 @@ import streamlit as st
 from streamlit import session_state as ss
 
 from backend_functions.database_functions import one_sql_result
+from backend_functions.elevation_tiles import reconcile_elevation_tiles
 from backend_functions.logging_functions import start_timer, elapsed_ms
 from backend_functions.service_logins import sql_rate_limited, rate_limit_test
 
@@ -16,6 +17,9 @@ def render_homepage():
     rating_display_module()
     dupe_widget()
     new_course_alert()
+
+    if st.button('Load Mapping Tiles'):
+        reconcile_elevation_tiles()
     return
 
 
