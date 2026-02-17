@@ -33,10 +33,10 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
     output_file = Path(elevation_tile_path()) / filename
 
     if output_file.exists():
-        logging.info(f"Tile {tile_id} already exists")
+        st.info(f"Tile {tile_id} already exists")
         return output_file
 
-    logging.info(f"Downloading tile {tile_id}...")
+    st.info(f"Downloading tile {tile_id}...")
 
     # Try 3m first, fall back to 10m, then 30m
     datasets = [
@@ -60,7 +60,7 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
             if data.get('items'):
                 download_url = data['items'][0]['downloadURL']
                 resolution = '3m' if '1/9' in dataset else '10m' if '1/3' in dataset else '30m'
-                logging.info(f"Found {resolution} data, downloading from USGS...")
+                st.info(f"Found {resolution} data, downloading from USGS...")
 
                 # Download the file (might be zip or tif)
                 temp_file = output_file.with_suffix('.download')
@@ -83,14 +83,14 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
                     # It's already a .tif, just rename
                     temp_file.rename(output_file)
 
-                logging.info(f"Successfully downloaded {tile_id} at {resolution}")
+                st.info(f"Successfully downloaded {tile_id} at {resolution}")
                 return output_file
 
         except Exception as e:
-            logging.warning(f"Failed to get {dataset}: {e}")
+            st.warning(f"Failed to get {dataset}: {e}")
             continue
 
-    logging.error(f"No data found for {tile_id}")
+    st.error(f"No data found for {tile_id}")
     return None
 
 
