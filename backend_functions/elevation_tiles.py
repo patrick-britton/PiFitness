@@ -31,21 +31,12 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
     """
     Download highest resolution tile available from USGS.
     Tries 3m first, then 10m, then 30m.
-    Always attempts to upgrade to higher resolution if available.
+    Files are saved with resolution suffix: {tile_id}_3m.tif, {tile_id}_10m.tif, etc.
+    Returns the highest resolution file available.
     """
-    filename = f"{tile_id}.tif"
-    output_file = Path(elevation_tile_path()) / filename
-
-    # Check what resolution we currently have (if any)
-    current_resolution = None
-    if output_file.exists():
-        # Try to determine current resolution from metadata table
-        # For now, we'll just try to upgrade anyway
-        st.info(f"Tile {tile_id} exists, checking for higher resolution...")
-
     st.info(f"Searching for tile {tile_id}...")
 
-    # Try 3m first, fall back to 10m, then 30m
+    # Try resolutions in priority order
     datasets = [
         ('National Elevation Dataset (NED) 1/9 arc-second', '3m'),
         ('National Elevation Dataset (NED) 1/3 arc-second', '10m'),
@@ -53,6 +44,17 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
     ]
 
     for dataset_name, resolution in datasets:
+        # Check if we already have this resolution
+        output_file = Path(elevation_tile_path()) / f"{tile_id}_{resolution}.tif"
+
+        if output_file.exists():
+            file_size = output_file.stat().st_size
+            st.success(f"✓ {tile_id} at {resolution} already exists ({file_size / 1024 / 1024:.1f} MB)")
+            return output_file
+
+        # Don't have this resolution, try to download it
+        st.info(f"Checking for {resolution} data...")
+
         try:
             # Query USGS API
             api_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
@@ -62,22 +64,21 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
                 'outputFormat': 'JSON'
             }
 
-            st.info(f"Checking for {resolution} data...")
             response = requests.get(api_url, params=params, timeout=30)
             data = response.json()
 
             if not data.get('items'):
-                st.warning(f"No {resolution} data available, trying next resolution...")
+                st.warning(f"No {resolution} data available")
                 continue
 
-            # Found data at this resolution
+            # Found data at this resolution - download it
             download_url = data['items'][0]['downloadURL']
             st.info(f"Found {resolution} data! Downloading from USGS...")
 
             # Use resolution-specific temp file
             temp_file = Path(elevation_tile_path()) / f"{tile_id}_{resolution}.download"
 
-            # Download the file
+            # Download
             with requests.get(download_url, stream=True, timeout=300) as r:
                 r.raise_for_status()
                 total_size = 0
@@ -102,71 +103,57 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
                     ]
 
                     if not elevation_files:
-                        st.error(f"No elevation files (.tif/.img) found in zip. Contents: {all_files[:5]}")
+                        st.error(f"No elevation files found in zip. Contents: {all_files[:5]}")
                         temp_file.unlink()
                         continue
 
-                    # Extract the first elevation file found
+                    # Extract the elevation file
                     elevation_file = elevation_files[0]
                     st.info(f"Extracting {elevation_file}...")
 
                     zip_ref.extract(elevation_file, elevation_tile_path())
                     extracted_path = Path(elevation_tile_path()) / elevation_file
 
-                    # Verify extraction succeeded
                     if not extracted_path.exists():
-                        st.error(f"Extraction failed - file not found at {extracted_path}")
+                        st.error(f"Extraction failed - file not found")
                         temp_file.unlink()
                         continue
 
-                    # Move to final location
-                    if output_file.exists():
-                        output_file.unlink()
-
+                    # Rename to standardized name with resolution suffix
                     extracted_path.rename(output_file)
-                    st.info(f"Extracted and renamed to {output_file.name}")
+                    st.info(f"Renamed to {output_file.name}")
 
-                # Clean up zip file (comment out to keep for debugging)
-                # temp_file.unlink()
+                # Clean up zip (uncomment to keep for debugging)
+                temp_file.unlink()
 
             else:
-                # File is already a .tif, just rename it
+                # File is already a GeoTIFF, just rename
                 st.info("File is already in GeoTIFF format")
-
-                if output_file.exists():
-                    output_file.unlink()
-
                 temp_file.rename(output_file)
 
-            # Verify final file exists and has content
+            # Verify final file
             if output_file.exists():
                 file_size = output_file.stat().st_size
-                st.success(
-                    f"✓ Successfully saved {tile_id} at {resolution} resolution ({file_size / 1024 / 1024:.1f} MB)")
+                st.success(f"✓ Successfully downloaded {tile_id} at {resolution} ({file_size / 1024 / 1024:.1f} MB)")
                 return output_file
             else:
-                st.error(f"File verification failed - {output_file} does not exist")
+                st.error(f"File verification failed")
                 continue
 
         except requests.exceptions.RequestException as e:
-            st.warning(f"Network error downloading {resolution} data: {e}")
+            st.warning(f"Network error downloading {resolution}: {e}")
             continue
         except zipfile.BadZipFile as e:
-            st.warning(f"Invalid zip file for {resolution} data: {e}")
-            # Clean up bad file
-            if temp_file.exists():
-                temp_file.unlink()
+            st.warning(f"Invalid zip file for {resolution}: {e}")
+            if Path(elevation_tile_path() / f"{tile_id}_{resolution}.download").exists():
+                Path(elevation_tile_path() / f"{tile_id}_{resolution}.download").unlink()
             continue
         except Exception as e:
-            st.error(f"Unexpected error with {resolution} data: {e}")
-            # Clean up on error
-            temp_file = Path(elevation_tile_path()) / f"{tile_id}_{resolution}.download"
-            if temp_file.exists():
-                temp_file.unlink()
+            st.error(f"Unexpected error with {resolution}: {e}")
             continue
 
     # If we get here, all resolutions failed
-    st.error(f"Failed to download tile {tile_id} at any resolution (3m/10m/30m)")
+    st.error(f"Failed to download tile {tile_id} at any resolution")
     return None
 
 
@@ -223,8 +210,6 @@ def load_tile_to_postgres(tile_file, tile_id, conn):
                 UPDATE activities.elevation_tiles 
                 SET tile_id = %s 
                 WHERE tile_id IS NULL
-                ON CONFLICT (tile_id) DO UPDATE SET
-                tile_id = EXCLUDED.tile_id
             """, (tile_id,))
 
             conn.commit()
