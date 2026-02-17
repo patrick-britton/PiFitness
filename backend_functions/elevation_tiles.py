@@ -9,6 +9,9 @@ import psycopg2
 from pathlib import Path
 import logging
 import zipfile
+
+import requests
+
 from backend_functions.database_functions import get_conn
 from backend_functions.file_handlers import elevation_tile_path
 import streamlit as st
