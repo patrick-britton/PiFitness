@@ -12,3 +12,4 @@ garminconnect
 matplotlib
 plotly
 shapely
+elevation
