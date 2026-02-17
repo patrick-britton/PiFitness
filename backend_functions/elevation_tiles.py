@@ -33,7 +33,7 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
     output_file = Path(elevation_tile_path()) / filename
 
     if output_file.exists():
-        st.info(f"Tile {tile_id} already exists")
+        st.info(f"Tile {tile_id} already exists at {output_file}")
         return output_file
 
     st.info(f"Downloading tile {tile_id}...")
@@ -60,39 +60,75 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
             if data.get('items'):
                 download_url = data['items'][0]['downloadURL']
                 resolution = '3m' if '1/9' in dataset else '10m' if '1/3' in dataset else '30m'
-                st.info(f"Found {resolution} data, downloading from USGS...")
+                st.info(f"Found {resolution} data, downloading from {download_url[:50]}...")
 
                 # Download the file (might be zip or tif)
                 temp_file = output_file.with_suffix('.download')
+
+                # Clean up any existing temp file
+                if temp_file.exists():
+                    temp_file.unlink()
+
                 with requests.get(download_url, stream=True, timeout=120) as r:
                     r.raise_for_status()
+                    total_size = 0
                     with open(temp_file, 'wb') as f:
                         for chunk in r.iter_content(chunk_size=8192):
                             f.write(chunk)
+                            total_size += len(chunk)
+
+                st.info(f"Downloaded {total_size / 1024 / 1024:.1f} MB")
 
                 # Check if it's a zip file
                 if zipfile.is_zipfile(temp_file):
+                    st.info("Extracting zip file...")
                     with zipfile.ZipFile(temp_file, 'r') as zip_ref:
                         tif_files = [f for f in zip_ref.namelist() if f.endswith('.tif')]
                         if tif_files:
+                            st.info(f"Found {tif_files[0]} in zip")
                             zip_ref.extract(tif_files[0], elevation_tile_path())
                             extracted = Path(elevation_tile_path()) / tif_files[0]
+
+                            # Remove output_file if it exists before renaming
+                            if output_file.exists():
+                                output_file.unlink()
+
                             extracted.rename(output_file)
+                            st.info(f"Extracted to {output_file}")
+                        else:
+                            st.error("No .tif files found in zip")
+                            temp_file.unlink()
+                            continue
                     temp_file.unlink()
                 else:
                     # It's already a .tif, just rename
+                    st.info("File is already .tif format, renaming...")
+
+                    # Remove output_file if it exists before renaming
+                    if output_file.exists():
+                        output_file.unlink()
+
                     temp_file.rename(output_file)
 
-                st.info(f"Successfully downloaded {tile_id} at {resolution}")
-                return output_file
+                # Verify the file exists and has size
+                if output_file.exists():
+                    file_size = output_file.stat().st_size
+                    st.success(f"Successfully downloaded {tile_id} at {resolution} ({file_size / 1024 / 1024:.1f} MB)")
+                    return output_file
+                else:
+                    st.error(f"File {output_file} does not exist after download!")
+                    return None
 
         except Exception as e:
             st.warning(f"Failed to get {dataset}: {e}")
+            # Clean up temp file on error
+            temp_file = output_file.with_suffix('.download')
+            if temp_file.exists():
+                temp_file.unlink()
             continue
 
     st.error(f"No data found for {tile_id}")
     return None
-
 
 def load_tile_to_postgres(tile_file, tile_id, conn):
     """Load tile into PostgreSQL using raster2pgsql"""
