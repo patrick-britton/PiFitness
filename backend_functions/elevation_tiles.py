@@ -241,14 +241,14 @@ def register_tile_metadata(tile_id, min_lat, max_lat, min_lon, max_lon, file_pat
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO activities.elevation_tiles_metadata 
-                (tile_id, min_lat, max_lat, min_lon, max_lon, file_path, resolution, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 'loaded')
+                (tile_id, min_lat, max_lat, min_lon, max_lon, file_path, resolution, is_downloaded)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
             ON CONFLICT (tile_id) 
             DO UPDATE SET 
                 download_date = CURRENT_TIMESTAMP,
                 file_path = EXCLUDED.file_path,
                 resolution = EXCLUDED.resolution,
-                status = 'loaded'
+                is_downloaded = TRUE
         """, (tile_id, min_lat, max_lat, min_lon, max_lon, str(file_path), resolution))
         conn.commit()
     return
