@@ -217,7 +217,7 @@ def reconcile_elevation_tiles():
             #     st.info(f"Failed to load {tile_id} into database")
 
         # Update all activities with new elevation data
-        update_activity_elevations(conn)
+        # update_activity_elevations(conn)
 
         st.info("Elevation tile process completed successfully!")
 
