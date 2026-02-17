@@ -169,21 +169,47 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
     st.error(f"Failed to download tile {tile_id} at any resolution (3m/10m/30m)")
     return None
 
+
 def load_tile_to_postgres(tile_file, tile_id, conn):
     """Load tile into PostgreSQL using raster2pgsql"""
     st.write(f"Loading {tile_id} into PostgreSQL...")
 
     try:
+        # Check if table exists to determine mode
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'activities' 
+                    AND table_name = 'elevation_tiles'
+                )
+            """)
+            table_exists = cur.fetchone()[0]
+
         # Generate SQL with raster2pgsql
-        cmd = [
-            'raster2pgsql',
-            '-s', '4326',  # SRID
-            '-I',  # Create spatial index
-            '-t', '100x100',  # Tile size
-            '-F',  # Add filename column
-            str(tile_file),
-            'activities.elevation_tiles'
-        ]
+        if table_exists:
+            # Append mode - table already exists
+            cmd = [
+                'raster2pgsql',
+                '-s', '4326',  # SRID
+                '-a',  # Append to existing table
+                '-t', '100x100',  # Tile size
+                '-F',  # Add filename column
+                str(tile_file),
+                'activities.elevation_tiles'
+            ]
+        else:
+            # Create mode - first time loading
+            cmd = [
+                'raster2pgsql',
+                '-s', '4326',  # SRID
+                '-I',  # Create spatial index
+                '-C',  # Add raster constraints
+                '-t', '100x100',  # Tile size
+                '-F',  # Add filename column
+                str(tile_file),
+                'activities.elevation_tiles'
+            ]
 
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         sql = result.stdout
@@ -206,6 +232,10 @@ def load_tile_to_postgres(tile_file, tile_id, conn):
 
     except subprocess.CalledProcessError as e:
         st.error(f"Failed to load {tile_id}: {e.stderr}")
+        conn.rollback()
+        return False
+    except Exception as e:
+        st.error(f"Database error loading {tile_id}: {e}")
         conn.rollback()
         return False
 
