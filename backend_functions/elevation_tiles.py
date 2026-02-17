@@ -11,6 +11,7 @@ import logging
 
 from backend_functions.database_functions import get_conn
 from backend_functions.file_handlers import elevation_tile_path
+import streamlit as st
 
 
 def get_missing_tiles(conn):
@@ -30,10 +31,10 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon, resolution='3m'):
     output_file = os.path.join(elevation_tile_path(), filename)
 
     if os.path.exists(output_file):
-        logging.info(f"Tile {tile_id} at {resolution} already exists")
+        st.write(f"Tile {tile_id} at {resolution} already exists")
         return output_file
 
-    logging.info(f"Downloading {resolution} tile {tile_id}")
+    st.write(f"Downloading {resolution} tile {tile_id}")
 
     try:
         if resolution == '10m':
@@ -55,18 +56,18 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon, resolution='3m'):
         ]
 
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        logging.info(f"Successfully downloaded {tile_id} at {resolution}")
+        st.write(f"Successfully downloaded {tile_id} at {resolution}")
         return output_file
 
     except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to download {tile_id} at {resolution}: {e.stderr}")
+        st.error(f"Failed to download {tile_id} at {resolution}: {e.stderr}")
 
         # Fallback to lower resolution if high-res not available
         if resolution == '3m':
-            logging.info(f"Falling back to 10m for {tile_id}")
+            st.write(f"Falling back to 10m for {tile_id}")
             return download_tile(tile_id, min_lat, max_lat, min_lon, max_lon, '10m')
         elif resolution == '10m':
-            logging.info(f"Falling back to 30m for {tile_id}")
+            st.write(f"Falling back to 30m for {tile_id}")
             return download_tile(tile_id, min_lat, max_lat, min_lon, max_lon, '30m')
 
         return None
@@ -74,7 +75,7 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon, resolution='3m'):
 
 def load_tile_to_postgres(tile_file, tile_id, conn):
     """Load tile into PostgreSQL using raster2pgsql"""
-    logging.info(f"Loading {tile_id} into PostgreSQL...")
+    st.write(f"Loading {tile_id} into PostgreSQL...")
 
     try:
         # Generate SQL with raster2pgsql
@@ -104,11 +105,11 @@ def load_tile_to_postgres(tile_file, tile_id, conn):
 
             conn.commit()
 
-        logging.info(f"Successfully loaded {tile_id} into database")
+        st.write(f"Successfully loaded {tile_id} into database")
         return True
 
     except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to load {tile_id}: {e.stderr}")
+        st.error(f"Failed to load {tile_id}: {e.stderr}")
         conn.rollback()
         return False
 
@@ -131,7 +132,7 @@ def register_tile_metadata(tile_id, min_lat, max_lat, min_lon, max_lon, file_pat
 
 def update_activity_elevations(conn):
     """Update activity_details with elevations from tiles"""
-    logging.info("Updating activity elevations from tiles...")
+    st.write("Updating activity elevations from tiles...")
 
     with conn.cursor() as cur:
         cur.execute("""
@@ -155,12 +156,12 @@ def update_activity_elevations(conn):
         rows_updated = cur.rowcount
         conn.commit()
 
-    print(f"Updated {rows_updated} activity points with tile elevations")
+    st.info(f"Updated {rows_updated} activity points with tile elevations")
 
 
 def reconcile_elevation_tiles():
     """Main execution flow"""
-    print("Starting elevation tile download process...")
+    st.info("Starting elevation tile download process...")
 
     # Connect to database
     conn = get_conn()
@@ -170,19 +171,19 @@ def reconcile_elevation_tiles():
         missing_tiles = get_missing_tiles(conn)
 
         if not missing_tiles:
-            print("No missing tiles found!")
+            st.info("No missing tiles found!")
             return
 
-        print(f"Found {len(missing_tiles)} tiles to download")
+        st.info(f"Found {len(missing_tiles)} tiles to download")
 
         # Download and load each tile
         for tile_id, min_lat, max_lat, min_lon, max_lon, point_count in missing_tiles:
-            print(f"Processing {tile_id} (covers {point_count} points)")
+            st.info(f"Processing {tile_id} (covers {point_count} points)")
 
             # Download
             tile_file = download_tile(tile_id, min_lat, max_lat, min_lon, max_lon)
             if not tile_file:
-                print(f"Skipping {tile_id} due to download failure")
+                st.info(f"Skipping {tile_id} due to download failure")
                 continue
 
             # Load into PostgreSQL
@@ -192,15 +193,15 @@ def reconcile_elevation_tiles():
                     tile_id, min_lat, max_lat, min_lon, max_lon, tile_file, conn
                 )
             else:
-                print(f"Failed to load {tile_id} into database")
+                st.info(f"Failed to load {tile_id} into database")
 
         # Update all activities with new elevation data
         update_activity_elevations(conn)
 
-        print("Elevation tile process completed successfully!")
+        st.info("Elevation tile process completed successfully!")
 
     except Exception as e:
-        logging.error(f"Error during execution: {e}")
+        st.error(f"Error during execution: {e}")
         conn.rollback()
         raise
     finally:
