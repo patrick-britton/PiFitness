@@ -97,9 +97,9 @@ def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
                             st.info(f"Extracted to {output_file}")
                         else:
                             st.error("No .tif files found in zip")
-                            temp_file.unlink()
+                            # temp_file.unlink()
                             continue
-                    temp_file.unlink()
+                    # temp_file.unlink()
                 else:
                     # It's already a .tif, just rename
                     st.info("File is already .tif format, renaming...")
