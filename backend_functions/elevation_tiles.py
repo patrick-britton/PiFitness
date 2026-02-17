@@ -278,18 +278,18 @@ def reconcile_elevation_tiles():
 
             # Download
             tile_file = download_tile(tile_id, min_lat, max_lat, min_lon, max_lon)
-            # if not tile_file:
-            #     st.info(f"Skipping {tile_id} due to download failure")
-            #     continue
-            #
-            # # Load into PostgreSQL
-            # if load_tile_to_postgres(tile_file, tile_id, conn):
-            #     # Register in metadata
-            #     register_tile_metadata(
-            #         tile_id, min_lat, max_lat, min_lon, max_lon, tile_file, conn
-            #     )
-            # else:
-            #     st.info(f"Failed to load {tile_id} into database")
+            if not tile_file:
+                st.info(f"Skipping {tile_id} due to download failure")
+                continue
+
+            # Load into PostgreSQL
+            if load_tile_to_postgres(tile_file, tile_id, conn):
+                # Register in metadata
+                register_tile_metadata(
+                    tile_id, min_lat, max_lat, min_lon, max_lon, tile_file, conn
+                )
+            else:
+                st.info(f"Failed to load {tile_id} into database")
 
         # Update all activities with new elevation data
         # update_activity_elevations(conn)
