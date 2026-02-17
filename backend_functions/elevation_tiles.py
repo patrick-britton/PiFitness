@@ -8,7 +8,7 @@ import subprocess
 import psycopg2
 from pathlib import Path
 import logging
-
+import zipfile
 from backend_functions.database_functions import get_conn
 from backend_functions.file_handlers import elevation_tile_path
 import streamlit as st
@@ -24,53 +24,71 @@ def get_missing_tiles(conn):
         return cur.fetchall()
 
 
-def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon, resolution='3m'):
-    """Download a single SRTM tile using elevation library"""
-
+def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
+    """Download high-resolution tile from USGS (3m or 10m)"""
     filename = f"{tile_id}.tif"
-    output_file = os.path.join(elevation_tile_path(), filename)
+    output_file = Path(elevation_tile_path()) / filename
 
-    if os.path.exists(output_file):
-        st.write(f"Tile {tile_id} at {resolution} already exists")
+    if output_file.exists():
+        logging.info(f"Tile {tile_id} already exists")
         return output_file
 
-    st.write(f"Downloading {resolution} tile {tile_id}")
+    logging.info(f"Downloading tile {tile_id}...")
 
-    try:
-        if resolution == '10m':
-            # USGS 3DEP 1/3 arc-second
-            product = 'ned13'
-        elif resolution == '3m':
-            # USGS 3DEP 1/9 arc-second
-            product = 'ned19'
-        else:
-            # Default to SRTM 30m
-            product = 'srtm30m'
+    # Try 3m first, fall back to 10m, then 30m
+    datasets = [
+        'National Elevation Dataset (NED) 1/9 arc-second',  # 3m
+        'National Elevation Dataset (NED) 1/3 arc-second',  # 10m
+        'National Elevation Dataset (NED) 1 arc-second'  # 30m
+    ]
 
-        # Use elevation library with specific product
-        cmd = [
-            'eio', 'clip',
-            '-o', str(output_file),
-            '--product', product,
-            '--bounds', f"{min_lon}", f"{min_lat}", f"{max_lon}", f"{max_lat}"
-        ]
+    for dataset in datasets:
+        try:
+            api_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
+            params = {
+                'datasets': dataset,
+                'bbox': f"{min_lon},{min_lat},{max_lon},{max_lat}",
+                'outputFormat': 'JSON'
+            }
 
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        st.write(f"Successfully downloaded {tile_id} at {resolution}")
-        return output_file
+            response = requests.get(api_url, params=params, timeout=30)
+            data = response.json()
 
-    except subprocess.CalledProcessError as e:
-        st.error(f"Failed to download {tile_id} at {resolution}: {e.stderr}")
+            if data.get('items'):
+                download_url = data['items'][0]['downloadURL']
+                resolution = '3m' if '1/9' in dataset else '10m' if '1/3' in dataset else '30m'
+                logging.info(f"Found {resolution} data, downloading from USGS...")
 
-        # Fallback to lower resolution if high-res not available
-        if resolution == '3m':
-            st.write(f"Falling back to 10m for {tile_id}")
-            return download_tile(tile_id, min_lat, max_lat, min_lon, max_lon, '10m')
-        elif resolution == '10m':
-            st.write(f"Falling back to 30m for {tile_id}")
-            return download_tile(tile_id, min_lat, max_lat, min_lon, max_lon, '30m')
+                # Download the file (might be zip or tif)
+                temp_file = output_file.with_suffix('.download')
+                with requests.get(download_url, stream=True, timeout=120) as r:
+                    r.raise_for_status()
+                    with open(temp_file, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
 
-        return None
+                # Check if it's a zip file
+                if zipfile.is_zipfile(temp_file):
+                    with zipfile.ZipFile(temp_file, 'r') as zip_ref:
+                        tif_files = [f for f in zip_ref.namelist() if f.endswith('.tif')]
+                        if tif_files:
+                            zip_ref.extract(tif_files[0], elevation_tile_path())
+                            extracted = Path(elevation_tile_path()) / tif_files[0]
+                            extracted.rename(output_file)
+                    temp_file.unlink()
+                else:
+                    # It's already a .tif, just rename
+                    temp_file.rename(output_file)
+
+                logging.info(f"Successfully downloaded {tile_id} at {resolution}")
+                return output_file
+
+        except Exception as e:
+            logging.warning(f"Failed to get {dataset}: {e}")
+            continue
+
+    logging.error(f"No data found for {tile_id}")
+    return None
 
 
 def load_tile_to_postgres(tile_file, tile_id, conn):
