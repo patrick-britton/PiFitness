@@ -13,4 +13,3 @@ matplotlib
 plotly
 shapely
 elevation
-zipfile
