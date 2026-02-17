@@ -27,76 +27,63 @@ def get_missing_tiles(conn):
         return cur.fetchall()
 
 
-Good
-catch! Yes,
-if the 3m fails and it falls back to 10m, the temp_file variable would point to the same.download file and overwrite the 3m zip.
-Better
-approach — give
-each
-resolution
-its
-own
-temp
-file
-name:
-pythondef
-download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
-"""Download high-resolution tile from USGS (3m or 10m)"""
-filename = f"{tile_id}.tif"
-output_file = Path(elevation_tile_path()) / filename
+def download_tile(tile_id, min_lat, max_lat, min_lon, max_lon):
+    """Download high-resolution tile from USGS (3m or 10m)"""
+    filename = f"{tile_id}.tif"
+    output_file = Path(elevation_tile_path()) / filename
 
-if output_file.exists():
-    st.info(f"Tile {tile_id} already exists at {output_file}")
-    return output_file
+    if output_file.exists():
+        st.info(f"Tile {tile_id} already exists at {output_file}")
+        return output_file
 
-st.info(f"Downloading tile {tile_id}...")
+    st.info(f"Downloading tile {tile_id}...")
 
-# Try 3m first, fall back to 10m, then 30m
-datasets = [
-    'National Elevation Dataset (NED) 1/9 arc-second',  # 3m
-    'National Elevation Dataset (NED) 1/3 arc-second',  # 10m
-    'National Elevation Dataset (NED) 1 arc-second'  # 30m
-]
+    # Try 3m first, fall back to 10m, then 30m
+    datasets = [
+        'National Elevation Dataset (NED) 1/9 arc-second',  # 3m
+        'National Elevation Dataset (NED) 1/3 arc-second',  # 10m
+        'National Elevation Dataset (NED) 1 arc-second'  # 30m
+    ]
 
-for dataset in datasets:
-    try:
-        api_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
-        params = {
-            'datasets': dataset,
-            'bbox': f"{min_lon},{min_lat},{max_lon},{max_lat}",
-            'outputFormat': 'JSON'
-        }
+    for dataset in datasets:
+        try:
+            api_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
+            params = {
+                'datasets': dataset,
+                'bbox': f"{min_lon},{min_lat},{max_lon},{max_lat}",
+                'outputFormat': 'JSON'
+            }
 
-        response = requests.get(api_url, params=params, timeout=30)
-        data = response.json()
+            response = requests.get(api_url, params=params, timeout=30)
+            data = response.json()
 
-        if data.get('items'):
-            download_url = data['items'][0]['downloadURL']
-            resolution = '3m' if '1/9' in dataset else '10m' if '1/3' in dataset else '30m'
-            st.info(f"Found {resolution} data, downloading from {download_url[:50]}...")
+            if data.get('items'):
+                download_url = data['items'][0]['downloadURL']
+                resolution = '3m' if '1/9' in dataset else '10m' if '1/3' in dataset else '30m'
+                st.info(f"Found {resolution} data, downloading from {download_url[:50]}...")
 
-            # Use resolution-specific temp file name
-            temp_file = Path(elevation_tile_path()) / f"{tile_id}_{resolution}.download"
+                # Use resolution-specific temp file name
+                temp_file = Path(elevation_tile_path()) / f"{tile_id}_{resolution}.download"
 
-            # Clean up any existing temp file
-            if temp_file.exists():
-                temp_file.unlink()
+                # Clean up any existing temp file
+                if temp_file.exists():
+                    temp_file.unlink()
 
-            with requests.get(download_url, stream=True, timeout=120) as r:
-                r.raise_for_status()
-                total_size = 0
-                with open(temp_file, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                        total_size += len(chunk)
+                with requests.get(download_url, stream=True, timeout=120) as r:
+                    r.raise_for_status()
+                    total_size = 0
+                    with open(temp_file, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                            total_size += len(chunk)
 
-            st.info(f"Downloaded {total_size / 1024 / 1024:.1f} MB to {temp_file.name}")
+                st.info(f"Downloaded {total_size / 1024 / 1024:.1f} MB to {temp_file.name}")
 
-            # Rest of your extraction logic...
+                # Rest of your extraction logic...
 
-    except Exception as e:
-        st.warning(f"Failed to get {dataset}: {e}")
-        continue
+        except Exception as e:
+            st.warning(f"Failed to get {dataset}: {e}")
+            continue
 
 def load_tile_to_postgres(tile_file, tile_id, conn):
     """Load tile into PostgreSQL using raster2pgsql"""
