@@ -223,6 +223,8 @@ def load_tile_to_postgres(tile_file, tile_id, conn):
                 UPDATE activities.elevation_tiles 
                 SET tile_id = %s 
                 WHERE tile_id IS NULL
+                ON CONFLICT (tile_id) DO UPDATE SET
+                tile_id = EXCLUDED.tile_id
             """, (tile_id,))
 
             conn.commit()
