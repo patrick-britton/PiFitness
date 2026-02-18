@@ -43,7 +43,7 @@ def reconcile_elevation_tiles():
                     # Note: We use -s 4269 (NAD83) as it is the USGS standard for 3DEP
                     cmd = (
                         f"raster2pgsql -a -I -C -M -t 50x50 -s 4269 {full_path} activities.elevation_rasters | "
-                        f"psql -d your_db_name"
+                        f"psql -d personal_fitness"
                     )
                     subprocess.run(cmd, shell=True, check=True)
 
@@ -92,48 +92,35 @@ def download_file(url, destination):
 
 
 def get_usgs_by_bbox(bbox):
-    """
-    bbox: string 'xmin,ymin,xmax,ymax' (e.g., '-117,32,-116,33')
-    """
     base_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
-
-    # We use the current official dataset names
-    # '1 meter' for high-res LiDAR, '1/3 arc-second' for 10m fallback
     params = {
         'bbox': bbox,
+        # 'datasets' list is very specific in the USGS backend:
         'datasets': '1 meter,1/3 arc-second',
         'prodFormats': 'GeoTIFF',
         'outputFormat': 'JSON'
     }
 
     try:
-        # Note: headers can help prevent some 403/rejected requests
-        headers = {'Accept': 'application/json'}
-        response = requests.get(base_url, params=params, headers=headers, timeout=20)
-
-        if response.status_code != 200:
-            st.info(f"  API Error: Received status {response.status_code}")
-            return []
-
+        response = requests.get(base_url, params=params, timeout=15)
         data = response.json()
         items = data.get('items', [])
 
-        if not items:
-            # Let's try one more time without the dataset filter 
-            # to see what is available at all
-            st.info(f"  No items in restricted search. Trying wide search for {bbox}...")
-            params.pop('datasets')
-            response = requests.get(base_url, params=params, headers=headers)
-            items = response.json().get('items', [])
+        # FILTER: Only keep items that are actually elevation models
+        # and not satellite imagery (like Sentinel/S1M)
+        elevation_items = [
+            i for i in items
+            if "elevation" in i.get('title', '').lower()
+               or "dem" in i.get('title', '').lower()
+        ]
 
-        # Return all unique download URLs found
-        urls = list(set([item.get('downloadURL') for item in items if item.get('downloadURL')]))
+        if not elevation_items:
+            return []
 
-        if urls:
-            st.info(f"  Success! Found {len(urls)} files for this region.")
-        return urls
+        # Return the best quality first
+        return [item.get('downloadURL') for item in elevation_items if item.get('downloadURL')]
 
     except Exception as e:
-        st.info(f"  Request failed: {e}")
+        print(f"  API Error: {e}")
         return []
 
