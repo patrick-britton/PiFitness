@@ -17,6 +17,7 @@ import hashlib
 import requests
 from pathlib import Path
 from typing import List, Dict, Tuple
+import streamlit as st
 
 from backend_functions.database_functions import sql_to_dict, qec
 from backend_functions.file_handlers import elevation_tile_path
@@ -56,6 +57,7 @@ def ingest_missing_elevation_tiles():
     required_tiles = get_required_tiles()
 
     for tile in required_tiles:
+        st.info(f"Processing {tile}")
         process_tile(tile)
     return
 
@@ -120,6 +122,7 @@ def discover_best_usgs_products(bbox: str) -> List[Dict]:
 def process_tile(tile: Dict):
     tile_name = tile["tile_name"]
     bbox = f"{tile['xmin']},{tile['ymin']},{tile['xmax']},{tile['ymax']}"
+    st.info(f"Tile BBOX: {bbox}")
 
     if tile_already_imported(tile_name):
         return
@@ -127,18 +130,24 @@ def process_tile(tile: Dict):
     products = discover_best_usgs_products(bbox)
     if not products:
         mark_tile_failed(tile_name, "no_products")
+        st.error(f'No products for {tile}')
         return
 
     for p in products:
         url = p["downloadURL"]
+        st.info(f'Checking download status of {tile}')
         local_file = download_if_needed(url)
         rasters = extract_rasters(local_file)
 
         for r in rasters:
+            st.info(f"Importing raster {r}")
             import_raster(r)
+            st.info(f"Recording metadata {tile_name}")
             record_metadata(tile_name, p, r)
 
     mark_tile_imported(tile_name)
+    st.info('Tile marked as imported')
+    return
 
 # -----------------------------
 # Download / Extraction
@@ -146,9 +155,10 @@ def process_tile(tile: Dict):
 
 def download_if_needed(url: str) -> Path:
     fname = url.split("/")[-1]
-    dest = TMP_DIR / fname
+    dest = TILE_ROOT / fname
 
     if dest.exists():
+        st.info(f"{url} already exists")
         return dest
 
     with requests.get(url, stream=True, timeout=60) as r:
@@ -157,27 +167,42 @@ def download_if_needed(url: str) -> Path:
             for c in r.iter_content(8192):
                 f.write(c)
 
+    st.success(f"{url} downloaded")
     return dest
 
 
 def extract_rasters(path: Path) -> List[Path]:
     """
-    Handles zip / direct GeoTIFF / IMG
+    Extract GeoTIFF / IMG rasters from a USGS download.
+    Uses environment-specific elevation tile storage.
+    Safe to call multiple times.
     """
-    outputs = []
+    outputs: List[Path] = []
+
+    tile_root = Path(elevation_tile_path())
+    tile_root.mkdir(parents=True, exist_ok=True)
 
     if path.suffix.lower() == ".zip":
         with zipfile.ZipFile(path) as z:
-            for name in z.namelist():
-                if name.lower().endswith((".tif", ".img")):
-                    out = TMP_DIR / Path(name).name
-                    z.extract(name, TMP_DIR)
-                    outputs.append(out)
+            for member in z.infolist():
+                name = member.filename
+
+                if not name.lower().endswith((".tif", ".img")):
+                    continue
+
+                out_path = tile_root / Path(name).name
+
+                # Avoid re-extracting identical files
+                if not out_path.exists():
+                    with z.open(member) as src, open(out_path, "wb") as dst:
+                        dst.write(src.read())
+
+                outputs.append(out_path)
     else:
+        # Non-zip raster already lives in tile_root
         outputs.append(path)
-
+    st.success(f"Rasters Extracted")
     return outputs
-
 # -----------------------------
 # PostGIS Import
 # -----------------------------
