@@ -92,38 +92,48 @@ def download_file(url, destination):
 
 
 def get_usgs_by_bbox(bbox):
-    """Searches USGS by spatial bounding box instead of keyword."""
+    """
+    bbox: string 'xmin,ymin,xmax,ymax' (e.g., '-117,32,-116,33')
+    """
     base_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
 
+    # We use the current official dataset names
+    # '1 meter' for high-res LiDAR, '1/3 arc-second' for 10m fallback
     params = {
         'bbox': bbox,
-        'datasets': '1/9 arc-second,1/3 arc-second,1 meter',  # List priorities
+        'datasets': '1 meter,1/3 arc-second',
         'prodFormats': 'GeoTIFF',
         'outputFormat': 'JSON'
     }
 
     try:
-        response = requests.get(base_url, params=params, timeout=15)
+        # Note: headers can help prevent some 403/rejected requests
+        headers = {'Accept': 'application/json'}
+        response = requests.get(base_url, params=params, headers=headers, timeout=20)
+
+        if response.status_code != 200:
+            st.info(f"  API Error: Received status {response.status_code}")
+            return []
+
         data = response.json()
         items = data.get('items', [])
 
         if not items:
-            return None
+            # Let's try one more time without the dataset filter 
+            # to see what is available at all
+            st.info(f"  No items in restricted search. Trying wide search for {bbox}...")
+            params.pop('datasets')
+            response = requests.get(base_url, params=params, headers=headers)
+            items = response.json().get('items', [])
 
-        # Sort results: Prefer 1 meter, then 1/9", then 1/3"
-        # The API usually returns higher res first, but we'll be safe:
-        sorted_items = sorted(
-            items,
-            key=lambda x: (
-                1 if '1 meter' in x['title'] else
-                2 if '1/9' in x['title'] else
-                3
-            )
-        )
+        # Return all unique download URLs found
+        urls = list(set([item.get('downloadURL') for item in items if item.get('downloadURL')]))
 
-        return sorted_items[0].get('downloadURL')
+        if urls:
+            st.info(f"  Success! Found {len(urls)} files for this region.")
+        return urls
 
     except Exception as e:
-        st.info(f"  Search error: {e}")
-        return None
+        st.info(f"  Request failed: {e}")
+        return []
 
