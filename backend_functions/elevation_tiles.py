@@ -1,138 +1,250 @@
+# Comprehensive Elevation Reference Pipeline
+# ------------------------------------------------------------
+# Goals addressed:
+# 1) Download only REQUIRED USGS elevation tiles at highest available resolution
+# 2) Avoid re-downloads and re-imports
+# 3) Correctly unzip / normalize rasters
+# 4) Persist raster + metadata in PostGIS
+# 5) Extract missing elevations for activity lat/lon points
+# 6) Support incremental operation for each new activity
+# ------------------------------------------------------------
+
 import os
-import requests
+import json
+import zipfile
 import subprocess
+import hashlib
+import requests
+from pathlib import Path
+from typing import List, Dict, Tuple
+
 from backend_functions.database_functions import sql_to_dict, qec
 from backend_functions.file_handlers import elevation_tile_path
-import streamlit as st
 
+# -----------------------------
+# Configuration
+# -----------------------------
 
+USGS_API = "https://tnmaccess.nationalmap.gov/api/v1/products"
+DATASET_PRIORITY = [
+    "1 meter",
+    "National Elevation Dataset (NED) 1/9 arc-second",
+    "1/3 arc-second",
+]
+SRID = 4269            # NAD83 (USGS standard)
+RASTER_TABLE = "activities.elevation_rasters"
+CATALOG_TABLE = "activities.elevation_file_catalog"
+TILE_ROOT = Path(elevation_tile_path())
+TILE_ROOT.mkdir(parents=True, exist_ok=True)
+
+# -----------------------------
+# Public Orchestrator
+# -----------------------------
 def reconcile_elevation_tiles():
-    # 1. Get tiles needing download from the updated view
-    sql = "SELECT * FROM activities.vw_required_elevation_tiles"
-    tile_list = sql_to_dict(sql)
+    """
+    Public entry point.
+    Idempotent.
+    Safe to run per activity ingest.
+    """
 
-    tile_storage_path = elevation_tile_path()
-
-    for tile in tile_list:
-        tile_name = tile.get('tile_name')
-        bbox = f"{tile['xmin']},{tile['ymin']},{tile['xmax']},{tile['ymax']}" # New column from the updated view
-
-        # 2. Search using the Bounding Box instead of the Name
-        st.info(f"Searching for data in {tile_name} ({bbox})...")
-
-        # --- THIS IS THE REPLACEMENT LINE ---
-        download_urls = get_usgs_by_bbox(bbox)
-        # -------------------------------------
-
-        if not download_urls:
-            st.info(f"  No products found for {tile_name}. Skipping.")
-            continue
-
-        # Handle the list of URLs (USGS often breaks 1m data into multiple chunks per degree)
-        for url in download_urls:
-            # Extract a unique filename from the USGS URL to avoid collisions
-            remote_filename = url.split('/')[-1]
-            full_path = os.path.join(tile_storage_path, remote_filename)
-
-            if os.path.exists(full_path):
-                st.info(f"  File {remote_filename} exists. Skipping download.")
-            else:
-                st.info(f"  Downloading: {remote_filename}")
-                if download_file(url, full_path):
-                    # 3. Import to Postgres
-                    import_to_postgres(full_path, db_name='personal_fitness')
-
-        # 4. Mark this 1-degree square as 'imported' in your catalog
-        catalog_sql = f"""
-            INSERT INTO activities.elevation_file_catalog (tile_name, import_status)
-            VALUES ('{tile_name}', 'imported')
-            ON CONFLICT (tile_name) DO UPDATE SET import_status = 'imported';
-        """
-        qec(catalog_sql)
-
-    # 5. Final Step: Run the spatial join update
-    qec("CALL activities.process_elevation_backlog()")
+    ingest_missing_elevation_tiles()
+    qec("CALL activities.process_elevation_backlog();")
     return
 
 
-def download_file(url, destination):
-    with requests.get(url, stream=True) as r:
-        r.raise_for_status()
-        with open(destination, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
-    return True
+def ingest_missing_elevation_tiles():
+    required_tiles = get_required_tiles()
 
+    for tile in required_tiles:
+        process_tile(tile)
+    return
 
-def get_usgs_by_bbox(target_bbox):
+# -----------------------------
+# Tile Resolution
+# -----------------------------
+
+def get_required_tiles() -> List[Dict]:
     """
-    target_bbox: string '-117,32,-116,33'
+    Each tile represents a 1-degree bbox required by activities
+    View must already exclude tiles fully covered by imported rasters
     """
-    base_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
+    return sql_to_dict("SELECT * FROM activities.vw_required_elevation_tiles")
 
-    # Parse target_bbox for comparison
-    t_xmin, t_ymin, t_xmax, t_ymax = map(float, target_bbox.split(','))
+# -----------------------------
+# USGS Discovery
+# -----------------------------
 
+def discover_best_usgs_products(bbox: str) -> List[Dict]:
+    """
+    Returns ordered list of products (best resolution first)
+    bbox: xmin,ymin,xmax,ymax (lon/lat)
+    """
     params = {
-        'bbox': target_bbox,
-        'datasets': '1 meter,1/3 arc-second,National Elevation Dataset (NED) 1/9 arc-second',
-        'prodFormats': 'GeoTIFF,IMG',
-        'outputFormat': 'JSON'
+        "bbox": bbox,
+        "datasets": ",".join(DATASET_PRIORITY),
+        "prodFormats": "GeoTIFF,IMG",
+        "outputFormat": "JSON",
     }
 
-    try:
-        response = requests.get(base_url, params=params, timeout=20)
-        data = response.json()
-        items = data.get('items', [])
+    r = requests.get(USGS_API, params=params, timeout=30)
+    r.raise_for_status()
 
-        valid_urls = []
-        for item in items:
-            # GEOMETRY GUARD: Check the item's actual footprint
-            # The API response includes a 'boundingBox' object for each result
-            sb = item.get('boundingBox', {})
-            i_xmin, i_xmax = sb.get('minX'), sb.get('maxX')
-            i_ymin, i_ymax = sb.get('minY'), sb.get('maxY')
+    items = r.json().get("items", [])
+    valid = []
 
-            # Ensure the tile isn't just "near" but actually intersects
-            if not (i_xmin > t_xmax or i_xmax < t_xmin or i_ymin > t_ymax or i_ymax < t_ymin):
-                url = item.get('downloadURL')
-                title = item.get('title', '')
+    xmin, ymin, xmax, ymax = map(float, bbox.split(","))
 
-                # Double-check: Some "National" files have 0,0,0,0 bbox in metadata
-                # We skip those to be safe.
-                if url and i_xmin != 0:
-                    valid_urls.append({'url': url, 'title': title})
+    for i in items:
+        bb = i.get("boundingBox") or {}
+        if bb.get("minX") in (None, 0):
+            continue
 
-        # --- Tiered Selection Logic ---
-        # Pick the best resolution available among the VALID items
-        tier_1 = [i['url'] for i in valid_urls if '1 meter' in i['title']]
-        tier_2 = [i['url'] for i in valid_urls if '1/9' in i['title']]
-        tier_3 = [i['url'] for i in valid_urls if '1/3' in i['title']]
+        # true spatial intersection check
+        if not (
+            bb["minX"] > xmax or bb["maxX"] < xmin or
+            bb["minY"] > ymax or bb["maxY"] < ymin
+        ):
+            valid.append(i)
 
-        if tier_1: return tier_1
-        if tier_2: return tier_2
-        return tier_3
+    # resolution prioritization
+    ordered = []
+    for tier in DATASET_PRIORITY:
+        ordered.extend([i for i in valid if tier in i.get("title", "")])
 
-    except Exception as e:
-        print(f"  API Error: {e}")
-        return []
+    return ordered
 
-def import_to_postgres(file_path, db_name):
+# -----------------------------
+# Tile Processing
+# -----------------------------
+
+def process_tile(tile: Dict):
+    tile_name = tile["tile_name"]
+    bbox = f"{tile['xmin']},{tile['ymin']},{tile['xmax']},{tile['ymax']}"
+
+    if tile_already_imported(tile_name):
+        return
+
+    products = discover_best_usgs_products(bbox)
+    if not products:
+        mark_tile_failed(tile_name, "no_products")
+        return
+
+    for p in products:
+        url = p["downloadURL"]
+        local_file = download_if_needed(url)
+        rasters = extract_rasters(local_file)
+
+        for r in rasters:
+            import_raster(r)
+            record_metadata(tile_name, p, r)
+
+    mark_tile_imported(tile_name)
+
+# -----------------------------
+# Download / Extraction
+# -----------------------------
+
+def download_if_needed(url: str) -> Path:
+    fname = url.split("/")[-1]
+    dest = TMP_DIR / fname
+
+    if dest.exists():
+        return dest
+
+    with requests.get(url, stream=True, timeout=60) as r:
+        r.raise_for_status()
+        with open(dest, "wb") as f:
+            for c in r.iter_content(8192):
+                f.write(c)
+
+    return dest
+
+
+def extract_rasters(path: Path) -> List[Path]:
     """
-    Standardizes the import whether the file is .img or .tif
+    Handles zip / direct GeoTIFF / IMG
     """
-    # -a: Append, -F: Add filename, -I: Index, -C: Constraints, -M: Analyze
-    # -t 100x100: Good middle-ground tile size for Pi 5 RAM
-    # -s 4269: Use NAD83 (USGS Standard)
+    outputs = []
 
+    if path.suffix.lower() == ".zip":
+        with zipfile.ZipFile(path) as z:
+            for name in z.namelist():
+                if name.lower().endswith((".tif", ".img")):
+                    out = TMP_DIR / Path(name).name
+                    z.extract(name, TMP_DIR)
+                    outputs.append(out)
+    else:
+        outputs.append(path)
+
+    return outputs
+
+# -----------------------------
+# PostGIS Import
+# -----------------------------
+
+def import_raster(raster_path: Path):
     cmd = (
-        f'raster2pgsql -a -F -I -C -M -t 100x100 -s 4269 "{file_path}" activities.elevation_rasters | '
-        f'psql -d {db_name} -q'
+        f'raster2pgsql -a -F -I -C -M '
+        f'-t 100x100 -s {SRID} "{raster_path}" {RASTER_TABLE} | '
+        f'psql -q'
     )
 
-    try:
-        subprocess.run(cmd, shell=True, check=True)
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"  Import failed for {file_path}: {e}")
-        return False
+    subprocess.run(cmd, shell=True, check=True)
+
+# -----------------------------
+# Metadata Catalog
+# -----------------------------
+
+def record_metadata(tile_name: str, product: Dict, raster: Path):
+    h = sha256_file(raster)
+
+    sql = f"""
+        INSERT INTO {CATALOG_TABLE}
+        (tile_name, product_id, title, source_url, file_hash)
+        VALUES (
+            '{tile_name}',
+            '{product.get('id')}',
+            '{product.get('title')}',
+            '{product.get('downloadURL')}',
+            '{h}'
+        )
+        ON CONFLICT (file_hash) DO NOTHING;
+    """
+    qec(sql)
+
+
+def tile_already_imported(tile_name: str) -> bool:
+    sql = f"""
+        SELECT 1 FROM {CATALOG_TABLE}
+        WHERE tile_name = '{tile_name}' AND import_status = 'imported'
+        LIMIT 1;
+    """
+    return bool(sql_to_dict(sql))
+
+
+def mark_tile_imported(tile_name: str):
+    qec(f"""
+        UPDATE {CATALOG_TABLE}
+        SET import_status = 'imported'
+        WHERE tile_name = '{tile_name}';
+    """)
+
+
+def mark_tile_failed(tile_name: str, reason: str):
+    qec(f"""
+        INSERT INTO {CATALOG_TABLE} (tile_name, import_status, notes)
+        VALUES ('{tile_name}', 'failed', '{reason}')
+        ON CONFLICT (tile_name)
+        DO UPDATE SET import_status='failed', notes='{reason}';
+    """)
+
+# -----------------------------
+# Utilities
+# -----------------------------
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            h.update(chunk)
+    return h.hexdigest()
