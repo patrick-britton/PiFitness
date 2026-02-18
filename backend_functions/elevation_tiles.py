@@ -93,34 +93,54 @@ def download_file(url, destination):
 
 def get_usgs_by_bbox(bbox):
     base_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
+
+    # We remove 'datasets' to avoid being filtered out by naming changes
     params = {
         'bbox': bbox,
-        # 'datasets' list is very specific in the USGS backend:
-        'datasets': '1 meter,1/3 arc-second',
         'prodFormats': 'GeoTIFF',
-        'outputFormat': 'JSON'
+        'outputFormat': 'JSON',
+        'max': 10  # Get a few options to choose from
     }
 
     try:
-        response = requests.get(base_url, params=params, timeout=15)
+        response = requests.get(base_url, params=params, timeout=20)
         data = response.json()
         items = data.get('items', [])
 
-        # FILTER: Only keep items that are actually elevation models
-        # and not satellite imagery (like Sentinel/S1M)
-        elevation_items = [
-            i for i in items
-            if "elevation" in i.get('title', '').lower()
-               or "dem" in i.get('title', '').lower()
-        ]
-
-        if not elevation_items:
+        if not items:
             return []
 
-        # Return the best quality first
-        return [item.get('downloadURL') for item in elevation_items if item.get('downloadURL')]
+        scored_items = []
+        for item in items:
+            title = item.get('title', '').lower()
+            url = item.get('downloadURL')
+            if not url: continue
+
+            # SCORING LOGIC: Higher is better
+            score = 0
+            if '1 meter' in title:
+                score = 100
+            elif '1/9' in title or '9th' in title:
+                score = 80
+            elif '1/3' in title or '3rd' in title:
+                score = 60
+            elif 'elevation' in title or 'dem' in title:
+                score += 10
+
+            # Skip imagery or other non-elevation products
+            if 'imagery' in title or 'topo map' in title: score = -1
+
+            if score > 0:
+                scored_items.append((score, url, title))
+
+        # Sort by score descending
+        scored_items.sort(key=lambda x: x[0], reverse=True)
+
+        if scored_items:
+            print(f"  Found: {scored_items[0][2]}")  # Log what we found
+            return [scored_items[0][1]]  # Return the best URL in a list
 
     except Exception as e:
         print(f"  API Error: {e}")
-        return []
+    return []
 
