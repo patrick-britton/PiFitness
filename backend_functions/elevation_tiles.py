@@ -14,6 +14,10 @@ def reconcile_elevation_tiles():
 
     for tile in tile_list:
         tile_name = tile.get('tile_name')
+        bbox = f"{tile['xmin']},{tile['ymin']},{tile['xmax']},{tile['ymax']}"
+
+        print(f"Searching for data in {tile_name} ({bbox})...")
+        download_url = get_usgs_by_bbox(bbox)
 
         # 1. Name the destination file
         # We save as .tif for raster2pgsql to consume later
@@ -89,4 +93,41 @@ def download_file(url, destination):
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
     return True
+
+
+def get_usgs_by_bbox(bbox):
+    """Searches USGS by spatial bounding box instead of keyword."""
+    base_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
+
+    params = {
+        'bbox': bbox,
+        'datasets': '1/9 arc-second,1/3 arc-second,1 meter',  # List priorities
+        'prodFormats': 'GeoTIFF',
+        'outputFormat': 'JSON'
+    }
+
+    try:
+        response = requests.get(base_url, params=params, timeout=15)
+        data = response.json()
+        items = data.get('items', [])
+
+        if not items:
+            return None
+
+        # Sort results: Prefer 1 meter, then 1/9", then 1/3"
+        # The API usually returns higher res first, but we'll be safe:
+        sorted_items = sorted(
+            items,
+            key=lambda x: (
+                1 if '1 meter' in x['title'] else
+                2 if '1/9' in x['title'] else
+                3
+            )
+        )
+
+        return sorted_items[0].get('downloadURL')
+
+    except Exception as e:
+        print(f"  Search error: {e}")
+        return None
 
