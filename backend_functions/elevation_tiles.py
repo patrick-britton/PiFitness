@@ -15,7 +15,7 @@ def reconcile_elevation_tiles():
 
     for tile in tile_list:
         tile_name = tile.get('tile_name')
-        bbox = tile.get('bbox_coords')  # New column from the updated view
+        bbox = f"{tile['xmin']},{tile['ymin']},{tile['xmax']},{tile['ymax']}" # New column from the updated view
 
         # 2. Search using the Bounding Box instead of the Name
         st.info(f"Searching for data in {tile_name} ({bbox})...")
