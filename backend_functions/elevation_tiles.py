@@ -30,14 +30,6 @@ def reconcile_elevation_tiles():
         st.info("No .tif files found in the elevation directory.")
         return
 
-    # 2. Check if the raster table already exists (determines Create vs Append)
-    table_exists_query = """
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_schema = 'activities' AND table_name = 'elevation_rasters'
-        );
-    """
-    table_exists = sql_to_dict(table_exists_query)[0]['exists']
 
     # 3. Setup the environment for the subprocess (Authentication)
     env = os.environ.copy()
@@ -57,7 +49,7 @@ def reconcile_elevation_tiles():
         progress_text.text(f"Ingesting {i + 1}/{len(files)}: {filename}")
 
         # Use Create (-c) for the first file if table doesn't exist, otherwise Append (-a)
-        mode = "-a" if table_exists else "-c"
+        mode = "-a"
 
         # Command explanation:
         # -F: Adds a 'filename' column to the raster table (critical for BBOX calculation)
@@ -83,10 +75,10 @@ def reconcile_elevation_tiles():
                 WHERE filename = '{filename}'
                 ON CONFLICT (filename) DO NOTHING;
             """
-            qec(metadata_sql)
+            returns = qec(metadata_sql)
+            if returns:
+                st.warning(returns)
 
-            # Switch to append mode for all subsequent files in this loop
-            table_exists = True
 
         except subprocess.CalledProcessError as e:
             st.error(f"Failed to ingest {filename}")
