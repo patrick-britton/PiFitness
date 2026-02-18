@@ -7,6 +7,7 @@ import streamlit as st
 
 
 def reconcile_elevation_tiles():
+    # 1. Get tiles needing download from the updated view
     sql = "SELECT * FROM activities.vw_required_elevation_tiles"
     tile_list = sql_to_dict(sql)
 
@@ -14,54 +15,49 @@ def reconcile_elevation_tiles():
 
     for tile in tile_list:
         tile_name = tile.get('tile_name')
-        bbox = f"{tile['xmin']},{tile['ymin']},{tile['xmax']},{tile['ymax']}"
+        bbox = tile.get('bbox_coords')  # New column from the updated view
 
+        # 2. Search using the Bounding Box instead of the Name
         print(f"Searching for data in {tile_name} ({bbox})...")
-        download_url = get_usgs_by_bbox(bbox)
 
-        # 1. Name the destination file
-        # We save as .tif for raster2pgsql to consume later
-        local_filename = f"usgs_19_{tile_name}.tif"
-        full_path = os.path.join(tile_storage_path, local_filename)
+        # --- THIS IS THE REPLACEMENT LINE ---
+        download_urls = get_usgs_by_bbox(bbox)
+        # -------------------------------------
 
-        # 2. Check to see if file has already been downloaded
-        if os.path.exists(full_path):
-            st.info(f"File {local_filename} already exists. Skipping download.")
-        else:
-            # 3. Search for precise file name via USGS API
-            # 1/9 arc-second is approx 3.4 meters
-            st.info(f"Searching for {tile_name} via USGS TNM API...")
-            download_url = get_usgs_3dep_url(tile_name)
+        if not download_urls:
+            print(f"  No products found for {tile_name}. Skipping.")
+            continue
 
-            if not download_url:
-                st.info(f"Could not find 1/9 arc-second data for {tile_name}. Skipping.")
-                continue
+        # Handle the list of URLs (USGS often breaks 1m data into multiple chunks per degree)
+        for url in download_urls:
+            # Extract a unique filename from the USGS URL to avoid collisions
+            remote_filename = url.split('/')[-1]
+            full_path = os.path.join(tile_storage_path, remote_filename)
 
-            # 4. download & save the correct file
-            st.info(f"Downloading {tile_name} from {download_url}...")
-            if download_file(download_url, full_path):
-                # 5. Process the raster into Postgres using raster2pgsql
-                # -a: Append to table
-                # -I: Create index
-                # -C: Apply constraints
-                # -t 100x100: Tile into 100px chunks (crucial for Pi 5 performance)
-                cmd = (
-                    f"raster2pgsql -a -I -C -M -t 50x50 -s 4269 {full_path} activities.elevation_rasters | "
-                    f"psql -d your_db_name"
-                )
-                subprocess.run(cmd, shell=True, check=True)
+            if os.path.exists(full_path):
+                print(f"  File {remote_filename} exists. Skipping download.")
+            else:
+                print(f"  Downloading: {remote_filename}")
+                if download_file(url, full_path):
+                    # 3. Import to Postgres
+                    # Note: We use -s 4269 (NAD83) as it is the USGS standard for 3DEP
+                    cmd = (
+                        f"raster2pgsql -a -I -C -M -t 50x50 -s 4269 {full_path} activities.elevation_rasters | "
+                        f"psql -d your_db_name"
+                    )
+                    subprocess.run(cmd, shell=True, check=True)
 
-                # Update the catalog so the View stops showing this tile
-                catalog_sql = f"""
-                    INSERT INTO activities.elevation_file_catalog (tile_name, import_status)
-                    VALUES ('{tile_name}', 'imported')
-                    ON CONFLICT (tile_name) DO UPDATE SET import_status = 'imported';
-                """
-                qec(catalog_sql)
+        # 4. Mark this 1-degree square as 'imported' in your catalog
+        catalog_sql = f"""
+            INSERT INTO activities.elevation_file_catalog (tile_name, import_status)
+            VALUES ('{tile_name}', 'imported')
+            ON CONFLICT (tile_name) DO UPDATE SET import_status = 'imported';
+        """
+        qec(catalog_sql)
 
-    # 6. Run the backlog update to populate elevation_reference in activity_details
-    st.info("Running database elevation update...")
+    # 5. Final Step: Run the spatial join update
     qec("CALL activities.process_elevation_backlog()")
+    return
 
 
 def get_usgs_3dep_url(tile_id):
