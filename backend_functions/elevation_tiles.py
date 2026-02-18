@@ -40,12 +40,7 @@ def reconcile_elevation_tiles():
                 st.info(f"  Downloading: {remote_filename}")
                 if download_file(url, full_path):
                     # 3. Import to Postgres
-                    # Note: We use -s 4269 (NAD83) as it is the USGS standard for 3DEP
-                    cmd = (
-                        f"raster2pgsql -a -I -C -M -t 50x50 -s 4269 {full_path} activities.elevation_rasters | "
-                        f"psql -d personal_fitness"
-                    )
-                    subprocess.run(cmd, shell=True, check=True)
+                    import_to_postgres(full_path, db_name='personal_fitness')
 
         # 4. Mark this 1-degree square as 'imported' in your catalog
         catalog_sql = f"""
@@ -60,28 +55,6 @@ def reconcile_elevation_tiles():
     return
 
 
-def get_usgs_3dep_url(tile_id):
-    """Queries USGS API for 1/9 arc-second (3 meter) GeoTIFFs"""
-    base_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
-    params = {
-        'datasets': 'Standard-3rd arc-second',  # This matches 1/9" (3 meters)
-        'q': tile_id,
-        'outputFormat': 'JSON'
-    }
-
-    try:
-        response = requests.get(base_url, params=params)
-        data = response.json()
-
-        # Filter items to find the best GeoTIFF download link
-        for item in data.get('items', []):
-            if 'IMG' in item.get('formats', []) or 'GeoTIFF' in item.get('formats', []):
-                return item.get('downloadURL')
-    except Exception as e:
-        st.info(f"API Error: {e}")
-    return None
-
-
 def download_file(url, destination):
     with requests.get(url, stream=True) as r:
         r.raise_for_status()
@@ -94,12 +67,13 @@ def download_file(url, destination):
 def get_usgs_by_bbox(bbox):
     base_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
 
-    # We remove 'datasets' to avoid being filtered out by naming changes
+    # We broaden the search to include all standard 3DEP products
     params = {
         'bbox': bbox,
-        'prodFormats': 'GeoTIFF',
+        'datasets': '1 meter,1/3 arc-second,National Elevation Dataset (NED) 1/9 arc-second',
+        'prodFormats': 'GeoTIFF,IMG',  # Include IMG for those legacy tiles
         'outputFormat': 'JSON',
-        'max': 10  # Get a few options to choose from
+        'max': 100
     }
 
     try:
@@ -108,39 +82,44 @@ def get_usgs_by_bbox(bbox):
         items = data.get('items', [])
 
         if not items:
+            print(f"  No elevation products found for {bbox}.")
             return []
 
-        scored_items = []
-        for item in items:
-            title = item.get('title', '').lower()
-            url = item.get('downloadURL')
-            if not url: continue
+        # We group items by their resolution to pick the best available "Tier"
+        # Tier 1: 1-meter (Best)
+        # Tier 2: 1/9 arc-second (~3m)
+        # Tier 3: 1/3 arc-second (~10m)
 
-            # SCORING LOGIC: Higher is better
-            score = 0
-            if '1 meter' in title:
-                score = 100
-            elif '1/9' in title or '9th' in title:
-                score = 80
-            elif '1/3' in title or '3rd' in title:
-                score = 60
-            elif 'elevation' in title or 'dem' in title:
-                score += 10
+        tier_1 = [i.get('downloadURL') for i in items if '1 meter' in i.get('title', '')]
+        tier_2 = [i.get('downloadURL') for i in items if '1/9' in i.get('title', '') or '9th' in i.get('title', '')]
+        tier_3 = [i.get('downloadURL') for i in items if '1/3' in i.get('title', '') or '3rd' in i.get('title', '')]
 
-            # Skip imagery or other non-elevation products
-            if 'imagery' in title or 'topo map' in title: score = -1
-
-            if score > 0:
-                scored_items.append((score, url, title))
-
-        # Sort by score descending
-        scored_items.sort(key=lambda x: x[0], reverse=True)
-
-        if scored_items:
-            print(f"  Found: {scored_items[0][2]}")  # Log what we found
-            return [scored_items[0][1]]  # Return the best URL in a list
+        # Return the best tier that actually has data
+        if tier_1: return tier_1
+        if tier_2: return tier_2
+        return tier_3
 
     except Exception as e:
         print(f"  API Error: {e}")
-    return []
+        return []
 
+
+def import_to_postgres(file_path, db_name):
+    """
+    Standardizes the import whether the file is .img or .tif
+    """
+    # -a: Append, -F: Add filename, -I: Index, -C: Constraints, -M: Analyze
+    # -t 100x100: Good middle-ground tile size for Pi 5 RAM
+    # -s 4269: Use NAD83 (USGS Standard)
+
+    cmd = (
+        f'raster2pgsql -a -F -I -C -M -t 100x100 -s 4269 "{file_path}" activities.elevation_rasters | '
+        f'psql -d {db_name} -q'
+    )
+
+    try:
+        subprocess.run(cmd, shell=True, check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"  Import failed for {file_path}: {e}")
+        return False
