@@ -1,70 +1,99 @@
 import os
 import subprocess
+
+from dotenv import load_dotenv
+
 from backend_functions.database_functions import sql_to_dict, qec
 from backend_functions.file_handlers import elevation_tile_path
 import streamlit as st
 
+# Load your .env file
+load_dotenv()
+
+# Map the environment variables from your specific .env keys
+PG_HOST = os.getenv("PG_HOST")
+PG_USER = os.getenv("PG_USER")
+PG_PASS = os.getenv("PG_PASSWORD")
+PG_PORT = os.getenv("PG_PORT")
+PG_DB = os.getenv("PG_DB")
+
 
 def reconcile_elevation_tiles():
+    """
+    Scans elevation_tile_path(), checks against metadata, and ingests new .tif files.
+    """
     tile_dir = elevation_tile_path()
-    db_name = "personal_fitness"
 
+    # 1. Identify .tif files in the directory
     files = [f for f in os.listdir(tile_dir) if f.lower().endswith('.tif')]
     if not files:
-        st.info("No .tif files found.")
+        st.info("No .tif files found in the elevation directory.")
         return
 
-    # Check if the table already exists to decide between Create (-c) or Append (-a)
+    # 2. Check if the raster table already exists (determines Create vs Append)
     table_exists_query = """
         SELECT EXISTS (
             SELECT FROM information_schema.tables 
-            WHERE table_schema = 'activities' 
-            AND table_name = 'elevation_rasters'
+            WHERE table_schema = 'activities' AND table_name = 'elevation_rasters'
         );
     """
     table_exists = sql_to_dict(table_exists_query)[0]['exists']
 
-    for index, filename in enumerate(files):
+    # 3. Setup the environment for the subprocess (Authentication)
+    env = os.environ.copy()
+    env["PGPASSWORD"] = PG_PASS
+
+    progress_text = st.empty()
+    bar = st.progress(0)
+
+    for i, filename in enumerate(files):
         file_path = os.path.join(tile_dir, filename)
 
-        # Check metadata to avoid duplicates
+        # 4. Check if already ingested in metadata
         check_sql = f"SELECT 1 FROM activities.elevation_tiles_metadata WHERE filename = '{filename}'"
         if sql_to_dict(check_sql):
             continue
 
-        st.info(f"Processing: {filename}")
+        progress_text.text(f"Ingesting {i + 1}/{len(files)}: {filename}")
 
-        # Use -c (Create) for the very first file if table doesn't exist,
-        # otherwise use -a (Append).
-        mode = "-a" if table_exists or index > 0 else "-c"
+        # Use Create (-c) for the first file if table doesn't exist, otherwise Append (-a)
+        mode = "-a" if table_exists else "-c"
 
-        # REMOVED -C: Strict constraints often fail on USGS tiles due to alignment.
-        # ADDED -e: Use individual transactions (helps debugging).
+        # Command explanation:
+        # -F: Adds a 'filename' column to the raster table (critical for BBOX calculation)
+        # -I: Creates the spatial index automatically
+        # -M: Vacuums and analyzes the table for performance
+        # -t 100x100: Breaks the massive TIF into smaller internal chunks for faster querying
         cmd = (
             f'raster2pgsql {mode} -F -I -M -t 100x100 -s 4269 "{file_path}" activities.elevation_rasters | '
-            f'psql -d {db_name} -q'
+            f'psql -h {PG_HOST} -p {PG_PORT} -U {PG_USER} -d {PG_DB} -q'
         )
 
         try:
-            # Capture stderr to see the actual Postgres/Raster error if it fails
-            result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+            # Run the ingestion
+            subprocess.run(cmd, shell=True, check=True, env=env, capture_output=True, text=True)
 
-            # Calculate and store metadata
+            # 5. Record metadata and calculate the Bounding Box from the ingested data
             metadata_sql = f"""
                 INSERT INTO activities.elevation_tiles_metadata (filename, bbox)
-                SELECT '{filename}', ST_SetSRID(ST_Extent(rast::geometry), 4269)
-                FROM activities.elevation_rasters WHERE filename = '{filename}'
+                SELECT 
+                    '{filename}', 
+                    ST_SetSRID(ST_Extent(rast::geometry), 4269)
+                FROM activities.elevation_rasters 
+                WHERE filename = '{filename}'
                 ON CONFLICT (filename) DO NOTHING;
             """
             qec(metadata_sql)
-            st.success(f"Ingested {filename}")
 
-            # After the first successful file, switch to append mode
+            # Switch to append mode for all subsequent files in this loop
             table_exists = True
 
         except subprocess.CalledProcessError as e:
-            st.error(f"Error ingesting {filename}")
-            st.code(e.stderr) # This will show the ACTUAL reason (e.g., 'column "filename" does not exist')
+            st.error(f"Failed to ingest {filename}")
+            st.code(e.stderr)  # Shows the specific database error
+            break
 
+        bar.progress((i + 1) / len(files))
+
+    progress_text.text("Ingestion complete.")
     return
-
