@@ -46,7 +46,7 @@ def reconcile_elevation_tiles():
                 # -C: Apply constraints
                 # -t 100x100: Tile into 100px chunks (crucial for Pi 5 performance)
                 cmd = (
-                    f"raster2pgsql -a -I -C -M -t 100x100 {full_path} activities.elevation_rasters | "
+                    f"raster2pgsql -a -I -C -M -t 50x50 -s 4269 {full_path} activities.elevation_rasters | "
                     f"psql -d your_db_name"
                 )
                 subprocess.run(cmd, shell=True, check=True)
