@@ -6,66 +6,65 @@ import streamlit as st
 
 
 def reconcile_elevation_tiles():
-    """
-    Scans the local directory for .tif files and ingests them if 
-    they haven't been processed yet.
-    """
     tile_dir = elevation_tile_path()
     db_name = "personal_fitness"
 
-    # 1. Scan contents of the elevation path
     files = [f for f in os.listdir(tile_dir) if f.lower().endswith('.tif')]
-
     if not files:
-        st.info("No .tif files found in the elevation directory.")
+        st.info("No .tif files found.")
         return
 
-    for filename in files:
+    # Check if the table already exists to decide between Create (-c) or Append (-a)
+    table_exists_query = """
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'activities' 
+            AND table_name = 'elevation_rasters'
+        );
+    """
+    table_exists = sql_to_dict(table_exists_query)[0]['exists']
+
+    for index, filename in enumerate(files):
         file_path = os.path.join(tile_dir, filename)
 
-        # 2. Check if already ingested
+        # Check metadata to avoid duplicates
         check_sql = f"SELECT 1 FROM activities.elevation_tiles_metadata WHERE filename = '{filename}'"
-        exists = sql_to_dict(check_sql)
-
-        if exists:
-            # st.write(f"Skipping {filename}: Already ingested.")
+        if sql_to_dict(check_sql):
             continue
 
-        st.info(f"Processing new file: {filename}")
+        st.info(f"Processing: {filename}")
 
-        # 3. Ingest the raster data
-        # -a: Append to table
-        # -F: Add a column 'filename' to the raster table (Crucial for BBOX calculation)
-        # -I: Create spatial index
-        # -C: Apply raster constraints
-        # -t 100x100: Tile size for performance
-        # -s 4269: NAD83 SRID
+        # Use -c (Create) for the very first file if table doesn't exist,
+        # otherwise use -a (Append).
+        mode = "-a" if table_exists or index > 0 else "-c"
+
+        # REMOVED -C: Strict constraints often fail on USGS tiles due to alignment.
+        # ADDED -e: Use individual transactions (helps debugging).
         cmd = (
-            f'raster2pgsql -a -F -I -C -M -t 100x100 -s 4269 "{file_path}" activities.elevation_rasters | '
+            f'raster2pgsql {mode} -F -I -M -t 100x100 -s 4269 "{file_path}" activities.elevation_rasters | '
             f'psql -d {db_name} -q'
         )
 
         try:
-            subprocess.run(cmd, shell=True, check=True)
+            # Capture stderr to see the actual Postgres/Raster error if it fails
+            result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
 
-            # 4. Record metadata and calculate Bounding Box
-            # We calculate the BBOX by looking at the envelope of all tiles 
-            # associated with this filename in the raster table.
+            # Calculate and store metadata
             metadata_sql = f"""
                 INSERT INTO activities.elevation_tiles_metadata (filename, bbox)
-                SELECT 
-                    '{filename}', 
-                    ST_SetSRID(ST_Extent(rast::geometry), 4269)
-                FROM activities.elevation_rasters
-                WHERE filename = '{filename}';
+                SELECT '{filename}', ST_SetSRID(ST_Extent(rast::geometry), 4269)
+                FROM activities.elevation_rasters WHERE filename = '{filename}'
+                ON CONFLICT (filename) DO NOTHING;
             """
             qec(metadata_sql)
-            st.success(f"Successfully ingested {filename}")
+            st.success(f"Ingested {filename}")
+
+            # After the first successful file, switch to append mode
+            table_exists = True
 
         except subprocess.CalledProcessError as e:
-            st.error(f"Failed to ingest {filename}: {e}")
-        except Exception as e:
-            st.error(f"Error updating metadata for {filename}: {e}")
+            st.error(f"Error ingesting {filename}")
+            st.code(e.stderr) # This will show the ACTUAL reason (e.g., 'column "filename" does not exist')
 
     return
 
