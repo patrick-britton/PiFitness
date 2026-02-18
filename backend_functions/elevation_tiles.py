@@ -18,14 +18,14 @@ def reconcile_elevation_tiles():
         bbox = tile.get('bbox_coords')  # New column from the updated view
 
         # 2. Search using the Bounding Box instead of the Name
-        print(f"Searching for data in {tile_name} ({bbox})...")
+        st.info(f"Searching for data in {tile_name} ({bbox})...")
 
         # --- THIS IS THE REPLACEMENT LINE ---
         download_urls = get_usgs_by_bbox(bbox)
         # -------------------------------------
 
         if not download_urls:
-            print(f"  No products found for {tile_name}. Skipping.")
+            st.info(f"  No products found for {tile_name}. Skipping.")
             continue
 
         # Handle the list of URLs (USGS often breaks 1m data into multiple chunks per degree)
@@ -35,9 +35,9 @@ def reconcile_elevation_tiles():
             full_path = os.path.join(tile_storage_path, remote_filename)
 
             if os.path.exists(full_path):
-                print(f"  File {remote_filename} exists. Skipping download.")
+                st.info(f"  File {remote_filename} exists. Skipping download.")
             else:
-                print(f"  Downloading: {remote_filename}")
+                st.info(f"  Downloading: {remote_filename}")
                 if download_file(url, full_path):
                     # 3. Import to Postgres
                     # Note: We use -s 4269 (NAD83) as it is the USGS standard for 3DEP
@@ -124,6 +124,6 @@ def get_usgs_by_bbox(bbox):
         return sorted_items[0].get('downloadURL')
 
     except Exception as e:
-        print(f"  Search error: {e}")
+        st.info(f"  Search error: {e}")
         return None
 
