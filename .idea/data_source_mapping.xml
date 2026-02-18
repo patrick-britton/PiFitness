@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/elevation_extraction.sql" value="e646928c-7cdb-48f2-b1bd-e13fb76cb606" />
     <file url="file://$PROJECT_DIR$/elevation_smooth.sql" value="e646928c-7cdb-48f2-b1bd-e13fb76cb606" />
   </component>
 </project>
