@@ -64,16 +64,20 @@ def download_file(url, destination):
     return True
 
 
-def get_usgs_by_bbox(bbox):
+def get_usgs_by_bbox(target_bbox):
+    """
+    target_bbox: string '-117,32,-116,33'
+    """
     base_url = "https://tnmaccess.nationalmap.gov/api/v1/products"
 
-    # We broaden the search to include all standard 3DEP products
+    # Parse target_bbox for comparison
+    t_xmin, t_ymin, t_xmax, t_ymax = map(float, target_bbox.split(','))
+
     params = {
-        'bbox': bbox,
+        'bbox': target_bbox,
         'datasets': '1 meter,1/3 arc-second,National Elevation Dataset (NED) 1/9 arc-second',
-        'prodFormats': 'GeoTIFF,IMG',  # Include IMG for those legacy tiles
-        'outputFormat': 'JSON',
-        'max': 100
+        'prodFormats': 'GeoTIFF,IMG',
+        'outputFormat': 'JSON'
     }
 
     try:
@@ -81,20 +85,30 @@ def get_usgs_by_bbox(bbox):
         data = response.json()
         items = data.get('items', [])
 
-        if not items:
-            print(f"  No elevation products found for {bbox}.")
-            return []
+        valid_urls = []
+        for item in items:
+            # GEOMETRY GUARD: Check the item's actual footprint
+            # The API response includes a 'boundingBox' object for each result
+            sb = item.get('boundingBox', {})
+            i_xmin, i_xmax = sb.get('minX'), sb.get('maxX')
+            i_ymin, i_ymax = sb.get('minY'), sb.get('maxY')
 
-        # We group items by their resolution to pick the best available "Tier"
-        # Tier 1: 1-meter (Best)
-        # Tier 2: 1/9 arc-second (~3m)
-        # Tier 3: 1/3 arc-second (~10m)
+            # Ensure the tile isn't just "near" but actually intersects
+            if not (i_xmin > t_xmax or i_xmax < t_xmin or i_ymin > t_ymax or i_ymax < t_ymin):
+                url = item.get('downloadURL')
+                title = item.get('title', '')
 
-        tier_1 = [i.get('downloadURL') for i in items if '1 meter' in i.get('title', '')]
-        tier_2 = [i.get('downloadURL') for i in items if '1/9' in i.get('title', '') or '9th' in i.get('title', '')]
-        tier_3 = [i.get('downloadURL') for i in items if '1/3' in i.get('title', '') or '3rd' in i.get('title', '')]
+                # Double-check: Some "National" files have 0,0,0,0 bbox in metadata
+                # We skip those to be safe.
+                if url and i_xmin != 0:
+                    valid_urls.append({'url': url, 'title': title})
 
-        # Return the best tier that actually has data
+        # --- Tiered Selection Logic ---
+        # Pick the best resolution available among the VALID items
+        tier_1 = [i['url'] for i in valid_urls if '1 meter' in i['title']]
+        tier_2 = [i['url'] for i in valid_urls if '1/9' in i['title']]
+        tier_3 = [i['url'] for i in valid_urls if '1/3' in i['title']]
+
         if tier_1: return tier_1
         if tier_2: return tier_2
         return tier_3
@@ -102,7 +116,6 @@ def get_usgs_by_bbox(bbox):
     except Exception as e:
         print(f"  API Error: {e}")
         return []
-
 
 def import_to_postgres(file_path, db_name):
     """
