@@ -244,7 +244,6 @@ def process_new_run():
     if ss.get("new_run_synced") is None:
         with st.spinner('Making sure I have all known activities', show_time=True):
             ultimate_task_executioner(force_task_id=4)
-            qec("REFRESH MATERIALIZED VIEW activities.vw_run_timing")
             ss.new_run_synced = True
 
 
