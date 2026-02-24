@@ -4,6 +4,7 @@ import pandas as pd
 
 from backend_functions.database_functions import get_conn, qec, sql_to_dict, one_sql_result
 from backend_functions.task_execution import task_executioner
+from backend_functions.ultimate_task_executioner import ultimate_task_executioner
 from backend_functions.viz_factory.run_list import render_course_list
 from backend_functions.viz_factory.segment_compare import render_segment_compare, get_segment_sql
 from frontend_functions.music_module import render_playlist_shuffle
@@ -242,7 +243,7 @@ def process_new_run():
     # Sync All activities
     if ss.get("new_run_synced") is None:
         with st.spinner('Making sure I have all known activities', show_time=True):
-            task_executioner(force_task_name='Sync Garmin Activities', force_task=True)
+            ultimate_task_executioner(force_task_id=4)
             qec("REFRESH MATERIALIZED VIEW activities.vw_run_timing")
             ss.new_run_synced = True
 
