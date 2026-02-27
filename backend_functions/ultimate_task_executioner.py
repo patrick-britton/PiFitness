@@ -3,7 +3,7 @@ import json
 import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
-import activity_smoothing
+
 
 import pytz
 from psycopg2.extras import execute_values
