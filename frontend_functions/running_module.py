@@ -7,9 +7,12 @@ from backend_functions.task_execution import task_executioner
 from backend_functions.ultimate_task_executioner import ultimate_task_executioner
 from backend_functions.viz_factory.run_list import render_course_list
 from backend_functions.viz_factory.segment_compare import render_segment_compare, get_segment_sql
+from backend_functions.viz_factory.topographics import render_topo
 from frontend_functions.music_module import render_playlist_shuffle
 from frontend_functions.music_widgets import playlist_config_table
 from frontend_functions.nav_buttons import nav_widget
+from frontend_functions.segment_creation import render_segment_creation, render_segment_matches, \
+    render_segment_leaderboard
 from frontend_functions.streamlit_helpers import sse, ss_pop
 
 
@@ -33,6 +36,8 @@ def render_running_module():
         segment_compare()
     else:
         st.info('Select an option above')
+
+    # render_topo()
     return
 
 
@@ -40,9 +45,9 @@ def segment_compare():
     ss_list=['seg_dict', 'seg_list', 'man_seg_dict']
     comp_choice = st.segmented_control('What type of comparison do you want?',
                                        options=['Race',
-                                                'Verify Segment',
-                                                'Merge Segment',
-                                                'Manual Segment Compare',
+                                                'Create Segment',
+                                                'Match Activities',
+                                                'Leaderboards',
                                                 'Course Review'],
                                        on_change=ss_pop,
                                        args=(ss_list,))
@@ -121,27 +126,10 @@ def segment_compare():
                     ss.seg_dict = sql_to_dict(match_sql)
             with st.spinner('Rendering maps', show_time=True):
                 render_segment_compare(ss.seg_dict, comp_choice)
-    elif comp_choice == 'Manual Segment Compare':
-        id1_col, id2_col = st.columns(spec=[1,1], gap="small", border=False)
-        with id1_col:
-            id1 = st.number_input('Segment id #1',
-                                  min_value=1,
-                                  value=None,
-                                  on_change=reset_seg_dict)
-        with id2_col:
-            id2 = st.number_input('Segment id #2',
-                                  min_value=1,
-                                  value=None,
-                                  on_change=reset_seg_dict)
-        if id1 and id2:
-            if 'man_seg_dict' not in ss:
-                with st.spinner('Pulling Potential Segment Overlaps', show_time=True):
-                    ss.man_seg_dict = sql_to_dict(get_segment_sql(id1, id2))
-            with st.spinner('Rendering maps', show_time=True):
-                render_segment_compare(ss.man_seg_dict, 'Merge Segment')
-    elif comp_choice == 'Verify Segment':
-        v_sql = """SELECT * FROM activities.vw_possible_segment_matches WHERE match_rank = 1"""
-        render_segment_compare(sql_to_dict(v_sql), comp_choice)
+    elif comp_choice == 'Leaderboards':
+        render_segment_leaderboard()
+    elif comp_choice == 'Match Activities':
+        render_segment_matches()
 
     elif comp_choice == 'Course Review':
         name_col, min_dist_col, max_dist, item_col = st.columns(spec=[2,1,1,1], gap="small", border=False)
@@ -188,7 +176,8 @@ def segment_compare():
         # st.write(f"Course #: {course_item}, {[ss.seg_list[course_item-1]]}")
         render_segment_compare([ss.seg_list[course_item-1]], comp_choice)
 
-
+    elif comp_choice == 'Create Segment':
+        render_segment_creation()
 
     else:
         st.info('not built yet')

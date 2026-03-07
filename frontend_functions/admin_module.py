@@ -34,6 +34,7 @@ from frontend_functions.streamlit_helpers import reconcile_with_postgres, ss_pop
 #                    'db_size': {'icon': 'database', 'label': 'DB Size'}},
 
 
+
 def render_admin_module():
     nav_selection = nav_widget('admin', 'Admin Options:')
 
@@ -121,6 +122,14 @@ def render_service_submodule():
                 st.rerun()
 
 
+    svc_name = st.text_input('Create a New Service')
+    if st.button(f':material/save: Save {svc_name}'):
+        ins_sql = f"""INSERT INTO api_services.api_service_list (api_service_name) VALUES (%s)"""
+        returns = qec(ins_sql, [svc_name, ])
+        if returns:
+            st.error(returns)
+        else:
+            st.rerun()
 
     return
 
@@ -537,7 +546,7 @@ def render_db_sessions():
         return
 
     for q in df:
-        msg=f"PID: {q['pid']} | Q: {q['query']} : :gray[*{q.run_length}]*] "
+        msg=f"PID: {q['pid']} | Q: {q['query']} : :gray[*{q['run_length']}*] "
         st.write(msg)
 
     id_to_kill = st.number_input("Kill ID", value=0)
