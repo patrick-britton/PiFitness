@@ -5,13 +5,19 @@ from scipy.signal import savgol_filter
 from psycopg2.extras import execute_values
 
 from backend_functions.database_functions import get_conn, sql_to_list, qec, one_sql_result
+from backend_functions.logging_functions import start_timer, elapsed_ms
 
 
-def apply_savgol_filter(records, window_length=31, polyorder=3):
+def apply_savgol_filter(records, polyorder=3, is_time=False):
     """
     Applies the Savitzky-Golay filter to a list of activity records.
     records format: [(activity_id, elapsed_duration_s, elevation_m), ...]
     """
+    if is_time:
+        window_length = 31
+    else:
+        window_length = 101
+
     # Edge case: If the activity is shorter than the window length
     if len(records) < window_length:
         window_length = len(records) if len(records) % 2 != 0 else len(records) - 1
@@ -35,18 +41,25 @@ def apply_savgol_filter(records, window_length=31, polyorder=3):
     return smoothed_records
 
 
-def update_smoothed_elevation(conn, smoothed_records, field_name):
+def update_smoothed_elevation(conn, smoothed_records, field_name, is_time=False):
     """
     Efficiently merges the smoothed elevations back into the database.
     """
     # The 'AS v(...)' part creates a temporary virtual table in memory
     # that we join against the actual activity_details table.
+    if is_time:
+        table_appendix = ''
+        pk_field = 'elapsed_duration_s'
+    else:
+        table_appendix = '_distance'
+        pk_field = 'distance_m'
+
     query = f"""
-        UPDATE activities.activity_details AS t
+        UPDATE activities.activity_details{table_appendix} AS t
         SET {field_name} = v.elevation_m_smooth
-        FROM (VALUES %s) AS v(activity_id, elapsed_duration_s, elevation_m_smooth)
+        FROM (VALUES %s) AS v(activity_id, {pk_field}, elevation_m_smooth)
         WHERE t.activity_id = v.activity_id::bigint 
-          AND t.elapsed_duration_s = v.elapsed_duration_s::int;
+          AND t.{pk_field} = v.{pk_field}::int;
     """
 
     with conn.cursor() as cur:
@@ -56,20 +69,25 @@ def update_smoothed_elevation(conn, smoothed_records, field_name):
     conn.commit()
 
 
-def process_all_activities(activity_ids, is_reference=False):
-    print("Starting Savitzky-Golay smoothing pipeline...")
+def process_all_activities(activity_ids, is_reference=False, is_time=False):
+
     start_time = time.time()
 
     # Connect to the database
     conn = get_conn()
 
-    total_activities = len(activity_ids)
-    print(f"Found {total_activities} activities to process.\n" + "-" * 40)
 
     if is_reference:
         field_name = 'elevation_reference'
     else:
         field_name = 'elevation_m_smooth'
+
+    if is_time:
+        table_appendix=''
+        order_field = 'elapsed_duration_s'
+    else:
+        table_appendix='_distance'
+        order_field = 'distance_m'
 
     for index, act_id in enumerate(activity_ids, start=1):
         try:
@@ -77,10 +95,10 @@ def process_all_activities(activity_ids, is_reference=False):
                 # 2. Fetch the raw data for this activity
                 # We use COALESCE to ensure we don't pass NULLs into the math function
                 cur.execute(f"""
-                    SELECT activity_id, elapsed_duration_s, COALESCE({field_name}, 0) 
-                    FROM activities.activity_details 
+                    SELECT activity_id, {order_field}, COALESCE({field_name}, 0) 
+                    FROM activities.activity_details{table_appendix}
                     WHERE activity_id = %s 
-                    ORDER BY elapsed_duration_s;
+                    ORDER BY {order_field};
                 """, (act_id,))
 
                 raw_records = cur.fetchall()
@@ -89,18 +107,11 @@ def process_all_activities(activity_ids, is_reference=False):
                 continue
 
             # 3. Apply the math
-            smoothed_records = apply_savgol_filter(raw_records)
+            smoothed_records = apply_savgol_filter(raw_records, is_time=is_time)
 
             # 4. Push it back to the database
-            update_smoothed_elevation(conn, smoothed_records, field_name)
+            update_smoothed_elevation(conn, smoothed_records, field_name, is_time=is_time)
 
-            # 5. Print progress every 10 activities to avoid terminal spam
-            if index % 10 == 0 or index == total_activities:
-                elapsed = time.time() - start_time
-                rate = index / elapsed
-                percent = (index / total_activities) * 100
-                print(
-                    f"[{percent:5.1f}%] Processed {index}/{total_activities} | ID: {act_id} | Rate: {rate:.1f} act/sec")
 
         except Exception as e:
             print(f"\nERROR on activity {act_id}: {e}")
@@ -109,18 +120,22 @@ def process_all_activities(activity_ids, is_reference=False):
     conn.close()
 
     total_time = time.time() - start_time
-    print("-" * 40)
-    print(f"Pipeline complete! Processed {total_activities} activities in {total_time:.1f} seconds.")
 
-def activity_post_processing():
-    activity_list = sql_to_list(
-        f"SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc")
+
+def activity_post_processing(manual_list=None):
+    if manual_list:
+        activity_list = manual_list
+    else:
+        activity_list = sql_to_list(
+            f"SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc")
 
     if not activity_list:
         return
-
+    ac = len(activity_list)
+    ctr=1
     for a in activity_list:
         int_a = int(a)
+        t0 = start_timer()
 
 
         # Insert heartrate values:
@@ -131,12 +146,30 @@ def activity_post_processing():
                 WHERE health.heartrate_raw.heartrate_bpm IS DISTINCT FROM EXCLUDED.heartrate_bpm;"""
         qec(hr_sql)
 
-        # Smooth Elevation Spikes
-        qec(f"CALL activities.smooth_elevation_spikes2({int_a});")
+        # Assign elevation_reference
+        qec(f"CALL activities.assign_elevation_reference_time({int_a});")
+
+        # Smooth raw elevation by time
+        qec(f"CALL activities.smooth_elevation_spikes_by_time({int_a});")
 
         # Smooth again in python
-        process_all_activities([int_a], False)
-        process_all_activities([int_a], True)
+        process_all_activities([int_a], is_reference=False, is_time=True)
+
+        # Update elevation reference table
+        qec(f"CALL activities.update_elevation_reference_by_time({int_a});")
+
+        # Resample to 1m; assigns elevation_reference
+        qec(f'CALL activities.resample_activity_to_distance({int_a});')
+
+        # Smooth Elevation Spikes (smooths elevation_m and elevation_reference
+        qec(f"CALL activities.smooth_elevation_spikes_by_distance({int_a});")
+
+        # Smooth again in python
+        process_all_activities([int_a], is_reference=False, is_time=False)
+        process_all_activities([int_a], is_reference=True, is_time=False)
+
+        # Update elevation reference again
+        qec(f"CALL activities.update_elevation_reference_by_distance({int_a});")
 
         # Build the path
         path_sql = f"""UPDATE activities.activities
@@ -146,34 +179,33 @@ def activity_post_processing():
                              rd.activity_id,
                              ST_SetSRID(
                                      ST_MakeLine(
-                                             ST_MakePoint(longitude, latitude, elevation_m_smooth, elapsed_duration_s)
-                                             ORDER BY elapsed_duration_s ASC
+                                             ST_MakePoint(longitude, latitude, elevation_m_smooth, distance_m)
+                                             ORDER BY distance_m ASC
                                      ),
                                      4326
                              ) AS path
-                         FROM activities.activity_details rd
+                         FROM activities.activity_details_distance rd
                          WHERE activity_id = {int_a} 
                          GROUP BY rd.activity_id
                      ) AS sub
                 WHERE activities.activity_id = sub.activity_id;"""
         qec(path_sql)
 
-        # Update Reference Values
-        qec(f"CALL activities.update_elevation_reference({int_a});")
-
 
         # Segment matching
-        max_id = one_sql_result(f"""SELECT
-                    MAX(elapsed_duration_s)
-                    FROM
-                    activities.activity_details
-                    where
-                    activity_id = {int_a}""")
-        qec(f"""CALL staging.match_activity_to_segment({int_a}, 0, {int(max_id)}, TRUE);""")
-        qec(f"""DELETE FROM activities.activity_processing_queue WHERE activity_id = {int_a}""")
+        # max_id = one_sql_result(f"""SELECT
+        #             MAX(elapsed_duration_s)
+        #             FROM
+        #             activities.activity_details
+        #             where
+        #             activity_id = {int_a}""")
+        # qec(f"""CALL staging.match_activity_to_segment({int_a}, 0, {int(max_id)}, TRUE);""")
+        # qec(f"""DELETE FROM activities.activity_processing_queue WHERE activity_id = {int_a}""")
+        print(f"{ctr}/{ac} | ID# {int_a} | {elapsed_ms(t0)} ms")
+        ctr += 1
 
-    qec("""CALL activities.refresh_overlaps();""")
-    qec("""CALL activities.repath_segment_matches();""")
-    qec("""CALL activities.repath_segments();""")
+    # qec("""CALL activities.refresh_overlaps();""")
+    # qec("""CALL activities.repath_segment_matches();""")
+    # qec("""CALL activities.repath_segments();""")
 
     return

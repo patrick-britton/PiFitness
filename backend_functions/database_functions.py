@@ -95,10 +95,13 @@ def one_sql_result(sql=None):
     return row[0]
 
 
-def sql_to_dict(query_str):
+def sql_to_dict(query_str, params=None):
     conn = get_conn()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute(query_str)
+    if params:
+        cur.execute(query_str, params)
+    else:
+        cur.execute(query_str)
     rows = cur.fetchall()  # list of dicts if using RealDictCursor
     cur.close()
     conn.close()

@@ -53,6 +53,9 @@ def spotify_creds():
         uri = None
     return cid, csec, uri
 
+def mapbox_token():
+    creds = load_api_credentials('Mapbox')
+    return creds.get('token')
 
 def garmin_creds():
     # Loads the decrypted garmin credentials from the database and returns email & password
