@@ -2,9 +2,12 @@ import streamlit as st
 from streamlit import session_state as ss
 import pandas as pd
 
+from backend_functions.activity_smoothing import activity_post_processing
 from backend_functions.database_functions import get_conn, qec, sql_to_dict, one_sql_result
+from backend_functions.running_functions import leaderboard_update
 from backend_functions.task_execution import task_executioner
 from backend_functions.ultimate_task_executioner import ultimate_task_executioner
+from backend_functions.viz_factory.leaderboards import render_leaderboard
 from backend_functions.viz_factory.run_list import render_course_list
 from backend_functions.viz_factory.segment_compare import render_segment_compare, get_segment_sql
 from backend_functions.viz_factory.topographics import render_topo
@@ -12,7 +15,7 @@ from frontend_functions.music_module import render_playlist_shuffle
 from frontend_functions.music_widgets import playlist_config_table
 from frontend_functions.nav_buttons import nav_widget
 from frontend_functions.segment_creation import render_segment_creation, render_segment_matches, \
-    render_segment_leaderboard
+    render_segment_leaderboard, plot_route_map
 from frontend_functions.streamlit_helpers import sse, ss_pop
 
 
@@ -228,69 +231,144 @@ def render_run_forecast():
 
 
 def process_new_run():
+    if 1==1:
+        if ss.get('pnr_pl_key') is None:
+            st.segmented_control('Music?',
+                                 options=['Running', 'Jogging', 'No Playlist'],
+                                 key='pnr_pl_key')
+            return
 
-    # Sync All activities
-    if ss.get("new_run_synced") is None:
-        with st.spinner('Making sure I have all known activities', show_time=True):
-            ultimate_task_executioner(force_task_id=4)
-            ss.new_run_synced = True
-
-
-    # Get most recent activity details
-    if ss.get("listens_df") is None:
-        sel_sql = """SELECT * FROM activities.vw_watch_music_heard;"""
-        ss.listens_df = pd.read_sql(sel_sql, get_conn(alchemy=True))
-
-    df = ss.listens_df.copy()
-    options = df['playlist_name'].unique().tolist()
-    options.append('No playlist')
-
-    sel = st.segmented_control(label='Which playlist did you listen to?',
-                               options=options,
-                               key='sc_pl_selection')
-    if not sel:
-        st.write(':gray[*make your selection above*]')
-        return
-
-    if sel == 'No playlist':
-        st.info('What did you even come here for?')
-        return
+        st.write(ss.get('pnr_processing_complete'))
+        if ss.get('pnr_processing_complete') is None or ss.get('pnr_processing_complete') is False:
+            if ss.get("new_run_synced") is None:
+                with st.spinner('Making sure I have all known activities', show_time=True):
+                    ultimate_task_executioner(force_task_id=4)
+                with st.spinner('Grabbing activity Details', show_time=True):
+                    ultimate_task_executioner(force_task_id=21)
+                ss.aid = one_sql_result("""SELECT MAX(activity_id) FROM activities.activities where activity_type_name like '%run%'""")
+                with st.spinner('Matching Segments', show_time=True):
+                    activity_post_processing([int(ss.aid)])
+                ss.new_run_synced = True
+                
 
 
-    filtered_df = df[df['playlist_name'] == sel].copy()
-    cols = ['track_order', 'track_name_clean', 'artist_display_name', 'played_at_utc']
-    col_config = {'track_order': st.column_config.NumberColumn(label='#',
-                                                               pinned=True,
-                                                               disabled=True,
-                                                               format='%d'),
-                'track_name_clean': st.column_config.TextColumn(label='Title',
-                                                                pinned=False,
-                                                                disabled=True),
-                  'artist_display_name': st.column_config.TextColumn(label='Artist',
-                                                                     pinned=False,
-                                                                     disabled=True),
-                  'played_at_utc': st.column_config.DatetimeColumn(label='Played At',
-                                                                   format='distance',
-                                                                   pinned=False,
-                                                                   disabled=True)
-                  }
+            if ss.get('pnr_pl_key') != 'No Playlist':
+                sel_sql = f"""SELECT * FROM activities.vw_watch_music_heard WHERE playlist_name = '{ss.get('pnr_pl_key')}'""";
+                df = pd.read_sql(sel_sql, get_conn(alchemy=True))
+                song_count = len(df)
+                first_song = df['track_name_clean'].iloc[0]
+                last_song = df['track_name_clean'].iloc[song_count - 1]
+                st.write(f"You heard __{song_count}__ songs: __{first_song}__ to __{last_song}__")
 
-    st.write('You heard these songs')
-    st.dataframe(filtered_df, column_order=cols, column_config=col_config, hide_index=True, on_select='ignore')
-    cols = ['played_at_utc', 'isrc', 'playlist_id']
-    if st.button(':material/database_upload: Insert into listening history'):
-        with st.spinner('Loading to SQL', show_time=True):
-            narrow_df = filtered_df[cols]
-            narrow_df.to_sql(schema='music', name='listening_history', con=get_conn(alchemy=True), if_exists='append', index=False )
-            st.toast(f"{len(narrow_df)} tracks uploaded to SQL", duration=3)
-            ss.rp_new_order = True
-            ss.target_id = narrow_df['playlist_id'].iloc[0]
+                with st.spinner('Inserting history & reshuffling playlist...', show_time=True):
+                    cols = ['played_at_utc', 'isrc', 'playlist_id']
+                    narrow_df = df[cols]
+                    narrow_df.to_sql(schema='music', name='listening_history', con=get_conn(alchemy=True), if_exists='append',
+                                     index=False)
+                    target_id = narrow_df['playlist_id'].iloc[0]
+                    render_playlist_shuffle(list_id=target_id)
 
-    if not ss.get("rp_new_order"):
-        return
+            ss.pnr_processing_complete = True
+        else:
+            return
 
-    st.write('New playlist order will be:')
-    render_playlist_shuffle(list_id=ss.target_id)
+    if 1==1:
+        if not sse('aid'):
+            ss.aid = one_sql_result("""SELECT MAX(activity_id) FROM activities.activities where activity_type_name like '%run%'""")
+
+        act_sql = f"""SELECT * from activities.vw_activity_summary where activity_id = {ss.aid}"""
+
+
+        if not sse('summary_df'):
+            with st.spinner('Loading run stats...', show_time=True):
+                ss.summary_df = pd.read_sql(act_sql, get_conn(alchemy=True))
+
+        was_course = ss.summary_df['is_course'].iloc[0]
+        if was_course:
+            effort_name = ss.summary_df['segment_name'].iloc[0]
+            dist_str = ss.summary_df['segment_distance_mi'].iloc[0]
+            pace_str = ss.summary_df['segment_pace'].iloc[0]
+        else:
+            effort_name = ss.summary_df['activity_start_utc'].iloc[0]
+            dist_str = ss.summary_df['distance_mi'].iloc[0]
+            pace_str = ss.summary_df['activity_pace'].iloc[0]
+        st.write(f"Your last run was __{effort_name}__")
+        st.write(f"You ran __{dist_str}__ miles @ __{pace_str}/mi__")
+
+        if was_course:
+
+            delta_pace_r = ss.summary_df['prior_delta_s'].iloc[0]
+            st.dataframe(ss.summary_df)
+            if delta_pace_r > 0:
+                pace_dir = 'seconds faster'
+                delta_pace_r = abs(delta_pace_r)
+                color='blue'
+            else:
+                pace_dir = 'seconds slower'
+                color='red'
+            msg1 = f"You were :{color}[__{delta_pace_r}__ {pace_dir}] than your last attempt"
+
+            delta_pace_r = ss.summary_df['best_delta_s'].iloc[0]
+            all_time_rank = ss.summary_df['all_time_rank'].iloc[0]
+            if int(all_time_rank) == 1:
+                msg2 = f"and # 1 all time!"
+            else:
+                msg2 = f"and :red[__{abs(delta_pace_r)} seconds__] behind your best effort (#{all_time_rank} all time)."
+
+            st.write(f"{msg1} {msg2}")
+        seg_dict = {}
+        if not ss.summary_df.empty:
+            st.write(f"You crossed __{len(ss.summary_df)}__ segments")
+            for idx, row in ss.summary_df.iterrows():
+                seg_name = row['segment_name']
+                seg_id = row['segment_id']
+                seg_dict[seg_name] = seg_id
+                if row['is_course']:
+                    continue
+
+
+                delta_pace_r = row['prior_delta_s']
+                if delta_pace_r > 0:
+                    pace_dir = 's faster'
+                    delta_pace_r = delta_pace_r
+                    color = 'blue'
+                else:
+                    pace_dir = 's slower'
+                    color = 'red'
+                msg1 = f":{color}[__{delta_pace_r}__ {pace_dir}] than your last attempt"
+
+                delta_pace_r = row['best_delta_s']
+                all_time_rank = row['all_time_rank']
+                if int(all_time_rank) == 1:
+                    msg2 = f"and # 1 all time!"
+                else:
+                    msg2 = f"and :red[__{abs(delta_pace_r)} s__] behind your best effort (#{all_time_rank} all time)."
+
+                st.write(f"__:material/conversion_path: {seg_name}__: {msg1} {msg2}")
+            seg_list = list(seg_dict)
+            st.segmented_control('Leaderboard Display:',
+                                 options=seg_list,
+                                 default=seg_list[0],
+                                 key='ad_seg_ldr_value')
+            st.write(seg_dict.get(ss.get('ad_seg_ldr_value')))
+            leaderboard_update(segment_id=seg_dict.get(ss.get('ad_seg_ldr_value')))
+            leader_sql = f"""SELECT * FROM activities.vw_segment_leaderboard WHERE segment_id = 
+                        {seg_dict.get(ss.get('ad_seg_ldr_value'))}"""
+            ss.sm_leaderboard_df = pd.read_sql(leader_sql, con=get_conn(alchemy=True))
+            w = int(700)
+            h = int(900 * (w / 1600))
+
+            st.write(f"__Leaderboard for {ss.get('ad_seg_ldr_value')}__")
+            render_leaderboard(ss.sm_leaderboard_df)
+
+
+
+
+
+
+
+
+
 
     return
 
