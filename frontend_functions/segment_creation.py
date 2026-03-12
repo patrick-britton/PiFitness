@@ -9,6 +9,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from backend_functions.database_functions import get_conn, sql_to_dict, qec, one_sql_result, sql_to_list
+from backend_functions.running_functions import leaderboard_update
 from backend_functions.service_logins import mapbox_token
 from backend_functions.viz_factory.leaderboards import render_leaderboard
 from backend_functions.viz_factory.segment_compare import render_segment_compare
@@ -261,7 +262,8 @@ def render_activity(activity_id=None, matching_activity_id=None):
         df_filtered = ss.cc_df[(ss.cc_df['distance_m'] >= trim_range_start) &
                                (ss.cc_df['distance_m'] <= trim_range_end)]
 
-        st.plotly_chart(plot_route_map(df_filtered), width=800, height=400, key='c-bev')
+        st.plotly_chart(plot_route_map(df_filtered), width=800, height=400, key='c-bev'
+                        ,config = {'staticPlot': True})
 
         start_col, end_col = st.columns(spec=[1,1], gap="small", border=True)
 
@@ -632,9 +634,9 @@ def render_segment_matches():
                 with st.spinner('Generating Pairs', show_time=True):
                     qec(f"CALL activities.segment_matching_pair_generation({int(ss.get('sm_seg_id'))});")
                 with st.spinner('Polygon Matching', show_time=True):
-                    qec(f"CALL activities.segment_matches_all_polygon();;")
+                    qec(f"CALL activities.segment_matches_all_polygon();")
                 with st.spinner('Auto-Approving', show_time=True):
-                    qec(f"CALL activities.segment_matching_mass_confirmation({ss.sm_seg_id}, 1);")
+                    qec(f"CALL activities.segment_matching_mass_confirmation(1);")
                 ss.sm_matches_attempted = True
                 ss.p_df = pd.read_sql(potential_match_sql, con=get_conn(alchemy=True))
 
@@ -720,7 +722,7 @@ def render_segment_matches():
             st.rerun()
         if st.button(':green[:material/check_circle: Confirm All Remaining]'):
             with st.spinner('Running Mass Approvals', show_time=True):
-                qec(f"CALL activities.segment_matching_mass_confirmation({ss.sm_seg_id}, 4);")
+                qec(f"CALL activities.segment_matching_mass_confirmation(4);")
             ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', ])
             ss_pop(['p_df', 'sm_seg_df', 'sm_comp_df'])
             st.rerun()
@@ -874,6 +876,7 @@ def render_segment_leaderboard():
         ss.sm_seg_df = get_activity_df(ss.get('sm_seg_act_id'), start_dist=ss.get('sm_seg_start'),
                                        end_dist=ss.get('sm_seg_end'))
         ss.sm_comp_df = None
+        leaderboard_update(segment_id=ss.get('sm_seg_id'))
         leader_sql = f"""SELECT * FROM activities.vw_segment_leaderboard WHERE segment_id = {ss.get('sm_seg_id')}"""
         ss.sm_leaderboard_df = pd.read_sql(leader_sql, con=get_conn(alchemy=True))
     hd_msg = f"__{ss.get('sm_seg_name')}__ | __{ss.get('sm_seg_dist')}__ mi :material/arrow_range: | __{int(ss.get('sm_seg_elev'))}__ m :material/altitude:    :gray[*id# {ss.sm_seg_id}*]"
@@ -892,6 +895,19 @@ def render_segment_leaderboard():
         st.rerun()
 
     return
+
+def running_display(activity_id=22115130889):
+    df=get_activity_df(activity_id)
+    map_col, info_col = st.columns(spec=[3,3], gap="small", border=True)
+    w = int(700)
+    h = int(900 * (w/1600))
+    with info_col:
+        st.info('info here')
+
+    with map_col:
+        st.plotly_chart(plot_route_map(df, None), height=h, width=w, key='sm_seg_route_map', config=None)
+
+
 
 
 

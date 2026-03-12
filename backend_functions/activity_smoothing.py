@@ -191,21 +191,22 @@ def activity_post_processing(manual_list=None):
                 WHERE activities.activity_id = sub.activity_id;"""
         qec(path_sql)
 
+        segment_match_workflow = [f"CALL activities.segment_matching_match_segments({int_a});",
+                             f"CALL activities.segment_matching_activity_pair_generation({int_a});",
+                             f"CALL activities.segment_matches_all_polygon();",
+                             f"CALL activities.segment_matching_mass_confirmation(1);",
+                             f"CALL activities.segment_matches_all_hausdorff();",
+                             f"CALL activities.segment_matching_mass_confirmation(2);",
+                            f"CALL activities.segment_matches_all_freschet();",
+                                  f"CALL activities.segment_matching_mass_confirmation(3);"
+                                  f"CALL staging.update_segment_details({int_a});"]
 
-        # Segment matching
-        # max_id = one_sql_result(f"""SELECT
-        #             MAX(elapsed_duration_s)
-        #             FROM
-        #             activities.activity_details
-        #             where
-        #             activity_id = {int_a}""")
-        # qec(f"""CALL staging.match_activity_to_segment({int_a}, 0, {int(max_id)}, TRUE);""")
-        # qec(f"""DELETE FROM activities.activity_processing_queue WHERE activity_id = {int_a}""")
+        for seg_sql in segment_match_workflow:
+            qec(seg_sql)
+
+        qec(f"""DELETE FROM activities.activity_processing_queue WHERE activity_id = {int_a}""")
         print(f"{ctr}/{ac} | ID# {int_a} | {elapsed_ms(t0)} ms")
         ctr += 1
 
-    # qec("""CALL activities.refresh_overlaps();""")
-    # qec("""CALL activities.repath_segment_matches();""")
-    # qec("""CALL activities.repath_segments();""")
 
     return
