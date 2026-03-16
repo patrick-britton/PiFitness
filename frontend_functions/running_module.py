@@ -1,22 +1,17 @@
 import time
 
 import streamlit as st
-from fontTools.misc.cython import returns
 from streamlit import session_state as ss
 import pandas as pd
 
-from backend_functions.activity_smoothing import activity_post_processing
 from backend_functions.database_functions import get_conn, qec, sql_to_dict, one_sql_result
 from backend_functions.music_functions import auto_shuffle_playlists
 from backend_functions.running_functions import leaderboard_update
-from backend_functions.task_execution import task_executioner
 from backend_functions.ultimate_task_executioner import ultimate_task_executioner
 from backend_functions.viz_factory.leaderboards import render_leaderboard
 from backend_functions.viz_factory.run_list import render_course_list
 from backend_functions.viz_factory.segment_compare import render_segment_compare, get_segment_sql
-from backend_functions.viz_factory.topographics import render_topo
-from frontend_functions.music_module import render_playlist_shuffle
-from frontend_functions.music_widgets import playlist_config_table
+
 from frontend_functions.nav_buttons import nav_widget
 from frontend_functions.segment_creation import render_segment_creation, render_segment_matches, \
     render_segment_leaderboard, plot_route_map
@@ -115,21 +110,21 @@ def segment_compare():
                 with st.spinner('Pulling Race Comparisons', show_time=True):
                     render_segment_compare(sql_to_dict(leaderboard_sql), comp_choice)
 
-    elif comp_choice == 'Merge Segment':
-        with comp_container:
-            match_num = st.number_input('Match # to retrieve',
-                                        min_value=1,
-                                        max_value=10,
-                                        step=1,
-                                        value=1,
-                                        on_change=reset_seg_dict)
-            match_sql = f"""SELECT * FROM activities.vw_overlapped_segments WHERE match_rank = {match_num}"""
-
-            if 'seg_dict' not in ss:
-                with st.spinner('Pulling Potential Segment Overlaps', show_time=True):
-                    ss.seg_dict = sql_to_dict(match_sql)
-            with st.spinner('Rendering maps', show_time=True):
-                render_segment_compare(ss.seg_dict, comp_choice)
+    # elif comp_choice == 'Merge Segment':
+    #     with comp_container:
+    #         match_num = st.number_input('Match # to retrieve',
+    #                                     min_value=1,
+    #                                     max_value=10,
+    #                                     step=1,
+    #                                     value=1,
+    #                                     on_change=reset_seg_dict)
+    #         match_sql = f"""SELECT * FROM activities.vw_overlapped_segments WHERE match_rank = {match_num}"""
+    #
+    #         if 'seg_dict' not in ss:
+    #             with st.spinner('Pulling Potential Segment Overlaps', show_time=True):
+    #                 ss.seg_dict = sql_to_dict(match_sql)
+    #         with st.spinner('Rendering maps', show_time=True):
+    #             render_segment_compare(ss.seg_dict, comp_choice)
     elif comp_choice == 'Leaderboards':
         render_segment_leaderboard()
     elif comp_choice == 'Match Activities':
@@ -227,10 +222,8 @@ def process_new_run():
                 time.sleep(0.5)
 
             # Smooth and match activities
-                ultimate_task_executioner(force_task_id=21)
-            ss.aid = one_sql_result("""SELECT MAX(activity_id) FROM activities.activities where activity_type_name like '%run%'""")
             with st.spinner('Matching Segments', show_time=True):
-                activity_post_processing([int(ss.aid)])
+                ultimate_task_executioner(force_task_id=21)
             ss.new_run_synced = True
 
 
@@ -264,9 +257,22 @@ def process_new_run():
     return
 
 def display_last_run():
+    opt = st.segmented_control('Display:',
+                               options=['Last Run', 'Last Activity'],
+                               key='dlr_type_choice',
+                               on_change=ss_pop,
+                               args=(['aid', 'sm_leaderboard_df', 'sm_seg_df', 'df_race','summary_df'],))
+
+    typ = ss.get('dlr_type_choice')
+    if typ == 'Last Run':
+            ss.aid = one_sql_result("""SELECT MAX(activity_id) FROM activities.activities where activity_type_name like '%run%'""")
+    elif typ == 'Last Activity':
+        ss.aid = one_sql_result(
+                """SELECT MAX(activity_id) FROM activities.activities""")
 
     if not sse('aid'):
-        ss.aid = one_sql_result("""SELECT MAX(activity_id) FROM activities.activities where activity_type_name like '%run%'""")
+        return
+
     display_activity()
     return
 
@@ -293,7 +299,7 @@ def display_activity():
 
     st.write(f""":blue[__{effort_name}__] : __{dist_str}__ miles @ __{pace_str}/mi__""")
 
-    st.write(was_course)
+    # st.write(was_course)
     if was_course:
 
         delta_pace_r = ss.summary_df['prior_delta_s'].iloc[0]
@@ -332,7 +338,7 @@ def display_activity():
             if row['is_course']:
                 continue
 
-            st.write(row)
+            # st.write(row)
             delta_pace_r = row['prior_delta_s']
             if delta_pace_r > 0:
                 pace_dir = 's faster'
@@ -374,15 +380,10 @@ def display_activity():
     else:
         st.info('Create a segment/course to create a leaderboard')
 
-
-
-
-
-
-
-
-
-
+    if st.button(':material/reset_settings: Reset'):
+        ss_pop(['aid', 'sm_leaderboard_df', 'sm_seg_df', 'df_race','summary_df'])
+        st.rerun()
+    st.caption(f"Activity ID# {ss.aid}")
     return
 
 
