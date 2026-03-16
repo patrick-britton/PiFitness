@@ -101,14 +101,16 @@ def render_leaderboard(df_raw):
         return
 
     # Display the static "Final Results" Chart
-    chart_col, config_col = st.columns(spec=[3,1], gap="small", border=False)
+    # chart_col, config_col = st.columns(spec=[3,1], gap="small", border=False)
+    map_style_widget()
 
-    with config_col:
-        map_style_widget()
 
-    with chart_col:
-        fig = create_static_leaderboard_viz(ss.df_race)
-        st.plotly_chart(fig, width=800)
+
+
+    fig = create_animated_map_viz(ss.df_race)
+    st.plotly_chart(fig, width=900, height=450)
+    fig2 = create_telemetry_charts_viz(ss.df_race)
+    st.plotly_chart(fig2, width=900, height=450*3)
 
     if st.button('Refresh'):
         ss_pop('sm_leaderboard_df')
@@ -167,11 +169,15 @@ def get_and_prep_telemetry():
     return df_long
 
 
-def create_static_leaderboard_viz(df_long):
+def create_animated_map_viz(df_long):
     activities = df_long['id_val'].unique()
-    colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A']
+    ref_act = activities[0]
 
-    # --- 1. View & Bound Calculations (Unchanged) ---
+    filtered_acts = [act for act in activities if act != ref_act]
+    num_filtered = len(filtered_acts)
+    colors = ['#000000', '#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A']
+
+    # --- 1. View & Bound Calculations (Reinstated) ---
     min_lat, max_lat = df_long['lat'].min(), df_long['lat'].max()
     min_lon, max_lon = df_long['lon'].min(), df_long['lon'].max()
     center_lat = round((max_lat + min_lat) / 2, 5)
@@ -183,143 +189,296 @@ def create_static_leaderboard_viz(df_long):
     adjusted_lon_span = lon_span * 1.1
     max_bound_deg = max(adjusted_lat_span, adjusted_lon_span)
     max_bound = max_bound_deg * 111
-
-    base_zoom = 14.55 if max_bound_deg > 0.0264 else 15.01
+    st.caption(max_bound_deg)
+    base_zoom = 14.75 if max_bound_deg > 0.018 else 15.71
     zoom = base_zoom - np.log(max_bound) if not math.isnan(base_zoom - np.log(max_bound)) else 16.78
+    zoom_adj = ss.get('zoom_adj')
+    if zoom_adj:
+        zoom = zoom + zoom_adj
+    y_slots = [f"Slot_{i}" for i in range(num_filtered)]
 
     fig = make_subplots(
-        rows=5, cols=1,
-        row_heights=[0.4, 0.2, 0.2, 0.2, 0.2],
-        vertical_spacing=0.03,
-        shared_xaxes=True,
-        specs=[[{"type": "mapbox"}], [{"type": "xy"}], [{"type": "xy"}], [{"type": "xy"}], [{"type": "xy"}]]
+        rows=1, cols=2,
+        column_widths=[0.83, 0.17],  # Roughly 5:1 ratio
+        specs=[[{"type": "mapbox"}, {"type": "xy"}]],
+        horizontal_spacing=0.02
     )
 
-    # --- 2. ADD STATIC LINES (The Course) ---
+    ghost_data = df_long[df_long['id_val'] == activities[0]]
+    fig.add_trace(go.Scattermapbox(
+        lat=ghost_data['lat'],
+        lon=ghost_data['lon'],
+        mode='lines',
+        line=dict(width=1, color='rgba(200, 200, 200, 1)'),  # Thin, light gray
+        showlegend=False,
+        hoverinfo='skip',
+        name="Course Outline"
+    ), row=1, col=1)
+
+    final_values = [df_long[df_long['id_val'] == a].iloc[-1]['y_time_delta'] for a in filtered_acts]
+    fig.add_trace(go.Bar(
+        y=y_slots,
+        x=final_values,
+        orientation='h',
+        marker_color='rgba(211, 211, 211, 0.25)',
+        text=[f"{int(v)}s" for v in final_values],
+        textposition='outside',
+        showlegend=False,
+        hoverinfo='skip',
+        width=0.2
+    ), row=1, col=2)
+
+    # --- 3. LAYER 2 (MIDDLE): ANIMATED GROWING LINES ---
+    line_indices = []
     for i, id_val in enumerate(activities):
-        data = df_long[df_long['id_val'] == id_val]
+        color = colors[i % len(colors)]
+        fig.add_trace(go.Scattermapbox(
+            lat=[], lon=[], mode='lines',
+            line=dict(width=4, color=color),
+            name=str(id_val), legendgroup=str(id_val),
+            showlegend=False,
+        ))
+        line_indices.append(len(fig.data) - 1)
+
+    # --- 4. LAYER 3 (TOP): ANIMATED LEAD MARKERS ---
+    animated_indices = []
+    for i, id_val in enumerate(activities):
         color = colors[i % len(colors)]
 
-        fig.add_trace(go.Scattermapbox(lat=data['lat'], lon=data['lon'], mode='lines', line=dict(width=3, color=color),
-                                       name=f"{id_val}", legendgroup=f"group{id_val}"), row=1, col=1)
-        fig.add_trace(
-            go.Scatter(x=data['x_distance'], y=data['y_time_delta'], mode='lines', line=dict(color=color), name="Time",
-                       legendgroup=f"group{id_val}", showlegend=False), row=2, col=1)
-        fig.add_trace(go.Scatter(x=data['x_distance'], y=data['y_elevation'], mode='lines', line=dict(color=color),
-                                 name="Elevation", legendgroup=f"group{id_val}", showlegend=False), row=3, col=1)
-        fig.add_trace(
-            go.Scatter(x=data['x_distance'], y=data['y_hr'], mode='lines', line=dict(color=color), name="Heart Rate",
-                       legendgroup=f"group{id_val}", showlegend=False), row=4, col=1)
-        fig.add_trace(
-            go.Scatter(x=data['x_distance'], y=data['y_cadence'], mode='lines', line=dict(color=color), name="Cadence",
-                       legendgroup=f"group{id_val}", showlegend=False), row=5, col=1)
+        # Add Map Marker
+        fig.add_trace(go.Scattermapbox(
+            mode='markers', marker=dict(size=14, color=color),
+            showlegend=False, legendgroup=str(id_val)
+        ), row=1, col=1)
+        animated_indices.append(len(fig.data) - 1)
 
-    # --- 3. ADD MOVING DOTS (The Racers) ---
-    # We must save the indices of these dot traces so the animation knows exactly what to move
-    dot_indices = []
-    current_trace_idx = len(activities) * 5
+        # Add Dynamic Bar (Only for non-reference activities)
+        if id_val != ref_act:
+            slot_idx = filtered_acts.index(id_val)
+            fig.add_trace(go.Bar(
+                y=[y_slots[slot_idx]],  # Matches exactly the slot from the gray trace
+                x=[0],
+                orientation='h',
+                marker_color=color,
+                text=["0s"],
+                textposition='outside',
+                showlegend=False,
+                legendgroup=str(id_val),
+                width=0.2
+            ), row=1, col=2)
+            animated_indices.append(len(fig.data) - 1)
 
-    for i, id_val in enumerate(activities):
-        data = df_long[df_long['id_val'] == id_val]
-        color = colors[i % len(colors)]
-        row0 = data.iloc[0]  # Starting position of each metric
 
-        # Notice: mode='markers' is used here to create the dot
-        fig.add_trace(
-            go.Scattermapbox(lat=[row0['lat']], lon=[row0['lon']], mode='markers', marker=dict(size=12, color=color),
-                             showlegend=False), row=1, col=1)
-        dot_indices.append(current_trace_idx);
-        current_trace_idx += 1
+    # Combine indices for the animation engine
+    all_animated_indices = line_indices + animated_indices
 
-        fig.add_trace(go.Scatter(x=[row0['x_distance']], y=[row0['y_time_delta']], mode='markers',
-                                 marker=dict(size=8, color=color), showlegend=False), row=2, col=1)
-        dot_indices.append(current_trace_idx);
-        current_trace_idx += 1
-
-        fig.add_trace(go.Scatter(x=[row0['x_distance']], y=[row0['y_elevation']], mode='markers',
-                                 marker=dict(size=8, color=color), showlegend=False), row=3, col=1)
-        dot_indices.append(current_trace_idx);
-        current_trace_idx += 1
-
-        fig.add_trace(
-            go.Scatter(x=[row0['x_distance']], y=[row0['y_hr']], mode='markers', marker=dict(size=8, color=color),
-                       showlegend=False), row=4, col=1)
-        dot_indices.append(current_trace_idx);
-        current_trace_idx += 1
-
-        fig.add_trace(
-            go.Scatter(x=[row0['x_distance']], y=[row0['y_cadence']], mode='markers', marker=dict(size=8, color=color),
-                       showlegend=False), row=5, col=1)
-        dot_indices.append(current_trace_idx);
-        current_trace_idx += 1
-
-    # --- 4. BUILD ANIMATION FRAMES ---
-    # Find the longest effort to set the timeline
+    # --- 5. BUILD FRAMES ---
     max_len = max([len(df_long[df_long['id_val'] == act]) for act in activities])
-
-    # DOWNSAMPLING: Force the animation into ~150 frames. Any more causes browser lag.
-    step = max(1, max_len // 150)
-
+    step = max(1, max_len // 400)
     frames = []
+    slider_steps = []
+
     for k in range(0, max_len, step):
         frame_data = []
+        current_dist = int(df_long[df_long['id_val'] == activities[0]].iloc[
+                               min(k, len(df_long[df_long['id_val'] == activities[0]]) - 1)]['x_distance'])
+        frame_name = f"{current_dist}m"
+        frame_id = str(k)
+
+        # Add Line Data first
         for id_val in activities:
             data = df_long[df_long['id_val'] == id_val]
-            # If someone finished early, lock their dot at their final row
             idx = min(k, len(data) - 1)
-            row = data.iloc[idx]
+            line_slice = data.iloc[0: idx + 1]
+            frame_data.append(go.Scattermapbox(lat=line_slice['lat'], lon=line_slice['lon']))
 
-            # The order here MUST match the order we added the Moving Dots in step 3
-            frame_data.extend([
-                go.Scattermapbox(lat=[row['lat']], lon=[row['lon']]),
-                go.Scatter(x=[row['x_distance']], y=[row['y_time_delta']]),
-                go.Scatter(x=[row['x_distance']], y=[row['y_elevation']]),
-                go.Scatter(x=[row['x_distance']], y=[row['y_hr']]),
-                go.Scatter(x=[row['x_distance']], y=[row['y_cadence']])
-            ])
+        # Add Marker Data second
+        for id_val in activities:
+            d = df_long[df_long['id_val'] == id_val]
+            row = d.iloc[min(k, len(d) - 1)]
+            frame_data.append(go.Scattermapbox(lat=[row['lat']], lon=[row['lon']]))
 
-        frames.append(go.Frame(data=frame_data, traces=dot_indices, name=f'frame_{k}'))
+            if id_val != ref_act:
+                slot_idx = filtered_acts.index(id_val)
+                val = row['y_time_delta']
+                frame_data.append(go.Bar(y=[y_slots[slot_idx]],
+                                         x=[val], text=[f"{int(val)}s"],
+                                         width=0.2))
+
+        frames.append(go.Frame(data=frame_data, traces=all_animated_indices, name=frame_id))
+
+        # Add Slider Step
+        slider_step = {
+            "args": [[frame_id],
+                     {"frame": {"duration": 50, "redraw": True}, "mode": "immediate", "transition": {"duration": 1}}],
+            "label": frame_name,
+            "method": "animate"
+        }
+        # if k % 250 == 0:
+        slider_steps.append(slider_step)
 
     fig.frames = frames
 
-    # --- 5. LAYOUT & FIXES ---
-    token = mapbox_token()  # Assuming this is a custom function of yours
-    view = ss.style_dict.get(ss.get('cc_map_style'))
-    if not view:
-        view = 'open-street-map'  # Simplified for the example
-
+    # --- 4. Layout & Styles (Reinstated) ---
+    token = mapbox_token()  # Custom function
+    view = ss.style_dict.get(ss.get('cc_map_style'), 'positron')
+    final_values = [df_long[df_long['id_val'] == a].iloc[-1]['y_time_delta'] for a in filtered_acts]
+    x_min, x_max = min(final_values), max(final_values)
+    x_range = [
+        x_min * 1.8 if x_min < 0 else -20,
+        x_max * 1.8 if x_max > 0 else 20
+    ]
     fig.update_layout(
-        height=1400,
-        mapbox_style=view,
+        height=700,
+        autosize=False,
+        barmode='overlay',
+        mapbox_style=view,  # Assuming 'view' logic from previous steps
         mapbox_accesstoken=token if token else None,
+        showlegend=False,
         mapbox=dict(center=dict(lat=center_lat, lon=center_lon), zoom=zoom),
-        margin=dict(l=0, r=0, t=0, b=0),
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        margin=dict(l=0, r=0, t=0, b=50),  # Space for slider
+        xaxis=dict(
+            showticklabels=False,
+            range=x_range,
+            # showticks=False,  # Explicitly disable the tick marks
+            # tickfont=dict(size=0),  # Force font size to zero as a backup
+            fixedrange=True,
+            showgrid=False,
+            zeroline=True,
+            zerolinecolor='rgba(255,255,255,0.2)'
+        ),
+        xaxis2=dict(
+            showticklabels=False,
+            range=x_range,
+            # showticks=False,
+            # tickfont=dict(size=0),
+            fixedrange=True,
+            showgrid=False,
+            zeroline=True,
+            zerolinecolor='rgba(255,255,255,0.2)'
+        ),
+        # Do the same for Y-axes just in case
+        yaxis=dict(showticklabels=False, showgrid=False, fixedrange=True),
+        yaxis2=dict(showticklabels=False, showgrid=False, fixedrange=True),
 
-        # Add the Play Button
-        updatemenus=[dict(
-            type="buttons",
-            showactive=False,
-            y=1.05,  # Positioned near the top/legend
-            x=0.8,
-            buttons=[dict(
-                label="▶ PLAY RACE",
-                method="animate",
-                args=[None, dict(frame=dict(duration=50, redraw=True), fromcurrent=True, mode="immediate")]
-            )]
-        )]
+        updatemenus=[{
+            "buttons": [
+                {
+                    "args": [None, {
+                        "frame": {"duration": 65, "redraw": True},
+                        "fromcurrent": True,
+                        "mode": "immediate"  # Ensures it starts from where you are
+                    }],
+                    "label": "▶ Play",
+                    "method": "animate"
+                },
+                {
+                    "args": [[None], {  # Note the [None] in a list - this is key
+                        "frame": {"duration": 0, "redraw": False},
+                        "mode": "immediate",
+                        "transition": {"duration": 0}
+                    }],
+                    "label": "⏸ Pause",
+                    "method": "animate"
+                }
+            ],
+            "direction": "left",
+            "pad": {"r": 10, "t": 65},
+            "showactive": False,
+            "type": "buttons",
+            "x": 0, "xanchor": "left", "y": 0, "yanchor": "top"
+        }],
+
+        sliders=[{
+            "active": 0,
+            "yanchor": "top",
+            "xanchor": "left",
+            "currentvalue": {"font": {"size": 14, "family": "monospace"}, "prefix": "Distance: ", "visible": True, "xanchor": "right"},
+            "pad": { "t": 50},
+            # "transition": {"duration": 300, "easing": "cubic-in-out"},
+            "len": 0.85,
+            "xanchor": "left",
+            "x": 0.2, "y": 0,
+            "steps": slider_steps
+        }]
     )
 
-    # THE FIX FOR THE ZOOM BUG: Lock the Cartesian (Line Chart) axes
-    fig.update_xaxes(fixedrange=True)
-    fig.update_yaxes(fixedrange=True)
+    return fig
 
-    fig.update_yaxes(title_text="Time Gap", row=2, col=1)
-    fig.update_yaxes(title_text="Elev (m)", row=3, col=1)
-    fig.update_yaxes(title_text="HR (bpm)", row=4, col=1)
-    fig.update_yaxes(title_text="Cadence", row=5, col=1)
-    fig.update_xaxes(title_text="Distance (m)", row=5, col=1)
+
+def create_telemetry_charts_viz(df_long):
+    activities = df_long['id_val'].unique()
+    colors = ['#000000', '#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A']
+
+    base_elev_data = df_long[df_long['id_val'] == activities[0]]
+
+    min_el = base_elev_data['y_elevation'].min()
+    max_el = base_elev_data['y_elevation'].max()
+    avg_el = base_elev_data['y_elevation'].mean()
+    diff = max_el - min_el
+
+    if diff < 100:
+        lower_bound = min(min_el - 10, avg_el - 60)
+        upper_bound = max(max_el + 10, avg_el + 60)
+    else:
+        lower_bound = min_el - 10
+        upper_bound = max_el + 10
+
+
+    fig = make_subplots(
+        rows=3, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.05,
+        specs=[[{"secondary_y": True}], [{"secondary_y": True}], [{"secondary_y": True}]]
+    )
+
+    # 1. ADD BACKGROUND ELEVATION (Canonical)
+    base_elev_data = df_long[df_long['id_val'] == activities[0]]
+    for r in [1, 2, 3]:
+        fig.add_trace(go.Scatter(
+            x=base_elev_data['x_distance'], y=base_elev_data['y_elevation'],
+            mode='lines', fill='tozeroy',
+            fillcolor='rgba(211, 211, 211, 0.15)',  # Color/Opacity control
+            line=dict(color='rgba(211, 211, 211, 0.45)', width=1),
+            showlegend=False, hoverinfo='skip'
+        ), row=r, col=1, secondary_y=True)
+
+    # 2. ADD ACTIVITY METRICS
+    for i, id_val in enumerate(activities):
+        data = df_long[df_long['id_val'] == id_val]
+        color = colors[i % len(colors)]
+
+        # Row 1: Time Gap (Line)
+        fig.add_trace(go.Scatter(x=data['x_distance'], y=data['y_time_delta'], mode='lines', line=dict(color=color),
+                                 name=str(id_val), legendgroup=str(id_val), showlegend=False), row=1, col=1, secondary_y=False,
+                      )
+
+        # Row 2: Heart Rate (Line)
+        fig.add_trace(
+            go.Scatter(x=data['x_distance'], y=data['y_hr'], mode='lines', line=dict(color=color), showlegend=False,
+                       legendgroup=str(id_val)), row=2, col=1, secondary_y=False)
+
+        # Row 3: Cadence (Dot Plot)
+        fig.add_trace(go.Scatter(
+            x=data['x_distance'], y=data['y_cadence'],
+            mode='markers',
+            marker=dict(size=5, color=color, opacity=0.5),  # Cadence Opacity control
+            showlegend=False, legendgroup=str(id_val)
+        ), row=3, col=1, secondary_y=False)
+
+    # 3. STYLING
+    fig.update_layout(height=800, hovermode="x unified", template="plotly_dark", margin=dict(t=20, b=20))
+    fig.update_yaxes(showticklabels=False, showgrid=False, secondary_y=True)  # Hide Elevation Labels
+
+    # Sync Zooming (Fix for your original bug)
+    fig.update_xaxes(fixedrange=True)
+    fig.update_yaxes(
+        range=[lower_bound, upper_bound],
+        showticklabels=False,
+        showgrid=False,
+        secondary_y=True
+    )
+    fig.update_layout(showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.5))
 
     return fig
 
@@ -335,11 +494,20 @@ def map_style_widget():
                       'Sat + Streets': 'satellite-streets'}
     if token:
         ss.style_dict = ss.style_dict | satellite_dict
+    style_col, zoom_col = st.columns(spec=[1,1], border=False, gap="small")
+    with style_col:
+        st.selectbox(label='Map Style',
+                 key='cc_map_style',
+                 options=list(ss.style_dict.keys()),
+                     on_change=update_map_options)
 
-    st.selectbox(label='Map Style',
-             key='cc_map_style',
-             options=list(ss.style_dict.keys()),
-                 on_change=update_map_options)
+    with zoom_col:
+        st.slider(label='Zoom',
+                  min_value=-1.0,
+                  max_value=1.0,
+                  step=0.01,
+                  key='zoom_adj',
+                  value=0.0)
 
 
     return

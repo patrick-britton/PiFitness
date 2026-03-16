@@ -93,7 +93,8 @@ def plot_route_map(df_main, df_compare=None, focus_type=None):
         fig.add_trace(go.Scattermapbox(
             lat=df_compare['latitude'],
             lon=df_compare['longitude'],
-            mode='lines',
+            mode='lines+markers',
+            # hovermode="closest",
             opacity = 0.5,
             line=dict(width=4, color='#EA3323'),
             name='Segment Match',
@@ -263,7 +264,7 @@ def render_activity(activity_id=None, matching_activity_id=None):
                                (ss.cc_df['distance_m'] <= trim_range_end)]
 
         st.plotly_chart(plot_route_map(df_filtered), width=800, height=400, key='c-bev'
-                        ,config = {'staticPlot': True})
+                        ,config = {'staticPlot': False})
 
         start_col, end_col = st.columns(spec=[1,1], gap="small", border=True)
 
@@ -706,6 +707,7 @@ def render_segment_matches():
                                                                        {int(ss.sm_comp_end)},
                                                                        {ss.sm_comp_confidence}::NUMERIC)"""
             qec(confirm_sql)
+            qec(f"CALL staging.update_segment_details(NULL);")
             ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', 'p_df', 'sm_seg_df', 'sm_comp_df'])
             st.toast('Match Confirmed', duration=5)
             st.rerun()
@@ -723,6 +725,7 @@ def render_segment_matches():
         if st.button(':green[:material/check_circle: Confirm All Remaining]'):
             with st.spinner('Running Mass Approvals', show_time=True):
                 qec(f"CALL activities.segment_matching_mass_confirmation(4);")
+                qec(f"CALL staging.update_segment_details(NULL);")
             ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', ])
             ss_pop(['p_df', 'sm_seg_df', 'sm_comp_df'])
             st.rerun()
@@ -746,6 +749,7 @@ def render_segment_matches():
         if st.button(':red[:material/delete: Delete Segment]'):
             qec(f"DELETE FROM activities.segment_matches where segment_id = {ss.sm_seg_id};")
             qec(f"DELETE FROM activities.segments where segment_id = {ss.sm_seg_id};")
+            qec(f"DELETE FROM activities.segment_details where segment_id = {ss.sm_seg_id};")
             pop_sm_vars()
 
 
@@ -812,7 +816,7 @@ def get_segment_id():
         filter_sql = f"""WHERE 1=1 """
 
     if ss.get('sm_seg_name_key'):
-        filter_sql = f"""{filter_sql} AND lower(activity_type_name) like LOWER('{ss.get('sm_seg_name_key')}') """
+        filter_sql = f"""{filter_sql} AND lower(segment_name) like LOWER('{ss.get('sm_seg_name_key')}') """
 
 
     if ss.get('sm_seg_type'):
@@ -825,6 +829,9 @@ def get_segment_id():
     final_sql = f"{sql} {filter_sql}"
 
     df = pd.read_sql(final_sql, con=get_conn(alchemy=True))
+    if df.empty:
+        st.info('No Matching activities')
+        return
     cols = ['segment_name', 'last_event_utc', 'matched_activities', 'distance_mi', 'elevation_gain']
     col_config = {'segment_name': st.column_config.TextColumn('Name'),
                   'last_event_utc': st.column_config.DateColumn('Last Effort', format='yyyy-MMM-DD'),
