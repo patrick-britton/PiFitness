@@ -228,15 +228,18 @@ def gen_playlist(client, name, description):
     return client, playlist_id
 
 
-def auto_shuffle_playlists():
-    sql = "SELECT DISTINCT playlist_id from music.vw_playlist_shuffle_eligibility "
-    playlists = sql_to_list(sql)
-    print('Starting Autoshuffle')
-    if not playlists:
-        print('No Playlists found to shuffle')
-        return
+def auto_shuffle_playlists(list_id=None, limit_minutes=False):
+    if list_id:
+        playlists = [list_id]
+    else:
+        sql = "SELECT DISTINCT playlist_id from music.vw_playlist_shuffle_eligibility "
+        playlists = sql_to_list(sql)
+        print('Starting Autoshuffle')
+        if not playlists:
+            print('No Playlists found to shuffle')
+            return
 
-    print(f"{len(playlists)} Playlists to shuffle")
+        print(f"{len(playlists)} Playlists to shuffle")
 
     client=get_spotify_client(None)
     #only execute with a valid client
@@ -249,10 +252,26 @@ def auto_shuffle_playlists():
     # The target_playlist_id returned is the child autoshuffle version of that playlist.
     for l in playlists:
         print(f'Pulling new order for list: {l}')
-        sql = f"""SELECT DISTINCT target_playlist_id, track_id,
-            default_new_order 
-            FROM music.vw_playlist_isrc_stats WHERE playlist_id = '{l}'
-            ORDER BY default_new_order asc;"""
+        if limit_minutes:
+            sql = f"""SELECT target_playlist_id,
+                               track_id,
+                               default_new_order
+                        FROM
+                               (SELECT DISTINCT target_playlist_id,
+                                                track_id,
+                                                default_new_order,
+                                                sum(duration_s)
+                                                OVER (PARTITION BY target_playlist_id ORDER BY default_new_order) as cumulative_duration_s,
+                                                minutes_to_sync
+                                FROM music.vw_playlist_isrc_stats
+                                WHERE playlist_id = '{l}') subquery
+                        WHERE cumulative_duration_s/60 < minutes_to_sync
+                        ORDER BY default_new_order asc;"""
+        else:
+            sql = f"""SELECT DISTINCT target_playlist_id, track_id,
+                default_new_order 
+                FROM music.vw_playlist_isrc_stats WHERE playlist_id = '{l}'
+                ORDER BY default_new_order asc;"""
         df = pd.read_sql(sql, get_conn(alchemy=True))
         if df.empty:
             print(f'No songs found for list: {l}')

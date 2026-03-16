@@ -192,17 +192,22 @@ def render_playlist_config():
 
 def render_playlist_shuffle(list_id=None):
     # Forces users to pick a playlist, then gives them weighting options
-    if ss.get("pl_selection") is None:
-        key_val = 'de_playlist_config_df_selection'
-        selection_value = ss.get(key_val)
-        if not selection_value:
-            playlist_config_table(is_selection=True, list_id=list_id)
-            return
-        else:
-            ss.pl_selection = selection_value["selection"]["rows"]
+    if list_id:
+        sql = """SELECT * FROM music.vw_playlist_config WHERE playlist_id = '{list_id}'"""
+        ss.pc_df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
+        row_index=0
+    else:
+        if ss.get("pl_selection") is None:
+            key_val = 'de_playlist_config_df_selection'
+            selection_value = ss.get(key_val)
+            if not selection_value:
+                playlist_config_table(is_selection=True, list_id=list_id)
+                return
+            else:
+                ss.pl_selection = selection_value["selection"]["rows"]
 
-    row = ss.pl_selection
-    row_index = row[0]
+        row = ss.pl_selection
+        row_index = row[0]
     id = ss.pc_df.iloc[row_index]["playlist_id"]
     ratings_weight = int(ss.pc_df.iloc[row_index]["ratings_weight"])
     recency_weight = int(ss.pc_df.iloc[row_index]["recency_weight"])

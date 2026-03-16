@@ -8,7 +8,7 @@ from plotly.subplots import make_subplots
 from shapely import wkb
 import numpy as np
 
-from backend_functions.database_functions import qec, one_sql_result
+from backend_functions.database_functions import qec, one_sql_result, get_conn
 from frontend_functions.streamlit_helpers import ss_pop
 
 
@@ -692,3 +692,4 @@ def update_course_name(key_val, seg_id):
     params = (new_name, seg_id)
     qec(up_sql, params)
     return
+
