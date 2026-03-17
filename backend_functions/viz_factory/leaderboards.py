@@ -108,9 +108,9 @@ def render_leaderboard(df_raw):
 
 
     fig = create_animated_map_viz(ss.df_race)
-    st.plotly_chart(fig, width=900, height=450)
+    st.plotly_chart(figure_or_data=fig, config={'width':800, 'height':350})
     fig2 = create_telemetry_charts_viz(ss.df_race)
-    st.plotly_chart(fig2, width=900, height=450*3)
+    st.plotly_chart(fig2, width=900, config={'width':800, 'height':250*3})
 
     if st.button('Refresh'):
         ss_pop('sm_leaderboard_df')
