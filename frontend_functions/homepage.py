@@ -1,23 +1,17 @@
-import pandas as pd
 import streamlit as st
 from streamlit import session_state as ss
 
 from backend_functions.database_functions import one_sql_result
 from backend_functions.elevation_tiles import reconcile_elevation_tiles
-from backend_functions.logging_functions import start_timer, elapsed_ms
 from backend_functions.service_logins import sql_rate_limited, rate_limit_test
-
-from backend_functions.viz_factory.task_summary import render_task_summary_dashboard
-from backend_functions.viz_factory.db_size import render_db_size_dashboard
 from frontend_functions.music_module import rating_display_module
-from frontend_functions.running_module import render_segment_notice_widgets
+
 
 
 def render_homepage():
     rate_limit_widget()
     rating_display_module()
     dupe_widget()
-    render_segment_notice_widgets()
 
     if st.button('Load Mapping Tiles'):
         reconcile_elevation_tiles()

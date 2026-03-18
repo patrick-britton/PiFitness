@@ -42,10 +42,12 @@ def nav_dictionary():
                     },
 
         # Running
-        'running': {'run_charting': {'icon': 'show_chart'},
-                    'new_run_process': {'icon': 'directory_sync'},
+        'running': {'run_charting': {'label': 'Recent Activity', 'icon': 'show_chart'},
+                    'leaderboards': {'label': 'Leaderboards', 'icon': 'rewarded_ads'},
+                    'segment_compare': {'icon': 'conversion_path', 'label': 'Segment Config'},
+                    'new_run_process': {'label': 'Activity Processing', 'icon': 'directory_sync'},
                     'run_forecast': {'icon': 'planet'},
-                    'segment_compare': {'icon': 'conversion_path', 'label': 'Courses & Segments'},
+
                     },
         # Food page
         'food': {},

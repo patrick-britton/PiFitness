@@ -135,7 +135,7 @@ def plot_route_map(df_main, df_compare=None, focus_type=None):
 
     view = ss.style_dict.get(ss.get('cc_map_style'))
     if not view:
-        view = 'open-street-map'
+        view = 'carto-positron'
 
     # Apply auto-zooming bounds
     fig.update_layout(
@@ -331,8 +331,9 @@ def render_activity(activity_id=None, matching_activity_id=None):
 
 def init_map_basics():
     if not sse('style_dict'):
-        ss.style_dict = {'Open Map': 'open-street-map',
-                         'Positron': 'carto-positron',
+        ss.style_dict = {'Positron': 'carto-positron',
+                         'Open Map': 'open-street-map',
+
                          'Dark Matter': 'carto-darkmatter',
                          'Whiteout': 'white-bg'}
         ss.map_style = 'carto-positron'
@@ -683,64 +684,66 @@ def render_segment_matches():
                                                                min_value=0,
                                                                max_value=max_fresh,
                                                                format='plain')}
-        st.dataframe(ss.p_df,
-                     hide_index=True,
-                     on_select='rerun',
-                     selection_mode='single-row',
-                     column_order=tsm_cols,
-                     column_config=tsm_config,
-                     key='sm_comp_dict')
-        if ss.get('sm_comp_dict'):
-            selected_idx_row = ss.get('sm_comp_dict').get('selection').get('rows')
-            if selected_idx_row:
-                ss.sm_comp_id = ss.p_df.iloc[selected_idx_row[0]]['activity_id']
-                ss.sm_comp_start = ss.p_df.iloc[selected_idx_row[0]]['best_start_dist']
-                ss.sm_comp_end = ss.p_df.iloc[selected_idx_row[0]]['best_end_dist']
-                ss.sm_comp_confidence = ss.p_df.iloc[selected_idx_row[0]]['confidence']
-                ss.sm_comp_df = get_activity_df(ss.sm_comp_id, ss.sm_comp_start, ss.sm_comp_end)
 
-        if st.button(':material/check_circle: Confirm Match'):
-            confirm_sql = f"""CALL activities.segment_matching_finalize_match(True,
-                                                                       {int(ss.sm_comp_id)},
-                                                                       {int(ss.sm_seg_id)},
-                                                                       {int(ss.sm_comp_start)},
-                                                                       {int(ss.sm_comp_end)},
-                                                                       {ss.sm_comp_confidence}::NUMERIC)"""
-            qec(confirm_sql)
-            qec(f"CALL staging.update_segment_details(NULL);")
-            ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', 'p_df', 'sm_seg_df', 'sm_comp_df'])
-            st.toast('Match Confirmed', duration=5)
-            st.rerun()
-        if st.button(':red[:material/cancel: Reject Match]'):
-            confirm_sql = f"""CALL activities.segment_matching_finalize_match(False,
-                                                                                   {int(ss.sm_comp_id)},
-                                                                                   {int(ss.sm_seg_id)},
-                                                                                   {int(ss.sm_comp_start)},
-                                                                                   {int(ss.sm_comp_end)},
-                                                                                   {ss.sm_comp_confidence}::NUMERIC)"""
-            qec(confirm_sql)
-            ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', 'p_df', 'sm_seg_df', 'sm_comp_df'])
-            st.toast('Match Rejected', duration=5)
-            st.rerun()
-        if st.button(':green[:material/check_circle: Confirm All Remaining]'):
-            with st.spinner('Running Mass Approvals', show_time=True):
-                qec(f"CALL activities.segment_matching_mass_confirmation(4);")
+        if not ss.p_df.empty:
+            st.dataframe(ss.p_df,
+                         hide_index=True,
+                         on_select='rerun',
+                         selection_mode='single-row',
+                         column_order=tsm_cols,
+                         column_config=tsm_config,
+                         key='sm_comp_dict')
+            if ss.get('sm_comp_dict'):
+                selected_idx_row = ss.get('sm_comp_dict').get('selection').get('rows')
+                if selected_idx_row:
+                    ss.sm_comp_id = ss.p_df.iloc[selected_idx_row[0]]['activity_id']
+                    ss.sm_comp_start = ss.p_df.iloc[selected_idx_row[0]]['best_start_dist']
+                    ss.sm_comp_end = ss.p_df.iloc[selected_idx_row[0]]['best_end_dist']
+                    ss.sm_comp_confidence = ss.p_df.iloc[selected_idx_row[0]]['confidence']
+                    ss.sm_comp_df = get_activity_df(ss.sm_comp_id, ss.sm_comp_start, ss.sm_comp_end)
+
+            if st.button(':material/check_circle: Confirm Match'):
+                confirm_sql = f"""CALL activities.segment_matching_finalize_match(True,
+                                                                           {int(ss.sm_comp_id)},
+                                                                           {int(ss.sm_seg_id)},
+                                                                           {int(ss.sm_comp_start)},
+                                                                           {int(ss.sm_comp_end)},
+                                                                           {ss.sm_comp_confidence}::NUMERIC)"""
+                qec(confirm_sql)
                 qec(f"CALL staging.update_segment_details(NULL);")
-            ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', ])
-            ss_pop(['p_df', 'sm_seg_df', 'sm_comp_df'])
-            st.rerun()
+                ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', 'p_df', 'sm_seg_df', 'sm_comp_df'])
+                st.toast('Match Confirmed', duration=5)
+                st.rerun()
+            if st.button(':red[:material/cancel: Reject Match]'):
+                confirm_sql = f"""CALL activities.segment_matching_finalize_match(False,
+                                                                                       {int(ss.sm_comp_id)},
+                                                                                       {int(ss.sm_seg_id)},
+                                                                                       {int(ss.sm_comp_start)},
+                                                                                       {int(ss.sm_comp_end)},
+                                                                                       {ss.sm_comp_confidence}::NUMERIC)"""
+                qec(confirm_sql)
+                ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', 'p_df', 'sm_seg_df', 'sm_comp_df'])
+                st.toast('Match Rejected', duration=5)
+                st.rerun()
+            if st.button(':green[:material/check_circle: Confirm All Remaining]'):
+                with st.spinner('Running Mass Approvals', show_time=True):
+                    qec(f"CALL activities.segment_matching_mass_confirmation(4);")
+                    qec(f"CALL staging.update_segment_details(NULL);")
+                ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', ])
+                ss_pop(['p_df', 'sm_seg_df', 'sm_comp_df'])
+                st.rerun()
 
-        if st.button(':material/timelapse: Run Hausdorff Scoring'):
-            with st.spinner('Running Hausdorff Scoring', show_time=True):
-                qec(f"CALL activities.segment_matches_all_hausdorff();")
-            ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', 'p_df', 'sm_seg_df', 'sm_comp_df'])
-            st.rerun()
+            if st.button(':material/timelapse: Run Hausdorff Scoring'):
+                with st.spinner('Running Hausdorff Scoring', show_time=True):
+                    qec(f"CALL activities.segment_matches_all_hausdorff();")
+                ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', 'p_df', 'sm_seg_df', 'sm_comp_df'])
+                st.rerun()
 
-        if st.button(':material/slow_motion_video: Run Freschett Scoring'):
-            with st.spinner('Running Hausdorff Scoring', show_time=True):
-                qec(f"CALL activities.segment_matches_all_freschet();")
-            ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', 'p_df', 'sm_seg_df', 'sm_comp_df'])
-            st.rerun()
+            if st.button(':material/slow_motion_video: Run Freschett Scoring'):
+                with st.spinner('Running Hausdorff Scoring', show_time=True):
+                    qec(f"CALL activities.segment_matches_all_freschet();")
+                ss_pop(['sm_comp_id', 'sm_comp_start', 'sm_comp_end', 'sm_comp_df', 'p_df', 'sm_seg_df', 'sm_comp_df'])
+                st.rerun()
 
         # -------FINAL clearance button------------
         if st.button(':material/restart_alt: Change Segment'):
