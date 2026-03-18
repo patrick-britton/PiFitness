@@ -28,7 +28,7 @@ def render_leaderboard(df_raw):
     with col1:
         range_choice = st.selectbox("Range", ["All Time", "Last 365", "Current Cycle", "Most Recent"])
     with col2:
-        type_choice = st.selectbox("Leaderboard Type", ["Basic", "Fitness", "Advanced", "Environment"])
+        type_choice = st.selectbox("Leaderboard Type", ["Basic", "Fitness", "Advanced", "Environment", "Preparedness"])
 
     # st.write(df_raw.columns)
     # --- 2. DATA PREPARATION ---
@@ -42,19 +42,18 @@ def render_leaderboard(df_raw):
     df_proc = df_raw.dropna(subset=[active_rank_col]).sort_values(active_rank_col).copy()
 
     # Calculate Gaps
-    df_proc['gap_s'] = df_proc['elapsed_duration_s'] - df_proc['elapsed_duration_s'].iloc[0]
+    df_proc['gap_s'] = round(df_proc['elapsed_duration_s'] - df_proc['elapsed_duration_s'].iloc[0],1)
     gap_min = 0 #df_proc['gap_s'].min()
     gap_max = df_proc['gap_s'].max()
     if gap_max <1:
         gap_max=1
 
+    basic_cols = col_selector(type_choice)
 
-    basic_cols = [
-                  'start_time_utc',
-                  'pace_str',
-                  'gap_s',
-                  'avg_hr']
-    st.write(active_rank_col)
+
+
+
+    # st.write(active_rank_col)
     ld_col_config = {active_rank_col: st.column_config.NumberColumn("#",
                      format='%d',
                      width=10),
@@ -62,10 +61,217 @@ def render_leaderboard(df_raw):
                                                                    format='yyyy-MMM-DD',
                                                                    width=30),
                      'gap_s': st.column_config.ProgressColumn('Gap (s)',
+                                                              format='%f',
+                                                              min_value=safe_minmax(df_proc,
+                                                                                    'gap_s',
+                                                                                    0,
+                                                                                    False),
+                                                              max_value=safe_minmax(df_proc,
+                                                                                    'gap_s',
+                                                                                    0,
+                                                                                    True),
+                                                              color='auto-inverse',
+                                                              width=30),
+                     'avg_hr': st.column_config.ProgressColumn('Avg HR',
+                                                              min_value=60,
+                                                              max_value = safe_minmax(df_proc,
+                                                                                    'avg_hr',
+                                                                                    60,
+                                                                                    True),
                                                               format='%d',
-                                                              min_value=gap_min,
-                                                              max_value=gap_max,
-                                                              color='auto-inverse')
+                                                               width=30),
+                     'vo2_max_value': st.column_config.ProgressColumn('VO2',
+                                                               min_value=safe_minmax(df_proc,
+                                                                                     'vo2_max_value',
+                                                                                     None,
+                                                                                     False),
+                                                               max_value=safe_minmax(df_proc,
+                                                                                     'vo2_max_value',
+                                                                                     None,
+                                                                                     True),
+                                                               format='%f',
+                                                                      color='auto',
+                                                               width=30),
+                     'resting_hr_asleep': st.column_config.ProgressColumn('RHR',
+                                                                      min_value=safe_minmax(df_proc,
+                                                                                            'resting_hr_asleep',
+                                                                                            30,
+                                                                                            False),
+                                                                      max_value=safe_minmax(df_proc,
+                                                                                            'resting_hr_asleep',
+                                                                                            30,
+                                                                                            True),
+                                                                      format='%d',
+                                                                          color='auto-inverse',
+                                                                      width=30),
+                     'training_load_acute': st.column_config.ProgressColumn('Acute Load',
+                                                                          min_value=safe_minmax(df_proc,
+                                                                                                'training_load_acute',
+                                                                                                None,
+                                                                                                False),
+                                                                          max_value=safe_minmax(df_proc,
+                                                                                                'training_load_acute',
+                                                                                                None,
+                                                                                                True),
+                                                                          format='%d',
+                                                                          color='auto',
+                                                                          width=30),
+                     'weight_lb': st.column_config.ProgressColumn('Weight',
+                                                                            min_value=safe_minmax(df_proc,
+                                                                                                  'weight_lb',
+                                                                                                  None,
+                                                                                                  False),
+                                                                            max_value=safe_minmax(df_proc,
+                                                                                                  'weight_lb',
+                                                                                                  None,
+                                                                                                  True),
+                                                                            format='%f',
+                                                                            color='auto-inverse',
+                                                                            width=30),
+                     'fat_pct': st.column_config.ProgressColumn('Fat%',
+                                                                  min_value=safe_minmax(df_proc,
+                                                                                        'fat_pct',
+                                                                                        None,
+                                                                                        False),
+                                                                  max_value=safe_minmax(df_proc,
+                                                                                        'fat_pct',
+                                                                                        None,
+                                                                                        True),
+                                                                  format='percent',
+                                                                  color='auto-inverse',
+                                                                  width=30),
+                     'muscle_pct': st.column_config.ProgressColumn('Fat%',
+                                                                min_value=safe_minmax(df_proc,
+                                                                                      'muscle_pct',
+                                                                                      None,
+                                                                                      False),
+                                                                max_value=safe_minmax(df_proc,
+                                                                                      'muscle_pct',
+                                                                                      None,
+                                                                                      True),
+                                                                format='percent',
+                                                                color='auto',
+                                                                width=30),
+                     'avg_cadence': st.column_config.ProgressColumn('Cadence',
+                                                                   min_value=safe_minmax(df_proc,
+                                                                                         'avg_cadence',
+                                                                                         None,
+                                                                                         False),
+                                                                   max_value=safe_minmax(df_proc,
+                                                                                         'avg_cadence',
+                                                                                         None,
+                                                                                         True),
+                                                                   format='%d',
+                                                                   color='auto',
+                                                                   width=30),
+                     'avg_vert_osc': st.column_config.ProgressColumn('Vert. Osc.',
+                                                                    min_value=safe_minmax(df_proc,
+                                                                                          'avg_vert_osc',
+                                                                                          None,
+                                                                                          False),
+                                                                    max_value=safe_minmax(df_proc,
+                                                                                          'avg_vert_osc',
+                                                                                          None,
+                                                                                          True),
+                                                                    format='%f',
+                                                                    color='auto-inverse',
+                                                                    width=30),
+                     'avg_gct': st.column_config.ProgressColumn('GCT',
+                                                                     min_value=safe_minmax(df_proc,
+                                                                                           'avg_gct',
+                                                                                           None,
+                                                                                           False),
+                                                                     max_value=safe_minmax(df_proc,
+                                                                                           'avg_gct',
+                                                                                           None,
+                                                                                           True),
+                                                                     format='%d',
+                                                                     color='auto-inverse',
+                                                                     width=30),
+                     'avg_stride_length': st.column_config.ProgressColumn('Stride',
+                                                                min_value=safe_minmax(df_proc,
+                                                                                      'avg_stride_length',
+                                                                                      None,
+                                                                                      False),
+                                                                max_value=safe_minmax(df_proc,
+                                                                                      'avg_stride_length',
+                                                                                      None,
+                                                                                      True),
+                                                                format='%f',
+                                                                color='auto',
+                                                                width=30),
+                     'avg_temp': st.column_config.ProgressColumn('Temp',
+                                                                          min_value=safe_minmax(df_proc,
+                                                                                                'avg_temp',
+                                                                                                None,
+                                                                                                False),
+                                                                          max_value=safe_minmax(df_proc,
+                                                                                                'avg_temp',
+                                                                                                None,
+                                                                                                True),
+                                                                          format='%f',
+                                                                          color='auto-inverse',
+                                                                          width=30),
+                     'altitude_acclimation_m': st.column_config.ProgressColumn('Acclimation',
+                                                                 min_value=safe_minmax(df_proc,
+                                                                                       'altitude_acclimation_m',
+                                                                                       None,
+                                                                                       False),
+                                                                 max_value=safe_minmax(df_proc,
+                                                                                       'altitude_acclimation_m',
+                                                                                       None,
+                                                                                       True),
+                                                                 format='%f',
+                                                                 color='auto',
+                                                                 width=30),
+                     'training_load_pct': st.column_config.ProgressColumn('Load %',
+                                                                    min_value=safe_minmax(df_proc,
+                                                                                          'training_load_pct',
+                                                                                          None,
+                                                                                          False),
+                                                                    max_value=safe_minmax(df_proc,
+                                                                                          'training_load_pct',
+                                                                                          None,
+                                                                                          True),
+                                                                    format='percent',
+                                                                    color='auto',
+                                                                    width=30),
+                     'sleep_hours': st.column_config.ProgressColumn('Sleep',
+                                                                               min_value=safe_minmax(df_proc,
+                                                                                                     'sleep_hours',
+                                                                                                     None,
+                                                                                                     False),
+                                                                               max_value=safe_minmax(df_proc,
+                                                                                                     'sleep_hours',
+                                                                                                     None,
+                                                                                                     True),
+                                                                               format='%f',
+                                                                               color='auto',
+                                                                               width=30),
+                     'sleep_score': st.column_config.ProgressColumn('Sleep Score',
+                                                                    min_value=safe_minmax(df_proc,
+                                                                                          'sleep_score',
+                                                                                          None,
+                                                                                          False),
+                                                                    max_value=safe_minmax(df_proc,
+                                                                                          'sleep_score',
+                                                                                          None,
+                                                                                          True),
+                                                                    format='%d',
+                                                                    color='auto',
+                                                                    width=30),
+                     'awake_hours': st.column_config.ProgressColumn('Awake Time',
+                                                                    min_value=safe_minmax(df_proc,
+                                                                                          'awake_hours',
+                                                                                          None,
+                                                                                          False),
+                                                                    max_value=safe_minmax(df_proc,
+                                                                                          'awake_hours',
+                                                                                          None,
+                                                                                          True),
+                                                                    format='%f',
+                                                                    color='auto',
+                                                                    width=30),
                      }
 
 
@@ -108,9 +314,13 @@ def render_leaderboard(df_raw):
 
 
     fig = create_animated_map_viz(ss.df_race)
-    st.plotly_chart(figure_or_data=fig, config={'width':800, 'height':350})
+    st.plotly_chart(figure_or_data=fig, width='content'
+                    # , config={'width':800, 'height':450}
+                    )
     fig2 = create_telemetry_charts_viz(ss.df_race)
-    st.plotly_chart(fig2, width=900, config={'width':800, 'height':250*3})
+    st.plotly_chart(fig2, width='content'
+                    # , config={'width':800, 'height':570*3}
+                    )
 
     if st.button('Refresh'):
         ss_pop('sm_leaderboard_df')
@@ -174,7 +384,7 @@ def create_animated_map_viz(df_long):
     ref_act = activities[0]
 
     filtered_acts = [act for act in activities if act != ref_act]
-    num_filtered = len(filtered_acts)
+
     colors = ['#000000', '#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A']
 
     # --- 1. View & Bound Calculations (Reinstated) ---
@@ -189,19 +399,19 @@ def create_animated_map_viz(df_long):
     adjusted_lon_span = lon_span * 1.1
     max_bound_deg = max(adjusted_lat_span, adjusted_lon_span)
     max_bound = max_bound_deg * 111
-    st.caption(max_bound_deg)
-    base_zoom = 14.75 if max_bound_deg > 0.018 else 15.71
+    # st.caption(max_bound_deg)
+    base_zoom = 14.75 if max_bound_deg > 0.018 else 15.41
     zoom = base_zoom - np.log(max_bound) if not math.isnan(base_zoom - np.log(max_bound)) else 16.78
     zoom_adj = ss.get('zoom_adj')
     if zoom_adj:
         zoom = zoom + zoom_adj
-    y_slots = [f"Slot_{i}" for i in range(num_filtered)]
+
 
     fig = make_subplots(
         rows=1, cols=2,
-        column_widths=[0.83, 0.17],  # Roughly 5:1 ratio
+        column_widths=[5, 1],
         specs=[[{"type": "mapbox"}, {"type": "xy"}]],
-        horizontal_spacing=0.02
+        horizontal_spacing=0.1
     )
 
     ghost_data = df_long[df_long['id_val'] == activities[0]]
@@ -209,23 +419,29 @@ def create_animated_map_viz(df_long):
         lat=ghost_data['lat'],
         lon=ghost_data['lon'],
         mode='lines',
-        line=dict(width=1, color='rgba(200, 200, 200, 1)'),  # Thin, light gray
+        line=dict(width=5, color='rgba(0, 0, 0, .1)'),  # Thin, light gray
         showlegend=False,
         hoverinfo='skip',
         name="Course Outline"
     ), row=1, col=1)
 
     final_values = [df_long[df_long['id_val'] == a].iloc[-1]['y_time_delta'] for a in filtered_acts]
+    max_slots = 5
+
+    y_slots = [f"{i}" for i in filtered_acts]
+    while len(y_slots) <= max_slots:
+        y_slots.append("")
+
     fig.add_trace(go.Bar(
         y=y_slots,
         x=final_values,
         orientation='h',
         marker_color='rgba(211, 211, 211, 0.25)',
-        text=[f"{int(v)}s" for v in final_values],
-        textposition='outside',
+        # text=[f"{int(v)}s" for v in final_values],
+        # textposition='outside',
         showlegend=False,
         hoverinfo='skip',
-        width=0.2
+        width=0.5
     ), row=1, col=2)
 
     # --- 3. LAYER 2 (MIDDLE): ANIMATED GROWING LINES ---
@@ -264,7 +480,7 @@ def create_animated_map_viz(df_long):
                 textposition='outside',
                 showlegend=False,
                 legendgroup=str(id_val),
-                width=0.2
+                width=0.5
             ), row=1, col=2)
             animated_indices.append(len(fig.data) - 1)
 
@@ -274,7 +490,20 @@ def create_animated_map_viz(df_long):
 
     # --- 5. BUILD FRAMES ---
     max_len = max([len(df_long[df_long['id_val'] == act]) for act in activities])
-    step = max(1, max_len // 400)
+    num_acts = len(y_slots)
+    if num_acts <= 2:
+        target_frames = 400
+        frame_duration = 50
+    elif num_acts == 3:
+        target_frames = 350
+        frame_duration = 65
+    elif num_acts == 4:
+        target_frames = 250
+        frame_duration = 90
+    else:  # 5+ activities (Maximum braking)
+        target_frames = 150
+        frame_duration = 140
+    step = max(1, max_len // target_frames)
     frames = []
     slider_steps = []
 
@@ -310,7 +539,7 @@ def create_animated_map_viz(df_long):
         # Add Slider Step
         slider_step = {
             "args": [[frame_id],
-                     {"frame": {"duration": 50, "redraw": True}, "mode": "immediate", "transition": {"duration": 1}}],
+                     {"frame": {"duration": frame_duration, "redraw": True}, "mode": "immediate", "transition": {"duration": 0}}],
             "label": frame_name,
             "method": "animate"
         }
@@ -329,7 +558,8 @@ def create_animated_map_viz(df_long):
         x_max * 1.8 if x_max > 0 else 20
     ]
     fig.update_layout(
-        height=700,
+        height=500,
+        width=850,
         autosize=False,
         barmode='overlay',
         mapbox_style=view,  # Assuming 'view' logic from previous steps
@@ -338,7 +568,9 @@ def create_animated_map_viz(df_long):
         mapbox=dict(center=dict(lat=center_lat, lon=center_lon), zoom=zoom),
         margin=dict(l=0, r=0, t=0, b=50),  # Space for slider
         xaxis=dict(
-            showticklabels=False,
+            showticklabels=True,
+            showline=True,
+            ticks="outside",
             range=x_range,
             # showticks=False,  # Explicitly disable the tick marks
             # tickfont=dict(size=0),  # Force font size to zero as a backup
@@ -358,14 +590,24 @@ def create_animated_map_viz(df_long):
             zerolinecolor='rgba(255,255,255,0.2)'
         ),
         # Do the same for Y-axes just in case
-        yaxis=dict(showticklabels=False, showgrid=False, fixedrange=True),
-        yaxis2=dict(showticklabels=False, showgrid=False, fixedrange=True),
+        yaxis=dict(
+            showticklabels=True,   # Switch this from False to True
+            tickmode='array',
+            type='category',
+            categoryarray=y_slots,
+            range=[-0.5, max_slots - 0.5],
+            tickvals=y_slots,      # Use your list: ['Slot_0', 'Slot_1', ...]
+            ticktext=y_slots,      # This is what actually displays
+            fixedrange=True,
+            showgrid=False,
+            side='left'            # Ensures they stay on the left of the bars
+    ),
 
         updatemenus=[{
             "buttons": [
                 {
                     "args": [None, {
-                        "frame": {"duration": 65, "redraw": True},
+                        "frame": {"duration": frame_duration, "redraw": True},
                         "fromcurrent": True,
                         "mode": "immediate"  # Ensures it starts from where you are
                     }],
@@ -374,7 +616,7 @@ def create_animated_map_viz(df_long):
                 },
                 {
                     "args": [[None], {  # Note the [None] in a list - this is key
-                        "frame": {"duration": 0, "redraw": False},
+                        "frame": {"duration": 0, "redraw": True},
                         "mode": "immediate",
                         "transition": {"duration": 0}
                     }],
@@ -428,7 +670,7 @@ def create_telemetry_charts_viz(df_long):
     fig = make_subplots(
         rows=3, cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.05,
+        vertical_spacing=0.1,
         specs=[[{"secondary_y": True}], [{"secondary_y": True}], [{"secondary_y": True}]]
     )
 
@@ -450,7 +692,7 @@ def create_telemetry_charts_viz(df_long):
 
         # Row 1: Time Gap (Line)
         fig.add_trace(go.Scatter(x=data['x_distance'], y=data['y_time_delta'], mode='lines', line=dict(color=color),
-                                 name=str(id_val), legendgroup=str(id_val), showlegend=False), row=1, col=1, secondary_y=False,
+                                 name=str(id_val), legendgroup=str(id_val), showlegend=True), row=1, col=1, secondary_y=False,
                       )
 
         # Row 2: Heart Rate (Line)
@@ -467,19 +709,30 @@ def create_telemetry_charts_viz(df_long):
         ), row=3, col=1, secondary_y=False)
 
     # 3. STYLING
-    fig.update_layout(height=800, hovermode="x unified", template="plotly_dark", margin=dict(t=20, b=20))
     fig.update_yaxes(showticklabels=False, showgrid=False, secondary_y=True)  # Hide Elevation Labels
 
     # Sync Zooming (Fix for your original bug)
     fig.update_xaxes(fixedrange=True)
+    fig.update_yaxes(
+        # range=[lower_bound, upper_bound],
+        showticklabels=True,
+        showgrid=True,
+        secondary_y=False
+    )
     fig.update_yaxes(
         range=[lower_bound, upper_bound],
         showticklabels=False,
         showgrid=False,
         secondary_y=True
     )
-    fig.update_layout(showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0.5))
-
+    fig.update_layout(showlegend=True,hovermode="x unified", template="plotly_dark",
+                      margin=dict(t=80, b=0, l=0, r=0),
+                      height=900,
+                      width=850,
+                      legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5))
+    fig.update_yaxes(title_text="Gap", row=1, col=1, secondary_y=False)
+    fig.update_yaxes(title_text="HR", row=2, col=1, secondary_y=False)
+    fig.update_yaxes(title_text="Cadence", row=3, col=1, secondary_y=False)
     return fig
 
 def map_style_widget():
@@ -526,10 +779,106 @@ def update_map_options():
 
 def init_map_basics():
     if not sse('style_dict'):
-        ss.style_dict = {'Open Map': 'open-street-map',
-                         'Positron': 'carto-positron',
+        ss.style_dict = {'Positron': 'carto-positron',
+                         'Open Map': 'open-street-map',
                          'Dark Matter': 'carto-darkmatter',
                          'Whiteout': 'white-bg'}
         ss.map_style = 'carto-positron'
         ss.cc_color1 = '#000000'
     return
+
+
+def col_selector(col_type):
+    # type_choice = st.selectbox("Leaderboard Type", ["Basic", "Fitness", "Advanced", "Environment"])
+
+    if col_type == 'Basic':
+        return  ['start_time_utc',
+                  'pace_str',
+                  'gap_s',
+                  'avg_hr',
+                 'weight_lb']
+
+    if col_type == 'Fitness':
+        return ['gap_s',
+                'vo2_max_value',
+                'resting_hr_asleep',
+                'training_load_acute',
+                'weight_lb',
+                'fat_pct',
+                'muscle_pct']
+
+    if col_type == 'Advanced':
+        return ['gap_s',
+                'avg_cadence',
+                'avg_vert_osc',
+                'avg_gct',
+                'avg_stride_length']
+
+    if col_type == 'Environment':
+        return ['gap_s',
+                'avg_temp',
+                'altitude_acclimation_m'
+                ]
+
+    if col_type == 'Preparedness':
+        return ['gap_s',
+                'training_load_acute',
+                'training_load_pct',
+                'sleep_hours',
+                'sleep_score',
+                'awake_hours']
+
+# start_time_utc
+
+# elapsed_duration_s
+# pace_str
+# weight_lb
+# muscle_lb
+# fat_lb
+# vo2_max_value
+# altitude_acclimation_m
+# heat_acclimation_pct
+# training_load_acute
+# training_load_pct
+# resting_hr_asleep
+# resting_hr_awake
+# sleep_duration_s
+# sleep_score
+# light_sleep_s
+# deep_sleep_s
+# awake_sleep_s
+# rem_sleep_s
+# awake_s_before_activity
+# max_hr
+# avg_hr
+# avg_cadence
+# avg_temp
+# avg_vert_osc
+# avg_vert_ratio
+# avg_gct
+# avg_perf
+# avg_balance
+# gap_s
+
+def safe_minmax(df, col_name, min_default=None, return_max=True):
+    if df.empty:
+        if return_max:
+            return 1
+        else:
+            return 0
+
+    if min_default:
+        min_val = min_default
+    else:
+        min_val = df[col_name].min()
+        if not pd.notna(min_val) or not isinstance(min_val, (int, float, np.number)):
+            min_val =0
+
+    max_val = df[col_name].max()
+    if not pd.notna(min_val) or not isinstance(min_val, (int, float, np.number)) or max_val == min_val:
+        max_val = min_val + 1
+
+    if return_max:
+        return max_val
+    else:
+        return min_val

@@ -10,11 +10,9 @@ from backend_functions.running_functions import leaderboard_update
 from backend_functions.ultimate_task_executioner import ultimate_task_executioner
 from backend_functions.viz_factory.leaderboards import render_leaderboard
 from backend_functions.viz_factory.run_list import render_course_list
-from backend_functions.viz_factory.segment_compare import render_segment_compare, get_segment_sql
 
 from frontend_functions.nav_buttons import nav_widget
-from frontend_functions.segment_creation import render_segment_creation, render_segment_matches, \
-    render_segment_leaderboard, plot_route_map
+from frontend_functions.segment_creation import render_segment_creation, render_segment_matches
 from frontend_functions.streamlit_helpers import sse, ss_pop
 
 
@@ -25,6 +23,8 @@ def render_running_module():
 
     if nav_selection == 'run_charting':
         display_last_run()
+    elif nav_selection == 'leaderboards':
+        display_segment_leaderboard()
     elif nav_selection == 'new_run_process':
         process_new_run()
     elif nav_selection == 'run_forecast':
@@ -36,18 +36,95 @@ def render_running_module():
     else:
         st.info('Select an option above')
 
-    # render_topo()
+    st.caption(nav_selection)
     return
+
+def display_segment_leaderboard():
+    get_segment_id_for_leaderboard()
+
+    if not sse('seg_id_df'):
+        return
+
+    if ss.seg_id_df.empty:
+        st.info('No Segments matching criteria')
+        return
+
+    display_cols = ['segment_name', 'last_effort', 'distance_mi', 'matched_activity_count', 'elevation_gain']
+    max_dist = int(ss.seg_id_df['distance_mi'].max())
+    max_elev = int(ss.seg_id_df['elevation_gain'].max())
+    max_count = int(ss.seg_id_df['matched_activity_count'].max())
+    min_dist = int(ss.seg_id_df['distance_mi'].min())
+    min_elev = int(ss.seg_id_df['elevation_gain'].min())
+    min_count = int(ss.seg_id_df['matched_activity_count'].min())
+
+    if max_dist == min(min_dist, 0):
+        max_dist += 1
+    if max_elev == min(min_elev,0):
+        max_elev += 1
+    if max_count == min(min_count,0):
+        max_count += 1
+
+    display_confg = {'segment_name': st.column_config.TextColumn('Name'),
+                     'last_effort': st.column_config.DateColumn('Last Effort',
+                                                                format='yyyy-MMM-DD'),
+                     'distance_mi': st.column_config.ProgressColumn('Distance (mi)',
+                                                                    min_value=0,
+                                                                    max_value = max_dist,
+                                                                    format='%.1f'),
+                     'matched_activity_count': st.column_config.ProgressColumn('Attempts',
+                                                                    min_value=0,
+                                                                    max_value = max_count,
+                                                                    format='%d'),
+                     'elevation_gain': st.column_config.ProgressColumn('Ascent (m)',
+                                                                    min_value=0,
+                                                                    max_value = max_elev,
+                                                                    format='%d')}
+    st.dataframe(ss.seg_id_df,
+                 column_config=display_confg,
+                 column_order=display_cols,
+                 key='sl_sel_df',
+                 selection_mode='single-row',
+                 on_select='rerun')
+
+    if len(ss.get('sl_sel_df').get('selection').get('rows')) == 0:
+        return
+
+    idx = ss.get('sl_sel_df').get('selection').get('rows')[0]
+    ss.sl_id_val = ss.seg_id_df['segment_id'].iloc[idx]
+    ss.seg_name = ss.seg_id_df['segment_name'].iloc[idx]
+    st.write(ss.sl_id_val)
+
+    if st.button(f'Generate Leaderboard for {ss.seg_name}'):
+
+        leaderboard_update(segment_id=ss.sl_id_val)
+        leader_sql = f"""SELECT * FROM activities.vw_segment_leaderboard WHERE segment_id = 
+                    {ss.sl_id_val}"""
+        ss.sm_leaderboard_df = pd.read_sql(leader_sql, con=get_conn(alchemy=True))
+    w = int(700)
+    h = int(900 * (w / 1600))
+
+    if not sse('sm_leaderboard_df'):
+        return
+
+    elif ss.sm_leaderboard_df.empty:
+        return
+    else:
+        st.write(f"__Leaderboard for {ss.seg_name}__")
+        render_leaderboard(ss.sm_leaderboard_df)
+
+        if st.button('Reset Leaderboard'):
+            ss_pop(['seg_id_df', 'sm_leaderboard_df', 'seg_id_df', 'seg_name'])
+            st.rerun()
+    return
+
 
 
 def segment_compare():
     ss_list=['seg_dict', 'seg_list', 'man_seg_dict']
-    comp_choice = st.segmented_control('What type of comparison do you want?',
-                                       options=['Race',
-                                                'Create Segment',
-                                                'Match Activities',
-                                                'Leaderboards',
-                                                'Course Review'],
+    comp_choice = st.segmented_control('Option?',
+                                       label_visibility='collapsed',
+                                       options=['Create Segment',
+                                                'Match Activities'],
                                        on_change=ss_pop,
                                        args=(ss_list,))
 
@@ -56,125 +133,8 @@ def segment_compare():
 
     comp_container = st.container(width=800)
 
-    if comp_choice == 'Race':
-        sql = "SELECT * FROM activities.vw_segment_racing"
-        df = pd.read_sql(sql, get_conn(alchemy=True))
-        if df.empty:
-            st.info('No Matches found')
-            return
-
-        dist_max = int(df['distance_mi'].max())
-        effort_max = int(df['effort_count'].max())
-        col_keep = ['segment_name', 'distance_mi','effort_count', 'last_effort']
-        col_config = {'segment_name': st.column_config.TextColumn(label='Segment Name',
-                                                                  disabled=True
-                                                                  ),
-                      'distance_mi': st.column_config.ProgressColumn('Miles',
-                                                                     min_value=0,
-                                                                     max_value=dist_max,
-                                                                     format='%.1d'),
-                      'effort_count': st.column_config.ProgressColumn('Attempts',
-                                                                     min_value=0,
-                                                                     max_value=effort_max,
-                                                                     format='%d'),
-                      'last_effort': st.column_config.DatetimeColumn(label='Last Effort',
-                                                                     format='distance')
-                      }
-        st.dataframe(df, column_order=col_keep, column_config=col_config,
-                     hide_index=True, selection_mode='single-row', key='kv_segment_selection',
-                     on_select='rerun')
-
-
-
-        sel_dict = ss.get('kv_segment_selection').get('selection').get('rows')
-        if sel_dict:
-            sel = df['segment_id'].iloc[sel_dict[0]]
-            st.write(sel)
-            leaderboard_sql = f"""SELECT
-                                sl.segment_id,
-                                sl.segment_name,
-                                sl.activity_id,
-                                sl.distance_mi,
-                                sl.elapsed_time_s,
-                                sl.all_time_rank,
-                                sl.last_365_rank,
-                                sl.current_cycle_rank,
-                                sl.effort_label,
-                                sm.activity_path
-                                FROM activities.vw_segment_leaderboard sl
-                                    INNER JOIN activities.segment_matches sm on sm.segment_id = {sel} and sm.activity_id = sl.activity_id
-                                where sl.segment_id ={sel}
-                                and effort_label != 'other'"""
-
-            with comp_container:
-                with st.spinner('Pulling Race Comparisons', show_time=True):
-                    render_segment_compare(sql_to_dict(leaderboard_sql), comp_choice)
-
-    # elif comp_choice == 'Merge Segment':
-    #     with comp_container:
-    #         match_num = st.number_input('Match # to retrieve',
-    #                                     min_value=1,
-    #                                     max_value=10,
-    #                                     step=1,
-    #                                     value=1,
-    #                                     on_change=reset_seg_dict)
-    #         match_sql = f"""SELECT * FROM activities.vw_overlapped_segments WHERE match_rank = {match_num}"""
-    #
-    #         if 'seg_dict' not in ss:
-    #             with st.spinner('Pulling Potential Segment Overlaps', show_time=True):
-    #                 ss.seg_dict = sql_to_dict(match_sql)
-    #         with st.spinner('Rendering maps', show_time=True):
-    #             render_segment_compare(ss.seg_dict, comp_choice)
-    elif comp_choice == 'Leaderboards':
-        render_segment_leaderboard()
-    elif comp_choice == 'Match Activities':
+    if comp_choice == 'Match Activities':
         render_segment_matches()
-
-    elif comp_choice == 'Course Review':
-        name_col, min_dist_col, max_dist, item_col = st.columns(spec=[2,1,1,1], gap="small", border=False)
-
-        with name_col:
-            name_str = st.text_input('Search by Name',
-                                     value='',
-                                     on_change=ss_pop,
-                                     args=['seg_list'])
-        with min_dist_col:
-            min_dist = st.number_input('Minimum Distance',
-                                       value=0,
-                                       min_value=0,
-                                       max_value=200,
-                                       step=1,
-                                       on_change=ss_pop,
-                                       args=['seg_list']
-                                       )
-        with max_dist:
-            max_dist = st.number_input('Maximum Distance',
-                                       value=200,
-                                       min_value=1,
-                                       max_value=500,
-                                       step=1,
-                                       on_change=ss_pop,
-                                       args=['seg_list']
-                                       )
-
-        sel_sql = f"""SELECT * FROM activities.vw_course_review
-                    WHERE lower(segment_name) like LOWER('%{name_str}%')
-                    AND distance_mi >= {int(min_dist)} and distance_mi < {int(max_dist)}"""
-
-        if not sse('seg_list'):
-            ss.seg_list = sql_to_dict(sel_sql)
-
-        with item_col:
-            max_id = ss.seg_list[0].get('max_course_idx')
-            course_item = st.number_input('Course #',
-                                          min_value=1,
-                                          max_value=max_id,
-                                          key=f"key_course_{name_str}_{max_id}_{min_dist}_{max_dist}",
-                                          value=1)
-
-        # st.write(f"Course #: {course_item}, {[ss.seg_list[course_item-1]]}")
-        render_segment_compare([ss.seg_list[course_item-1]], comp_choice)
-
     elif comp_choice == 'Create Segment':
         render_segment_creation()
 
@@ -197,7 +157,49 @@ def course_review():
 
 
 def render_run_forecast():
-    st.info('Run forecasting not yet built')
+    sql = "SELECT * FROM activities.vw_pr_hunter ORDER BY prestige_score desc"
+    df = pd.read_sql(sql, con=get_conn(alchemy=True))
+    if ss.is_mobile:
+        col_ord = ['attempt_label',
+               'segment_name',
+               'weight_delta',
+                   'vo2_delta']
+    else:
+        col_ord = ['attempt_label',
+                   'segment_name',
+                   'vs_date',
+                   'prestige_score',
+                   'weight_delta',
+                   'vo2_delta',
+                   'acute_load_delta',
+                   'load_pct_delta']
+
+    cfg = {'attempt_label':st.column_config.TextColumn('PR'),
+               'segment_name': st.column_config.TextColumn('Course'),
+               'vs_date': st.column_config.DateColumn('Date',
+                                                      format='yyyy-MMM-DD'),
+               'prestige_score': st.column_config.ProgressColumn('#',
+                                                                 min_value=0,
+                                                                 max_value=df['prestige_score'].max(),
+                                                                 format='%f'),
+               'weight_delta': st.column_config.ProgressColumn('Weight',
+                                                                 min_value=0,
+                                                                 max_value=df['prestige_score'].max(),
+                                                                 format='%f'),
+               'vo2_delta': st.column_config.ProgressColumn('VO2',
+                                                                 min_value=df['vo2_delta'].min(),
+                                                                 max_value=df['vo2_delta'].max(),
+                                                                 format='%f'),
+               'acute_load_delta': st.column_config.ProgressColumn('Load',
+                                                                 min_value=df['acute_load_delta'].min(),
+                                                                 max_value=df['acute_load_delta'].max(),
+                                                                 format='%f'),
+               'load_pct_delta': st.column_config.ProgressColumn('Load%',
+                                                                 min_value=df['load_pct_delta'].min(),
+                                                                 max_value=df['load_pct_delta'].max(),
+                                                                 format='%f')}
+
+    st.dataframe(df, column_config=cfg, column_order=col_ord, hide_index=True)
     return
 
 
@@ -419,4 +421,76 @@ def render_segment_notice_widgets():
     return
 
 
+
+def get_segment_id_for_leaderboard():
+    sql = """SELECT * FROM activities.vw_segments_effort_stats"""
+
+
+    nm_col, course_col,  dist_col, type_col = st.columns(spec=[3,2,2,4], border=False, gap="small")
+
+    pop_list = ['seg_id_df']
+
+    with nm_col:
+        st.text_input('Name:',
+                             key='sl_seg_name',
+                      value=None,
+                             on_change=ss_pop,
+                             args=(pop_list,))
+
+    with course_col:
+        st.segmented_control('Course/Segment',
+                                         options=['Course', 'Segment'],
+                                         key='sl_seg_is_course',
+                                   on_change=ss_pop,
+                                   args=(pop_list,))
+
+    with dist_col:
+        st.number_input('Min Distance (mi)',
+                                   min_value=0,
+                                   value=0,
+                                   max_value=50,
+                                   step=1,
+                                   key='sm_min_dist_val',
+                                   on_change=ss_pop,
+                                   args=(pop_list,))
+    with type_col:
+        st.segmented_control(label='Select Activity Type',
+                             default=None,
+                             key='sm_act_type',
+                             options=['Run', 'Trail Run', 'Hike', 'Walk', 'Bike', 'Ski'],
+                                   on_change=ss_pop,
+                                   args=(pop_list,))
+
+    if ss.get('sl_seg_name') is not None and len(ss.get('sl_seg_name')) > 1:
+        f = f"{sql} WHERE LOWER(segment_name) LIKE '%{ss.get('sl_seg_name').lower()}%'"
+    else:
+        f = f"{sql} WHERE 1=1"
+
+    if ss.get('sm_seg_is_course') == 'Course':
+        f = f"{f} AND is_course"
+    elif ss.get('sm_seg_is_course') == 'Segment':
+        f = f"{f} AND NOT is_course"
+
+    if ss.get('sm_min_dist_val') >0:
+        f= f"{f} AND distance_mi >= {int(ss.get('sm_min_dist_val'))}"
+
+    act = ss.get('sm_act_type')
+    if act == 'Run':
+        f = f"{f} and activity_type_name like '%run%' and activity_type name not like '%trail%'"
+    elif act == 'Trail Run':
+        f = f"{f} and activity_type_name like '%trail%run%' "
+    elif act == 'Hike':
+        f = f"{f} and activity_type_name like '%hik%' "
+    elif act == 'Walk':
+        f = f"{f} and activity_type_name like '%walk%' "
+    elif act == 'Bike':
+        f = f"{f} and activity_type_name like '%bik%' "
+    elif act == 'Ski':
+        f = f"{f} and activity_type_name like '%ski%' "
+
+
+    # st.code(f, language='sql')
+    if not sse('seg_id_df'):
+        ss.seg_id_df = pd.read_sql(sql, con=get_conn(alchemy=True))
+    return
 
