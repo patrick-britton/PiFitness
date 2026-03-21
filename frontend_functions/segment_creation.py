@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from backend_functions.database_functions import get_conn, sql_to_dict, qec, one_sql_result, sql_to_list
 from backend_functions.running_functions import leaderboard_update
 from backend_functions.service_logins import mapbox_token
-from backend_functions.viz_factory.leaderboards import render_leaderboard
+from backend_functions.viz_factory.leaderboards import render_leaderboard, safe_minmax
 from backend_functions.viz_factory.segment_compare import render_segment_compare
 from frontend_functions.streamlit_helpers import sse, ss_pop
 
@@ -491,7 +491,7 @@ WHERE
 
 def select_course_create_activity():
     st.info('Select an activity to map from:')
-    type_col, dist_col = st.columns(spec=[1, 1], gap="small", border=False)
+    type_col, dist_col, aid_col= st.columns(spec=[1, 1,1], gap="small", border=False)
 
     with type_col:
         st.segmented_control(label='Select Activity Type',
@@ -510,42 +510,54 @@ def select_course_create_activity():
                         on_change=ss_pop,
                         args=('cc_act_df',)
                         )
+    with aid_col:
+        st.number_input(label='Activity ID#',
+                        key='sc_activity_id',
+                        on_change=ss_pop,
+                        args=('cc_act_df',)
+                        )
 
     sql = """SELECT * FROM activities.vw_activity_summary_segment_creation """
 
-    filter_sql = None
-    if ss.get('sc_act_type') == 'Run':
-        filter_sql = f"""WHERE activity_type_name like '%%run%%' and activity_type_name not like '%%trail%%'"""
-    elif ss.get('sc_act_type') == 'Trail Run':
-        filter_sql = f"""WHERE activity_type_name like '%%trail%%run%%'"""
-    elif ss.get('sc_act_type') == 'Hike':
-        filter_sql = f"""WHERE activity_type_name like '%%hik%%'"""
-    elif ss.get('sc_act_type') == 'Walk':
-        filter_sql = f"""WHERE activity_type_name like '%%walk%%'"""
-    elif ss.get('sc_act_type') == 'Bike':
-        filter_sql = f"""WHERE activity_type_name like '%%bik%%'"""
-    elif ss.get('sc_act_type') == 'Ski':
-        filter_sql = f"""WHERE activity_type_name like '%%ski%%'"""
+    if int(ss.get('sc_activity_id'))>0:
+        filter_sql = f"WHERE activity_id = {int(ss.get('sc_activity_id'))}"
+    else:
+        filter_sql = None
+        if ss.get('sc_act_type') == 'Run':
+            filter_sql = f"""WHERE activity_type_name like '%%run%%' and activity_type_name not like '%%trail%%'"""
+        elif ss.get('sc_act_type') == 'Trail Run':
+            filter_sql = f"""WHERE activity_type_name like '%%trail%%run%%'"""
+        elif ss.get('sc_act_type') == 'Hike':
+            filter_sql = f"""WHERE activity_type_name like '%%hik%%'"""
+        elif ss.get('sc_act_type') == 'Walk':
+            filter_sql = f"""WHERE activity_type_name like '%%walk%%'"""
+        elif ss.get('sc_act_type') == 'Bike':
+            filter_sql = f"""WHERE activity_type_name like '%%bik%%'"""
+        elif ss.get('sc_act_type') == 'Ski':
+            filter_sql = f"""WHERE activity_type_name like '%%ski%%'"""
 
-    if ss.get('sc_min_dist') is not None:
-        distance_m = int(ss.get('sc_min_dist') * 1609.344)
-        if filter_sql:
-            filter_sql = f"""{filter_sql} AND distance_m >= {distance_m}"""
-        else:
-            filter_sql = f"WHERE distance_m >= {distance_m} "
+        if ss.get('sc_min_dist') is not None:
+            distance_m = int(ss.get('sc_min_dist') * 1609.344)
+            if filter_sql:
+                filter_sql = f"""{filter_sql} AND distance_m >= {distance_m}"""
+            else:
+                filter_sql = f"WHERE distance_m >= {distance_m} "
 
     if filter_sql:
         sql = f"""{sql} {filter_sql} ORDER BY start_time_utc desc limit 50"""
 
     if not sse('cc_act_df'):
         ss.cc_act_df = pd.read_sql(sql, con=get_conn(alchemy=True))
+    if ss.cc_act_df.empty:
+        st.info('No Matching activities found')
+        return
 
-    dist_max = int(ss.cc_act_df['distance_mi'].max()) + 1
-    child_segment_max = int(ss.cc_act_df['child_segments'].max())
-    matched_courses = int(ss.cc_act_df['matched_courses'].max())
-    matched_segments = int(ss.cc_act_df['matched_segments'].max())
+    dist_max = safe_minmax(ss.cc_act_df, 'distance_mi', 0, True)
+    child_segment_max = int(safe_minmax(ss.cc_act_df, 'child_segments', 0, True))
+    matched_courses = int(safe_minmax(ss.cc_act_df, 'matched_courses', 0, True))
+    matched_segments = int(safe_minmax(ss.cc_act_df, 'matched_segments', 0, True))
 
-
+    st.dataframe(ss.cc_act_df)
 
     col_config = {'activity_id': st.column_config.TextColumn(label='#', width="small"),
                   'start_time_utc': st.column_config.DatetimeColumn(label='Start Time',
@@ -554,7 +566,7 @@ def select_course_create_activity():
                                                                     width='small'),
                   'distance_mi': st.column_config.ProgressColumn(label='Miles',
                                                                  min_value=0,
-                                                                 format='localized',
+                                                                 format='%f',
                                                                  max_value=dist_max,
                                                                  width='small'),
                   'child_courses': st.column_config.TextColumn(label='Child Courses',
@@ -562,7 +574,7 @@ def select_course_create_activity():
                   'child_segments': st.column_config.ProgressColumn(label='Child Segments',
                                                                  min_value=0,
                                                                  format='%d',
-                                                                 max_value=child_segment_max+1,
+                                                                 max_value=child_segment_max,
                                                                  width='small'),
                   'matched_courses': st.column_config.ProgressColumn(label='Matched Courses',
                                                                  min_value=0,
@@ -573,7 +585,7 @@ def select_course_create_activity():
                                                                  min_value=0,
                                                                  format='%d',
                                                                  max_value=matched_segments+1,
-                                                                 width='small'),
+                                                                 width='small')
                   }
 
     cols = ['start_time_utc', 'distance_mi', 'child_courses']
@@ -651,18 +663,13 @@ def render_segment_matches():
                     'hausdorff_deviation_m',
                     'freschet_deviation_m'
                     ]
-        max_dist = ss.p_df['dist_deviation'].max()
-        if math.isnan(max_dist) or max_dist == 0:
-            max_dist = 1
-        max_poly = ss.p_df['polygon_deviation_m'].max()
-        if math.isnan(max_poly) or max_poly == 0:
-            max_poly = 1
-        max_haus = ss.p_df['hausdorff_deviation_m'].max()
-        if math.isnan(max_haus) or max_haus == 0:
-            max_haus = 1
-        max_fresh = ss.p_df['freschet_deviation_m'].max()
-        if math.isnan(max_fresh) or max_fresh == 0:
-            max_fresh = 1
+        max_dist = safe_minmax(ss.p_df, 'dist_deviation', 0, True)
+
+        max_poly = safe_minmax(ss.p_df, 'polygon_deviation_m', 0, True)
+        max_haus = safe_minmax(ss.p_df, 'hausdorff_deviation_m', 0, True)
+        # max_haus = ss.p_df['hausdorff_deviation_m'].max()
+        max_fresh = safe_minmax(ss.p_df, 'freschet_deviation_m', 0, True)
+
 
         tsm_config = {'confidence': st.column_config.NumberColumn('Confidence',
                                                                   format='plain'),
