@@ -162,42 +162,48 @@ def render_run_forecast():
     if ss.is_mobile:
         col_ord = ['attempt_label',
                'segment_name',
+                   'vs_date',
+                   'vs_pace',
                'weight_delta',
                    'vo2_delta']
     else:
         col_ord = ['attempt_label',
                    'segment_name',
                    'vs_date',
-                   'prestige_score',
+                   'vs_pace',
+                   'estimated_pace',
+                   # 'prestige_score',
                    'weight_delta',
                    'vo2_delta',
                    'acute_load_delta',
-                   'load_pct_delta']
+                   'load_max_delta']
 
     cfg = {'attempt_label':st.column_config.TextColumn('PR'),
                'segment_name': st.column_config.TextColumn('Course'),
                'vs_date': st.column_config.DateColumn('Date',
                                                       format='yyyy-MMM-DD'),
+                'vs_pace': st.column_config.TextColumn('Target Pace'),
+           'estimated_pace': st.column_config.TextColumn('Predicted Pace'),
                'prestige_score': st.column_config.ProgressColumn('#',
                                                                  min_value=0,
                                                                  max_value=df['prestige_score'].max(),
                                                                  format='%f'),
                'weight_delta': st.column_config.ProgressColumn('Weight',
-                                                                 min_value=0,
-                                                                 max_value=df['prestige_score'].max(),
-                                                                 format='%f'),
+                                                                 min_value=df['weight_delta'].min(),
+                                                                 max_value=df['weight_delta'].max(),
+                                                                 format='percent'),
                'vo2_delta': st.column_config.ProgressColumn('VO2',
                                                                  min_value=df['vo2_delta'].min(),
                                                                  max_value=df['vo2_delta'].max(),
-                                                                 format='%f'),
+                                                                 format='percent'),
                'acute_load_delta': st.column_config.ProgressColumn('Load',
                                                                  min_value=df['acute_load_delta'].min(),
                                                                  max_value=df['acute_load_delta'].max(),
-                                                                 format='%f'),
-               'load_pct_delta': st.column_config.ProgressColumn('Load%',
-                                                                 min_value=df['load_pct_delta'].min(),
-                                                                 max_value=df['load_pct_delta'].max(),
-                                                                 format='%f')}
+                                                                 format='percent'),
+               'load_max_delta': st.column_config.ProgressColumn('Load Max',
+                                                                 min_value=df['load_max_delta'].min(),
+                                                                 max_value=df['load_max_delta'].max(),
+                                                                 format='percent')}
 
     st.dataframe(df, column_config=cfg, column_order=col_ord, hide_index=True)
     return

@@ -64,11 +64,11 @@ def render_leaderboard(df_raw):
                                                               format='%f',
                                                               min_value=safe_minmax(df_proc,
                                                                                     'gap_s',
-                                                                                    0,
+                                                                                    None,
                                                                                     False),
                                                               max_value=safe_minmax(df_proc,
                                                                                     'gap_s',
-                                                                                    0,
+                                                                                    None,
                                                                                     True),
                                                               color='auto-inverse',
                                                               width=30),
@@ -140,7 +140,7 @@ def render_leaderboard(df_raw):
                                                                   format='percent',
                                                                   color='auto-inverse',
                                                                   width=30),
-                     'muscle_pct': st.column_config.ProgressColumn('Fat%',
+                     'muscle_pct': st.column_config.ProgressColumn('Muscle%',
                                                                 min_value=safe_minmax(df_proc,
                                                                                       'muscle_pct',
                                                                                       None,
@@ -861,24 +861,59 @@ def col_selector(col_type):
 # gap_s
 
 def safe_minmax(df, col_name, min_default=None, return_max=True):
-    if df.empty:
-        if return_max:
-            return 1
-        else:
-            return 0
+    # Helper: convert to JSON-safe Python scalar
+    def to_safe_number(val):
+        if pd.isna(val) or not np.isfinite(val):
+            return None
 
-    if min_default:
-        min_val = min_default
+        # Convert numpy types → native python
+        if isinstance(val, (np.integer,)):
+            return int(val)
+        if isinstance(val, (np.floating,)):
+            return float(val)
+
+        if isinstance(val, (int, float)):
+            return val
+
+        return None
+
+    # Empty dataframe fallback
+    if df.empty or col_name not in df.columns:
+        return 1 if return_max else 0
+
+    series = df[col_name]
+
+    # Drop invalid values early
+    series = series.replace([np.inf, -np.inf], np.nan).dropna()
+
+    if series.empty:
+        return 1 if return_max else 0
+
+    # Determine min
+    if min_default is not None:
+        min_val = to_safe_number(min_default)
     else:
-        min_val = df[col_name].min()
-        if not pd.notna(min_val) or not isinstance(min_val, (int, float, np.number)):
-            min_val =0
+        min_val = to_safe_number(series.min())
 
-    max_val = df[col_name].max()
-    if not pd.notna(min_val) or not isinstance(min_val, (int, float, np.number)) or max_val == min_val:
+    if min_val is None:
+        min_val = 0
+
+    # Determine max
+    max_val = to_safe_number(series.max())
+
+    if max_val is None:
         max_val = min_val + 1
 
-    if return_max:
-        return max_val
+    # Ensure valid range
+    if max_val <= min_val:
+        max_val = min_val + 1
+
+    # Preserve integer type if column is integer-like
+    if pd.api.types.is_integer_dtype(series):
+        min_val = int(min_val)
+        max_val = int(max_val)
     else:
-        return min_val
+        min_val = float(min_val)
+        max_val = float(max_val)
+
+    return max_val if return_max else min_val
