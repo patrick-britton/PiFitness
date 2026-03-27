@@ -212,43 +212,87 @@ def render_run_forecast():
 def process_new_run():
 
     if ss.get('pnr_processing_complete') is None or ss.get('pnr_processing_complete') is False:
+        st.segmented_control('Music?',
+                             options=['Running', 'Jogging', 'No Playlist', 'Manual Processing'],
+                             key='pnr_pl_key')
+
         if ss.get('pnr_pl_key') is None:
-            st.segmented_control('Music?',
-                                 options=['Running', 'Jogging', 'No Playlist'],
-                                 key='pnr_pl_key')
+            return
+
+        if ss.get('pnr_pl_key') == 'Manual Processing':
+            st.datetime_input('Start Time:',
+                              key='pnr_fa_start',
+                              value=None,
+                              step=60)
+            st.datetime_input('End Time:',
+                              key='pnr_fa_end',
+                              value=None,
+                              step=60)
+
+            if ss.get('pnr_fa_start') is None or ss.get('pnr_fa_end') is None:
+                ss.new_run_synced = False
+                st.info('Select start & stop times for your activity')
+                return
+
+            if st.button('Reshuffle Playlist'):
+                qec("DELETE FROM activities.activities where activity_id = 9223372036854775800")
+                ins_sql = f"""INSERT INTO activities.activities (activity_id, activity_type_name, start_time_utc, end_time_utc)
+                VALUES (9223372036854775800,'fake_running_activity', %s, %s)"""
+                params = [ss.get('pnr_fa_start'), ss.get('pnr_fa_end')]
+                returns = qec(ins_sql, params)
+                if returns:
+                    st.error(f'Fake Insertion Error: {returns}')
+                else:
+                    st.success('Placeholder activity inserted')
+                ss.new_run_synced = True
+
+        else:
+            if ss.get("new_run_synced") is None:
+                # Sync Activities
+                with st.spinner('Making sure I have all known activities', show_time=True):
+                    ultimate_task_executioner(force_task_id=4)
+
+                # Sync Activity Details
+                with st.spinner('Grabbing activity Details', show_time=True):
+                    ultimate_task_executioner(force_task_id=19)
+                    time.sleep(0.5)
+
+                # Smooth and match activities
+                with st.spinner('Matching Segments', show_time=True):
+                    ultimate_task_executioner(force_task_id=21)
+                ss.new_run_synced = True
+
+        if not ss.get('new_run_synced') == True:
+            st.warning('Run not yet processed')
             return
 
 
-        if ss.get("new_run_synced") is None:
-            # Sync Activities
-            with st.spinner('Making sure I have all known activities', show_time=True):
-                ultimate_task_executioner(force_task_id=4)
-
-            # Sync Activity Details
-            with st.spinner('Grabbing activity Details', show_time=True):
-                ultimate_task_executioner(force_task_id=19)
-                time.sleep(0.5)
-
-            # Smooth and match activities
-            with st.spinner('Matching Segments', show_time=True):
-                ultimate_task_executioner(force_task_id=21)
-            ss.new_run_synced = True
-
-
-
         if ss.get('pnr_pl_key') != 'No Playlist':
-            sel_sql = f"""SELECT * FROM activities.vw_watch_music_heard WHERE playlist_name = '{ss.get('pnr_pl_key')}'""";
+            if ss.get('pnr_pl_key') == 'Manual Processing':
+                pn = 'Running'
+            else:
+                pn = ss.get('pnr_pl_key')
+            sel_sql = f"""SELECT * FROM activities.vw_watch_music_heard WHERE playlist_name = '{pn}'"""
             df = pd.read_sql(sel_sql, get_conn(alchemy=True))
             song_count = len(df)
             first_song = df['track_name_clean'].iloc[0]
             last_song = df['track_name_clean'].iloc[song_count - 1]
             st.write(f"You heard __{song_count}__ songs: __{first_song}__ to __{last_song}__")
 
+
             with st.spinner('Inserting history & reshuffling playlist...', show_time=True):
                 cols = ['played_at_utc', 'isrc', 'playlist_id']
+
                 narrow_df = df[cols]
+                st.info(narrow_df['playlist_id'].iloc[0])
+                returns = qec("TRUNCATE music.temp_listening_history")
+                if returns:
+                    st.error(f'Error truncating temp_listening_history {returns}')
+                else:
+                    st.success('Temp listening history truncated')
                 narrow_df.to_sql(schema='music', name='temp_listening_history', con=get_conn(alchemy=True), if_exists='replace',
                                  index=False)
+
                 reconcile_sql = """INSERT INTO music.listening_history (
                 played_at_utc, isrc, playlist_id)
                 SELECT played_at_utc::TIMESTAMPTZ, isrc, playlist_id
@@ -259,9 +303,20 @@ def process_new_run():
                 auto_shuffle_playlists(target_id, limit_minutes=True)
 
         ss.pnr_processing_complete = True
+        if ss.get('pnr_pl_key') == 'Manual Processing':
+            del_sql = "DELETE FROM activities.activities where activity_id = 9223372036854775800"
+            returns = qec(del_sql)
+            if returns:
+                st.error(f"Error deleting fake activity: {returns}")
+
+
         st.success('Processing complete!')
         st.balloons()
-
+        return
+    else:
+        if st.button('Reset'):
+            ss_pop(['pnr_processing_complete', 'new_run_synced'])
+            st.rerun()
     return
 
 def display_last_run():
