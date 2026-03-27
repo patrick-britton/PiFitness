@@ -284,9 +284,17 @@ def garmin_login():
         return False
 
     try:
-        client = Garmin(email, password)
-        client.login()
-        log_api_event(service='Garmin', event='Official login')
+        cache_loc = str(Path(os.getenv("LOCAL_STORAGE_PATH")))
+        try:
+            client = Garmin()
+            client.login(tokenstore=cache_loc)
+            log_api_event(service='Garmin', event='Cached Token login')
+        except Exception as e:
+            print(f'Garmin Login Exception for token reuse: {e}')
+            client = Garmin(email, password)
+            client.login()
+            client.garth.dump(cache_loc)
+            log_api_event(service='Garmin', event='Official login')
         return client
     except GarminConnectAuthenticationError as e:
         log_api_event(service='Garmin', event='login failure, authentication', err=e)
