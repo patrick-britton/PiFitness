@@ -14,3 +14,4 @@ plotly
 shapely
 elevation
 scipy
+playwright

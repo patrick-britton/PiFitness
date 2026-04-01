@@ -39,6 +39,7 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
     # Default the api service name to none -- will trigger a fresh login
     api_service_name = None
     if not task_list:
+        print('Task List empty, breaking')
         return
 
     for task_dict in task_list:
@@ -71,6 +72,7 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
                 login_function = getattr(module, login_function_name)
                 l_t0 = start_timer()
                 client_dict = login_function(client_dict)
+                # print(f"Login function: {login_function} returning dict: {client_dict}")
                 log_app_event(cat=f"Task #{task_id}: {task_name}",
                               desc='Login Success',
                               task_id=task_id,
@@ -163,11 +165,12 @@ def extract_load_flatten(cd, td):
     t0=start_timer()
     try:
         json_data = local_function(client=cd.get('client'), td=td)
-        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                      desc=f"Valid Extraction",
-                      exec_time=elapsed_ms(t0),
-                      task_id=td.get('task_id'),
-                      data_event='Extract')
+        if json_data:
+            log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
+                          desc=f"Valid Extraction",
+                          exec_time=elapsed_ms(t0),
+                          task_id=td.get('task_id'),
+                          data_event='Extract')
         print(f"Data Extraction Success for Task #{td.get('task_id')}: {td.get('task_name')}")
     except Exception as e:
         print(f"Data Extraction Failed for Task #{td.get('task_id')}: {td.get('task_name')} : {e}")
@@ -440,10 +443,6 @@ def metric_interpolation(task_dict):
     return False
 
 
-
-
-
-
 def json_loading(json_data, d):
     task_id = d.get("task_id")
     if isinstance(json_data, dict):
@@ -485,3 +484,5 @@ def json_loading(json_data, d):
     cur.close()
     conn.close()
     return
+
+

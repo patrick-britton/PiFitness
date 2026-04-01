@@ -22,6 +22,7 @@ var/
 wheels/
 share/python-wheels/
 *.egg-info/
+.idea/
 .installed.cfg
 *.egg
 MANIFEST
@@ -54,6 +55,11 @@ cover/
 # Translations
 *.mo
 *.pot
+
+# SQL stuff
+*.meta
+*.zip
+*.idea
 
 # Django stuff:
 *.log
@@ -216,6 +222,7 @@ __marimo__/
 
 # Local storage
 /local_storage/
+/.idea/
 
 # Pictures
 *.svg

@@ -3,7 +3,7 @@ import time
 from datetime import date, timedelta, datetime
 import pytz
 
-from backend_functions.database_functions import sql_to_dict, qec, sql_to_list
+from backend_functions.database_functions import sql_to_dict, qec, sql_to_list, start_timer, elapsed_ms
 from backend_functions.helper_functions import get_sync_dates
 from backend_functions.logging_functions import log_app_event
 from backend_functions.music_functions import get_playlist_list
@@ -289,5 +289,75 @@ def extract_json_isrc_search(client=None, td=None, aid=None):
             qec(f"""UPDATE music.all_tracks set id_synced_at_utc = CURRENT_TIMESTAMP where track_isrc = '{isrc}'""")
 
     return results
+
+
+def get_pirate_data(endpoint, path_params=None, query_params=None):
+    from pirate_garmin.cli import app
+    from typer.testing import CliRunner
+    import json
+
+    runner = CliRunner()
+    args = ["get", endpoint]
+
+    # 1. Handle Path Parameters (CRITICAL for dayview)
+    if path_params:
+        for key, val in path_params.items():
+            args.extend(["--path", f"{key}={val}"])
+
+    # 2. Handle Query Parameters (For filters/ranges)
+    if query_params:
+        for key, val in query_params.items():
+            args.extend(["--query", f"{key}={val}"])
+
+    result = runner.invoke(app, args)
+
+    if result.exit_code == 0:
+        return json.loads(result.stdout), None
+    else:
+        print(f"Error: {result}")
+        return None, str(result.stderr)
+
+
+def extract_pirate_daily(client=None, td=None):
+    t0 = start_timer()
+    endpoint = td.get('api_function_name')
+    date_list = get_sync_dates(td.get('value_recency'), 'single_day')
+    all_json = []
+    for date_val in date_list:
+        # Pause for multiple iterations
+        if date_val != date_list[0]:
+            time.sleep(2)
+
+        # Get the data
+        raw_json, error = get_pirate_data(endpoint=endpoint,
+                                        path_params={"date": date_val},
+                                        query_params=None)
+
+        if error:
+            log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
+                          desc=f"Extraction Failure for : {date_val}",
+                          exec_time=elapsed_ms(t0),
+                          task_id=td.get('task_id'),
+                          data_event='Extraction Failure')
+            print(f"Error: {error}")
+            continue
+
+        if isinstance(raw_json, dict):
+            all_json.append(raw_json)
+        elif isinstance(raw_json, list):
+            all_json.extend(raw_json)
+        elif raw_json is not None:
+            log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
+                          desc=f"Extraction Failure for : {date_val}",
+                          exec_time=elapsed_ms(t0),
+                          task_id=td.get('task_id'),
+                          data_event=f'Unexpected response {raw_json}')
+            print(f"Bad JSON for {date_val}: {raw_json}")
+        else:
+            print(f"No JSON for {date_val}")
+
+
+    # Garmin's 'dayview' endpoint is the most detailed for a single date
+    return all_json
 
 
