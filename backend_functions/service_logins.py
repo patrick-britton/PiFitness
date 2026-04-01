@@ -1,5 +1,6 @@
 import importlib
 import os
+import sys
 import time
 
 import requests
@@ -12,8 +13,12 @@ from pathlib import Path
 from backend_functions.credential_management import decrypt_dict
 from backend_functions.database_functions import one_sql_result, get_conn, qec
 from backend_functions.logging_functions import log_api_event, log_app_event, start_timer, elapsed_ms
+import pirate_garmin
+
 
 load_dotenv()
+
+
 
 
 def load_api_credentials(service=None):
@@ -386,3 +391,61 @@ def get_service_list(append_option=None):
     return service_list
 
 
+def pirate_garmin_login(headless=False):
+    # Get the absolute path to your project folder
+    project_root = Path(__file__).parent.absolute().parent
+    # Point to the 'src' directory inside the cloned repo
+    pirate_src_path = project_root / "pirate-garmin_clone" / "src"
+
+    if pirate_src_path.exists():
+        sys.path.insert(0, str(pirate_src_path))
+    else:
+        print(f"Warning: Could not find source at {pirate_src_path}")
+
+    from pirate_garmin.cli import app
+    from typer.testing import CliRunner
+
+    # 1. Dynamic Path Injection
+    # # Ensure this variable is defined globally or passed in
+    # if pirate_src_path.exists():
+    #     if str(pirate_src_path) not in sys.path:
+    #         sys.path.insert(0, str(pirate_src_path))
+    # else:
+    #     log_api_event(service='Pirate Garmin', event='Login Error 1', err='Missing Source Path')
+    #     return None
+
+    # 2. Imports MUST happen after sys.path is modified
+    new_token = {"client": 'fake_client',
+                 "token": 'fake_token',
+                 "token_age": time.time()}
+
+    # 3. Credential Setup
+    email, password = garmin_creds()
+    os.environ["GARMIN_USERNAME"] = email
+    os.environ["GARMIN_PASSWORD"] = password
+    # Set to "true" for your Raspberry Pi later, "false" for Windows testing
+    if headless:
+        os.environ["GARMIN_HEADLESS"] = "true"
+    else:
+        os.environ["PIRATE_GARMIN_HEADLESS"] = "false"
+
+    # 4. Execution
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["login"])
+
+
+
+    # 5. Error Handling & Logging
+    if result.exit_code != 0:
+        # result.output captures the actual CLI text (including the 429 error message)
+        err_msg = result.stdout if result.stdout else str(result.exception)
+        log_api_event(
+            service='Pirate Garmin',
+            event=f'Login Failed (Code {result.exit_code})',
+            err=err_msg
+        )
+        new_token['error'] = f'Uncaught Exception: {err_msg}'
+        return None
+
+    return new_token
