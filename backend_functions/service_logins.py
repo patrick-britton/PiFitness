@@ -393,7 +393,7 @@ def pirate_garmin_login(headless=False):
     # Get the absolute path to your project folder
     project_root = Path(__file__).parent.absolute().parent
     # Point to the 'src' directory inside the cloned repo
-    pirate_src_path = project_root / "pirate-garmin" / "src"
+    pirate_src_path = project_root / "pirate_garmin" / "src"
 
     if pirate_src_path.exists():
         sys.path.insert(0, str(pirate_src_path))
