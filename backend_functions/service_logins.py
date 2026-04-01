@@ -13,8 +13,6 @@ from pathlib import Path
 from backend_functions.credential_management import decrypt_dict
 from backend_functions.database_functions import one_sql_result, get_conn, qec
 from backend_functions.logging_functions import log_api_event, log_app_event, start_timer, elapsed_ms
-import pirate_garmin
-
 
 load_dotenv()
 
@@ -395,7 +393,7 @@ def pirate_garmin_login(headless=False):
     # Get the absolute path to your project folder
     project_root = Path(__file__).parent.absolute().parent
     # Point to the 'src' directory inside the cloned repo
-    pirate_src_path = project_root / "pirate-garmin_clone" / "src"
+    pirate_src_path = project_root / "pirate-garmin" / "src"
 
     if pirate_src_path.exists():
         sys.path.insert(0, str(pirate_src_path))
@@ -433,7 +431,6 @@ def pirate_garmin_login(headless=False):
     runner = CliRunner()
 
     result = runner.invoke(app, ["login"])
-
 
 
     # 5. Error Handling & Logging
