@@ -38,6 +38,7 @@ def render_test_widget():
                 ss.step_no = 3
             except Exception as e:
                 st.error(f'Imports Failed: {e}')
+                ss.step_no = 3
 
 
             # 3. Credential Setup
@@ -62,6 +63,8 @@ def render_test_widget():
             if st.button('Final Login'):
                 result = ss.runner.invoke(app, ["login"])
                 st.info(f'Full success: {result}')
+
+    st.write(f"Step no: {ss.get('step_no')}")
     return
 
 
