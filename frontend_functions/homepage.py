@@ -9,6 +9,7 @@ from backend_functions.database_functions import one_sql_result
 from backend_functions.elevation_tiles import reconcile_elevation_tiles
 from backend_functions.service_logins import sql_rate_limited, rate_limit_test, garmin_creds
 from frontend_functions.music_module import rating_display_module
+from frontend_functions.streamlit_helpers import sse
 
 
 def render_test_widget():
