@@ -12,7 +12,8 @@ from frontend_functions.music_module import rating_display_module
 
 
 def render_test_widget():
-    ss.step_no=0
+    if not sse('step_no'):
+        ss.step_no=0
 
     if ss.step_no==0:
         if st.button('Path Test'):

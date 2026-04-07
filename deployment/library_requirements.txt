@@ -17,4 +17,3 @@ scipy
 playwright
 typer
 httpx
-urllib
