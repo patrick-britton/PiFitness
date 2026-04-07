@@ -8,6 +8,7 @@ from backend_functions.database_functions import sql_to_dict, one_sql_result, qe
     get_api_function_list
 from backend_functions.service_logins import get_service_list
 from backend_functions.ultimate_task_executioner import ultimate_task_executioner, reconcile_task_dates
+from backend_functions.viz_factory.leaderboards import safe_minmax
 from frontend_functions.nav_buttons import nav_widget, update_nav, clear_nav
 from frontend_functions.streamlit_helpers import sse, ss_pop
 
@@ -338,7 +339,7 @@ def recent_execution_log(task_id):
                     LIMIT 10"""
     recent_df = pd.read_sql(text(sel_sql), con=get_conn(alchemy=True))
     if not recent_df.empty:
-        max_time = int(recent_df['execution_time_ms'].max())
+        max_time = safe_minmax(recent_df, 'execution_time_ms', min_default=0, return_max=True)
         max_time = 1 if max_time == 0 else max_time
         cols = ['event_time_utc', 'event_description', 'execution_time_ms', 'error_text']
         col_config = {'event_time_utc': st.column_config.DatetimeColumn(label='Age', format='distance', width="small"),
