@@ -18,25 +18,27 @@ def render_test_widget():
         if st.button('Path Test'):
             ss.project_root = Path(__file__).parent.absolute().parent
         # Point to the 'src' directory inside the cloned repo
-            ss.pirate_src_path = ss.project_root / "pirate-garmin_clone" / "src" / "pirate_garmin"
+            ss.pirate_src_path = ss.project_root / "pirate-garmin_clone" / "src"
             st.write(f"Root: {ss.project_root} || Path: {ss.pirate_src_path}")
-        ss.step_no=1
+            ss.step_no=1
 
     if ss.step_no==1:
         if ss.pirate_src_path.exists():
             sys.path.insert(0, str(ss.pirate_src_path))
+            ss.step_no = 2
         else:
             st.error(f"Warning: Could not find source at {ss.pirate_src_path}")
-        ss.step_no=2
+
 
     if ss.step_no==2:
         if st.button('Imports'):
             try:
                 from pirate_garmin.cli import app
                 from typer.testing import CliRunner
+                ss.step_no = 3
             except Exception as e:
                 st.error(f'Imports Failed: {e}')
-        ss.step_no = 3
+
 
             # 3. Credential Setup
     if ss.step_no==3:
