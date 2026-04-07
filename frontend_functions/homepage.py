@@ -59,12 +59,15 @@ def render_test_widget():
         if st.button('Client Runner'):
 
             # 4. Execution
+            from typer.testing import CliRunner
             ss.runner = CliRunner()
             st.success('Client Runner established')
+            ss.step_no=5
 
-            if st.button('Final Login'):
-                result = ss.runner.invoke(app, ["login"])
-                st.info(f'Full success: {result}')
+    if ss.step_no==5:
+        if st.button('Final Login'):
+            result = ss.runner.invoke(app, ["login"])
+            st.info(f'Full success: {result}')
 
     st.write(f"Step no: {ss.get('step_no')}")
     return
