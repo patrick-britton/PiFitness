@@ -67,6 +67,8 @@ def render_test_widget():
 
     if ss.step_no==5:
         if st.button('Final Login'):
+            from typer.testing import CliRunner
+            from pirate_garmin.cli import app
             result = ss.runner.invoke(app, ["login"])
             st.info(f'Full success: {result}')
 
