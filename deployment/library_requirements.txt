@@ -16,3 +16,6 @@ elevation
 scipy
 playwright
 typer
+enum
+httpx
+urllib
