@@ -15,3 +15,4 @@ shapely
 elevation
 scipy
 playwright
+typer
