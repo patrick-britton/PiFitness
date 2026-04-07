@@ -1,5 +1,6 @@
 import importlib
 import os
+import random
 import sys
 import time
 
@@ -431,6 +432,8 @@ def pirate_garmin_login(headless=False):
     runner = CliRunner()
 
     result = runner.invoke(app, ["login"])
+
+    time.sleep(random.randint(1000, random.randint(2000,5000))/1000)
 
 
     # 5. Error Handling & Logging
