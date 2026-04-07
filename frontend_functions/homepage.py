@@ -14,16 +14,16 @@ from frontend_functions.music_module import rating_display_module
 def render_test_widget():
 
     if st.button('Path Test'):
-        project_root = Path(__file__).parent.absolute().parent
+        ss.project_root = Path(__file__).parent.absolute().parent
     # Point to the 'src' directory inside the cloned repo
-        pirate_src_path = project_root / "pirate-garmin_clone" / "src" / "pirate_garmin"
-        st.write(f"Root: {project_root} || Path: {pirate_src_path}")
+        ss.pirate_src_path = ss.project_root / "pirate-garmin_clone" / "src" / "pirate_garmin"
+        st.write(f"Root: {ss.project_root} || Path: {ss.pirate_src_path}")
 
 
-        if pirate_src_path.exists():
-            sys.path.insert(0, str(pirate_src_path))
+        if ss.pirate_src_path.exists():
+            sys.path.insert(0, str(ss.pirate_src_path))
         else:
-            st.error(f"Warning: Could not find source at {pirate_src_path}")
+            st.error(f"Warning: Could not find source at {ss.pirate_src_path}")
 
 
         if st.button('Imports'):
@@ -38,9 +38,9 @@ def render_test_widget():
 
             if st.button('Cred Setup'):
 
-                email, password = garmin_creds()
-                os.environ["GARMIN_USERNAME"] = email
-                os.environ["GARMIN_PASSWORD"] = password
+                ss.email, ss.password = garmin_creds()
+                os.environ["GARMIN_USERNAME"] = ss.email
+                os.environ["GARMIN_PASSWORD"] = ss.password
                 # Set to "true" for your Raspberry Pi later, "false" for Windows testing
                 os.environ["PIRATE_GARMIN_HEADLESS"] = "false"
                 st.success('Creds Established')
@@ -48,11 +48,11 @@ def render_test_widget():
                 if st.button('Client Runner'):
 
                     # 4. Execution
-                    runner = CliRunner()
+                    ss.runner = CliRunner()
                     st.success('Client Runner established')
 
                     if st.button('Final Login'):
-                        result = runner.invoke(app, ["login"])
+                        result = ss.runner.invoke(app, ["login"])
                         st.info(f'Full success: {result}')
     return
 
