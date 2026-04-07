@@ -357,7 +357,78 @@ def extract_pirate_daily(client=None, td=None):
             print(f"No JSON for {date_val}")
 
 
-    # Garmin's 'dayview' endpoint is the most detailed for a single date
     return all_json
 
+
+def extract_pirate_activity(client=None, td=None, aid=None):
+    t0 = start_timer()
+    endpoint = td.get('api_function_name')
+    if not aid:
+        activities = sql_to_dict(query_str="SELECT * FROM activities.vw_activity_ids_to_sync")
+    else:
+        activities = [{'activity_id': aid, 'max_points': 99999}]
+    all_json = []
+    for a in activities:
+        # Pause for multiple iterations
+        if a != activities[0]:
+            time.sleep(2)
+
+        # Get the data
+        raw_json, error = get_pirate_data(endpoint=endpoint,
+                                        path_params={"activityId": a.get('activity_id'),
+                                                     "maxChartSize": a.get('max_points'),
+                                                     "maxPolyLineSize": a.get('max_points')},
+                                        query_params=None)
+
+        if error:
+            log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
+                          desc=f"Extraction Failure for Activity : {a.get('activity_id')}",
+                          exec_time=elapsed_ms(t0),
+                          task_id=td.get('task_id'),
+                          data_event='Extraction Failure')
+            print(f"Error: {error}")
+            continue
+
+        if isinstance(raw_json, dict):
+            all_json.append(raw_json)
+        elif isinstance(raw_json, list):
+            all_json.extend(raw_json)
+        elif raw_json is not None:
+            log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
+                          desc=f"Extraction Failure for Activity: {a.get('activity_id')}",
+                          exec_time=elapsed_ms(t0),
+                          task_id=td.get('task_id'),
+                          data_event=f'Unexpected response {raw_json}')
+            print(f"Bad JSON for {a.get('activity_id')}: {raw_json}")
+        else:
+            print(f"No JSON for {a.get('activity_id')}")
+
+
+    return all_json
+
+def extract_pirate_activity_summary(client=None, td=None, aid=None):
+    t0 = start_timer()
+    endpoint = td.get('api_function_name')
+
+    all_json = []
+
+
+    # Get the data
+
+    raw_json, error = get_pirate_data(endpoint=endpoint,
+                                    path_params={"start": 0,
+                                                 "limit": 100},
+                                    query_params=None)
+
+
+    if error:
+        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
+                      desc=f"Extraction Failure pulling activity summary",
+                      exec_time=elapsed_ms(t0),
+                      task_id=td.get('task_id'),
+                      data_event='Extraction Failure')
+        print(f"Error: {error}")
+
+
+    return raw_json
 
