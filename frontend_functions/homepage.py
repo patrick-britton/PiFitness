@@ -1,10 +1,61 @@
+import os
+import sys
+from pathlib import Path
+
 import streamlit as st
 from streamlit import session_state as ss
 
 from backend_functions.database_functions import one_sql_result
 from backend_functions.elevation_tiles import reconcile_elevation_tiles
-from backend_functions.service_logins import sql_rate_limited, rate_limit_test
+from backend_functions.service_logins import sql_rate_limited, rate_limit_test, garmin_creds
 from frontend_functions.music_module import rating_display_module
+
+
+def render_test_widget():
+
+    if st.button('Path Test'):
+        project_root = Path(__file__).parent.absolute().parent
+    # Point to the 'src' directory inside the cloned repo
+        pirate_src_path = project_root / "pirate-garmin_clone" / "src" / "pirate_garmin"
+        st.write(f"Root: {project_root} || Path: {pirate_src_path}")
+
+
+        if pirate_src_path.exists():
+            sys.path.insert(0, str(pirate_src_path))
+        else:
+            st.error(f"Warning: Could not find source at {pirate_src_path}")
+
+
+        if st.button('Imports'):
+            try:
+                from pirate_garmin.cli import app
+                from typer.testing import CliRunner
+            except Exception as e:
+                st.error(f'Imports Failed: {e}')
+
+
+            # 3. Credential Setup
+
+            if st.button('Cred Setup'):
+
+                email, password = garmin_creds()
+                os.environ["GARMIN_USERNAME"] = email
+                os.environ["GARMIN_PASSWORD"] = password
+                # Set to "true" for your Raspberry Pi later, "false" for Windows testing
+                os.environ["PIRATE_GARMIN_HEADLESS"] = "false"
+                st.success('Creds Established')
+
+                if st.button('Client Runner'):
+
+                    # 4. Execution
+                    runner = CliRunner()
+                    st.success('Client Runner established')
+
+                    if st.button('Final Login'):
+                        result = runner.invoke(app, ["login"])
+                        st.info(f'Full success: {result}')
+    return
+
 
 
 
@@ -12,10 +63,13 @@ def render_homepage():
     rate_limit_widget()
     rating_display_module()
     dupe_widget()
+    render_test_widget()
 
     if st.button('Load Mapping Tiles'):
         reconcile_elevation_tiles()
     return
+
+
 
 
 def dupe_widget():
