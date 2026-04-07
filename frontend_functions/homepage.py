@@ -12,48 +12,54 @@ from frontend_functions.music_module import rating_display_module
 
 
 def render_test_widget():
+    ss.step_no=0
 
-    if st.button('Path Test'):
-        ss.project_root = Path(__file__).parent.absolute().parent
-    # Point to the 'src' directory inside the cloned repo
-        ss.pirate_src_path = ss.project_root / "pirate-garmin_clone" / "src" / "pirate_garmin"
-        st.write(f"Root: {ss.project_root} || Path: {ss.pirate_src_path}")
+    if ss.step_no==0:
+        if st.button('Path Test'):
+            ss.project_root = Path(__file__).parent.absolute().parent
+        # Point to the 'src' directory inside the cloned repo
+            ss.pirate_src_path = ss.project_root / "pirate-garmin_clone" / "src" / "pirate_garmin"
+            st.write(f"Root: {ss.project_root} || Path: {ss.pirate_src_path}")
+        ss.step_no=1
 
-
+    if ss.step_no==1:
         if ss.pirate_src_path.exists():
             sys.path.insert(0, str(ss.pirate_src_path))
         else:
             st.error(f"Warning: Could not find source at {ss.pirate_src_path}")
+        ss.step_no=2
 
-
+    if ss.step_no==2:
         if st.button('Imports'):
             try:
                 from pirate_garmin.cli import app
                 from typer.testing import CliRunner
             except Exception as e:
                 st.error(f'Imports Failed: {e}')
-
+        ss.step_no = 3
 
             # 3. Credential Setup
+    if ss.step_no==3:
+        if st.button('Cred Setup'):
 
-            if st.button('Cred Setup'):
+            ss.email, ss.password = garmin_creds()
+            os.environ["GARMIN_USERNAME"] = ss.email
+            os.environ["GARMIN_PASSWORD"] = ss.password
+            # Set to "true" for your Raspberry Pi later, "false" for Windows testing
+            os.environ["PIRATE_GARMIN_HEADLESS"] = "false"
+            st.success('Creds Established')
+            ss.step_no=4
 
-                ss.email, ss.password = garmin_creds()
-                os.environ["GARMIN_USERNAME"] = ss.email
-                os.environ["GARMIN_PASSWORD"] = ss.password
-                # Set to "true" for your Raspberry Pi later, "false" for Windows testing
-                os.environ["PIRATE_GARMIN_HEADLESS"] = "false"
-                st.success('Creds Established')
+    if ss.step_no==4:
+        if st.button('Client Runner'):
 
-                if st.button('Client Runner'):
+            # 4. Execution
+            ss.runner = CliRunner()
+            st.success('Client Runner established')
 
-                    # 4. Execution
-                    ss.runner = CliRunner()
-                    st.success('Client Runner established')
-
-                    if st.button('Final Login'):
-                        result = ss.runner.invoke(app, ["login"])
-                        st.info(f'Full success: {result}')
+            if st.button('Final Login'):
+                result = ss.runner.invoke(app, ["login"])
+                st.info(f'Full success: {result}')
     return
 
 
