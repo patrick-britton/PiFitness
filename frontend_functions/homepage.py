@@ -60,6 +60,7 @@ def render_test_widget():
 
             # 4. Execution
             from typer.testing import CliRunner
+            from pirate_garmin.cli import app
             ss.runner = CliRunner()
             st.success('Client Runner established')
             ss.step_no=5
