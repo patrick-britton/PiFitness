@@ -139,16 +139,19 @@ def render_function_library():
                                         ORDER BY api_service_name, python_extraction_function, friendly_name""",
                                          get_conn(alchemy=True))
     svc_list = sql_to_list("SELECT DISTINCT api_service_name FROM api_services.api_service_list ")
-    cols = ['friendly_name', 'api_service_name', 'api_function_name', 'python_extraction_function', 'flatten_sproc',
-            'parsing_sproc', 'interpolation_sproc', 'forecasting_sproc']
+    cols = ['friendly_name', 'api_service_name', 'api_function_name', 'loop_strategy', 'iter_path_keys',
+            'iter_query_keys','static_path_params','static_query_params',
+            'python_extraction_function', 'flatten_sproc']
     col_config = {'friendly_name': st.column_config.TextColumn(label='Name', disabled=False),
                   'api_service_name': st.column_config.SelectboxColumn(label='API', options=svc_list, disabled=False),
                   'api_function_name': st.column_config.TextColumn(label='API Function', disabled=False),
                   'python_extraction_function': st.column_config.TextColumn(label='Python Extraction', disabled=False),
                   'flatten_sproc': st.column_config.TextColumn(label='Flatten SPROC', disabled=False),
-                  'parsing_sproc': st.column_config.TextColumn(label='Parsing SPROC', disabled=False),
-                  'interpolation_sproc': st.column_config.TextColumn(label='Interpolation SPROC', disabled=False),
-                  'forecasting_sproc': st.column_config.TextColumn(label='Forecasting SPROC', disabled=False),}
+                  'loop_strategy': st.column_config.SelectboxColumn(label='API Loop Type', disabled=False, options=['single_day', 'range', 'activity', 'single_run']),
+                  'iter_path_keys': st.column_config.TextColumn(label='Dynamic Path Keys', disabled=False),
+                  'iter_query_keys': st.column_config.TextColumn(label='Dynamic Query Keys', disabled=False),
+                  'static_path_params': st.column_config.TextColumn(label='Static Path Keys', disabled=False),
+                  'static_query_params': st.column_config.TextColumn(label='Static Query Keys', disabled=False)}
     if ss.function_library_df.empty:
         ss.function_library_df = pd.DataFrame(columns=cols)
 

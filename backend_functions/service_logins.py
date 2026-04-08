@@ -13,6 +13,7 @@ from spotipy import SpotifyOAuth, SpotifyException
 from pathlib import Path
 from backend_functions.credential_management import decrypt_dict
 from backend_functions.database_functions import one_sql_result, get_conn, qec
+from backend_functions.helper_functions import random_sleep
 from backend_functions.logging_functions import log_api_event, log_app_event, start_timer, elapsed_ms
 
 load_dotenv()
@@ -433,7 +434,7 @@ def pirate_garmin_login(headless=False):
 
     result = runner.invoke(app, ["login"])
 
-    time.sleep(random.randint(1000, random.randint(2000,5000))/1000)
+    random_sleep(500,5000)
 
 
     # 5. Error Handling & Logging
