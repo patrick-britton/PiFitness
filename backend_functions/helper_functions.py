@@ -1,4 +1,7 @@
+import json
 import math
+import random
+import time
 from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 import numpy as np
@@ -23,7 +26,7 @@ def list_to_dict_by_key(list_of_dicts, primary_key):
 def get_sync_dates(meta_sync_val=None, meta_sync_type=None, max_range_days=7):
     # returns either a list of dates or a list of date pairs.
 
-    is_range = meta_sync_type == 'Range'
+    is_range = meta_sync_type.lower() == 'range'
 
     # Convert meta_sync to a date object
     if meta_sync_val is None:
@@ -200,3 +203,21 @@ def safe_float(value):
         return 0.0 if math.isnan(v) else v
     except (TypeError, ValueError):
         return 0.0
+
+
+def random_sleep(min_ms, max_ms):
+    val = random.randint(min_ms, random.randint(min_ms+500, max(min_ms+500, max_ms))) / 1000
+    # print(val)
+    time.sleep(val)
+    return
+
+def safe_parse(val, default_val):
+    """Safely converts stringified JSON from the database into Python objects."""
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except json.JSONDecodeError:
+            print(f"Warning: Failed to parse JSON for: {val}")
+            return default_val
+    # If it's already a dict/list (or None), return it or the default
+    return val if val is not None else default_val

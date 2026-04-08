@@ -52,10 +52,7 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
                       task_id=task_id,
                       data_event='Begin')
         run_elt= task_dict.get('run_extract')
-        run_interpolation = task_dict.get('run_interpolation')
-        run_forecasting = task_dict.get('run_forecasting')
         run_python = task_dict.get('run_python')
-        run_parsing = task_dict.get('run_parsing')
 
         task_fail = False
         fail_msg=None
@@ -91,17 +88,6 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
 
             task_fail, client_dict = extract_load_flatten(client_dict, task_dict)
 
-        if run_parsing and not task_fail:
-            print(f"Starting Parsing for task #{task_id} : {task_name}")
-            task_fail = execute_sproc(d=task_dict, sproc_type='parsing')
-
-        if run_interpolation and not task_fail:
-            print(f"Starting Interpolation for task #{task_id} : {task_name}")
-            task_fail = metric_interpolation(task_dict)
-
-        if run_forecasting and not task_fail:
-            print(f"Starting Forecasting for task #{task_id} : {task_name}")
-            task_fail = execute_sproc(d=task_dict, sproc_type='forecasting')
 
         if run_python and not task_fail:
             print(f"Starting Python Execution for task #{task_id} : {task_name}")

@@ -1,10 +1,11 @@
+import ast
 import hashlib
 import time
 from datetime import date, timedelta, datetime
 import pytz
 
 from backend_functions.database_functions import sql_to_dict, qec, sql_to_list, start_timer, elapsed_ms
-from backend_functions.helper_functions import get_sync_dates
+from backend_functions.helper_functions import get_sync_dates, random_sleep, safe_parse
 from backend_functions.logging_functions import log_app_event
 from backend_functions.music_functions import get_playlist_list
 
@@ -300,12 +301,12 @@ def get_pirate_data(endpoint, path_params=None, query_params=None):
     args = ["get", endpoint]
 
     # 1. Handle Path Parameters (CRITICAL for dayview)
-    if path_params:
+    if path_params is not None:
         for key, val in path_params.items():
             args.extend(["--path", f"{key}={val}"])
 
     # 2. Handle Query Parameters (For filters/ranges)
-    if query_params:
+    if query_params is not None:
         for key, val in query_params.items():
             args.extend(["--query", f"{key}={val}"])
 
@@ -317,76 +318,78 @@ def get_pirate_data(endpoint, path_params=None, query_params=None):
         print(f"Error: {result}")
         return None, str(result.stderr)
 
-
-def extract_pirate_daily(client=None, td=None):
-    t0 = start_timer()
-    endpoint = td.get('api_function_name')
-    date_list = get_sync_dates(td.get('value_recency'), 'single_day')
-    all_json = []
-    for date_val in date_list:
-        # Pause for multiple iterations
-        if date_val != date_list[0]:
-            time.sleep(2)
-
-        # Get the data
-        raw_json, error = get_pirate_data(endpoint=endpoint,
-                                        path_params={"date": date_val},
-                                        query_params=None)
-
-        if error:
-            log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                          desc=f"Extraction Failure for : {date_val}",
-                          exec_time=elapsed_ms(t0),
-                          task_id=td.get('task_id'),
-                          data_event='Extraction Failure')
-            print(f"Error: {error}")
-            continue
-
-        if isinstance(raw_json, dict):
-            all_json.append(raw_json)
-        elif isinstance(raw_json, list):
-            all_json.extend(raw_json)
-        elif raw_json is not None:
-            log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                          desc=f"Extraction Failure for : {date_val}",
-                          exec_time=elapsed_ms(t0),
-                          task_id=td.get('task_id'),
-                          data_event=f'Unexpected response {raw_json}')
-            print(f"Bad JSON for {date_val}: {raw_json}")
-        else:
-            print(f"No JSON for {date_val}")
-
-
-    return all_json
-
-
-def extract_pirate_activity(client=None, td=None, aid=None):
-    t0 = start_timer()
-    endpoint = td.get('api_function_name')
+def gen_activity_list(aid=None):
     if not aid:
-        activities = sql_to_dict(query_str="SELECT * FROM activities.vw_activity_ids_to_sync")
+        return sql_to_dict(query_str="SELECT DISTINCT activity_id FROM activities.vw_activity_ids_to_sync")
     else:
-        activities = [{'activity_id': aid, 'max_points': 99999}]
+        return [aid]
+
+
+def extract_pirate_universal(client=None, td=None, aid=None):
+    """
+    A single, metadata-driven orchestrator for all pirate-garmin endpoints.
+    """
+    t0 = start_timer()
+    endpoint = td.get('api_function_name')
+    loop_strategy = td.get('loop_strategy')
     all_json = []
-    for a in activities:
-        # Pause for multiple iterations
-        if a != activities[0]:
-            time.sleep(2)
 
-        # Get the data
-        raw_json, error = get_pirate_data(endpoint=endpoint,
-                                        path_params={"activityId": a.get('activity_id'),
-                                                     "maxChartSize": a.get('max_points'),
-                                                     "maxPolyLineSize": a.get('max_points')},
-                                        query_params=None)
+    # 1. Initialize the correct iterator based on metadata
+    if loop_strategy == 'single_day':
+        iter_list = get_sync_dates(td.get('value_recency'), 'single_day')
+    elif loop_strategy == 'range':
+        iter_list = get_sync_dates(td.get('value_recency'), 'range')
+    elif loop_strategy == 'activity':
+        iter_list = gen_activity_list(aid)
+    elif loop_strategy == 'single_run':
+        iter_list = [None]  # Executes the loop exactly once without variables
+    else:
+        print(f"Unknown loop strategy: {loop_strategy}")
+        return []
 
+    # 2. Extract routing instructions
+    path_keys = safe_parse(td.get('iter_path_keys'), [])
+    query_keys = safe_parse(td.get('iter_query_keys'), [])
+    static_path = safe_parse(td.get('static_path_params'), {})
+    static_query = safe_parse(td.get('static_query_params'), {})
+
+    # 3. Execution Loop
+    for idx, val in enumerate(iter_list):
+        if idx > 0:
+            random_sleep(500,5000)
+
+        # Clone the static parameters so we don't overwrite the original dictionary
+        current_path = static_path.copy()
+        current_query = static_query.copy()
+
+        if val is not None:
+            # Ensure the loop variable is iterable (handles single strings vs tuples)
+            vals = val if isinstance(val, tuple) else (val,)
+
+            # Map the loop values to their designated path or query keys
+            for i, key in enumerate(path_keys):
+                if i < len(vals): current_path[key] = vals[i]
+
+            for i, key in enumerate(query_keys):
+                if i < len(vals): current_query[key] = vals[i]
+
+        # Call your existing get_pirate_data function
+        raw_json, error = get_pirate_data(
+            endpoint=endpoint,
+            path_params=current_path if current_path else None,
+            query_params=current_query if current_query else None
+        )
+
+        # Handle Error / Logging Protocol
         if error:
-            log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                          desc=f"Extraction Failure for Activity : {a.get('activity_id')}",
-                          exec_time=elapsed_ms(t0),
-                          task_id=td.get('task_id'),
-                          data_event='Extraction Failure')
-            print(f"Error: {error}")
+            log_app_event(
+                cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
+                desc=f"Extraction Failure for : {val}",
+                exec_time=elapsed_ms(t0),
+                task_id=td.get('task_id'),
+                data_event='Extraction Failure'
+            )
+            print(f"Error on {endpoint} [{val}]: {error}")
             continue
 
         if isinstance(raw_json, dict):
@@ -394,41 +397,15 @@ def extract_pirate_activity(client=None, td=None, aid=None):
         elif isinstance(raw_json, list):
             all_json.extend(raw_json)
         elif raw_json is not None:
-            log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                          desc=f"Extraction Failure for Activity: {a.get('activity_id')}",
-                          exec_time=elapsed_ms(t0),
-                          task_id=td.get('task_id'),
-                          data_event=f'Unexpected response {raw_json}')
-            print(f"Bad JSON for {a.get('activity_id')}: {raw_json}")
+            log_app_event(
+                cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
+                desc=f"Unexpected Payload for : {val}",
+                exec_time=elapsed_ms(t0),
+                task_id=td.get('task_id'),
+                data_event=f'Unexpected response {raw_json}'
+            )
+            print(f"Bad JSON for {val}: {raw_json}")
         else:
-            print(f"No JSON for {a.get('activity_id')}")
-
+            print(f"No JSON returned for {val}")
 
     return all_json
-
-def extract_pirate_activity_summary(client=None, td=None, aid=None):
-    t0 = start_timer()
-    endpoint = td.get('api_function_name')
-
-    all_json = []
-
-
-    # Get the data
-
-    raw_json, error = get_pirate_data(endpoint=endpoint,
-                                    path_params={"start": 0,
-                                                 "limit": 100},
-                                    query_params=None)
-
-
-    if error:
-        log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
-                      desc=f"Extraction Failure pulling activity summary",
-                      exec_time=elapsed_ms(t0),
-                      task_id=td.get('task_id'),
-                      data_event='Extraction Failure')
-        print(f"Error: {error}")
-
-
-    return raw_json
-
