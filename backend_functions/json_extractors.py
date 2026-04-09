@@ -320,7 +320,7 @@ def get_pirate_data(endpoint, path_params=None, query_params=None):
 
 def gen_activity_list(aid=None):
     if not aid:
-        return sql_to_dict(query_str="SELECT DISTINCT activity_id FROM activities.vw_activity_ids_to_sync")
+        return sql_to_list(query_str="SELECT DISTINCT activity_id FROM activities.vw_activity_ids_to_sync")
     else:
         return [aid]
 
