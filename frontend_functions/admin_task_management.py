@@ -234,6 +234,12 @@ def render_task_edit(task_id):
             else:
                 task_stop_hour=23
 
+        if st.button(':red[:material/delete: Delete Task]'):
+            sql = f"""DELETE FROM tasks.task_configuration where task_id = {task_id};"""
+            qec(sql)
+            ss_pop('selected_task_id')
+            st.rerun()
+
     with st.container(border=True):
         st.write('__:material/file_json: Extraction__')
         api_function_name = st.segmented_control(label='Data Extraction (API Function)',
