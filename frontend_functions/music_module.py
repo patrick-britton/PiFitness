@@ -6,7 +6,8 @@ import requests
 import streamlit as st
 from streamlit import session_state as ss
 
-from backend_functions.database_functions import get_conn, qec, sql_to_list, sql_to_dict, one_sql_result
+from backend_functions.database_functions import get_conn, qec, sql_to_list, sql_to_dict, one_sql_result, \
+    sql_to_lookup_dict
 from backend_functions.file_handlers import album_art_path
 from backend_functions.music_functions import playlist_upload, get_now_playing, add_isrc_to_local, \
     record_recommendation_decision, remove_recommendation, add_into_current_ratings, save_matchup_results, \
@@ -620,8 +621,16 @@ def render_recent_plays():
 
 
 def render_ratings():
+    pl_sql = """SELECT playlist_name, playlist_id FROM music.vw_rating_eligible_playlists"""
+    pl_dict = sql_to_lookup_dict(pl_sql)
+    st.segmented_control('Playlists to rate',
+                         key='pl_pn_sel',
+                         options=list(pl_dict.keys())
+                         )
+    id = pl_dict.get(ss.get('pl_pn_sel')) if pl_dict else None
+
     with st.spinner('Getting matchup...', show_time=True):
-        d = get_matchup_dictionary()
+        d = get_matchup_dictionary(id)
 
     if not d:
         st.info('No songs to rate at this time')

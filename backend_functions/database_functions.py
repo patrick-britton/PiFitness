@@ -107,6 +107,17 @@ def sql_to_dict(query_str, params=None):
     conn.close()
     return rows
 
+def sql_to_lookup_dict(query_str, params=None):
+    data = sql_to_dict(query_str, params)
+    result = {}
+    for d in data:
+        it = iter(d.values())
+        key = next(it)
+        value = next(it)
+        result[key] = value
+    return result
+
+
 
 def sql_to_list(query_str):
     conn = get_conn()
