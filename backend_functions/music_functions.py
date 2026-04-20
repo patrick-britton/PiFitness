@@ -593,8 +593,11 @@ def remove_track_from_spotify_playlist(isrc, list_id, client):
         log_app_event(cat='Playlist Track Removal', desc=f"List: {id} || ISRC: {isrc}, {len(track_list)} potential tracks")
     return
 
-def get_matchup_dictionary():
-    sql = "SELECT isrc, playlist_id FROM music.vw_rating_eligible LIMIT 1"
+def get_matchup_dictionary(i):
+    if i:
+        sql = f"SELECT isrc, playlist_id FROM music.vw_rating_eligible where playlist_id = '{i}' LIMIT 1"
+    else:
+        sql = "SELECT isrc, playlist_id FROM music.vw_rating_eligible LIMIT 1"
     id = sql_to_dict(sql)
     if not id:
         return None
