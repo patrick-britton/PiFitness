@@ -156,13 +156,19 @@ echo "Backup Turned Off"
 # --- 4. Pull the branch ---
 cd /home/god/PiFitness
 
-# Stash any local changes to avoid checkout conflicts
-info "Stashing any local changes..."
-git stash push --include-untracked || true
+# Protect .env files before reset (receiver mode - no local changes preserved)
+info "Protecting local configuration files..."
+[ -f backend/.env ] && cp backend/.env /tmp/.env.backup || true
+[ -f .env ] && cp .env /tmp/.env.root.backup || true
 
+# Receiver mode: hard reset to remote branch (no local changes preserved)
+info "Resetting to remote branch (receiver mode)..."
 git fetch origin
-git checkout "$BRANCH"
-git pull origin "$BRANCH"
+git reset --hard origin/"$BRANCH"
+
+# Restore protected .env files
+[ -f /tmp/.env.backup ] && cp /tmp/.env.backup backend/.env && info "Restored backend/.env"
+[ -f /tmp/.env.root.backup ] && cp /tmp/.env.root.backup .env && info "Restored .env"
 
 # --- 5. Install/update Python dependencies ---
 source venv/bin/activate
@@ -237,7 +243,7 @@ info "Nginx configured to use port $TARGET_PORT."
 restart_agent_service
 
 # --- 10. Cleanup old backups (keep last 2) ---
-cd /home/god/PiFitness/backups
-ls -1t | tail -n +3 | xargs -r rm-rf
+cd /home/god/PiFitness/backups 2>/dev/null || true
+ls -1t | tail -n +3 | xargs -r rm -rf
 
 info "Deployment of $BRANCH completed successfully!"

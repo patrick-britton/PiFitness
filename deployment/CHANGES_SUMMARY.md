@@ -24,10 +24,16 @@ This was caused by the nginx template file containing bash heredoc syntax (`cat 
 - Added verification step to ensure nginx is using the correct port
 - Improved error handling throughout the nginx configuration process
 
-**Additional Features Added:**
-- **Git Stashing**: Automatically stashes local changes before branch switching to prevent checkout conflicts
+**Receiver-Only Mode Enhancements:**
+- **Git Hard Reset**: Replaced stashing with `git reset --hard` for receiver-only Pi deployments
+- **.env File Protection**: Automatically backs up and restores .env files during deployment
 - **Agent Service Management**: Stops agent service before deployment and restarts it after completion
 - **Enhanced Process Detection**: Smart detection of running processes with graceful shutdown
+
+**Bug Fixes Applied:**
+- **Xargs Command Fix**: Fixed `rm-rf` typo to `rm -rf` in backup cleanup
+- **Receiver Strategy**: Implemented hard reset to handle divergent branches automatically
+- **Configuration Protection**: Added .env file backup/restore to preserve local configuration
 
 **Key Improvements:**
 ```bash
