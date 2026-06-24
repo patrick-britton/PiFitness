@@ -42,6 +42,7 @@ info "Deploying branch: $BRANCH"
 info "Stopping any running services..."
 sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
 sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+sudo pkill -f "streamlit run" 2>/dev/null || true
 
 # --- 3. Backup current code (rollback point) ---
 BACKUP_DIR="/home/god/PiFitness/backups/$(date +%Y%m%d_%H%M%S)_$BRANCH"
