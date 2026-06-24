@@ -24,6 +24,27 @@ warn() {
     echo -e "${YELLOW}WARNING: $1${NC}"
 }
 
+cleanup_processes() {
+    # Clean up any processes that might be leaking memory
+    info "Cleaning up potential memory leaks..."
+
+    # Python processes that might be orphaned
+    sudo pkill -f "python.*backend" 2>/dev/null || true
+    sudo pkill -f "python.*pi_fitness" 2>/dev/null || true
+
+    # Node processes from React builds
+    sudo pkill -f "node.*frontend" 2>/dev/null || true
+    sudo pkill -f "npm" 2>/dev/null || true
+
+    # Any processes using the ports
+    sudo lsof -ti :8000 | xargs -r sudo kill -9 2>/dev/null || true
+    sudo lsof -ti :8501 | xargs -r sudo kill -9 2>/dev/null || true
+
+    # Clean up any temporary files
+    sudo rm -f /tmp/*.sock 2>/dev/null || true
+    sudo rm -f /tmp/*.pid 2>/dev/null || true
+}
+
 # --- 1. Ask for branch ---
 echo "Which branch to deploy?"
 echo "  1) streamlit-prd (legacy Streamlit)"
@@ -40,9 +61,47 @@ info "Deploying branch: $BRANCH"
 
 # --- 2. Stop all services ---
 info "Stopping any running services..."
-sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
+
+# First cleanup any potential memory leaks from previous runs
+cleanup_processes
+
+# Stop services gracefully with timeout
+info "Stopping FastAPI service..."
 sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+
+info "Stopping Streamlit service..."
+sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
+
+# Kill any remaining processes with graceful shutdown
+info "Killing remaining processes..."
+
+# FastAPI/uvicorn processes
+sudo pkill -f "uvicorn" 2>/dev/null || true
+sudo pkill -f "backend.main:app" 2>/dev/null || true
+
+# Streamlit processes
 sudo pkill -f "streamlit run" 2>/dev/null || true
+
+# Wait for processes to terminate
+info "Waiting for processes to terminate..."
+sleep 3
+
+# Force kill any stubborn processes
+info "Checking for remaining processes..."
+if pgrep -f "uvicorn" > /dev/null; then
+    warn "Force killing remaining uvicorn processes..."
+    sudo pkill -9 -f "uvicorn"
+fi
+
+if pgrep -f "streamlit" > /dev/null; then
+    warn "Force killing remaining streamlit processes..."
+    sudo pkill -9 -f "streamlit"
+fi
+
+# Clean up any zombie processes
+info "Cleaning up zombie processes..."
+sudo pkill -9 -f "defunct" 2>/dev/null || true
+sudo pkill -9 -f "<defunct>" 2>/dev/null || true
 
 # --- 3. Backup current code (rollback point) ---
 echo "Backup Turned Off"

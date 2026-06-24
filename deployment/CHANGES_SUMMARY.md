@@ -14,6 +14,15 @@ The 502 errors were caused by nginx trying to connect to port 8501 (Streamlit) i
 - Added verification step to ensure nginx is using the correct port
 - Improved error handling throughout the nginx configuration process
 
+**Performance Improvements Added:**
+- Added `cleanup_processes()` function to clean up memory leaks and orphaned processes
+- Enhanced service stopping with graceful shutdown and timeout handling
+- Added process cleanup before starting new services
+- Added zombie process cleanup
+- Added port-specific process killing (8000, 8501)
+- Added temporary file cleanup
+- Improved logging throughout the shutdown process
+
 **Key Improvements:**
 ```bash
 # Verify the port was actually replaced
