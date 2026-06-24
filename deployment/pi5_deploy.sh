@@ -98,12 +98,32 @@ if [[ ! -f "$NGINX_TEMPLATE" ]]; then
 fi
 
 # Replace PORT placeholder with target port
+info "Updating nginx configuration to use port ${TARGET_PORT}..."
 sudo sed "s/PORT/${TARGET_PORT}/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
 
+# Verify the port was actually replaced
+if ! grep -q ":${TARGET_PORT};" "$NGINX_SITE"; then
+    error_exit "Failed to update nginx configuration with port ${TARGET_PORT}. Check if PORT placeholder exists in template."
+fi
+
+# Ensure symlink exists in sites-enabled
+if [[ ! -f "/etc/nginx/sites-enabled/pifitness" ]]; then
+    info "Creating nginx symlink..."
+    sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness
+fi
+
 # Test and reload nginx
+info "Testing nginx configuration..."
 sudo nginx -t || error_exit "Nginx configuration test failed."
-sudo systemctl reload nginx
-info "Nginx reloaded with port $TARGET_PORT."
+
+info "Reloading nginx..."
+sudo systemctl reload nginx || error_exit "Failed to reload nginx."
+
+# Verify nginx is using the correct port
+info "Verifying nginx configuration..."
+sudo nginx -T 2>/dev/null | grep -A5 "server_name pifitness.duckdns.org" | grep "proxy_pass" | grep -q ":${TARGET_PORT};" || warn "Nginx may not be using the expected port ${TARGET_PORT}"
+
+info "Nginx configured to use port $TARGET_PORT."
 
 # --- 9. Cleanup old backups (keep last 2) ---
 cd /home/god/PiFitness/backups
