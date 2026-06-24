@@ -25,24 +25,56 @@ warn() {
 }
 
 cleanup_processes() {
-    # Clean up any processes that might be leaking memory
-    info "Cleaning up potential memory leaks..."
-
-    # Python processes that might be orphaned
-    sudo pkill -f "python.*backend" 2>/dev/null || true
-    sudo pkill -f "python.*pi_fitness" 2>/dev/null || true
-
-    # Node processes from React builds
-    sudo pkill -f "node.*frontend" 2>/dev/null || true
-    sudo pkill -f "npm" 2>/dev/null || true
-
-    # Any processes using the ports
-    sudo lsof -ti :8000 | xargs -r sudo kill -9 2>/dev/null || true
-    sudo lsof -ti :8501 | xargs -r sudo kill -9 2>/dev/null || true
-
-    # Clean up any temporary files
+    # Clean up temporary files that might cause issues
+    info "Cleaning up temporary files..."
     sudo rm -f /tmp/*.sock 2>/dev/null || true
     sudo rm -f /tmp/*.pid 2>/dev/null || true
+}
+
+detect_and_kill_processes() {
+    # Smart process detection and safe killing
+    info "Detecting running processes..."
+
+    # Check if FastAPI/uvicorn is running
+    if pgrep -f "uvicorn" > /dev/null; then
+        info "Found running FastAPI processes - stopping gracefully..."
+        sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+        sleep 2
+
+        if pgrep -f "uvicorn" > /dev/null; then
+            warn "FastAPI processes still running - force killing..."
+            sudo pkill -9 -f "uvicorn" || warn "Failed to kill FastAPI processes"
+        else
+            info "FastAPI processes stopped successfully"
+        fi
+    else
+        info "No FastAPI processes found"
+    fi
+
+    # Check if Streamlit is running
+    if pgrep -f "streamlit run" > /dev/null; then
+        info "Found running Streamlit processes - stopping gracefully..."
+        sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
+        sleep 2
+
+        if pgrep -f "streamlit run" > /dev/null; then
+            warn "Streamlit processes still running - force killing..."
+            sudo pkill -9 -f "streamlit run" || warn "Failed to kill Streamlit processes"
+        else
+            info "Streamlit processes stopped successfully"
+        fi
+    else
+        info "No Streamlit processes found"
+    fi
+
+    # Clean up any processes using our ports
+    info "Checking for processes using deployment ports..."
+    for port in 8000 8501; do
+        if sudo lsof -ti :$port > /dev/null; then
+            warn "Process found using port $port - killing..."
+            sudo lsof -ti :$port | xargs -r sudo kill -9 || warn "Failed to kill processes on port $port"
+        fi
+    done
 }
 
 # --- 1. Ask for branch ---
@@ -62,46 +94,14 @@ info "Deploying branch: $BRANCH"
 # --- 2. Stop all services ---
 info "Stopping any running services..."
 
-# First cleanup any potential memory leaks from previous runs
+# First cleanup temporary files
 cleanup_processes
 
-# Stop services gracefully with timeout
-info "Stopping FastAPI service..."
-sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+# Use smart process detection and safe killing
+detect_and_kill_processes
 
-info "Stopping Streamlit service..."
-sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
-
-# Kill any remaining processes with graceful shutdown
-info "Killing remaining processes..."
-
-# FastAPI/uvicorn processes
-sudo pkill -f "uvicorn" 2>/dev/null || true
-sudo pkill -f "backend.main:app" 2>/dev/null || true
-
-# Streamlit processes
-sudo pkill -f "streamlit run" 2>/dev/null || true
-
-# Wait for processes to terminate
-info "Waiting for processes to terminate..."
-sleep 3
-
-# Force kill any stubborn processes
-info "Checking for remaining processes..."
-if pgrep -f "uvicorn" > /dev/null; then
-    warn "Force killing remaining uvicorn processes..."
-    sudo pkill -9 -f "uvicorn"
-fi
-
-if pgrep -f "streamlit" > /dev/null; then
-    warn "Force killing remaining streamlit processes..."
-    sudo pkill -9 -f "streamlit"
-fi
-
-# Clean up any zombie processes
-info "Cleaning up zombie processes..."
-sudo pkill -9 -f "defunct" 2>/dev/null || true
-sudo pkill -9 -f "<defunct>" 2>/dev/null || true
+# No need for additional process killing since detect_and_kill_processes
+# handles everything with proper detection and graceful shutdown
 
 # --- 3. Backup current code (rollback point) ---
 echo "Backup Turned Off"
