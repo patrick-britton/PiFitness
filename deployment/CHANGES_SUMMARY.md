@@ -15,13 +15,25 @@ The 502 errors were caused by nginx trying to connect to port 8501 (Streamlit) i
 - Improved error handling throughout the nginx configuration process
 
 **Performance Improvements Added:**
-- Added `cleanup_processes()` function to clean up memory leaks and orphaned processes
-- Enhanced service stopping with graceful shutdown and timeout handling
-- Added process cleanup before starting new services
-- Added zombie process cleanup
-- Added port-specific process killing (8000, 8501)
-- Added temporary file cleanup
-- Improved logging throughout the shutdown process
+- **Smart Process Detection**: Replaced aggressive process killing with `detect_and_kill_processes()` function that:
+  - Detects running processes before attempting to kill them
+  - Uses graceful `systemctl stop` before force killing
+  - Only kills processes that are actually running
+  - Provides clear logging of what's being found and stopped
+  - Handles failures gracefully with warnings instead of errors
+
+- **Simplified Cleanup**: `cleanup_processes()` now only cleans up temporary files, avoiding overly aggressive process killing
+
+- **Better Error Handling**: All process killing operations use `|| warn` to handle failures gracefully
+
+- **Improved Logging**: Each step provides clear info about what processes are found and how they're being handled
+
+**Key Benefits:**
+- **No More Blind Killing**: Only kills processes that are actually running
+- **System Stability**: Won't kill system monitoring commands
+- **Memory Safe**: Doesn't create memory pressure by killing too much
+- **Faster Deployment**: No unnecessary process killing slows down deployment
+- **Better Diagnostics**: Clear logging shows exactly what's happening
 
 **Key Improvements:**
 ```bash
