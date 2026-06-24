@@ -1,7 +1,17 @@
 # Deployment Configuration Fixes - Summary of Changes
 
 ## Problem Analysis
+
+### Initial Issue (502 Errors)
 The 502 errors were caused by nginx trying to connect to port 8501 (Streamlit) instead of port 8000 (FastAPI). This happened because the nginx configuration wasn't being properly updated during deployment.
+
+### Additional Issue (Nginx Configuration Failure)
+During testing, an additional issue was discovered where the nginx configuration test failed with:
+```
+unknown directive "cat" in /etc/nginx/sites-enabled/pifitness:2
+```
+
+This was caused by the nginx template file containing bash heredoc syntax (`cat > ... <<'EOF'`) that was being included in the final nginx configuration file, making it invalid nginx syntax.
 
 ## Files Modified
 
