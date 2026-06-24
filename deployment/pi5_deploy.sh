@@ -45,10 +45,11 @@ sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
 sudo pkill -f "streamlit run" 2>/dev/null || true
 
 # --- 3. Backup current code (rollback point) ---
-BACKUP_DIR="/home/god/PiFitness/backups/$(date +%Y%m%d_%H%M%S)_$BRANCH"
-mkdir -p "$BACKUP_DIR"
-cp -r /home/god/PiFitness/* "$BACKUP_DIR" 2>/dev/null || true
-info "Backup saved to $BACKUP_DIR"
+echo "Backup Turned Off"
+# BACKUP_DIR="/home/god/PiFitness/backups/$(date +%Y%m%d_%H%M%S)_$BRANCH"
+# mkdir -p "$BACKUP_DIR"
+# cp -r /home/god/PiFitness/* "$BACKUP_DIR" 2>/dev/null || true
+# info "Backup saved to $BACKUP_DIR"
 
 # --- 4. Pull the branch ---
 cd /home/god/PiFitness
