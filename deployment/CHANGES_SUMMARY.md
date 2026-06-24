@@ -24,6 +24,25 @@ This was caused by the nginx template file containing bash heredoc syntax (`cat 
 - Added verification step to ensure nginx is using the correct port
 - Improved error handling throughout the nginx configuration process
 
+**Additional Features Added:**
+- **Git Stashing**: Automatically stashes local changes before branch switching to prevent checkout conflicts
+- **Agent Service Management**: Stops agent service before deployment and restarts it after completion
+- **Enhanced Process Detection**: Smart detection of running processes with graceful shutdown
+
+**Key Improvements:**
+```bash
+# Git stashing to prevent checkout conflicts
+info "Stashing any local changes..."
+git stash push --include-untracked || true
+
+# Agent service management
+manage_agent_service      # Stop before deployment
+restart_agent_service     # Restart after deployment
+
+# Smart process detection
+detect_and_kill_processes  # Detect and gracefully stop processes
+```
+
 **Performance Improvements Added:**
 - **Smart Process Detection**: Replaced aggressive process killing with `detect_and_kill_processes()` function that:
   - Detects running processes before attempting to kill them

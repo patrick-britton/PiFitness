@@ -31,6 +31,46 @@ cleanup_processes() {
     sudo rm -f /tmp/*.pid 2>/dev/null || true
 }
 
+manage_agent_service() {
+    # Manage the agent service (agent_hourly.py timer)
+    info "Managing agent service..."
+
+    # Stop agent service if running
+    if sudo systemctl is-active --quiet pifitness_agent.service; then
+        info "Stopping agent service..."
+        sudo systemctl stop pifitness_agent.service
+    else
+        info "Agent service not running"
+    fi
+
+    # Stop agent timer if running
+    if sudo systemctl is-active --quiet pifitness_agent.timer; then
+        info "Stopping agent timer..."
+        sudo systemctl stop pifitness_agent.timer
+    else
+        info "Agent timer not running"
+    fi
+}
+
+restart_agent_service() {
+    # Restart the agent service after deployment
+    info "Restarting agent service..."
+
+    # Reload systemd to pick up any service file changes
+    sudo systemctl daemon-reload
+
+    # Start timer (which will trigger the service)
+    sudo systemctl start pifitness_agent.timer
+
+    # Check status
+    if sudo systemctl is-active --quiet pifitness_agent.timer; then
+        info "Agent timer started successfully"
+    else
+        warn "Failed to start agent timer - check logs"
+        sudo systemctl status pifitness_agent.timer --no-pager || true
+    fi
+}
+
 detect_and_kill_processes() {
     # Smart process detection and safe killing
     info "Detecting running processes..."
@@ -97,6 +137,9 @@ info "Stopping any running services..."
 # First cleanup temporary files
 cleanup_processes
 
+# Manage agent service (stop before deployment)
+manage_agent_service
+
 # Use smart process detection and safe killing
 detect_and_kill_processes
 
@@ -112,6 +155,11 @@ echo "Backup Turned Off"
 
 # --- 4. Pull the branch ---
 cd /home/god/PiFitness
+
+# Stash any local changes to avoid checkout conflicts
+info "Stashing any local changes..."
+git stash push --include-untracked || true
+
 git fetch origin
 git checkout "$BRANCH"
 git pull origin "$BRANCH"
@@ -185,8 +233,11 @@ sudo nginx -T 2>/dev/null | grep -A5 "server_name pifitness.duckdns.org" | grep 
 
 info "Nginx configured to use port $TARGET_PORT."
 
-# --- 9. Cleanup old backups (keep last 2) ---
+# --- 9. Restart agent service ---
+restart_agent_service
+
+# --- 10. Cleanup old backups (keep last 2) ---
 cd /home/god/PiFitness/backups
-ls -1t | tail -n +3 | xargs -r rm -rf
+ls -1t | tail -n +3 | xargs -r rm-rf
 
 info "Deployment of $BRANCH completed successfully!"
