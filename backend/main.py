@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
+from datetime import datetime
 
 app = FastAPI()
 
@@ -11,7 +12,20 @@ os.makedirs(static_dir, exist_ok=True)
 # 1. API routes first (they take priority)
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    try:
+        # Test database connection
+        from backend_functions.database_functions import get_conn
+        conn = get_conn()
+        conn.close()
+        db_status = "ok"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+
+    return {
+        "status": "ok",
+        "database": db_status,
+        "timestamp": datetime.now().isoformat()
+    }
 
 # 2. Serve Next.js static assets from /_next
 next_static_dir = os.path.join(static_dir, "_next")
