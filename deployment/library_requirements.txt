@@ -18,3 +18,5 @@ playwright
 typer
 httpx
 pytz
+fastapi
+react
