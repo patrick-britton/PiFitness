@@ -24,16 +24,10 @@ This was caused by the nginx template file containing bash heredoc syntax (`cat 
 - Added verification step to ensure nginx is using the correct port
 - Improved error handling throughout the nginx configuration process
 
-**Receiver-Only Mode Enhancements:**
-- **Git Hard Reset**: Replaced stashing with `git reset --hard` for receiver-only Pi deployments
-- **.env File Protection**: Automatically backs up and restores .env files during deployment
+**Additional Features Added:**
+- **Git Stashing**: Automatically stashes local changes before branch switching to prevent checkout conflicts
 - **Agent Service Management**: Stops agent service before deployment and restarts it after completion
 - **Enhanced Process Detection**: Smart detection of running processes with graceful shutdown
-
-**Bug Fixes Applied:**
-- **Xargs Command Fix**: Fixed `rm-rf` typo to `rm -rf` in backup cleanup
-- **Receiver Strategy**: Implemented hard reset to handle divergent branches automatically
-- **Configuration Protection**: Added .env file backup/restore to preserve local configuration
 
 **Key Improvements:**
 ```bash
@@ -60,6 +54,12 @@ detect_and_kill_processes  # Detect and gracefully stop processes
 - **Simplified Cleanup**: `cleanup_processes()` now only cleans up temporary files, avoiding overly aggressive process killing
 
 - **Better Error Handling**: All process killing operations use `|| warn` to handle failures gracefully
+
+**Automated Testing Added:**
+- **Pytest Integration**: Added automated testing for React UI branch only
+- **Test Gate**: Deployment aborts if tests fail, preventing broken deployments
+- **Optimal Placement**: Tests run after dependencies but before service start
+- **Clear Logging**: Provides visible test output and success/failure messages
 
 - **Improved Logging**: Each step provides clear info about what processes are found and how they're being handled
 

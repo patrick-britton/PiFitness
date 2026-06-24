@@ -174,6 +174,16 @@ git reset --hard origin/"$BRANCH"
 source venv/bin/activate
 pip install -r deployment/library_requirements.txt
 
+# --- 5.5. Run automated tests (React UI branch only) ---
+if [[ "$BRANCH" == "react-ui" ]]; then
+    info "Running automated tests..."
+    source venv/bin/activate
+    if ! pytest tests/ -v; then
+        error_exit "Tests failed, aborting deployment"
+    fi
+    info "All tests passed successfully"
+fi
+
 # Install/update systemd service files
 sudo cp /home/god/PiFitness/deployment/pifitness-streamlit.service /etc/systemd/system/
 sudo cp /home/god/PiFitness/deployment/pifitness-fastapi.service /etc/systemd/system/
