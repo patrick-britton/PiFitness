@@ -5,17 +5,19 @@ import os
 
 app = FastAPI()
 
-# Serve static files (React build output)
+# Ensure static directory exists (create if missing)
 static_dir = os.path.join(os.path.dirname(__file__), "static")
-if os.path.exists(static_dir):
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+os.makedirs(static_dir, exist_ok=True)
 
-# Health check endpoint (for testing)
+# Mount static files (will serve index.html and other assets)
+app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+
+# Health check endpoint
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
 
-# Fallback to index.html for SPA routing
+# SPA fallback – return index.html for any non‑API route if it exists
 @app.get("/{path:path}")
 async def catch_all(path: str):
     index_path = os.path.join(static_dir, "index.html")

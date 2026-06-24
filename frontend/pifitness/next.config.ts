@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'export',  // static export
+  output: 'export',  // ✅ this is the correct way in Next.js 16
   distDir: 'out',    // output directory (matches deployment script)
 };
 
