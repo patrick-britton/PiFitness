@@ -20,3 +20,6 @@ httpx
 pytz
 fastapi
 react
+pytest
+httpx
+pytest-asyncio
