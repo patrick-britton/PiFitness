@@ -15,4 +15,7 @@ def test_health():
 
     # Assert the response
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    response_data = response.json()
+    assert response_data["status"] == "ok"
+    assert "database" in response_data
+    assert "timestamp" in response_data
