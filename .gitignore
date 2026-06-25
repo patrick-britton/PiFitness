@@ -228,9 +228,8 @@ __marimo__/
 *.svg
 *.png
 
-memory-bank/activeContext.md
-memory-bank/productContext.md
-memory-bank/progress.md
-memory-bank/projectBrief.md
-memory-bank/techContext.md
+memory-bank/
 .clinerules
+node_modules/
+.next/
+out/

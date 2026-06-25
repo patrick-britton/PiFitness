@@ -1,20 +1,118 @@
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+"""
+PiFitness FastAPI Application
+=============================
+
+Main entry point for the PiFitness API backend.
+Serves API endpoints and optionally serves the compiled React frontend
+as static assets in production.
+
+Endpoints:
+    GET /api/health - Health check (database connectivity)
+    GET /api/activities - List activities
+    GET /api/activities/{id} - Get activity details
+    GET /api/health/weight-targets - Get weight targets
+    GET /api/health/heartrate - Get heart rate data
+    GET /api/admin/tasks - List tasks
+"""
+
 import os
 from datetime import datetime
 
-app = FastAPI()
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-os.makedirs(static_dir, exist_ok=True)
+from backend.config import get_settings
+from backend.api import activities, health, admin
 
-# 1. API routes first (they take priority)
+# ---------------------------------------------------------------------------
+# Application Initialization
+# ---------------------------------------------------------------------------
+
+settings = get_settings()
+
+app = FastAPI(
+    title=settings.app_name,
+    version="1.0.0",
+    debug=settings.debug,
+)
+
+# ---------------------------------------------------------------------------
+# CORS Middleware
+# ---------------------------------------------------------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---------------------------------------------------------------------------
+# Global Error Handlers
+# ---------------------------------------------------------------------------
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Return structured JSON for HTTP errors instead of HTML."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "status": exc.status_code,
+            "type": "HTTPException",
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+):
+    """Return structured JSON for Pydantic validation errors."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": exc.errors(),
+            "body": exc.body,
+            "status": 422,
+            "type": "ValidationError",
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all handler for unhandled exceptions."""
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "status": 500,
+            "type": "InternalServerError",
+        },
+    )
+
+# ---------------------------------------------------------------------------
+# API Routes
+# ---------------------------------------------------------------------------
+
+# Include API routers
+app.include_router(activities.router)
+app.include_router(health.router)
+app.include_router(admin.router)
+
 @app.get("/api/health")
 async def health():
+    """Health check endpoint that tests database connectivity."""
     try:
-        # Test database connection
         from backend_functions.database_functions import get_conn
+
         conn = get_conn()
         conn.close()
         db_status = "ok"
@@ -24,15 +122,22 @@ async def health():
     return {
         "status": "ok",
         "database": db_status,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
 
-# 2. Serve Next.js static assets from /_next
+# ---------------------------------------------------------------------------
+# Static File Serving (Production)
+# ---------------------------------------------------------------------------
+
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(static_dir, exist_ok=True)
+
+# Serve Next.js static assets from /_next (built by `npm run build`)
 next_static_dir = os.path.join(static_dir, "_next")
 if os.path.exists(next_static_dir):
     app.mount("/_next", StaticFiles(directory=next_static_dir), name="_next")
 
-# 3. SPA fallback – serve index.html for any other route
+# SPA fallback — serve index.html for any other route
 @app.get("/{path:path}")
 async def catch_all(path: str):
     index_path = os.path.join(static_dir, "index.html")
