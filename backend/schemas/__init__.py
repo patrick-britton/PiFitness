@@ -1,19 +1,15 @@
 """
-PiFitness API Schemas
-====================
+Pydantic Schemas Package
+=========================
 
-Pydantic models for the PiFitness API that mirror the database structure.
-These models define the API contract for request/response payloads.
+Data validation models using Pydantic.
 """
 
-from .activity_schemas import Activity, ActivityDetail, ActivityMetric, Segment
-from .health_schemas import HeartRate, SleepData, BodyComposition
-from .music_schemas import Track, TrackDetail, Playlist, PlaylistDetail, TrackRecommendation
-from .admin_schemas import TaskExecution, TaskConfig, DBStats
-
-__all__ = [
-    'Activity', 'ActivityDetail', 'ActivityMetric', 'Segment',
-    'HeartRate', 'SleepData', 'BodyComposition',
-    'Track', 'TrackDetail', 'Playlist', 'PlaylistDetail', 'TrackRecommendation',
-    'TaskExecution', 'TaskConfig', 'DBStats'
-]
+# Empty file to make this a Python package
+# Package structure:
+# - backend/schemas/
+#   - __init__.py (this file)
+#   - activity_schemas.py
+#   - health_schemas.py
+#   - music_schemas.py
+#   - admin_schemas.py
