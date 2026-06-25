@@ -19,7 +19,7 @@ typer
 httpx
 pytz
 fastapi
+uvicorn
 react
 pytest
-httpx
 pytest-asyncio

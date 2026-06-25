@@ -1,0 +1,133 @@
+"""
+Query Functions Package
+======================
+
+Centralized database query functions extracted from Streamlit frontend.
+These functions return plain Python data structures (dicts, lists, dataclasses)
+with no Streamlit dependencies, making them reusable by both FastAPI and legacy code.
+"""
+
+# Import query modules
+from .health_queries import (
+    get_weight_targets,
+    add_weight_target,
+    get_weight_viz_data,
+    add_photo_metadata,
+    add_body_dimensions
+)
+from .music_queries import (
+    get_rating_eligible_count,
+    get_isrc_dupe_count,
+    get_isrc_dupe_match,
+    get_playlist_config,
+    get_playlist_isrc_stats,
+    get_recent_plays,
+    get_rating_eligible_playlists,
+    get_playlists_not_containing_isrc,
+    process_isrc_dupe_acceptance,
+    add_isrc_to_local_playlist,
+    record_recommendation_decision,
+    remove_recommendation,
+    add_into_current_ratings,
+    update_playlist_config_weights,
+    record_rating_history,
+    update_ratings_from_view,
+    add_soft_rejection_exclusion
+)
+from .admin_queries import (
+    get_api_service_list,
+    get_distinct_api_service_names,
+    insert_api_service,
+    delete_api_service,
+    get_function_library,
+    insert_function_library_entry,
+    update_function_library_entry,
+    delete_function_library_entry,
+    get_credential_requirements,
+    upsert_credentials,
+    delete_credentials,
+    get_task_configuration,
+    get_placeholder_task_id,
+    insert_placeholder_task,
+    get_task_config_by_id,
+    delete_task_configuration,
+    delete_fact_configuration,
+    upsert_fact_configuration,
+    get_distinct_task_names,
+    get_task_execution_view,
+    get_task_scheduling_view,
+    get_active_db_sessions,
+    kill_db_session,
+    get_event_history,
+    get_log_tables_simple,
+    get_log_data_simple,
+)
+from .activities_queries import (
+    get_activities_list,
+    get_activity_by_id,
+    get_activity_telemetry,
+    get_segment_matches,
+    get_recent_activities,
+    get_activity_stats,
+)
+
+__all__ = [
+    # Health
+    'get_weight_targets',
+    'add_weight_target',
+    'get_weight_viz_data',
+    'add_photo_metadata',
+    'add_body_dimensions',
+    # Music
+    'get_rating_eligible_count',
+    'get_isrc_dupe_count',
+    'get_isrc_dupe_match',
+    'get_playlist_config',
+    'get_playlist_isrc_stats',
+    'get_recent_plays',
+    'get_rating_eligible_playlists',
+    'get_playlists_not_containing_isrc',
+    'process_isrc_dupe_acceptance',
+    'add_isrc_to_local_playlist',
+    'record_recommendation_decision',
+    'remove_recommendation',
+    'add_into_current_ratings',
+    'update_playlist_config_weights',
+    'record_rating_history',
+    'update_ratings_from_view',
+    'add_soft_rejection_exclusion',
+    # Admin
+    'get_api_service_list',
+    'get_distinct_api_service_names',
+    'insert_api_service',
+    'delete_api_service',
+    'get_function_library',
+    'insert_function_library_entry',
+    'update_function_library_entry',
+    'delete_function_library_entry',
+    'get_credential_requirements',
+    'upsert_credentials',
+    'delete_credentials',
+    'get_task_configuration',
+    'get_placeholder_task_id',
+    'insert_placeholder_task',
+    'get_task_config_by_id',
+    'delete_task_configuration',
+    'delete_fact_configuration',
+    'upsert_fact_configuration',
+    'get_distinct_task_names',
+    'get_task_execution_view',
+    'get_task_scheduling_view',
+    'get_active_db_sessions',
+    'kill_db_session',
+    'get_event_history',
+    'get_log_tables_simple',
+    'get_log_data_simple',
+    # Activities
+    'get_activities_list',
+    'get_activity_by_id',
+    'get_activity_telemetry',
+    'get_segment_matches',
+    'get_recent_activities',
+    'get_activity_stats',
+]

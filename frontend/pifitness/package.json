@@ -8,9 +8,19 @@
     "start": "next start"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.10",
+    "@tailwindcss/postcss": "^4.3.1",
+    "@tanstack/react-query": "^5.101.1",
+    "autoprefixer": "^10.5.2",
+    "chart.js": "^4.5.1",
+    "maplibre-gl": "^5.24.0",
     "next": "^16.0.0",
+    "postcss": "^8.5.15",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.1",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/node": "^20",
