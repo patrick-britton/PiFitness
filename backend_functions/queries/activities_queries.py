@@ -100,17 +100,17 @@ def get_activity_telemetry(activity_id: int) -> Sequence[Dict[str, Any]]:
     """
     sql = """
         SELECT
-            timestamp_utc,
-            latitude_deg,
-            longitude_deg,
+            ts_utc AS timestamp_utc,
+            latitude,
+            longitude,
             elevation_m,
-            heart_rate_bpm,
-            cadence_rpm,
-            speed_mps,
-            distance_m
-        FROM activities.activity_telemetry
+            heartrate_bpm,
+            cadence_spm,
+            speed_mmps / 1000.0 AS speed_mps,
+            distance_mm / 1000.0 AS distance_m
+        FROM activities.activity_details
         WHERE activity_id = %s
-        ORDER BY timestamp_utc
+        ORDER BY ts_utc
     """
     result = sql_to_dict(sql, (activity_id,))
     return result if result else []
@@ -128,20 +128,19 @@ def get_segment_matches(activity_id: int) -> Sequence[Dict[str, Any]]:
     """
     sql = """
         SELECT
-            sm.segment_match_id,
-            sm.segment_id,
+            sd.segment_id,
             s.segment_name,
-            sm.match_confidence,
-            sm.duration_s,
-            sm.distance_m,
-            sm.elevation_gain_m,
-            sm.avg_heart_rate_bpm,
-            sm.max_heart_rate_bpm,
-            sm.start_timestamp_utc
-        FROM activities.segment_matches sm
-        JOIN activities.segments s ON sm.segment_id = s.segment_id
-        WHERE sm.activity_id = %s
-        ORDER BY sm.start_timestamp_utc
+            sd.distance_m,
+            sd.elapsed_duration_s AS duration_s,
+            sd.max_hr AS max_heart_rate_bpm,
+            sd.avg_hr AS avg_heart_rate_bpm,
+            sd.start_time_utc,
+            sd.avg_cadence,
+            sd.avg_temp
+        FROM activities.segments_details sd
+        JOIN activities.segments s ON sd.segment_id = s.segment_id
+        WHERE sd.activity_id = %s
+        ORDER BY sd.start_time_utc
     """
     result = sql_to_dict(sql, (activity_id,))
     return result if result else []
@@ -190,11 +189,11 @@ def get_activity_stats(activity_id: int) -> Optional[Dict[str, Any]]:
             COUNT(*) AS telemetry_points,
             MIN(elevation_m) AS min_elevation_m,
             MAX(elevation_m) AS max_elevation_m,
-            AVG(heart_rate_bpm) AS avg_heart_rate_bpm,
-            MAX(heart_rate_bpm) AS max_heart_rate_bpm,
-            AVG(speed_mps) * 3.6 AS avg_speed_kph,
-            MAX(speed_mps) * 3.6 AS max_speed_kph
-        FROM activities.activity_telemetry
+            AVG(heartrate_bpm) AS avg_heart_rate_bpm,
+            MAX(heartrate_bpm) AS max_heart_rate_bpm,
+            AVG(speed_mmps / 1000.0) * 3.6 AS avg_speed_kph,
+            MAX(speed_mmps / 1000.0) * 3.6 AS max_speed_kph
+        FROM activities.activity_details
         WHERE activity_id = %s
         GROUP BY activity_id
     """

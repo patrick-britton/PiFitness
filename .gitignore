@@ -233,3 +233,5 @@ memory-bank/
 node_modules/
 .next/
 out/
+backend/static/
+.agents/

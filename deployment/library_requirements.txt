@@ -5,7 +5,7 @@ pandas
 numpy
 requests
 spotipy
-dotenv
+python-dotenv
 cryptography
 pathlib
 garminconnect
@@ -16,10 +16,11 @@ elevation
 scipy
 playwright
 typer
-httpx
+httpx2
 pytz
 fastapi
 uvicorn
-react
+pydantic
+starlette
 pytest
 pytest-asyncio

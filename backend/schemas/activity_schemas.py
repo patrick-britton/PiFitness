@@ -8,7 +8,7 @@ These models now exactly match the database schema based on validation.
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class Activity(BaseModel):
     """Activity data matching the activities.activities table"""
@@ -53,9 +53,9 @@ class Activity(BaseModel):
     is_downloaded: Optional[bool] = Field(None, description="Whether activity data is downloaded")
     activity_path: Optional[str] = Field(None, description="Activity path/route")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "activity_id": 12345,
                 "activity_name": "Morning Run",
@@ -99,6 +99,7 @@ class Activity(BaseModel):
                 "activity_path": "morning_run_path"
             }
         }
+    )
 
 class ActivityDetail(BaseModel):
     """Detailed activity information with telemetry"""
@@ -114,8 +115,7 @@ class ActivityDetail(BaseModel):
     elevation: Optional[float] = Field(None, description="Elevation in meters at timestamp")
     distance: Optional[float] = Field(None, description="Cumulative distance in meters")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ActivityMetric(BaseModel):
     """Activity metrics and statistics"""
@@ -125,8 +125,7 @@ class ActivityMetric(BaseModel):
     metric_unit: str = Field(..., description="Unit of measurement")
     metric_category: Optional[str] = Field(None, description="Category of the metric")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class Segment(BaseModel):
     """GPS segment information"""
@@ -145,8 +144,7 @@ class Segment(BaseModel):
     created_date: datetime = Field(..., description="Date segment was created")
     is_active: bool = Field(..., description="Whether segment is active")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SegmentMatch(BaseModel):
     """Segment match result"""
@@ -163,5 +161,4 @@ class SegmentMatch(BaseModel):
     end_time: datetime = Field(..., description="End time of the match")
     is_confirmed: bool = Field(..., description="Whether match is confirmed by user")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
