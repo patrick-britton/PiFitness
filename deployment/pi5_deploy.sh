@@ -236,6 +236,21 @@ if [[ ! -f "/etc/nginx/sites-enabled/pifitness" ]]; then
     sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness
 fi
 
+# --- Remove stale nginx site symlinks from previous deployments ---
+if [[ "$BRANCH" == "react-ui" ]]; then
+    # Disable legacy Streamlit nginx config if present (server_name conflict)
+    if [[ -L "/etc/nginx/sites-enabled/streamlit" ]]; then
+        info "Removing stale streamlit nginx symlink (conflicts with react-ui)..."
+        sudo rm -f "/etc/nginx/sites-enabled/streamlit"
+    fi
+elif [[ "$BRANCH" == "streamlit-prd" ]]; then
+    # Disable FastAPI nginx config if present (prevents port conflict)
+    if [[ -L "/etc/nginx/sites-enabled/pifitness" ]]; then
+        info "Removing stale pifitness nginx symlink (conflicts with streamlit-prd)..."
+        sudo rm -f "/etc/nginx/sites-enabled/pifitness"
+    fi
+fi
+
 # Test and reload nginx
 info "Testing nginx configuration..."
 sudo nginx -t || error_exit "Nginx configuration test failed."

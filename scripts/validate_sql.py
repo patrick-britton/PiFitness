@@ -9,8 +9,12 @@ import json
 import re
 import sys
 from pathlib import Path
+from pathlib import Path
+from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ENV_PATH = PROJECT_ROOT / "backend" / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
 CACHE_FILE = PROJECT_ROOT / 'scripts' / 'schema_cache.json'
 
 def load_cache():

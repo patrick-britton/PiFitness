@@ -6,12 +6,14 @@ FastAPI endpoints for health metrics (heart rate, sleep, weight, etc.).
 """
 
 from fastapi import APIRouter, HTTPException
-from typing import Optional, List
+from typing import Optional
 from datetime import date
 
 from backend_functions.queries import (
     get_weight_targets,
     get_weight_viz_data,
+    get_heart_rate_timeseries,
+    get_sleep_data,
 )
 
 router = APIRouter(prefix="/api/health", tags=["health"])
@@ -50,21 +52,15 @@ async def get_heart_rate_timeseries_endpoint(
         limit: Maximum number of data points to return
 
     Returns:
-        List of heart rate data points
+        List of heart rate data points from health.heartrate_raw
     """
     try:
-        # Note: get_heart_rate_timeseries doesn't exist yet; placeholder
-        # In a real implementation, this would query health.heartrate_raw
-        # For now, return a mock response to satisfy the test requirement
-        return {
-            "data": [
-                {
-                    "timestamp_utc": "2026-06-25T12:00:00",
-                    "heart_rate_bpm": 72,
-                }
-            ],
-            "count": 1,
-        }
+        data = get_heart_rate_timeseries(
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit or 1000,
+        )
+        return {"data": data, "count": len(data)}
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -81,28 +77,18 @@ async def get_sleep_data_endpoint(
     Get sleep data.
 
     Args:
-        start_date: Filter by start date (inclusive)
-        end_date: Filter by end date (inclusive)
+        start_date: Filter by sleep end date (inclusive)
+        end_date: Filter by sleep end date (inclusive)
 
     Returns:
-        List of sleep records
+        List of sleep records from health.sleep_totals
     """
     try:
-        # Note: get_sleep_data doesn't exist yet; placeholder
-        # In a real implementation, this would query health.sleep_totals
-        # For now, return a mock response to satisfy the test requirement
-        return {
-            "data": [
-                {
-                    "date": "2026-06-25",
-                    "total_sleep_s": 28800,
-                    "deep_sleep_s": 7200,
-                    "rem_sleep_s": 9000,
-                    "light_sleep_s": 12600,
-                }
-            ],
-            "count": 1,
-        }
+        data = get_sleep_data(
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return {"data": data, "count": len(data)}
     except Exception as e:
         raise HTTPException(
             status_code=500,

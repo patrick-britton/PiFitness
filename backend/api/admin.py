@@ -69,3 +69,24 @@ async def get_task_names():
             status_code=500,
             detail=f"Failed to fetch task names: {str(e)}",
         )
+
+@router.post("/tasks/{task_name}/execute")
+async def execute_task(task_name: str):
+    """
+    Trigger execution of a background task.
+
+    Args:
+        task_name: The name of the task to execute
+
+    Returns:
+        Execution result or error
+    """
+    try:
+        from backend_functions.task_execution import execute_task_by_name
+        result = execute_task_by_name(task_name)
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to execute task: {str(e)}",
+        )

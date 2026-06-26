@@ -8,10 +8,11 @@ import json
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 
-# Add the project root to the path so we can import backend_functions
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+ENV_PATH = PROJECT_ROOT / "backend" / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
 
 from backend_functions.database_functions import con_cur
 

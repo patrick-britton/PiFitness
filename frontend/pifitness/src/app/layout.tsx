@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Layout from "./components/Layout";
 
 export const metadata: Metadata = {
   title: "PiFitness",
@@ -12,9 +13,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
-        {children}
+    <html lang="en" className="light">
+      <body className="min-h-screen text-gray-900 antialiased">
+        <Layout>
+          {children}
+        </Layout>
       </body>
     </html>
   );
