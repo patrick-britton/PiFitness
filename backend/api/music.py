@@ -39,7 +39,10 @@ async def list_playlists():
         List of playlist configuration records
     """
     try:
-        playlists = get_playlist_config()
+        # Get all playlists from playlist_config table
+        from backend_functions.database_functions import sql_to_dict
+        sql = "SELECT * FROM music.playlist_config ORDER BY playlist_name"
+        playlists = sql_to_dict(sql)
         return {"data": playlists, "count": len(playlists)}
     except Exception as e:
         raise HTTPException(
