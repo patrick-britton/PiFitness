@@ -172,7 +172,19 @@ git reset --hard origin/"$BRANCH"
 
 # --- 5. Install/update Python dependencies ---
 source venv/bin/activate
-pip install -r deployment/library_requirements.txt
+
+# Ask about package checks
+echo "Do you want to perform package dependency checks?"
+echo "  1) Yes, install/update all Python and npm packages (recommended)"
+echo "  2) No, skip package checks (faster, but may miss updates)"
+read -rp "Enter 1 or 2: " package_choice
+
+if [[ "$package_choice" == "1" ]]; then
+    info "Installing/updating Python dependencies..."
+    pip install -r deployment/library_requirements.txt
+else
+    info "Skipping Python package checks"
+fi
 
 # --- 5.5. Run automated tests (React UI branch only) ---
 if [[ "$BRANCH" == "react-ui" ]]; then
@@ -238,6 +250,10 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     if ! pm2 show pifitness-next | grep -q "status.*online"; then
         error_exit "PM2 failed to start Next.js server. Check logs with: pm2 logs pifitness-next"
     fi
+
+    # Return to project root
+    cd /home/god/PiFitness
+fi
 
 # --- 7. Start the appropriate service ---
 if [[ "$BRANCH" == "streamlit-prd" ]]; then
