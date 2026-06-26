@@ -205,6 +205,9 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     fi
 fi
 
+# Return to project root after npm install
+cd /home/god/PiFitness || error_exit "Failed to return to project root after npm install"
+
 # Install/update systemd service files
 sudo cp /home/god/PiFitness/deployment/pifitness-streamlit.service /etc/systemd/system/
 sudo cp /home/god/PiFitness/deployment/pifitness-fastapi.service /etc/systemd/system/
@@ -213,18 +216,7 @@ sudo systemctl daemon-reload
 # --- 6. Branch-specific actions ---
 if [[ "$BRANCH" == "react-ui" ]]; then
     info "Building React frontend..."
-    # Check if frontend/pifitness directory exists, if not try frontend directory
-    if [[ -d "frontend/pifitness" ]]; then
-        cd frontend/pifitness
-    elif [[ -d "frontend" ]]; then
-        cd frontend
-        if [[ ! -d "pifitness" ]]; then
-            error_exit "pifitness directory not found in frontend/"
-        fi
-        cd pifitness
-    else
-        error_exit "frontend/pifitness directory not found"
-    fi
+    cd frontend/pifitness || error_exit "frontend/pifitness not found. Verify directory structure."
 
     # Set environment variables for production build
     export NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -234,8 +226,8 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     npm run build
 
     # Copy build output to backend/static (FastAPI will serve it)
-    # Navigate back to PiFitness root first
-    cd ../..
+    # Navigate back to PiFitness root using absolute path
+    cd /home/god/PiFitness
     mkdir -p backend/static
     cp -r frontend/pifitness/out/* backend/static/
     cd /home/god/PiFitness
