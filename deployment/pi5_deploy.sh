@@ -240,6 +240,9 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     export NEXT_PUBLIC_API_URL=http://localhost:8000
     export NEXT_PUBLIC_APP_ENV=production
 
+    info "Building Next.js application..."
+    npm run build
+
     info "Configuring PM2 for Next.js server..."
     pm2 delete pifitness-next 2>/dev/null || true
 
