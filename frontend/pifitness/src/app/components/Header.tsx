@@ -37,9 +37,21 @@ export default function Header() {
         </h1>
       </div>
 
-      {/* Theme toggle removed as requested */}
+      {/* Debug toggle button */}
       <div className="flex items-center gap-2">
-        {/* Empty div to maintain spacing */}
+        <button
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              const currentState = localStorage.getItem('pifitness-debug');
+              localStorage.setItem('pifitness-debug', currentState !== 'true' ? 'true' : 'false');
+              window.location.reload(); // Force refresh to show/hide debug panel
+            }
+          }}
+          className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          aria-label="Toggle debug info"
+        >
+          <span className="text-sm">🐛</span>
+        </button>
       </div>
     </header>
   );

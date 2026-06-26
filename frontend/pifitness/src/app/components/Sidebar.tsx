@@ -5,17 +5,27 @@
 
 'use client';
 
-import { NAVIGATION_MODULES } from '../../stores/uiStore';
+import { NAVIGATION_MODULES, NavigationModule } from '../../stores/uiStore';
 import { useUIStore } from '../../stores/uiStore';
 import * as Icons from '@mui/icons-material';
+import { useRouter } from 'next/navigation';
 
 export default function Sidebar() {
   const { activeModule, setActiveModule } = useUIStore();
+  const router = useRouter();
 
   // Get the appropriate Material UI icon for each module
   const getIcon = (iconName: string) => {
     const IconComponent = (Icons as any)[iconName];
     return IconComponent ? <IconComponent className="w-5 h-5" /> : null;
+  };
+
+  const handleNavigation = (moduleId: NavigationModule) => {
+    const module = NAVIGATION_MODULES.find(m => m.id === moduleId);
+    if (module) {
+      setActiveModule(moduleId);
+      router.push(module.path);
+    }
   };
 
   return (
@@ -31,7 +41,7 @@ export default function Sidebar() {
           {NAVIGATION_MODULES.map((module) => (
             <button
               key={module.id}
-              onClick={() => setActiveModule(module.id)}
+              onClick={() => handleNavigation(module.id)}
               className={`w-full flex items-center justify-center gap-3 p-3 rounded-lg border transition-colors ${
                 activeModule === module.id
                   ? 'border-blue-300 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
