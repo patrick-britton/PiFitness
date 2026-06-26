@@ -109,7 +109,7 @@ detect_and_kill_processes() {
 
     # Clean up any processes using our ports
     info "Checking for processes using deployment ports..."
-    for port in 8000 8501; do
+    for port in 8000 8501 3000; do
         if sudo lsof -ti :$port > /dev/null; then
             warn "Process found using port $port - killing..."
             sudo lsof -ti :$port | xargs -r sudo kill -9 || warn "Failed to kill processes on port $port"
@@ -197,7 +197,7 @@ if [[ "$BRANCH" == "react-ui" ]]; then
 fi
 
 # --- 5.7. Install frontend dependencies (React UI branch only) ---
-if [[ "$BRANCH" == "react-ui" ]]; then
+if [[ "$BRANCH" == "react-ui" && "$package_choice" == "1" ]]; then
     info "Installing frontend dependencies..."
     cd frontend/pifitness
     if [[ -f "../../npm_requirements.txt" ]]; then
@@ -218,7 +218,9 @@ if [[ "$BRANCH" == "react-ui" ]]; then
 fi
 
 # Return to project root after npm install
-cd /home/god/PiFitness || error_exit "Failed to return to project root after npm install"
+if [[ "$BRANCH" == "react-ui" ]]; then
+    cd /home/god/PiFitness || error_exit "Failed to return to project root after npm install"
+fi
 
 # Install/update systemd service files
 sudo cp /home/god/PiFitness/deployment/pifitness-streamlit.service /etc/systemd/system/
