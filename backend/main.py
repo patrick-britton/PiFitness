@@ -127,21 +127,23 @@ async def health():
     }
 
 # ---------------------------------------------------------------------------
-# Static File Serving (Production)
+# Static File Serving (Production) - DISABLED
 # ---------------------------------------------------------------------------
+# Note: Static file serving is now handled by Next.js server directly.
+# The nginx configuration routes /api to FastAPI and all other traffic to Next.js.
 
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-os.makedirs(static_dir, exist_ok=True)
+# static_dir = os.path.join(os.path.dirname(__file__), "static")
+# os.makedirs(static_dir, exist_ok=True)
 
 # Serve Next.js static assets from /_next (built by `npm run build`)
-next_static_dir = os.path.join(static_dir, "_next")
-if os.path.exists(next_static_dir):
-    app.mount("/_next", StaticFiles(directory=next_static_dir), name="_next")
+# next_static_dir = os.path.join(static_dir, "_next")
+# if os.path.exists(next_static_dir):
+#     app.mount("/_next", StaticFiles(directory=next_static_dir), name="_next")
 
 # SPA fallback — serve index.html for any other route
-@app.get("/{path:path}")
-async def catch_all(path: str):
-    index_path = os.path.join(static_dir, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {"error": "Not found"}
+# @app.get("/{path:path}")
+# async def catch_all(path: str):
+#     index_path = os.path.join(static_dir, "index.html")
+#     if os.path.exists(index_path):
+#         return FileResponse(index_path)
+#     return {"error": "Not found"}
