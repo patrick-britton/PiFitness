@@ -221,7 +221,7 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     # Install PM2 globally if not already installed
     if ! command -v pm2 &> /dev/null; then
         info "Installing PM2 for process management..."
-        npm install -g pm2
+        sudo npm install -g pm2
     fi
 
     # Set environment variables for production

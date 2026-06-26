@@ -1,0 +1,24 @@
+# PiFitness Frontend NPM Packages
+# Generated from package.json dependencies
+# Used by deployment script for npm install
+
+# Production dependencies
+@headlessui/react
+@tailwindcss/postcss
+@tanstack/react-query
+autoprefixer
+chart.js
+maplibre-gl
+next
+postcss
+react
+react-chartjs-2
+react-dom
+tailwindcss
+zustand
+
+# Development dependencies
+@types/node
+@types/react
+@types/react-dom
+typescript
