@@ -190,7 +190,13 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     cd frontend/pifitness
     if [[ -f "../npm_requirements.txt" ]]; then
         info "Installing npm packages from requirements file..."
-        cat ../npm_requirements.txt | xargs npm install
+        # Install packages line by line to avoid comment issues
+        while IFS= read -r package || [[ -n "$package" ]]; do
+            # Skip empty lines and comments
+            if [[ -n "$package" && "$package" != \#* ]]; then
+                npm install "$package"
+            fi
+        done < ../npm_requirements.txt
     else
         warn "npm_requirements.txt not found, running standard npm install..."
         npm install
