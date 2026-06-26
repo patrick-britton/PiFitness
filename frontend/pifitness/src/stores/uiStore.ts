@@ -8,7 +8,7 @@ import { create } from 'zustand';
 /**
  * Navigation module types
  */
-type NavigationModule = 'home' | 'health' | 'music' | 'running' | 'admin';
+export type NavigationModule = 'home' | 'health' | 'music' | 'running' | 'admin';
 
 /**
  * UI store state interface

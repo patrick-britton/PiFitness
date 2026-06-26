@@ -11,6 +11,7 @@ import { useUIStore } from '../../stores/uiStore';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import NavBar from './NavBar';
+import DebugPanel from './DebugPanel';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -67,6 +68,9 @@ export default function Layout({ children }: LayoutProps) {
           <NavBar />
         </div>
       )}
+
+      {/* Debug Panel - always rendered but conditionally visible */}
+      <DebugPanel />
     </div>
   );
 }
