@@ -18,18 +18,9 @@ export default function Header() {
         </h1>
       </div>
       
+      {/* Theme toggle removed as requested */}
       <div className="flex items-center gap-2">
-        <button
-          onClick={toggleTheme}
-          className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          aria-label="Toggle theme"
-        >
-          {theme === 'light' ? (
-            <span className="text-lg">🌙</span>
-          ) : (
-            <span className="text-lg">☀️</span>
-          )}
-        </button>
+        {/* Empty div to maintain spacing */}
       </div>
     </header>
   );
