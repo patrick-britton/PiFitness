@@ -215,21 +215,27 @@ sudo systemctl daemon-reload
 
 # --- 6. Branch-specific actions ---
 if [[ "$BRANCH" == "react-ui" ]]; then
-    info "Building React frontend..."
+    info "Setting up Next.js server (replacing static export)..."
     cd frontend/pifitness || error_exit "frontend/pifitness not found. Verify directory structure."
 
-    # Set environment variables for production build
+    # Install PM2 globally if not already installed
+    if ! command -v pm2 &> /dev/null; then
+        info "Installing PM2 for process management..."
+        npm install -g pm2
+    fi
+
+    # Set environment variables for production
     export NEXT_PUBLIC_API_URL=http://localhost:8000
     export NEXT_PUBLIC_APP_ENV=production
 
-    info "Running production build with environment variables..."
-    npm run build
+    info "Configuring PM2 for Next.js server..."
+    pm2 delete pifitness-next 2>/dev/null || true
+    pm2 start "npm run start" --name pifitness-next --cwd /home/god/PiFitness/frontend/pifitness
 
-    # Copy build output to backend/static (FastAPI will serve it)
-    # Navigate back to PiFitness root using absolute path
-    cd /home/god/PiFitness
-    mkdir -p backend/static
-    cp -r frontend/pifitness/out/* backend/static/
+    # Save PM2 process list for startup
+    pm2 save
+
+    # Return to project root
     cd /home/god/PiFitness
 fi
 
