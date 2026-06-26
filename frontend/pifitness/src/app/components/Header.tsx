@@ -15,6 +15,9 @@ export default function Header() {
       <div className="flex items-center gap-4">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
           PiFitness
+          <span className="text-xs font-normal text-gray-500 dark:text-gray-400 ml-2">
+            {typeof window !== 'undefined' ? `(${window.innerWidth}x${window.innerHeight})` : ''}
+          </span>
         </h1>
       </div>
       

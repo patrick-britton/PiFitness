@@ -4,7 +4,6 @@
  */
 
 import { create } from 'zustand';
-import { useViewport } from '../hooks/useViewport';
 
 /**
  * Viewport store state interface
@@ -44,16 +43,45 @@ export const useViewportStore = create<ViewportState>((set, get) => ({
    * Initialize the store with current viewport values
    */
   initialize: () => {
-    const viewport = useViewport();
-    set({
-      width: viewport.width,
-      height: viewport.height,
-      breakpoint: viewport.breakpoint,
-      orientation: viewport.orientation,
-      isMobile: viewport.isMobile,
-      isPortrait: viewport.isPortrait,
-      isLandscape: viewport.isLandscape,
-    });
+    if (typeof window !== 'undefined') {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      // Calculate breakpoint
+      const getBreakpoint = (w: number): 'xs' | 'sm' | 'md' | 'lg' | 'xl' => {
+        if (w >= 1440) return 'xl';
+        if (w >= 1024) return 'lg';
+        if (w >= 768) return 'md';
+        if (w >= 640) return 'sm';
+        return 'xs';
+      };
+
+      // Calculate orientation
+      const getOrientation = (w: number, h: number): 'portrait' | 'landscape' => {
+        return w > h ? 'landscape' : 'portrait';
+      };
+
+      const breakpoint = getBreakpoint(width);
+      const orientation = getOrientation(width, height);
+
+      // Check URL for mobile parameter
+      const isMobileFromURL = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.has('mobile') && (urlParams.get('mobile') === 'true' || urlParams.get('mobile') === '');
+      };
+
+      const isMobile = isMobileFromURL() || breakpoint === 'xs' || (breakpoint === 'sm' && orientation === 'portrait');
+
+      set({
+        width,
+        height,
+        breakpoint,
+        orientation,
+        isMobile,
+        isPortrait: orientation === 'portrait',
+        isLandscape: orientation === 'landscape',
+      });
+    }
   },
 
   /**
