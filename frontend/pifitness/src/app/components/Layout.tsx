@@ -8,6 +8,7 @@
 import { useEffect } from 'react';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore } from '../../stores/uiStore';
+import Header from './Header';
 import Sidebar from './Sidebar';
 import NavBar from './NavBar';
 
@@ -39,21 +40,23 @@ export default function Layout({ children }: LayoutProps) {
   }, [initializeViewport, initializeUI, setViewport]);
 
   const { isMobile } = useViewportStore();
-  const { sidebarOpen } = useUIStore();
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header */}
+      <Header />
+
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar for desktop */}
-        {!isMobile && sidebarOpen && (
+        {/* Sidebar for desktop - always visible */}
+        {!isMobile && (
           <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700">
             <Sidebar />
           </div>
         )}
 
         {/* Main content */}
-        <main className={`flex-1 overflow-auto ${!isMobile && sidebarOpen ? 'ml-0' : ''}`}>
+        <main className="flex-1 overflow-auto">
           {children}
         </main>
       </div>
