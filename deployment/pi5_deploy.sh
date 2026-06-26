@@ -231,24 +231,13 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     info "Configuring PM2 for Next.js server..."
     pm2 delete pifitness-next 2>/dev/null || true
 
-    # Set environment variables for PM2
-    export NEXT_PUBLIC_API_URL=http://localhost:8000
-    export NEXT_PUBLIC_APP_ENV=production
-
     # Start Next.js with PM2 using correct command syntax
-    pm2 start npm --name pifitness-next -- run start -- --cwd /home/god/PiFitness/frontend/pifitness --env production
+    pm2 start npm --name pifitness-next -- run start -- --port 3000
 
     # Verify PM2 process started successfully
     if ! pm2 show pifitness-next | grep -q "status.*online"; then
         error_exit "PM2 failed to start Next.js server. Check logs with: pm2 logs pifitness-next"
     fi
-
-    # Save PM2 process list for startup
-    pm2 save
-
-    # Return to project root
-    cd /home/god/PiFitness
-fi
 
 # --- 7. Start the appropriate service ---
 if [[ "$BRANCH" == "streamlit-prd" ]]; then
