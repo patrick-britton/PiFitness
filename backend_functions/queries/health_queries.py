@@ -7,7 +7,7 @@ These functions return plain Python data structures with no Streamlit dependenci
 """
 
 from typing import List, Dict, Any, Optional, Union, Sequence
-from datetime import datetime
+from datetime import datetime, date
 from backend_functions.database_functions import qec, sql_to_dict
 from backend.schemas.health_schemas import HeartRate, SleepData
 
@@ -126,12 +126,101 @@ def add_body_dimensions(
     result = qec(ins_sql, [butt_cm, waist_cm, stomach_cm, chest_cm, neck_cm])
     return result if result else "Success"
 
-# Additional health query functions can be added here as needed
-# For example:
-# def get_heart_rate_data(user_id: str, date_range: tuple) -> List[HeartRate]:
-#     """Get heart rate data for a user within a date range"""
-#     pass
-#
-# def get_sleep_data(user_id: str, date_range: tuple) -> List[SleepData]:
-#     """Get sleep data for a user within a date range"""
-#     pass
+# ---------------------------------------------------------------------------
+# Heart Rate
+# ---------------------------------------------------------------------------
+
+def get_heart_rate_timeseries(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    limit: int = 1000,
+) -> Sequence[Dict[str, Any]]:
+    """
+    Retrieve heart rate time series data from the database.
+
+    Args:
+        start_date (Optional[date]): Filter by start date (inclusive).
+        end_date (Optional[date]): Filter by end date (inclusive).
+        limit (int): Maximum number of data points to return.
+
+    Returns:
+        Sequence[Dict[str, Any]]: List of heart rate records with
+        ts_utc, heartrate_bpm, activity_label, and hr_date fields.
+    """
+    sql = "SELECT ts_utc, heartrate_bpm, activity_label, hr_date FROM health.heartrate_raw"
+    params = []
+    conditions = []
+
+    if start_date:
+        conditions.append("ts_utc >= %s::DATE")
+        params.append(start_date)
+    if end_date:
+        conditions.append("ts_utc <= %s::DATE")
+        params.append(end_date)
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+
+    sql += " ORDER BY ts_utc DESC LIMIT %s"
+    params.append(limit)
+
+    result = sql_to_dict(sql, params)
+    return result if result else []
+
+
+# ---------------------------------------------------------------------------
+# Sleep Data
+# ---------------------------------------------------------------------------
+
+def get_sleep_data(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> Sequence[Dict[str, Any]]:
+    """
+    Retrieve sleep data from the database.
+
+    Args:
+        start_date (Optional[date]): Filter by sleep end date (inclusive).
+        end_date (Optional[date]): Filter by sleep end date (inclusive).
+
+    Returns:
+        Sequence[Dict[str, Any]]: List of sleep records with
+        sleep_end_date, sleep_start_utc, sleep_end_utc, sleep_score,
+        heartrate_bpm, spo2, breaths_per_min, hrv_value, sleep_duration_s,
+        rem_sleep_s, light_sleep_s, awake_sleep_s, deep_sleep_s, score_label.
+    """
+    sql = """
+        SELECT
+            sleep_end_date,
+            sleep_start_utc,
+            sleep_end_utc,
+            sleep_score,
+            heartrate_bpm,
+            spo2,
+            breaths_per_min,
+            hrv_value,
+            sleep_duration_s,
+            rem_sleep_s,
+            light_sleep_s,
+            awake_sleep_s,
+            deep_sleep_s,
+            score_label
+        FROM health.sleep_totals
+    """
+    params = []
+    conditions = []
+
+    if start_date:
+        conditions.append("sleep_end_date >= %s::DATE")
+        params.append(start_date)
+    if end_date:
+        conditions.append("sleep_end_date <= %s::DATE")
+        params.append(end_date)
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+
+    sql += " ORDER BY sleep_end_date DESC"
+
+    result = sql_to_dict(sql, params)
+    return result if result else []

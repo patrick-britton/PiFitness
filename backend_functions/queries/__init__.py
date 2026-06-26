@@ -13,7 +13,9 @@ from .health_queries import (
     add_weight_target,
     get_weight_viz_data,
     add_photo_metadata,
-    add_body_dimensions
+    add_body_dimensions,
+    get_heart_rate_timeseries,
+    get_sleep_data,
 )
 from .music_queries import (
     get_rating_eligible_count,
@@ -78,6 +80,8 @@ __all__ = [
     'get_weight_viz_data',
     'add_photo_metadata',
     'add_body_dimensions',
+    'get_heart_rate_timeseries',
+    'get_sleep_data',
     # Music
     'get_rating_eligible_count',
     'get_isrc_dupe_count',
