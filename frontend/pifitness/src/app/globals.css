@@ -1,12 +1,11 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
 
 @theme {
   --breakpoint-mobile: 320px;
   --breakpoint-mobile-landscape: 568px;
   --breakpoint-tablet: 768px;
   --breakpoint-desktop: 1024px;
-  --font-family-sans: 'Inter', Roboto, Arial, sans-serif;
 }
 
 body {
