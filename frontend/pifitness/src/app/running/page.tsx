@@ -5,7 +5,7 @@ export default function RunningPage() {
         Running
       </h1>
       <p className="text-gray-600 dark:text-gray-400">
-        Module under construction.
+        Running activities (GPS tracks, stats, segments) under construction.
       </p>
     </div>
   );

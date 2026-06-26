@@ -20,9 +20,9 @@ export default function Sidebar() {
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-800">
-      {/* Header - removed duplicate PiFitness, sidebar now starts with navigation */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Navigation</h2>
+      {/* Header removed - sidebar starts directly with navigation buttons */}
+      <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+        {/* Spacer to maintain layout */}
       </div>
 
       {/* Navigation */}

@@ -5,7 +5,7 @@ export default function MusicPage() {
         Music
       </h1>
       <p className="text-gray-600 dark:text-gray-400">
-        Module under construction.
+        Music library (playlists, ratings, smart shuffle) under construction.
       </p>
     </div>
   );

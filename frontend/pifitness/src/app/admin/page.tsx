@@ -5,7 +5,7 @@ export default function AdminPage() {
         Admin
       </h1>
       <p className="text-gray-600 dark:text-gray-400">
-        Module under construction.
+        Admin panel (task monitoring, DB sessions, credentials) under construction.
       </p>
     </div>
   );

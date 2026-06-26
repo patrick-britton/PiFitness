@@ -5,7 +5,7 @@ export default function HealthPage() {
         Health
       </h1>
       <p className="text-gray-600 dark:text-gray-400">
-        Module under construction.
+        Health metrics (heart rate, sleep, weight) under construction.
       </p>
     </div>
   );
