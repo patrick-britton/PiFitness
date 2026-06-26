@@ -15,6 +15,7 @@ from backend_functions.queries import (
     get_activity_telemetry,
     get_segment_matches,
 )
+from backend_functions.database_functions import sql_to_dict
 
 router = APIRouter(prefix="/api/activities", tags=["activities"])
 
@@ -121,3 +122,4 @@ async def get_activity_segment_matches(activity_id: int):
             status_code=500,
             detail=f"Failed to fetch segment matches: {str(e)}",
         )
+
