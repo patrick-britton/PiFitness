@@ -184,6 +184,19 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     info "All tests passed successfully"
 fi
 
+# --- 5.7. Install frontend dependencies (React UI branch only) ---
+if [[ "$BRANCH" == "react-ui" ]]; then
+    info "Installing frontend dependencies..."
+    cd frontend/pifitness
+    if [[ -f "../../npm_requirements.txt" ]]; then
+        info "Installing npm packages from requirements file..."
+        cat ../../npm_requirements.txt | xargs npm install
+    else
+        warn "npm_requirements.txt not found, running standard npm install..."
+        npm install
+    fi
+fi
+
 # Install/update systemd service files
 sudo cp /home/god/PiFitness/deployment/pifitness-streamlit.service /etc/systemd/system/
 sudo cp /home/god/PiFitness/deployment/pifitness-fastapi.service /etc/systemd/system/
@@ -193,8 +206,14 @@ sudo systemctl daemon-reload
 if [[ "$BRANCH" == "react-ui" ]]; then
     info "Building React frontend..."
     cd frontend/pifitness
-    npm install
+
+    # Set environment variables for production build
+    export NEXT_PUBLIC_API_URL=http://localhost:8000
+    export NEXT_PUBLIC_APP_ENV=production
+
+    info "Running production build with environment variables..."
     npm run build
+
     # Copy build output to backend/static (FastAPI will serve it)
     mkdir -p ../../backend/static
     cp -r out/* ../../backend/static/
