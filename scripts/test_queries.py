@@ -92,7 +92,7 @@ except Exception as e:
 print("\n--- get_weight_viz_data ---")
 try:
     t0 = time.time()
-    result = get_weight_viz_data('day_of_year', 'relative_year', ['weight_lb', 'weight_goal_lb'], 2)
+    result = get_weight_viz_data('day_of_year', 'relative_year', ['total_lb', 'tgt_lb'], 2)
     elapsed = (time.time() - t0) * 1000
     assert isinstance(result, (list, tuple)), f"Expected list/tuple, got {type(result)}"
     record_test("health_queries", "get_weight_viz_data", True,
