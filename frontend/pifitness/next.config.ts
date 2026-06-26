@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "export", // static export for production
-  distDir: "out", // output directory (matches deployment script)
+  // Server-side rendering for full functionality
+  // Remove output: "export" to enable proper Next.js server
 
   // Dev-only: proxy /api/* requests to the FastAPI backend
   async rewrites() {
