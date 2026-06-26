@@ -191,15 +191,17 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     if [[ -f "../npm_requirements.txt" ]]; then
         info "Installing npm packages from requirements file..."
         # Install packages line by line to avoid comment issues
+        # Use --no-save to avoid modifying package.json and only install missing packages
         while IFS= read -r package || [[ -n "$package" ]]; do
             # Skip empty lines and comments
             if [[ -n "$package" && "$package" != \#* ]]; then
-                npm install "$package"
+                info "Installing/updating package: $package"
+                npm install --no-save "$package"
             fi
         done < ../npm_requirements.txt
     else
         warn "npm_requirements.txt not found, running standard npm install..."
-        npm install
+        npm install --no-save
     fi
 fi
 
@@ -211,7 +213,18 @@ sudo systemctl daemon-reload
 # --- 6. Branch-specific actions ---
 if [[ "$BRANCH" == "react-ui" ]]; then
     info "Building React frontend..."
-    cd frontend/pifitness
+    # Check if frontend/pifitness directory exists, if not try frontend directory
+    if [[ -d "frontend/pifitness" ]]; then
+        cd frontend/pifitness
+    elif [[ -d "frontend" ]]; then
+        cd frontend
+        if [[ ! -d "pifitness" ]]; then
+            error_exit "pifitness directory not found in frontend/"
+        fi
+        cd pifitness
+    else
+        error_exit "frontend/pifitness directory not found"
+    fi
 
     # Set environment variables for production build
     export NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -221,9 +234,11 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     npm run build
 
     # Copy build output to backend/static (FastAPI will serve it)
-    mkdir -p ../backend/static
-    cp -r out/* ../backend/static/
-    cd ..
+    # Navigate back to PiFitness root first
+    cd ../..
+    mkdir -p backend/static
+    cp -r frontend/pifitness/out/* backend/static/
+    cd /home/god/PiFitness
 fi
 
 # --- 7. Start the appropriate service ---
