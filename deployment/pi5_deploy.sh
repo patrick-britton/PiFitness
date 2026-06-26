@@ -188,7 +188,7 @@ fi
 if [[ "$BRANCH" == "react-ui" ]]; then
     info "Installing frontend dependencies..."
     cd frontend/pifitness
-    if [[ -f "../npm_requirements.txt" ]]; then
+    if [[ -f "../../npm_requirements.txt" ]]; then
         info "Installing npm packages from requirements file..."
         # Install packages line by line to avoid comment issues
         # Use --no-save to avoid modifying package.json and only install missing packages
@@ -198,7 +198,7 @@ if [[ "$BRANCH" == "react-ui" ]]; then
                 info "Installing/updating package: $package"
                 npm install --no-save "$package"
             fi
-        done < ../npm_requirements.txt
+        done < ../../npm_requirements.txt
     else
         warn "npm_requirements.txt not found, running standard npm install..."
         npm install --no-save
