@@ -259,14 +259,14 @@ if [[ ! -f "$NGINX_TEMPLATE" ]]; then
     error_exit "Nginx template not found at $NGINX_TEMPLATE"
 fi
 
-# Replace PORT placeholder with target port
-info "Updating nginx configuration to use port ${TARGET_PORT}..."
-sudo sed "s/PORT/${TARGET_PORT}/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
+    # Replace FASTAPI_PORT placeholder with target port
+    info "Updating nginx configuration to use port ${TARGET_PORT}..."
+    sudo sed "s/FASTAPI_PORT/${TARGET_PORT}/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
 
-# Verify the port was actually replaced
-if ! grep -q ":${TARGET_PORT};" "$NGINX_SITE"; then
-    error_exit "Failed to update nginx configuration with port ${TARGET_PORT}. Check if PORT placeholder exists in template."
-fi
+    # Verify the port was actually replaced
+    if ! grep -q ":${TARGET_PORT};" "$NGINX_SITE"; then
+        error_exit "Failed to update nginx configuration with port ${TARGET_PORT}. Check if FASTAPI_PORT placeholder exists in template."
+    fi
 
 # Ensure symlink exists in sites-enabled
 if [[ ! -f "/etc/nginx/sites-enabled/pifitness" ]]; then
