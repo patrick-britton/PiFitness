@@ -64,7 +64,9 @@ def test_activity_telemetry():
         if len(data["data"]) > 0:
             first_point = data["data"][0]
             assert "timestamp_utc" in first_point
-            assert "latitude_deg" in first_point
+            assert "latitude" in first_point
+            assert "longitude" in first_point
+            assert "elevation_m" in first_point
 
 def test_activity_segments():
     """Test GET /api/activities/{id}/segments returns successfully."""

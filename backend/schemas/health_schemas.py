@@ -8,7 +8,7 @@ These models now exactly match the database schema based on validation.
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class HeartRate(BaseModel):
     """Heart rate data matching the health.heartrate_raw table"""
@@ -17,9 +17,9 @@ class HeartRate(BaseModel):
     activity_label: Optional[str] = Field(None, description="Activity label")
     hr_date: Optional[datetime] = Field(None, description="Date of the reading")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "ts_utc": "2023-06-24T07:30:00",
                 "heartrate_bpm": 72,
@@ -27,6 +27,7 @@ class HeartRate(BaseModel):
                 "hr_date": "2023-06-24T00:00:00"
             }
         }
+    )
 
 class SleepData(BaseModel):
     """Sleep data matching the health.sleep_totals table"""
@@ -45,9 +46,9 @@ class SleepData(BaseModel):
     deep_sleep_s: Optional[int] = Field(None, description="Deep sleep duration in seconds")
     score_label: Optional[str] = Field(None, description="Sleep score label")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "sleep_end_date": "2023-06-24T00:00:00",
                 "sleep_start_utc": "2023-06-23T22:30:00",
@@ -65,6 +66,7 @@ class SleepData(BaseModel):
                 "score_label": "excellent"
             }
         }
+    )
 
 class BodyComposition(BaseModel):
     """Body composition measurements"""
@@ -81,8 +83,7 @@ class BodyComposition(BaseModel):
     metabolic_age: Optional[int] = Field(None, description="Metabolic age")
     measurement_method: Optional[str] = Field(None, description="How the measurement was taken")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class StressData(BaseModel):
     """Stress level data"""
@@ -93,8 +94,7 @@ class StressData(BaseModel):
     stress_duration: Optional[float] = Field(None, description="Duration of stress period in seconds")
     stress_source: Optional[str] = Field(None, description="Identified source of stress")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class HRVData(BaseModel):
     """Heart Rate Variability data"""
@@ -105,8 +105,7 @@ class HRVData(BaseModel):
     measurement_duration: Optional[int] = Field(None, description="Duration of measurement in seconds")
     hrv_status: Optional[str] = Field(None, description="HRV status (low, normal, high)")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class RespirationData(BaseModel):
     """Respiration rate data"""
@@ -116,5 +115,4 @@ class RespirationData(BaseModel):
     breaths_per_minute: float = Field(..., description="Breaths per minute")
     measurement_method: Optional[str] = Field(None, description="How respiration was measured")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

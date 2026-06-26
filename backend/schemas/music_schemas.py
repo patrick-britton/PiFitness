@@ -8,7 +8,7 @@ These models now exactly match the database schema based on validation.
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class Track(BaseModel):
     """Music track information matching the music.all_tracks table (15 fields)
@@ -31,9 +31,9 @@ class Track(BaseModel):
     updated_at_utc: Optional[str] = Field(None, description="When track was last updated (ISO timestamp)")
     id_synced_at_utc: Optional[str] = Field(None, description="When ID was synced (ISO timestamp)")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "track_id": "123456789",
                 "track_name": "Sample Track",
@@ -52,6 +52,7 @@ class Track(BaseModel):
                 "id_synced_at_utc": "2023-06-24T08:00:00"
             }
         }
+    )
 
 class TrackDetail(BaseModel):
     """Extended music track information combining all_tracks with audio features (32 fields)
@@ -89,9 +90,9 @@ class TrackDetail(BaseModel):
     track_name_search: Optional[str] = Field(None, description="Search track name")
     updated_at_utc: Optional[datetime] = Field(None, description="When track was last updated")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "track_id": "123456789",
                 "track_name": "Sample Track",
@@ -127,6 +128,7 @@ class TrackDetail(BaseModel):
                 "updated_at_utc": "2023-06-24T09:00:00"
             }
         }
+    )
 
 class Playlist(BaseModel):
     """Playlist information matching the music.playlist_config table"""
@@ -148,9 +150,9 @@ class Playlist(BaseModel):
     recency_weight: Optional[float] = Field(None, description="Recency weight")
     seeds_only: Optional[bool] = Field(None, description="Whether to use seeds only")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "playlist_id": "playlist123",
                 "playlist_name": "My Workout Mix",
@@ -171,6 +173,7 @@ class Playlist(BaseModel):
                 "seeds_only": False
             }
         }
+    )
 
 class PlaylistDetail(BaseModel):
     """Detailed playlist information with tracks"""
@@ -182,8 +185,7 @@ class PlaylistDetail(BaseModel):
     track_name: str = Field(..., description="Name of the track")
     artist_name: str = Field(..., description="Name of the artist")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TrackRecommendation(BaseModel):
     """Track recommendation with ELO rating"""
@@ -201,8 +203,7 @@ class TrackRecommendation(BaseModel):
     randomness_score: float = Field(..., description="Randomness score for recommendation")
     last_updated: datetime = Field(..., description="When recommendation was last updated")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ListeningHistory(BaseModel):
     """User listening history"""
@@ -214,8 +215,7 @@ class ListeningHistory(BaseModel):
     source: Optional[str] = Field(None, description="Source of playback")
     device: Optional[str] = Field(None, description="Device used for playback")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SmartShuffleConfig(BaseModel):
     """Smart shuffle configuration"""
@@ -231,5 +231,4 @@ class SmartShuffleConfig(BaseModel):
     created_at: datetime = Field(..., description="When configuration was created")
     updated_at: datetime = Field(..., description="When configuration was last updated")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

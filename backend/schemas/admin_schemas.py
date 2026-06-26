@@ -8,7 +8,7 @@ These models now exactly match the database schema based on validation.
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class TaskExecution(BaseModel):
     """Task execution log entry matching the logging.task_executions table"""
@@ -24,9 +24,9 @@ class TaskExecution(BaseModel):
     error_text: Optional[str] = Field(None, description="Error text if failure occurred")
     failure_type: Optional[str] = Field(None, description="Type of failure")
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "event_time_utc": "2023-06-24T07:30:00",
                 "task_id": 1,
@@ -41,6 +41,7 @@ class TaskExecution(BaseModel):
                 "failure_type": None
             }
         }
+    )
 
 class TaskConfig(BaseModel):
     """Task configuration"""
@@ -54,8 +55,7 @@ class TaskConfig(BaseModel):
     next_execution: Optional[datetime] = Field(None, description="When task should run next")
     is_active: bool = Field(..., description="Whether task is active")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DBStats(BaseModel):
     """Database statistics"""
@@ -67,8 +67,7 @@ class DBStats(BaseModel):
     total_time_ms: Optional[int] = Field(None, description="Total operation duration in ms")
     maintenance_type: str = Field(..., description="Type of maintenance performed")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SystemLog(BaseModel):
     """System log entry"""
@@ -81,8 +80,7 @@ class SystemLog(BaseModel):
     stack_trace: Optional[str] = Field(None, description="Stack trace if error")
     execution_time_ms: Optional[int] = Field(None, description="Execution time in milliseconds")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class APIServiceConfig(BaseModel):
     """API service configuration"""
@@ -93,8 +91,7 @@ class APIServiceConfig(BaseModel):
     last_call_time: Optional[datetime] = Field(None, description="When service was last called")
     is_active: bool = Field(..., description="Whether service is active")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BackupInfo(BaseModel):
     """Database backup information"""
@@ -105,5 +102,4 @@ class BackupInfo(BaseModel):
     database_version: Optional[str] = Field(None, description="Database version at backup time")
     retention_days: int = Field(..., description="Number of days to retain backup")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
