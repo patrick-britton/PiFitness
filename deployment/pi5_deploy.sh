@@ -188,9 +188,9 @@ fi
 if [[ "$BRANCH" == "react-ui" ]]; then
     info "Installing frontend dependencies..."
     cd frontend/pifitness
-    if [[ -f "../../npm_requirements.txt" ]]; then
+    if [[ -f "../npm_requirements.txt" ]]; then
         info "Installing npm packages from requirements file..."
-        cat ../../npm_requirements.txt | xargs npm install
+        cat ../npm_requirements.txt | xargs npm install
     else
         warn "npm_requirements.txt not found, running standard npm install..."
         npm install
@@ -215,9 +215,9 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     npm run build
 
     # Copy build output to backend/static (FastAPI will serve it)
-    mkdir -p ../../backend/static
-    cp -r out/* ../../backend/static/
-    cd ../..
+    mkdir -p ../backend/static
+    cp -r out/* ../backend/static/
+    cd ..
 fi
 
 # --- 7. Start the appropriate service ---
