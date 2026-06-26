@@ -16,7 +16,6 @@ type NavigationModule = 'home' | 'health' | 'music' | 'running' | 'admin';
 interface UIState {
   // Navigation state
   activeModule: NavigationModule;
-  sidebarOpen: boolean;
 
   // Theme state
   theme: 'light' | 'dark';
@@ -27,8 +26,6 @@ interface UIState {
 
   // Navigation actions
   setActiveModule: (module: NavigationModule) => void;
-  toggleSidebar: () => void;
-  setSidebarOpen: (open: boolean) => void;
 
   // Theme actions
   toggleTheme: () => void;
@@ -42,7 +39,6 @@ interface UIState {
 export const useUIStore = create<UIState>((set) => ({
   // Initial state
   activeModule: 'home',
-  sidebarOpen: true,
   theme: 'light',
   colorScheme: 'default',
 
@@ -53,11 +49,9 @@ export const useUIStore = create<UIState>((set) => ({
     // Load preferences from localStorage if available
     if (typeof window !== 'undefined') {
       const savedTheme = localStorage.getItem('pifitness-theme') as 'light' | 'dark' | null;
-      const savedSidebar = localStorage.getItem('pifitness-sidebar') === 'true';
 
       set({
         theme: savedTheme || 'light',
-        sidebarOpen: savedSidebar !== undefined ? savedSidebar : true,
       });
     }
   },
@@ -67,34 +61,6 @@ export const useUIStore = create<UIState>((set) => ({
    */
   setActiveModule: (module: NavigationModule) => {
     set({ activeModule: module });
-
-    // For mobile, close sidebar when navigating
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      set({ sidebarOpen: false });
-    }
-  },
-
-  /**
-   * Toggle sidebar open/closed
-   */
-  toggleSidebar: () => {
-    set((state) => {
-      const newState = { sidebarOpen: !state.sidebarOpen };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('pifitness-sidebar', newState.sidebarOpen.toString());
-      }
-      return newState;
-    });
-  },
-
-  /**
-   * Set sidebar open state
-   */
-  setSidebarOpen: (open: boolean) => {
-    set({ sidebarOpen: open });
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('pifitness-sidebar', open.toString());
-    }
   },
 
   /**

@@ -10,7 +10,7 @@ import { useUIStore } from '../../stores/uiStore';
 import * as Icons from '@mui/icons-material';
 
 export default function Sidebar() {
-  const { activeModule, setActiveModule, sidebarOpen, toggleSidebar } = useUIStore();
+  const { activeModule, setActiveModule } = useUIStore();
 
   // Get the appropriate Material UI icon for each module
   const getIcon = (iconName: string) => {
@@ -26,36 +26,24 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto">
-        <ul className="p-2 space-y-1">
+      <nav className="flex-1 overflow-y-auto p-2">
+        <div className="space-y-2">
           {NAVIGATION_MODULES.map((module) => (
-            <li key={module.id}>
-              <button
-                onClick={() => setActiveModule(module.id)}
-                className={`w-full flex items-center p-2 rounded-lg text-left ${
-                  activeModule === module.id
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                <span className="mr-3">{getIcon(module.iconName)}</span>
-                <span>{module.label}</span>
-              </button>
-            </li>
+            <button
+              key={module.id}
+              onClick={() => setActiveModule(module.id)}
+              className={`w-full flex items-center justify-center gap-3 p-3 rounded-lg border transition-colors ${
+                activeModule === module.id
+                  ? 'border-blue-300 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+              }`}
+            >
+              <span className="flex-shrink-0">{getIcon(module.iconName)}</span>
+              <span className="font-medium">{module.label}</span>
+            </button>
           ))}
-        </ul>
+        </div>
       </nav>
-
-      {/* Footer with toggle button */}
-      <div className="p-2 border-t border-gray-200 dark:border-gray-700">
-        <button
-          onClick={toggleSidebar}
-          className="w-full flex items-center justify-center p-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg"
-        >
-          <Icons.ChevronLeft className="w-5 h-5 mr-2" />
-          {sidebarOpen ? 'Collapse' : 'Expand'}
-        </button>
-      </div>
     </div>
   );
 }
