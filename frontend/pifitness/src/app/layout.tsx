@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Layout from "./components/Layout";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "PiFitness",
@@ -15,9 +16,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="light">
       <body className="min-h-screen text-gray-900 antialiased">
-        <Layout>
-          {children}
-        </Layout>
+        <Providers>
+          <Layout>
+            {children}
+          </Layout>
+        </Providers>
       </body>
     </html>
   );
