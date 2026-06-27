@@ -271,6 +271,22 @@ def delete_fact_configuration(fact_id: int) -> Union[str, List[str], None]:
     return qec(sql, (int(fact_id),))
 
 
+def update_task_configuration(task_id: int, is_active: bool, task_frequency: str) -> Union[str, List[str], None]:
+    """
+    Update a task configuration entry.
+
+    Args:
+        task_id (int): The task ID to update.
+        is_active (bool): Whether the task should be active.
+        task_frequency (str): The new frequency for the task.
+
+    Returns:
+        Union[str, List[str], None]: Error messages if any, None on success.
+    """
+    sql = "UPDATE tasks.task_configuration SET is_active = %s, task_frequency = %s WHERE task_id = %s"
+    return qec(sql, [is_active, task_frequency, task_id])
+
+
 def upsert_fact_configuration(fields: Dict[str, Any], is_insert: bool = True,
                               fact_id: Optional[int] = None) -> Union[str, List[str], None]:
     """
@@ -485,4 +501,5 @@ __all__ = [
     'get_event_history',
     'get_log_tables_simple',
     'get_log_data_simple',
+    'update_task_configuration',
 ]

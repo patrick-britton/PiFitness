@@ -1,13 +1,13 @@
 """
 Admin Schemas
-=============
+===========
 
 Pydantic models for administrative and system monitoring data structures.
 These models now exactly match the database schema based on validation.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 
 class TaskExecution(BaseModel):
@@ -103,3 +103,113 @@ class BackupInfo(BaseModel):
     retention_days: int = Field(..., description="Number of days to retain backup")
 
     model_config = ConfigDict(from_attributes=True)
+
+# New schemas for admin operations as per SP-02 design
+
+class APIService(BaseModel):
+    """API service credential requirements"""
+    api_service_name: str = Field(..., description="Name of the API service")
+    api_credential_requirements: Optional[str] = Field(None, description="JSON schema for required credentials")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class FunctionLibraryEntry(BaseModel):
+    """Function library entry"""
+    friendly_name: str = Field(..., description="Human-readable name for the function")
+    api_service_name: str = Field(..., description="Associated API service")
+    python_extraction_function: str = Field(..., description="Python function name for extraction")
+    description: Optional[str] = Field(None, description="Description of what the function does")
+    # Additional fields as per the table structure can be added here if known
+
+    model_config = ConfigDict(from_attributes=True)
+
+class CredentialUpsert(BaseModel):
+    """Credential upsert request"""
+    api_service_name: str = Field(..., description="Name of the API service")
+    raw_credentials_json_string: str = Field(..., description="JSON string of credentials to be encrypted")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class FactConfigUpsert(BaseModel):
+    """Fact configuration upsert request"""
+    fact_id: Optional[int] = Field(None, description="Fact ID (required for update)")
+    task_id: int = Field(..., description="Associated task ID")
+    staging_id: int = Field(..., description="Staging ID")
+    is_active: bool = Field(..., description="Whether the fact is active")
+    custom_params: Optional[Dict[str, Any]] = Field(None, description="Custom parameters as JSON object")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class TaskConfigEdit(BaseModel):
+    """Task configuration edit request"""
+    task_id: int = Field(..., description="Task ID to update")
+    is_active: bool = Field(..., description="Whether task should be active")
+    task_frequency: str = Field(..., description="Cron-like frequency string")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class DBSession(BaseModel):
+    """Database session information"""
+    pid: int = Field(..., description="Process ID")
+    state: str = Field(..., description="Session state (active, idle, etc.)")
+    query: str = Field(..., description="Current query being executed")
+    run_length: float = Field(..., description="Duration of query execution in seconds")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class LogEntry(BaseModel):
+    """Generic log entry - represents a row from any logging table"""
+    # This is a generic model that can accommodate any log table structure
+    # In practice, the actual columns will depend on the specific table queried
+    # We'll use a dictionary approach for flexibility, but define common fields if known
+    # For now, we'll use a flexible approach with a dict root model or allow extra fields
+    # Since we don't know the exact columns, we'll use a Dict[str, Any] approach
+    # However, Pydantic v2 doesn't have root_model in the same way, so we'll use a generic model
+    # and allow extra fields via model_config
+    
+    model_config = ConfigDict(from_attributes=True, extra='allow')
+    
+    # We can add common fields if they exist across log tables
+    # For example, many logs might have a timestamp and message
+    # But to keep it generic, we'll just allow any fields
+    
+    # If we know specific columns from the logging tables, we could define them here
+    # For now, leaving it as a pass-through model that accepts any fields
+
+# Alternative approach for LogEntry if we want to define common fields:
+# class LogEntry(BaseModel):
+#     """Generic log entry"""
+#     # Common fields that might appear in log tables
+#     log_time: Optional[datetime] = Field(None, description="Timestamp of the log entry")
+#     message: Optional[str] = Field(None, description="Log message")
+#     level: Optional[str] = Field(None, description="Log level")
+#     
+#     model_config = ConfigDict(from_attributes=True, extra='allow')
+
+# For simplicity and flexibility, we'll go with the extra='allow' approach above
+# but we need to define at least one field to make it a valid model
+# Let's add a placeholder field that will be ignored if extra data is present
+# Actually, with extra='allow', we don't need to define any fields
+# But Pydantic requires at least one field. Let's add a dummy field that we'll ignore.
+
+# Let me redefine LogEntry properly:
+
+class LogEntry(BaseModel):
+    """Generic log entry representing a row from logging tables"""
+    # This model allows any fields to be present from the database row
+    # The actual structure depends on the specific log table queried
+    
+    model_config = ConfigDict(from_attributes=True, extra='allow')
+    
+    # Add a placeholder to satisfy Pydantic's requirement for at least one field
+    # In practice, this field will be ignored if the actual data doesn't contain it
+    # and extra fields will be preserved due to extra='allow'
+    id: Optional[int] = Field(None, description="Placeholder field - actual data may vary")
+
+# However, a better approach might be to not define any specific fields and use a Dict-based approach
+# But Pydantic models need field definitions. Let's check if we can use RootModel in v2
+# Since we don't know the Pydantic version exactly, let's use a more flexible approach:
+# We'll allow the model to be initialized with any kwargs and store them
+# Actually, the extra='allow' already does this if we have at least one field.
+
+# Let's keep the above version with the id placeholder.

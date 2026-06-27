@@ -63,6 +63,7 @@ from .admin_queries import (
     get_event_history,
     get_log_tables_simple,
     get_log_data_simple,
+    update_task_configuration,
 )
 from .activities_queries import (
     get_activities_list,
@@ -127,6 +128,7 @@ __all__ = [
     'get_event_history',
     'get_log_tables_simple',
     'get_log_data_simple',
+    'update_task_configuration',
     # Activities
     'get_activities_list',
     'get_activity_by_id',
