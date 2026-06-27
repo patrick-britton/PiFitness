@@ -2,8 +2,8 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  // Server-side rendering for full functionality
-  // Remove output: "export" to enable proper Next.js server
+  // Force server-side rendering for all routes
+  output: 'standalone', // This forces proper server-side rendering
 
   // Fix workspace root detection
   outputFileTracingRoot: path.join(__dirname, '../../'),
