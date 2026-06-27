@@ -236,3 +236,4 @@ out/
 backend/static/
 .agents/
 frontend/DEPLOYMENT_GUIDE.md
+.debug/
