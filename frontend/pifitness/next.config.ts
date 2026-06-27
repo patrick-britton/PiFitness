@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Fix workspace root detection when multiple package-lock.json exist
+  // Prevents Turbopack from inferring the wrong root and missing @/* alias
+  turbopack: {
+    root: process.cwd(),
+  },
 };
 
 export default nextConfig;
