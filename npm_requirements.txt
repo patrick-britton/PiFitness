@@ -6,6 +6,7 @@
 @headlessui/react
 @tailwindcss/postcss
 @tanstack/react-query
+@mui/icons-material
 autoprefixer
 chart.js
 maplibre-gl
