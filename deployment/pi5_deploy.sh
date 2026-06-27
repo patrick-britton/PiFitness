@@ -242,11 +242,13 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     export NEXT_PUBLIC_API_URL=http://localhost:8000
     export NEXT_PUBLIC_APP_ENV=production
 
+    # Clean up any stale build artifacts or processes
+    info "Cleaning up previous Next.js build artifacts..."
+    rm -rf .next
+    pm2 delete pifitness-next 2>/dev/null || true
+
     info "Building Next.js application..."
     npm run build
-
-    info "Configuring PM2 for Next.js server..."
-    pm2 delete pifitness-next 2>/dev/null || true
 
     # Start Next.js with PM2 using correct command syntax
     pm2 start npm --name pifitness-next -- run start -- --port 3000
