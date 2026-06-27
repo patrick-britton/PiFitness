@@ -3,10 +3,13 @@
 # Used by deployment script for npm install
 
 # Production dependencies
+@emotion/react
+@emotion/styled
 @headlessui/react
+@mui/icons-material
+@mui/material
 @tailwindcss/postcss
 @tanstack/react-query
-@mui/icons-material
 autoprefixer
 chart.js
 maplibre-gl

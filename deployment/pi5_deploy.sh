@@ -247,6 +247,10 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     rm -rf .next
     pm2 delete pifitness-next 2>/dev/null || true
 
+    # Fix Windows CRLF line endings that corrupt @/ import paths on Linux
+    info "Normalizing line endings (LF) for source files..."
+    find src/ -type f \( -name "*.ts" -o -name "*.tsx" \) -exec sed -i 's/\r$//' {} + 2>/dev/null || true
+
     info "Building Next.js application..."
     npm run build
 
