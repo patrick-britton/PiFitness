@@ -25,17 +25,13 @@ warn() {
 }
 
 cleanup_processes() {
-    # Clean up temporary files that might cause issues
     info "Cleaning up temporary files..."
     sudo rm -f /tmp/*.sock 2>/dev/null || true
     sudo rm -f /tmp/*.pid 2>/dev/null || true
 }
 
 manage_agent_service() {
-    # Manage the agent service (agent_hourly.py timer)
     info "Managing agent service..."
-
-    # Stop agent service if running
     if sudo systemctl is-active --quiet pifitness_agent.service; then
         info "Stopping agent service..."
         sudo systemctl stop pifitness_agent.service
@@ -43,7 +39,6 @@ manage_agent_service() {
         info "Agent service not running"
     fi
 
-    # Stop agent timer if running
     if sudo systemctl is-active --quiet pifitness_agent.timer; then
         info "Stopping agent timer..."
         sudo systemctl stop pifitness_agent.timer
@@ -53,16 +48,10 @@ manage_agent_service() {
 }
 
 restart_agent_service() {
-    # Restart the agent service after deployment
     info "Restarting agent service..."
-
-    # Reload systemd to pick up any service file changes
     sudo systemctl daemon-reload
-
-    # Start timer (which will trigger the service)
     sudo systemctl start pifitness_agent.timer
 
-    # Check status
     if sudo systemctl is-active --quiet pifitness_agent.timer; then
         info "Agent timer started successfully"
     else
@@ -72,10 +61,8 @@ restart_agent_service() {
 }
 
 detect_and_kill_processes() {
-    # Smart process detection and safe killing
     info "Detecting running processes..."
 
-    # Check if FastAPI/uvicorn is running
     if pgrep -f "uvicorn" > /dev/null; then
         info "Found running FastAPI processes - stopping gracefully..."
         sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
@@ -91,7 +78,6 @@ detect_and_kill_processes() {
         info "No FastAPI processes found"
     fi
 
-    # Check if Streamlit is running
     if pgrep -f "streamlit run" > /dev/null; then
         info "Found running Streamlit processes - stopping gracefully..."
         sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
@@ -107,7 +93,6 @@ detect_and_kill_processes() {
         info "No Streamlit processes found"
     fi
 
-    # Clean up any processes using our ports
     info "Checking for processes using deployment ports..."
     for port in 8000 8501 3000; do
         if sudo lsof -ti :$port > /dev/null; then
@@ -133,47 +118,30 @@ info "Deploying branch: $BRANCH"
 
 # --- 2. Stop all services ---
 info "Stopping any running services..."
-
-# First cleanup temporary files
 cleanup_processes
-
-# Manage agent service (stop before deployment)
 manage_agent_service
-
-# Use smart process detection and safe killing
 detect_and_kill_processes
-
-# No need for additional process killing since detect_and_kill_processes
-# handles everything with proper detection and graceful shutdown
 
 # --- 3. Backup current code (rollback point) ---
 echo "Backup Turned Off"
-# BACKUP_DIR="/home/god/PiFitness/backups/$(date +%Y%m%d_%H%M%S)_$BRANCH"
-# mkdir -p "$BACKUP_DIR"
-# cp -r /home/god/PiFitness/* "$BACKUP_DIR" 2>/dev/null || true
-# info "Backup saved to $BACKUP_DIR"
 
 # --- 4. Pull the branch ---
 cd /home/god/PiFitness
 
-# Protect .env files before reset (receiver mode - no local changes preserved)
 info "Protecting local configuration files..."
 [ -f backend/.env ] && cp backend/.env /tmp/.env.backup || true
 [ -f .env ] && cp .env /tmp/.env.root.backup || true
 
-# Receiver mode: hard reset to remote branch (no local changes preserved)
 info "Resetting to remote branch (receiver mode)..."
 git fetch origin
 git reset --hard origin/"$BRANCH"
 
-# Restore protected .env files
 [ -f /tmp/.env.backup ] && cp /tmp/.env.backup backend/.env && info "Restored backend/.env"
 [ -f /tmp/.env.root.backup ] && cp /tmp/.env.root.backup .env && info "Restored .env"
 
 # --- 5. Install/update Python dependencies ---
 source venv/bin/activate
 
-# Ask about package checks
 echo "Do you want to perform package dependency checks?"
 echo "  1) Yes, install/update all Python and npm packages (recommended)"
 echo "  2) No, skip package checks (faster, but may miss updates)"
@@ -186,10 +154,14 @@ else
     info "Skipping Python package checks"
 fi
 
+# DEFENSIVE PURGE: Clear Python Bytecode
+info "Purging Python bytecode caches..."
+find . -type d -name "__pycache__" -exec rm -rf {} +
+find . -type f -name "*.pyc" -exec rm -f {} +
+
 # --- 5.5. Run automated tests (React UI branch only) ---
 if [[ "$BRANCH" == "react-ui" ]]; then
     info "Running automated tests..."
-    source venv/bin/activate
     if ! pytest tests/ -v; then
         error_exit "Tests failed, aborting deployment"
     fi
@@ -202,10 +174,7 @@ if [[ "$BRANCH" == "react-ui" && "$package_choice" == "1" ]]; then
     cd frontend/pifitness
     if [[ -f "../../npm_requirements.txt" ]]; then
         info "Installing npm packages from requirements file..."
-        # Install packages line by line to avoid comment issues
-        # Use --no-save to avoid modifying package.json and only install missing packages
         while IFS= read -r package || [[ -n "$package" ]]; do
-            # Skip empty lines and comments
             if [[ -n "$package" && "$package" != \#* ]]; then
                 info "Installing/updating package: $package"
                 npm install --no-save "$package"
@@ -215,10 +184,6 @@ if [[ "$BRANCH" == "react-ui" && "$package_choice" == "1" ]]; then
         warn "npm_requirements.txt not found, running standard npm install..."
         npm install --no-save
     fi
-fi
-
-# Return to project root after npm install
-if [[ "$BRANCH" == "react-ui" ]]; then
     cd /home/god/PiFitness || error_exit "Failed to return to project root after npm install"
 fi
 
@@ -232,17 +197,16 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     info "Setting up Next.js server (replacing static export)..."
     cd frontend/pifitness || error_exit "frontend/pifitness not found. Verify directory structure."
 
-    # Install PM2 globally if not already installed
     if ! command -v pm2 &> /dev/null; then
         info "Installing PM2 for process management..."
         sudo npm install -g pm2
     fi
 
-    # Set environment variables for production
-    export NEXT_PUBLIC_API_URL=http://localhost:8000
+    # CRITICAL DEFENSIVE FIX: Eradicate the localhost variable from the environment
+    info "Purging environment of local API URLs..."
+    unset NEXT_PUBLIC_API_URL
     export NEXT_PUBLIC_APP_ENV=production
 
-    # Clean up any stale build artifacts or processes
     info "Cleaning up previous Next.js build artifacts..."
     rm -rf .next
     pm2 delete pifitness-next 2>/dev/null || true
@@ -250,15 +214,14 @@ if [[ "$BRANCH" == "react-ui" ]]; then
     info "Building Next.js application..."
     npm run build
 
-    # Start Next.js with PM2 using correct command syntax
+    # Start Next.js with PM2 and force the save state
     pm2 start npm --name pifitness-next -- run start -- --port 3000
+    pm2 save --force
 
-    # Verify PM2 process started successfully
     if ! pm2 show pifitness-next | grep -q "status.*online"; then
         error_exit "PM2 failed to start Next.js server. Check logs with: pm2 logs pifitness-next"
     fi
 
-    # Return to project root
     cd /home/god/PiFitness
 fi
 
@@ -277,53 +240,46 @@ fi
 NGINX_SITE="/etc/nginx/sites-available/pifitness"
 NGINX_TEMPLATE="/home/god/PiFitness/deployment/nginx-template.conf"
 
-# Ensure template exists
 if [[ ! -f "$NGINX_TEMPLATE" ]]; then
     error_exit "Nginx template not found at $NGINX_TEMPLATE"
 fi
 
-    # Replace FASTAPI_PORT placeholder with target port
-    info "Updating nginx configuration to use port ${TARGET_PORT}..."
-    sudo sed "s/FASTAPI_PORT/${TARGET_PORT}/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
+info "Updating nginx configuration to use port ${TARGET_PORT}..."
+sudo sed "s/FASTAPI_PORT/${TARGET_PORT}/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
 
-    # Verify the port was actually replaced
-    if ! grep -q ":${TARGET_PORT};" "$NGINX_SITE"; then
-        error_exit "Failed to update nginx configuration with port ${TARGET_PORT}. Check if FASTAPI_PORT placeholder exists in template."
-    fi
+if ! grep -q ":${TARGET_PORT};" "$NGINX_SITE"; then
+    error_exit "Failed to update nginx configuration with port ${TARGET_PORT}."
+fi
 
-# Ensure symlink exists in sites-enabled
 if [[ ! -f "/etc/nginx/sites-enabled/pifitness" ]]; then
     info "Creating nginx symlink..."
     sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness
 fi
 
-# --- Remove stale nginx site symlinks from previous deployments ---
 if [[ "$BRANCH" == "react-ui" ]]; then
-    # Disable legacy Streamlit nginx config if present (server_name conflict)
     if [[ -L "/etc/nginx/sites-enabled/streamlit" ]]; then
-        info "Removing stale streamlit nginx symlink (conflicts with react-ui)..."
+        info "Removing stale streamlit nginx symlink..."
         sudo rm -f "/etc/nginx/sites-enabled/streamlit"
     fi
 elif [[ "$BRANCH" == "streamlit-prd" ]]; then
-    # Disable FastAPI nginx config if present (prevents port conflict)
     if [[ -L "/etc/nginx/sites-enabled/pifitness" ]]; then
-        info "Removing stale pifitness nginx symlink (conflicts with streamlit-prd)..."
+        info "Removing stale pifitness nginx symlink..."
         sudo rm -f "/etc/nginx/sites-enabled/pifitness"
     fi
 fi
 
-# Test and reload nginx
+# DEFENSIVE PURGE: Clear Nginx Proxy Caches
+info "Clearing Nginx caches..."
+sudo rm -rf /var/cache/nginx/* 2>/dev/null || true
+
 info "Testing nginx configuration..."
 sudo nginx -t || error_exit "Nginx configuration test failed."
 
 info "Reloading nginx..."
 sudo systemctl reload nginx || error_exit "Failed to reload nginx."
 
-# Verify nginx is using the correct port
 info "Verifying nginx configuration..."
 sudo nginx -T 2>/dev/null | grep -A5 "server_name pifitness.duckdns.org" | grep "proxy_pass" | grep -q ":${TARGET_PORT};" || warn "Nginx may not be using the expected port ${TARGET_PORT}"
-
-info "Nginx configured to use port $TARGET_PORT."
 
 # --- 9. Restart agent service ---
 restart_agent_service
