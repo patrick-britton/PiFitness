@@ -254,15 +254,34 @@ async def delete_fact_configuration_endpoint(fact_id: int):
 
 
 @router.get("/events")
-async def get_events():
+async def get_events(
+    search: Optional[str] = None,
+    errors_only: bool = False,
+    ignore_skips: bool = False,
+    event_type: Optional[str] = None,
+    limit: int = 250
+):
     """
-    Get event history.
+    Get event history with optional filtering.
+
+    Args:
+        search: Text search across event_type, description, error_text
+        errors_only: If True, show only error events
+        ignore_skips: If True, filter out skipped rows
+        event_type: Filter by specific event type
+        limit: Maximum number of rows to return (default: 250)
 
     Returns:
-        List of event history records
+        List of filtered event history records
     """
     try:
-        events = get_event_history()
+        events = get_event_history(
+            search_val=search,
+            errors_only=errors_only,
+            ignore_skips=ignore_skips,
+            event_type=event_type,
+            limit=limit
+        )
         return {"data": events, "count": len(events)}
     except Exception as e:
         raise HTTPException(
