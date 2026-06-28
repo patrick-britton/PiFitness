@@ -25,12 +25,12 @@ import RawLogViewer from './components/RawLogViewer';
  * Tab configuration
  */
 const TABS = [
-  { id: 'tasks', label: '📋 Tasks', icon: '⚙️', component: TaskList },
-  { id: 'sessions', label: '🗄️ DB Sessions', icon: '🛢️', component: DBSessions },
-  { id: 'events', label: '📜 Events', icon: '📋', component: EventHistory },
-  { id: 'services', label: '🔧 Services', icon: '🔌', component: ServiceConfig },
-  { id: 'credentials', label: '🔑 Credentials', icon: '🔐', component: CredentialManager },
-  { id: 'logs', label: '📊 Raw Logs', icon: '📈', component: RawLogViewer },
+  { id: 'tasks', label: 'Tasks', icon: '⚙️', component: TaskList },
+  { id: 'sessions', label: 'DB Sessions', icon: '🛢️', component: DBSessions },
+  { id: 'events', label: 'Events', icon: '📋', component: EventHistory },
+  { id: 'services', label: 'Services', icon: '🔌', component: ServiceConfig },
+  { id: 'credentials', label: 'Credentials', icon: '🔐', component: CredentialManager },
+  { id: 'logs', label: 'Raw Logs', icon: '📈', component: RawLogViewer },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];

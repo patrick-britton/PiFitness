@@ -46,3 +46,28 @@ def test_admin_task_names():
     if data["count"] > 0:
         assert isinstance(data["data"], list)
         assert len(data["data"]) > 0
+
+def test_admin_events_no_filter():
+    """Test GET /api/admin/events returns successfully without filters."""
+    response = client.get("/api/admin/events")
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    assert "count" in data
+    assert isinstance(data["count"], int)
+    if data["count"] > 0:
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) > 0
+
+def test_admin_events_with_filters():
+    """Test GET /api/admin/events with filter parameters."""
+    response = client.get("/api/admin/events?search=test&errors_only=true&ignore_skips=true&event_type=INFO&limit=50")
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    assert "count" in data
+    assert isinstance(data["count"], int)
+    # With filters, count should be <= limit
+    if data["count"] > 0:
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) <= 50
