@@ -5,7 +5,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { API, ApiListResponse, ApiStatusResponse } from "@/lib/api-client";
+import { API, ApiListResponse, ApiStatusResponse } from "../lib/api-client";
 
 // ---------------------------------------------------------------------------
 // Query Key Factories
