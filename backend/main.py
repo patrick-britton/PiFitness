@@ -52,6 +52,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add Private Network Access header middleware
+@app.middleware("http")
+async def add_private_network_access_header(request: Request, call_next):
+    """
+    Add Access-Control-Allow-Private-Network header to allow public sites
+    to access local/private network resources. This addresses the PNA
+    (Private Network Access) restrictions in modern browsers.
+    """
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
 # ---------------------------------------------------------------------------
 # Global Error Handlers
 # ---------------------------------------------------------------------------

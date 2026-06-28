@@ -3,7 +3,7 @@
  * Environment-aware fetch wrapper with comprehensive error handling
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 /**
  * Typed API fetch function with error handling
