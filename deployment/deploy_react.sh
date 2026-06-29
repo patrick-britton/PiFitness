@@ -163,8 +163,17 @@ if [[ "$FAST" == "true" ]]; then
     info "=== FAST MODE ==="
     cd "$PROJECT_DIR"
 
-    # Check what changed
+    # Fetch latest from origin
     git fetch origin
+
+    # Ensure we're on the right branch (switch if needed)
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    if [[ "$CURRENT_BRANCH" != "$TARGET" ]]; then
+        info "Switching from '$CURRENT_BRANCH' to '$TARGET'..."
+        git checkout "$TARGET" 2>/dev/null || git checkout -b "$TARGET" origin/"$TARGET"
+    fi
+
+    # Check what changed since last deploy
     CHANGED_FILES=$(git diff HEAD..origin/"$TARGET" --name-only)
 
     if [[ -z "$CHANGED_FILES" ]]; then
@@ -175,8 +184,8 @@ if [[ "$FAST" == "true" ]]; then
     info "Changed files:"
     echo "$CHANGED_FILES"
 
-    # git pull preserves local state
-    git pull origin "$TARGET"
+    # Reset to match origin exactly (safer than pull which can fail on diverged branches)
+    git reset --hard origin/"$TARGET"
 
     # Purge Python bytecode always
     find "$PROJECT_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

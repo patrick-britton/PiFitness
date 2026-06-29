@@ -1,0 +1,25 @@
+[Unit]
+Description=PiFitness FastAPI Backend
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=god
+Group=god
+WorkingDirectory=/home/god/PiFitness
+EnvironmentFile=/home/god/PiFitness/.env
+ExecStart=/home/god/PiFitness/venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/god/PiFitness
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,31 @@
+[Unit]
+Description=PiFitness Streamlit Service
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=god
+Group=god
+WorkingDirectory=/home/god/PiFitness
+Environment="PATH=/home/god/PiFitness/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/home/god/PiFitness/.env
+ExecStart=/home/god/PiFitness/venv/bin/streamlit run /home/god/PiFitness/pi_fitness.py \
+    --server.port 8501 \
+    --server.headless true \
+    --server.enableCORS false \
+    --server.enableXsrfProtection false \
+    --server.address 0.0.0.0
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/god/PiFitness
+
+[Install]
+WantedBy=multi-user.target
