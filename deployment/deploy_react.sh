@@ -170,7 +170,8 @@ if [[ "$FAST" == "true" ]]; then
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     if [[ "$CURRENT_BRANCH" != "$TARGET" ]]; then
         info "Switching from '$CURRENT_BRANCH' to '$TARGET'..."
-        git checkout "$TARGET" 2>/dev/null || git checkout -b "$TARGET" origin/"$TARGET"
+        # Force checkout to discard any local changes from the previous branch
+        git checkout --force "$TARGET"
     fi
 
     # Check what changed since last deploy
