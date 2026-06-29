@@ -1,7 +1,7 @@
 #!/bin/bash
 # PiFitness Bootstrap Launcher
-# Usage: bash bootstrap.sh <target> [--install-packages] [--nuclear] [--fast]
-#   target: streamlit-prd or react-ui
+# Usage: bash bootstrap.sh [options]
+#   Options override interactive prompts.
 #
 # This script:
 #   1. Validates environment
@@ -36,29 +36,11 @@ warn() {
     echo -e "${YELLOW}WARNING: $1${NC}"
 }
 
-usage() {
-    echo "Usage: bash bootstrap.sh <target> [options]"
-    echo ""
-    echo "  target: streamlit-prd | react-ui"
-    echo ""
-    echo "Options:"
-    echo "  --install-packages    Install/verify all Python & npm dependencies"
-    echo "  --fast                Partial deploy (git pull only, skip package install, skip DB backup)"
-    echo "  --nuclear             Full wipe: delete project dir, venv, npm caches, re-clone, rebuild"
-    echo ""
-    echo "Examples:"
-    echo "  bash bootstrap.sh react-ui --install-packages"
-    echo "  bash bootstrap.sh react-ui --fast"
-    echo "  bash bootstrap.sh streamlit-prd --install-packages"
-    echo "  bash bootstrap.sh react-ui --nuclear"
-    exit 1
-}
-
-# --- Parse args ---
+# --- Parse CLI args (optional — if omitted, interactive prompts are shown) ---
 TARGET=""
-INSTALL_PACKAGES=false
-FAST=false
-NUCLEAR=false
+INSTALL_PACKAGES=""
+FAST=""
+NUCLEAR=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -72,10 +54,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         --fast)
             FAST=true
+            NUCLEAR=false
             shift
             ;;
         --nuclear)
             NUCLEAR=true
+            FAST=false
             shift
             ;;
         *)
@@ -84,9 +68,55 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# --- Interactive prompts if not all args provided ---
 if [[ -z "$TARGET" ]]; then
-    usage
+    echo ""
+    echo "Which branch to deploy?"
+    echo "  1) streamlit-prd (legacy Streamlit)"
+    echo "  2) react-ui (new FastAPI + React)"
+    read -rp "Enter 1 or 2: " branch_choice
+
+    case $branch_choice in
+        1) TARGET="streamlit-prd" ;;
+        2) TARGET="react-ui" ;;
+        *) error_exit "Invalid choice. Exiting." ;;
+    esac
 fi
+
+if [[ -z "$FAST" && -z "$NUCLEAR" ]]; then
+    echo ""
+    echo "Select deployment mode:"
+    echo "  1) Full deploy (pull code, DB backup, tests, install packages, rebuild, restart services)"
+    echo "  2) Fast deploy (pull code, skip tests/packages/DB backup, restart services only)"
+    echo "  3) Nuclear (wipe everything, re-clone, rebuild from scratch)"
+    read -rp "Enter 1, 2, or 3: " mode_choice
+
+    case $mode_choice in
+        1) FAST=false; NUCLEAR=false ;;
+        2) FAST=true; NUCLEAR=false ;;
+        3) FAST=false; NUCLEAR=true ;;
+        *) error_exit "Invalid choice. Exiting." ;;
+    esac
+
+    # Ask about package install unless fast (which skips packages)
+    if [[ "$FAST" != "true" && "$NUCLEAR" != "true" ]]; then
+        echo ""
+        echo "Install/verify packages?"
+        echo "  1) Yes, install/update Python and npm dependencies"
+        echo "  2) No, skip package checks"
+        read -rp "Enter 1 or 2: " pkg_choice
+        case $pkg_choice in
+            1) INSTALL_PACKAGES=true ;;
+            2) INSTALL_PACKAGES=false ;;
+            *) error_exit "Invalid choice. Exiting." ;;
+        esac
+    fi
+fi
+
+# Defaults for any unset values
+INSTALL_PACKAGES="${INSTALL_PACKAGES:-false}"
+FAST="${FAST:-false}"
+NUCLEAR="${NUCLEAR:-false}"
 
 if [[ "$FAST" == true && "$NUCLEAR" == true ]]; then
     error_exit "--fast and --nuclear are mutually exclusive"
@@ -154,7 +184,7 @@ else
     chmod +x "$DEPLOY_DIR"/*.sh 2>/dev/null || true
 fi
 
-# --- Pre-deployment validation (dry-run mode if --fast or --install-packages) ---
+# --- Pre-deployment backup (full mode only) ---
 if [[ "$FAST" == false && "$NUCLEAR" == false ]]; then
     info "Creating database backup..."
     BACKUP_DIR="/home/god/DB-Backups"
@@ -197,7 +227,11 @@ if [[ $DEPLOY_EXIT_CODE -eq 0 ]]; then
     echo "========================================="
     echo ""
     info "To roll back to the other version, run:"
-    info "  bash bootstrap.sh <other_target> --install-packages"
+    if [[ "$TARGET" == "react-ui" ]]; then
+        info "  bash bootstrap.sh streamlit-prd"
+    else
+        info "  bash bootstrap.sh react-ui"
+    fi
 else
     echo ""
     echo "========================================="
@@ -206,9 +240,9 @@ else
     echo ""
     warn "To roll back to the last working version, run:"
     if [[ "$TARGET" == "react-ui" ]]; then
-        warn "  bash bootstrap.sh streamlit-prd --install-packages"
+        warn "  bash bootstrap.sh streamlit-prd"
     else
-        warn "  bash bootstrap.sh react-ui --install-packages"
+        warn "  bash bootstrap.sh react-ui"
     fi
     exit $DEPLOY_EXIT_CODE
 fi
