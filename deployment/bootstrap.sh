@@ -13,6 +13,9 @@
 
 set -e
 
+# --- Constants ---
+PROJECT_DIR="/home/god/PiFitness"
+
 # --- Colours ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -119,14 +122,14 @@ if ! command -v git &> /dev/null; then
 fi
 
 # Check Python virtual environment
-VENV_DIR="/home/god/PiFitness/venv"
+VENV_DIR="$PROJECT_DIR/venv"
 if [[ ! -d "$VENV_DIR" && "$NUCLEAR" == false ]]; then
     warn "Virtual environment not found at $VENV_DIR"
     warn "Will create it during deployment"
 fi
 
-# Check target branch exists
-if git show-ref --verify --quiet "refs/heads/$TARGET" 2>/dev/null; then
+# Check target branch exists (run git from PROJECT_DIR regardless of CWD)
+if git -C "$PROJECT_DIR" show-ref --verify --quiet "refs/heads/$TARGET" 2>/dev/null; then
     info "Target branch '$TARGET' exists locally"
 else
     warn "Target branch '$TARGET' not found locally. Will fetch from origin."
@@ -139,14 +142,14 @@ DEPLOY_DIR="/tmp/pifitness-deploy"
 mkdir -p "$DEPLOY_DIR"
 
 info "Fetching latest deployment scripts from origin/deployment_script..."
-if ! git fetch origin deployment_script 2>/dev/null; then
+if ! git -C "$PROJECT_DIR" fetch origin deployment_script 2>/dev/null; then
     info "Using local deployment scripts (could not fetch deployment_script branch)"
-    SCRIPT_DIR="/home/god/PiFitness/deployment"
+    SCRIPT_DIR="$PROJECT_DIR/deployment"
 else
     SCRIPT_DIR="$DEPLOY_DIR"
     # Extract files from deployment_script branch
     for f in bootstrap.sh deploy_streamlit.sh deploy_react.sh nginx-template.conf requirements-streamlit.txt requirements-react.txt npm_requirements.txt; do
-        git show origin/deployment_script:"deployment/$f" > "$DEPLOY_DIR/$f" 2>/dev/null || warn "Could not extract $f from deployment_script branch"
+        git -C "$PROJECT_DIR" show origin/deployment_script:"deployment/$f" > "$DEPLOY_DIR/$f" 2>/dev/null || warn "Could not extract $f from deployment_script branch"
     done
     chmod +x "$DEPLOY_DIR"/*.sh 2>/dev/null || true
 fi
@@ -165,7 +168,13 @@ if [[ "$FAST" == false && "$NUCLEAR" == false ]]; then
 fi
 
 # --- Execute target-specific script ---
-TARGET_SCRIPT="$SCRIPT_DIR/deploy_${TARGET//-/_}.sh"
+# Map branch names to script names
+if [[ "$TARGET" == "streamlit-prd" ]]; then
+    TARGET_SHORT="streamlit"
+elif [[ "$TARGET" == "react-ui" ]]; then
+    TARGET_SHORT="react"
+fi
+TARGET_SCRIPT="$SCRIPT_DIR/deploy_${TARGET_SHORT}.sh"
 if [[ ! -f "$TARGET_SCRIPT" ]]; then
     error_exit "Deployment script not found: $TARGET_SCRIPT"
 fi
