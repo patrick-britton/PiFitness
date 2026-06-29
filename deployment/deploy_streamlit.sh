@@ -145,6 +145,33 @@ if [[ "$FAST" == "true" ]]; then
         git checkout --force "$TARGET"
     fi
 
+    # Force alignment of other components if we just switched branches, even with no code changes
+    if [[ "$CURRENT_BRANCH" != "$TARGET" ]]; then
+        info "Switching branches. Forcing full restart & nginx realignment..."
+        # Force a service restart and nginx configuration reload
+        sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+        pm2 delete pifitness-next 2>/dev/null || true
+        sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
+        
+        # Pull master .env
+        cp /home/god/Documents/.env "$PROJECT_DIR/.env" 2>/dev/null || true
+        
+        # Start Streamlit
+        sudo systemctl start pifitness-streamlit.service
+        
+        # Update nginx config
+        NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
+        NGINX_SITE="/etc/nginx/sites-available/pifitness"
+        if [[ -f "$NGINX_TEMPLATE" ]]; then
+            sudo sed "s/FASTAPI_PORT/8501/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
+            sudo rm -f /etc/nginx/sites-enabled/streamlit 2>/dev/null || true
+            sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness 2>/dev/null || true
+            sudo nginx -t && sudo systemctl reload nginx
+        fi
+        info "Services and nginx realigned for streamlit-prd."
+        exit 0
+    fi
+
     # Check what changed since last deploy
     CHANGED_FILES=$(git diff HEAD..origin/"$TARGET" --name-only)
 
@@ -164,6 +191,14 @@ if [[ "$FAST" == "true" ]]; then
             info "Streamlit service started."
         else
             info "Streamlit service already running."
+            # Confirm Nginx is correctly routed anyway (defensive measure)
+            NGINX_SITE="/etc/nginx/sites-available/pifitness"
+            if [[ -f "$NGINX_SITE" ]] && ! grep -q ":8501;" "$NGINX_SITE"; then
+                info "Correcting Nginx routing to port 8501..."
+                NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
+                sudo sed "s/FASTAPI_PORT/8501/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
+                sudo nginx -t && sudo systemctl reload nginx
+            fi
         fi
         exit 0
     fi
