@@ -149,7 +149,22 @@ if [[ "$FAST" == "true" ]]; then
     CHANGED_FILES=$(git diff HEAD..origin/"$TARGET" --name-only)
 
     if [[ -z "$CHANGED_FILES" ]]; then
-        info "No changes detected. Already up to date."
+        info "No code changes detected. Verifying services are running..."
+        # Ensure Streamlit service is running (may have been stopped after branch switch)
+        if ! sudo systemctl is-active --quiet pifitness-streamlit.service; then
+            info "Streamlit service not running. Starting it..."
+            sudo systemctl start pifitness-streamlit.service
+            # Ensure nginx is configured for streamlit
+            NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
+            NGINX_SITE="/etc/nginx/sites-available/pifitness"
+            if [[ -f "$NGINX_TEMPLATE" ]]; then
+                sudo sed "s/FASTAPI_PORT/8501/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null 2>/dev/null || true
+                sudo nginx -t 2>/dev/null && sudo systemctl reload nginx 2>/dev/null || true
+            fi
+            info "Streamlit service started."
+        else
+            info "Streamlit service already running."
+        fi
         exit 0
     fi
 
