@@ -178,7 +178,41 @@ if [[ "$FAST" == "true" ]]; then
     CHANGED_FILES=$(git diff HEAD..origin/"$TARGET" --name-only)
 
     if [[ -z "$CHANGED_FILES" ]]; then
-        info "No changes detected. Already up to date."
+        info "No code changes detected. Verifying services are running..."
+        # Ensure FastAPI service is running (may have been stopped after branch switch)
+        FASTAPI_ACTIVE=false
+        if sudo systemctl is-active --quiet pifitness-fastapi.service; then
+            FASTAPI_ACTIVE=true
+        fi
+        # Ensure Next.js/PM2 is running
+        PM2_ACTIVE=false
+        if pm2 show pifitness-next 2>/dev/null | grep -q "status.*online"; then
+            PM2_ACTIVE=true
+        fi
+
+        if [[ "$FASTAPI_ACTIVE" == "true" && "$PM2_ACTIVE" == "true" ]]; then
+            info "FastAPI and Next.js services already running."
+        else
+            if [[ "$FASTAPI_ACTIVE" == "false" ]]; then
+                info "FastAPI service not running. Starting it..."
+                sudo systemctl start pifitness-fastapi.service
+            fi
+            if [[ "$PM2_ACTIVE" == "false" ]]; then
+                info "Next.js not running. Starting it..."
+                cd "$FRONTEND_DIR"
+                pm2 start npm --name pifitness-next -- run start -- --port 3000
+                pm2 save --force
+                cd "$PROJECT_DIR"
+            fi
+            # Ensure nginx is configured for react
+            NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
+            NGINX_SITE="/etc/nginx/sites-available/pifitness"
+            if [[ -f "$NGINX_TEMPLATE" ]]; then
+                sudo sed "s/FASTAPI_PORT/8000/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null 2>/dev/null || true
+                sudo nginx -t 2>/dev/null && sudo systemctl reload nginx 2>/dev/null || true
+            fi
+            info "Services verified and started."
+        fi
         exit 0
     fi
 
