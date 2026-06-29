@@ -1,4 +1,7 @@
-streamlit
+fastapi
+uvicorn
+pydantic
+starlette
 psycopg2-binary
 sqlalchemy
 pandas
@@ -18,9 +21,5 @@ playwright
 typer
 httpx
 pytz
-fastapi
-uvicorn
-pydantic
-starlette
 pytest
 pytest-asyncio

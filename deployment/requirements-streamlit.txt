@@ -18,9 +18,5 @@ playwright
 typer
 httpx
 pytz
-fastapi
-uvicorn
-pydantic
-starlette
 pytest
 pytest-asyncio
