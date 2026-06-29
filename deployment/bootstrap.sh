@@ -86,8 +86,8 @@ fi
 if [[ -z "$FAST" && -z "$NUCLEAR" ]]; then
     echo ""
     echo "Select deployment mode:"
-    echo "  1) Full deploy (pull code, DB backup, tests, install packages, rebuild, restart services)"
-    echo "  2) Fast deploy (pull code, skip tests/packages/DB backup, restart services only)"
+    echo "  1) Full deploy (pull code, tests, install packages, rebuild, restart services)"
+    echo "  2) Fast deploy (pull code, skip tests/packages, restart services only)"
     echo "  3) Nuclear (wipe everything, re-clone, rebuild from scratch)"
     read -rp "Enter 1, 2, or 3: " mode_choice
 
@@ -177,23 +177,13 @@ if ! git -C "$PROJECT_DIR" fetch origin deployment_script 2>/dev/null; then
     SCRIPT_DIR="$PROJECT_DIR/deployment"
 else
     SCRIPT_DIR="$DEPLOY_DIR"
-    # Extract files from deployment_script branch
-    for f in bootstrap.sh deploy_streamlit.sh deploy_react.sh nginx-template.conf requirements-streamlit.txt requirements-react.txt npm_requirements.txt; do
-        git -C "$PROJECT_DIR" show origin/deployment_script:"deployment/$f" > "$DEPLOY_DIR/$f" 2>/dev/null || warn "Could not extract $f from deployment_script branch"
-    done
-    chmod +x "$DEPLOY_DIR"/*.sh 2>/dev/null || true
-fi
-
-# --- Pre-deployment backup (full mode only) ---
-if [[ "$FAST" == false && "$NUCLEAR" == false ]]; then
-    info "Creating database backup..."
-    BACKUP_DIR="/home/god/DB-Backups"
-    mkdir -p "$BACKUP_DIR"
-    BACKUP_FILE="$BACKUP_DIR/pifitness-$(date +%Y%m%d-%H%M%S).sql"
-    if pg_dump -h localhost -U god personal_fitness > "$BACKUP_FILE" 2>/dev/null; then
-        info "Database backup saved to $BACKUP_FILE"
+    info "Extracting deployment scripts from deployment_script branch..."
+    # Use git archive to get the entire deployment/ directory
+    if git -C "$PROJECT_DIR" archive origin/deployment_script deployment/ | tar -x -C "$DEPLOY_DIR" --strip-components=1 2>/dev/null; then
+        chmod +x "$DEPLOY_DIR"/*.sh 2>/dev/null || true
     else
-        warn "Database backup failed (continuing anyway)"
+        warn "Failed to extract deployment scripts. Falling back to local scripts."
+        SCRIPT_DIR="$PROJECT_DIR/deployment"
     fi
 fi
 
