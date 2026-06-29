@@ -16,7 +16,7 @@ elevation
 scipy
 playwright
 typer
-httpx2
+httpx
 pytz
 fastapi
 uvicorn
