@@ -174,6 +174,44 @@ if [[ "$FAST" == "true" ]]; then
         git checkout --force "$TARGET"
     fi
 
+    # Force alignment of other components if we just switched branches, even with no code changes
+    if [[ "$CURRENT_BRANCH" != "$TARGET" ]]; then
+        info "Switching branches. Forcing full restart & nginx realignment..."
+        # Force stop Streamlit
+        sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
+        
+        # Pull master .env to react backend folder
+        cp /home/god/Documents/.env "$PROJECT_DIR/backend/.env" 2>/dev/null || true
+        
+        # Start FastAPI
+        sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+        sudo systemctl start pifitness-fastapi.service
+        
+        # Restart Next.js under PM2 (always fresh)
+        pm2 delete pifitness-next 2>/dev/null || true
+        cd "$FRONTEND_DIR"
+        
+        # Purge environment variables to prevent dev proxy leaks
+        unset NEXT_PUBLIC_API_URL
+        export NEXT_PUBLIC_APP_ENV=production
+        
+        pm2 start npm --name pifitness-next -- run start -- --port 3000
+        pm2 save --force
+        cd "$PROJECT_DIR"
+        
+        # Update nginx config
+        NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
+        NGINX_SITE="/etc/nginx/sites-available/pifitness"
+        if [[ -f "$NGINX_TEMPLATE" ]]; then
+            sudo sed "s/FASTAPI_PORT/8000/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
+            sudo rm -f /etc/nginx/sites-enabled/streamlit 2>/dev/null || true
+            sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness 2>/dev/null || true
+            sudo nginx -t && sudo systemctl reload nginx
+        fi
+        info "Services and nginx realigned for react-ui."
+        exit 0
+    fi
+
     # Check what changed since last deploy
     CHANGED_FILES=$(git diff HEAD..origin/"$TARGET" --name-only)
 
@@ -192,6 +230,14 @@ if [[ "$FAST" == "true" ]]; then
 
         if [[ "$FASTAPI_ACTIVE" == "true" && "$PM2_ACTIVE" == "true" ]]; then
             info "FastAPI and Next.js services already running."
+            # Confirm Nginx is correctly routed anyway (defensive measure)
+            NGINX_SITE="/etc/nginx/sites-available/pifitness"
+            if [[ -f "$NGINX_SITE" ]] && ! grep -q ":8000;" "$NGINX_SITE"; then
+                info "Correcting Nginx routing to port 8000..."
+                NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
+                sudo sed "s/FASTAPI_PORT/8000/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
+                sudo nginx -t && sudo systemctl reload nginx
+            fi
         else
             if [[ "$FASTAPI_ACTIVE" == "false" ]]; then
                 info "FastAPI service not running. Starting it..."
@@ -200,6 +246,9 @@ if [[ "$FAST" == "true" ]]; then
             if [[ "$PM2_ACTIVE" == "false" ]]; then
                 info "Next.js not running. Starting it..."
                 cd "$FRONTEND_DIR"
+                # Purge environment variables to prevent dev proxy leaks
+                unset NEXT_PUBLIC_API_URL
+                export NEXT_PUBLIC_APP_ENV=production
                 pm2 start npm --name pifitness-next -- run start -- --port 3000
                 pm2 save --force
                 cd "$PROJECT_DIR"
