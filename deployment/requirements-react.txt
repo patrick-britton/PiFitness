@@ -19,7 +19,7 @@ elevation
 scipy
 playwright
 typer
-httpx
+httpx2
 pytz
 pytest
 pytest-asyncio
