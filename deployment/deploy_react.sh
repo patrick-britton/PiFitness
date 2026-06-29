@@ -63,11 +63,7 @@ if [[ "$NUCLEAR" == "true" ]]; then
         exit 1
     fi
 
-    # Backup data first
-    info "Backing up database..."
-    mkdir -p /home/god/DB-Backups
-    pg_dump -h localhost -U god personal_fitness > "/home/god/DB-Backups/pre-nuclear-$(date +%Y%m%d-%H%M%S).sql" || warn "DB backup failed"
-
+    # Backup .env and auth tokens (no database backup – database is untouched)
     info "Backing up .env..."
     [ -f "$PROJECT_DIR/backend/.env" ] && cp "$PROJECT_DIR/backend/.env" /home/god/Documents/.env.pre-nuclear
     cp /home/god/Documents/.env /home/god/Documents/.env.pre-nuclear 2>/dev/null || true
@@ -77,11 +73,22 @@ if [[ "$NUCLEAR" == "true" ]]; then
         [ -f "$PROJECT_DIR/$token_file" ] && cp "$PROJECT_DIR/$token_file" "/tmp/${token_file}.backup" || true
     done
 
-    # Wipe everything
-    info "Wiping project directory, venv, and npm caches..."
-    rm -rf "$PROJECT_DIR"
-    rm -rf "$VENV_DIR"
-    rm -rf ~/.npm/_cacache
+     # Wipe everything
+     info "Stopping any running services before wipe..."
+     sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
+     sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+     pm2 delete pifitness-next 2>/dev/null || true
+     # Clear PM2 saved state to purge any stale environment variables
+     rm -f ~/.pm2/dump.pm2
+     for port in 8000 8501 3000; do
+         lsof -ti :$port 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+     done
+     info "Wiping project directory, venv, and npm caches..."
+     rm -rf "$PROJECT_DIR"
+     rm -rf "$VENV_DIR"
+     rm -rf ~/.npm/_cacache
+     # Also wipe PM2's entire cache to be absolutely clean
+     rm -rf ~/.pm2
 
     # Re-clone
     info "Cloning repository..."
@@ -90,8 +97,9 @@ if [[ "$NUCLEAR" == "true" ]]; then
     git fetch origin
     git checkout "$TARGET"
 
-    # Restore .env (react uses backend/.env)
+    # Restore .env (react uses backend/.env AND project root for systemd service)
     cp /home/god/Documents/.env "$PROJECT_DIR/backend/.env"
+    cp /home/god/Documents/.env "$PROJECT_DIR/.env"
 
     # Restore auth tokens
     for token_file in garmin_tokens.json oauth1_token.json .spotify_cache; do
@@ -131,23 +139,31 @@ if [[ "$NUCLEAR" == "true" ]]; then
     sudo systemctl daemon-reload
     sudo systemctl start pifitness-fastapi.service
 
-    # Start Next.js with PM2
+    # Start Next.js with PM2 (fresh environment)
     if ! command -v pm2 &> /dev/null; then
         sudo npm install -g pm2
     fi
-    pm2 delete pifitness-next 2>/dev/null || true
+    # Environment already clean, but we ensure no stale PM2 data
+    pm2 kill 2>/dev/null || true
+    rm -rf ~/.pm2
+    # Purge environment variables to prevent dev proxy leaks
+    unset NEXT_PUBLIC_API_URL
+    export NEXT_PUBLIC_APP_ENV=production
     pm2 start npm --name pifitness-next -- run start -- --port 3000
     pm2 save --force
 
-    # Configure nginx for port 8000 (API) + 3000 (Next.js)
-    NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
+    # Configure nginx using the dedicated React config (ports 8000 & 3000 already baked in)
+    NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
     NGINX_SITE="/etc/nginx/sites-available/pifitness"
-    sudo sed "s/FASTAPI_PORT/8000/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
+    sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE"
     if [[ ! -f "/etc/nginx/sites-enabled/pifitness" ]]; then
         sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness
     fi
     sudo rm -f /etc/nginx/sites-enabled/streamlit 2>/dev/null || true
-    sudo nginx -t && sudo systemctl reload nginx
+    if ! sudo nginx -t; then
+        error_exit "Nginx configuration test failed!"
+    fi
+    sudo systemctl reload nginx || error_exit "Failed to reload nginx."
 
     # Start agent timer
     sudo systemctl start pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
@@ -161,6 +177,12 @@ fi
 # ======================================================================
 if [[ "$FAST" == "true" ]]; then
     info "=== FAST MODE ==="
+
+    # Ensure any previous Streamlit deployment is shut down
+    info "Stopping any lingering Streamlit services..."
+    sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
+    lsof -ti :8501 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+
     cd "$PROJECT_DIR"
 
     # Fetch latest from origin
@@ -170,43 +192,40 @@ if [[ "$FAST" == "true" ]]; then
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     if [[ "$CURRENT_BRANCH" != "$TARGET" ]]; then
         info "Switching from '$CURRENT_BRANCH' to '$TARGET'..."
-        # Force checkout to discard any local changes from the previous branch
         git checkout --force "$TARGET"
     fi
 
     # Force alignment of other components if we just switched branches, even with no code changes
     if [[ "$CURRENT_BRANCH" != "$TARGET" ]]; then
         info "Switching branches. Forcing full restart & nginx realignment..."
-        # Force stop Streamlit
         sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
         
-        # Pull master .env to react backend folder
         cp /home/god/Documents/.env "$PROJECT_DIR/backend/.env" 2>/dev/null || true
         
-        # Start FastAPI
         sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
         sudo systemctl start pifitness-fastapi.service
         
-        # Restart Next.js under PM2 (always fresh)
+        # Clear PM2 data completely and start fresh
         pm2 delete pifitness-next 2>/dev/null || true
+        rm -f ~/.pm2/dump.pm2
         cd "$FRONTEND_DIR"
-        
-        # Purge environment variables to prevent dev proxy leaks
         unset NEXT_PUBLIC_API_URL
         export NEXT_PUBLIC_APP_ENV=production
-        
         pm2 start npm --name pifitness-next -- run start -- --port 3000
         pm2 save --force
         cd "$PROJECT_DIR"
         
         # Update nginx config
-        NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
+        NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
         NGINX_SITE="/etc/nginx/sites-available/pifitness"
         if [[ -f "$NGINX_TEMPLATE" ]]; then
-            sudo sed "s/FASTAPI_PORT/8000/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
+            sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE"
             sudo rm -f /etc/nginx/sites-enabled/streamlit 2>/dev/null || true
             sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness 2>/dev/null || true
-            sudo nginx -t && sudo systemctl reload nginx
+            if ! sudo nginx -t; then
+                error_exit "Nginx configuration test failed!"
+            fi
+            sudo systemctl reload nginx || error_exit "Failed to reload nginx."
         fi
         info "Services and nginx realigned for react-ui."
         exit 0
@@ -217,12 +236,10 @@ if [[ "$FAST" == "true" ]]; then
 
     if [[ -z "$CHANGED_FILES" ]]; then
         info "No code changes detected. Verifying services are running..."
-        # Ensure FastAPI service is running (may have been stopped after branch switch)
         FASTAPI_ACTIVE=false
         if sudo systemctl is-active --quiet pifitness-fastapi.service; then
             FASTAPI_ACTIVE=true
         fi
-        # Ensure Next.js/PM2 is running
         PM2_ACTIVE=false
         if pm2 show pifitness-next 2>/dev/null | grep -q "status.*online"; then
             PM2_ACTIVE=true
@@ -230,13 +247,15 @@ if [[ "$FAST" == "true" ]]; then
 
         if [[ "$FASTAPI_ACTIVE" == "true" && "$PM2_ACTIVE" == "true" ]]; then
             info "FastAPI and Next.js services already running."
-            # Confirm Nginx is correctly routed anyway (defensive measure)
             NGINX_SITE="/etc/nginx/sites-available/pifitness"
             if [[ -f "$NGINX_SITE" ]] && ! grep -q ":8000;" "$NGINX_SITE"; then
                 info "Correcting Nginx routing to port 8000..."
-                NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
-                sudo sed "s/FASTAPI_PORT/8000/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
-                sudo nginx -t && sudo systemctl reload nginx
+                NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
+                sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE"
+                if ! sudo nginx -t; then
+                    error_exit "Nginx configuration test failed!"
+                fi
+                sudo systemctl reload nginx || error_exit "Failed to reload nginx."
             fi
         else
             if [[ "$FASTAPI_ACTIVE" == "false" ]]; then
@@ -246,18 +265,18 @@ if [[ "$FAST" == "true" ]]; then
             if [[ "$PM2_ACTIVE" == "false" ]]; then
                 info "Next.js not running. Starting it..."
                 cd "$FRONTEND_DIR"
-                # Purge environment variables to prevent dev proxy leaks
                 unset NEXT_PUBLIC_API_URL
                 export NEXT_PUBLIC_APP_ENV=production
+                # Clear any old PM2 state before starting
+                rm -f ~/.pm2/dump.pm2
                 pm2 start npm --name pifitness-next -- run start -- --port 3000
                 pm2 save --force
                 cd "$PROJECT_DIR"
             fi
-            # Ensure nginx is configured for react
-            NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
+            NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
             NGINX_SITE="/etc/nginx/sites-available/pifitness"
             if [[ -f "$NGINX_TEMPLATE" ]]; then
-                sudo sed "s/FASTAPI_PORT/8000/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null 2>/dev/null || true
+                sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE" 2>/dev/null || true
                 sudo nginx -t 2>/dev/null && sudo systemctl reload nginx 2>/dev/null || true
             fi
             info "Services verified and started."
@@ -268,14 +287,11 @@ if [[ "$FAST" == "true" ]]; then
     info "Changed files:"
     echo "$CHANGED_FILES"
 
-    # Reset to match origin exactly (safer than pull which can fail on diverged branches)
     git reset --hard origin/"$TARGET"
 
-    # Purge Python bytecode always
     find "$PROJECT_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
     find "$PROJECT_DIR" -type f -name "*.pyc" -exec rm -f {} + 2>/dev/null || true
 
-    # Check if only non-app files changed
     ONLY_CONFIG=true
     BACKEND_CHANGED=false
     FRONTEND_CHANGED=false
@@ -302,14 +318,10 @@ if [[ "$FAST" == "true" ]]; then
         exit 0
     fi
 
-    # Copy .env (react uses backend/.env)
     cp /home/god/Documents/.env "$PROJECT_DIR/backend/.env" 2>/dev/null || true
-
-    # Purge environment variables to prevent dev proxy leaks
     unset NEXT_PUBLIC_API_URL
     export NEXT_PUBLIC_APP_ENV=production
 
-    # Restart based on what changed
     if [[ "$BACKEND_CHANGED" == "true" && "$FRONTEND_CHANGED" == "false" ]]; then
         info "Backend-only changes detected. Restarting FastAPI only..."
         sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
@@ -323,6 +335,7 @@ if [[ "$FAST" == "true" ]]; then
         rm -rf .next
         npm run build
         pm2 delete pifitness-next 2>/dev/null || true
+        rm -f ~/.pm2/dump.pm2
         pm2 start npm --name pifitness-next -- run start -- --port 3000
         pm2 save --force
         cd "$PROJECT_DIR"
@@ -335,6 +348,7 @@ if [[ "$FAST" == "true" ]]; then
         rm -rf .next
         npm run build
         pm2 delete pifitness-next 2>/dev/null || true
+        rm -f ~/.pm2/dump.pm2
         pm2 start npm --name pifitness-next -- run start -- --port 3000
         pm2 save --force
         cd "$PROJECT_DIR"
@@ -343,7 +357,6 @@ if [[ "$FAST" == "true" ]]; then
         info "Both services restarted."
     fi
 
-    # Always reload nginx to clear any cached config
     sudo nginx -t 2>/dev/null && sudo systemctl reload nginx 2>/dev/null || true
 
     info "Fast deployment of react-ui completed."
@@ -359,17 +372,15 @@ info "=== FULL DEPLOY MODE ==="
 info "Stopping any running services..."
 rm -f /tmp/*.sock /tmp/*.pid 2>/dev/null || true
 
-# Stop agent
 sudo systemctl stop pifitness_agent.service 2>/dev/null || true
 sudo systemctl stop pifitness_agent.timer 2>/dev/null || true
-
-# Stop app processes
 sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
 sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
 pm2 delete pifitness-next 2>/dev/null || true
+# Clear PM2 saved state
+rm -f ~/.pm2/dump.pm2
 sleep 2
 
-# Force-kill lingering
 pkill -9 -f "uvicorn" 2>/dev/null || true
 pkill -9 -f "streamlit run" 2>/dev/null || true
 pkill -9 -f "next" 2>/dev/null || true
@@ -391,7 +402,6 @@ cd "$PROJECT_DIR"
 [ -f backend/.env ] && cp backend/.env /tmp/.env.backup || true
 [ -f .env ] && cp .env /tmp/.env.root.backup || true
 
-# Auth tokens
 for token_file in garmin_tokens.json oauth1_token.json .spotify_cache; do
     [ -f "$PROJECT_DIR/$token_file" ] && cp "$PROJECT_DIR/$token_file" "/tmp/${token_file}.backup" || true
 done
@@ -462,18 +472,19 @@ if ! command -v pm2 &> /dev/null; then
     sudo npm install -g pm2
 fi
 
-# Purge environment variables to prevent dev proxy leaks
+# Purge environment variables and any old PM2 state
 unset NEXT_PUBLIC_API_URL
 export NEXT_PUBLIC_APP_ENV=production
+# Wipe PM2 saved state to guarantee no stale env vars
+rm -rf ~/.pm2
 
 info "Cleaning up previous Next.js build artifacts..."
 rm -rf .next
-pm2 delete pifitness-next 2>/dev/null || true
 
 info "Building Next.js application..."
 npm run build
 
-# Start Next.js with PM2
+# Start Next.js with PM2 (fresh PM2 state)
 pm2 start npm --name pifitness-next -- run start -- --port 3000
 pm2 save --force
 
@@ -490,14 +501,14 @@ TARGET_PORT=8000
 
 # --- 12. Update nginx configuration ---
 info "Updating nginx configuration..."
-NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-template.conf"
+NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
 NGINX_SITE="/etc/nginx/sites-available/pifitness"
 
 if [[ ! -f "$NGINX_TEMPLATE" ]]; then
     error_exit "Nginx template not found at $NGINX_TEMPLATE"
 fi
 
-sudo sed "s/FASTAPI_PORT/${TARGET_PORT}/g" "$NGINX_TEMPLATE" | sudo tee "$NGINX_SITE" > /dev/null
+sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE"
 
 if ! grep -q ":${TARGET_PORT};" "$NGINX_SITE"; then
     error_exit "Failed to update nginx configuration with port ${TARGET_PORT}"
@@ -507,7 +518,6 @@ if [[ ! -f "/etc/nginx/sites-enabled/pifitness" ]]; then
     sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness
 fi
 
-# Remove stale streamlit symlink if it exists
 sudo rm -f /etc/nginx/sites-enabled/streamlit 2>/dev/null || true
 
 info "Testing nginx configuration..."
