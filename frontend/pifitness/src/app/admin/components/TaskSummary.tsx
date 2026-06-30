@@ -38,11 +38,13 @@ function toNumber(value: any): number | null {
 
 function formatRelativeTime(seconds: number | null): string {
   if (seconds === null || seconds === undefined) return '-';
-  if (seconds < 0) return 'overdue';
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
-  return `${Math.floor(seconds / 86400)} days ago`;
+  const absSeconds = Math.abs(seconds);
+  const prefix = seconds < 0 ? 'in ' : '';
+  const suffix = seconds > 0 ? ' ago' : '';
+  if (absSeconds < 60) return `${prefix}just now${suffix}`;
+  if (absSeconds < 3600) return `${prefix}${Math.floor(absSeconds / 60)} min${suffix}`;
+  if (absSeconds < 86400) return `${prefix}${Math.floor(absSeconds / 3600)} hours${suffix}`;
+  return `${prefix}${Math.floor(absSeconds / 86400)} days${suffix}`;
 }
 
 function formatExactTime(iso: string | null): string {
@@ -121,8 +123,8 @@ export default function TaskSummary() {
         computedSuccessPercentage = (successCount / executionCount) * 100;
       }
 
-      const timeAgoExecution = executionMinutesAgo !== null ? Math.abs(executionMinutesAgo) * 60 : null;
-      const timeAgoNext = nextPlannedMinutes !== null ? Math.abs(nextPlannedMinutes) * 60 : null;
+      const timeAgoExecution = executionMinutesAgo !== null ? executionMinutesAgo * 60 : null;
+      const timeAgoNext = nextPlannedMinutes !== null ? nextPlannedMinutes * 60 : null;
 
       const totalDurationMs = [
         r.login_ms, r.extract_ms, r.load_ms, r.flatten_ms, r.parse_ms,

@@ -497,6 +497,22 @@ def to_params(param_list=None, search_val=None, replace_val=None, return_type='l
     else:
         return ", ".join(rb_list)
 
+def execute_task_by_name(task_name: str):
+    """
+    Execute a single task by name via forced execution through the task executioner.
+    
+    Args:
+        task_name: The exact task_name from tasks.task_config to execute immediately
+        
+    Returns:
+        None (task results are logged to task_executions table)
+        
+    Raises:
+        ValueError: If task_name is not found in the task execution view
+    """
+    task_executioner(force_task_name=task_name, force_task=True)
+
+
 def default_range():
     d2 = date.today()
     d1 = d2 - timedelta(days=1)
