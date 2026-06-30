@@ -498,33 +498,13 @@ def get_log_data_simple(log_table: str, limit: int = 100) -> Sequence[Dict[str, 
         limit (int): Maximum number of rows to return.
 
     Returns:
-        Sequence[Dict[str, Any]]: List of log records with NaN values
-        converted to None for JSON-safe serialization.
+        Sequence[Dict[str, Any]]: List of log records.
+        NULL database values are returned as None (no NaN conversion needed).
     """
     from backend_functions.database_functions import get_log_data
-    df = get_log_data(log_table)
-    if df.empty:
-        return []
-    records = df.head(limit).to_dict('records')
-
-    # Convert NaN/Inf to None for JSON-safe serialization.
-    # NULL DB columns become float NaN when pandas reads them.
-    cleaned: List[Dict[str, Any]] = []
-    for record in records:
-        clean_row: Dict[str, Any] = {}
-        for key, value in record.items():
-            if value is None:
-                clean_row[str(key)] = None
-            elif isinstance(value, float):
-                if math.isnan(value) or math.isinf(value):
-                    clean_row[str(key)] = None
-                else:
-                    clean_row[str(key)] = value
-            else:
-                clean_row[str(key)] = value
-        cleaned.append(clean_row)
-
-    return cast(List[Dict[str, Any]], cleaned)
+    logs = get_log_data(log_table)
+    # sql_to_dict() returns None for NULL values, no pandas NaN cleanup needed
+    return logs[:limit] if logs else []
 
 
 # ---------------------------------------------------------------------------

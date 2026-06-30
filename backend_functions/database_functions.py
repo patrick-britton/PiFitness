@@ -1,6 +1,5 @@
 import os
 from datetime import datetime
-import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 import psycopg2
@@ -199,9 +198,17 @@ def get_log_tables(as_list=False):
 
 
 def get_log_data(table_name):
+    """
+    Get log data from a specific log table.
+    
+    Args:
+        table_name: Name of the log table in logging schema
+        
+    Returns:
+        List[Dict[str, Any]]: List of log records with NULL values as None
+    """
     sql = f"""SELECT *, time_ago(event_time_utc) as event_age FROM logging.{table_name} ORDER BY event_time_utc DESC"""
-    df = pd.read_sql(sql=sql, con=get_conn(alchemy=True))
-    return df
+    return sql_to_dict(sql)
 
 
 def get_table_row_count(pg_schema, pg_table, fact_col):
