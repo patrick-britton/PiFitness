@@ -138,6 +138,11 @@ export const API = {
       const params = limit ? `?limit=${limit}` : "";
       return fetchAPI<ApiListResponse<any>>(`/api/admin/logs/data/${encodeURIComponent(tableName)}${params}`);
     },
+
+    // DB Info (Charting)
+    getTaskSummaryChart: () => fetchAPI<ApiListResponse<any>>("/api/admin/db-info/task-summary"),
+    getDbSizeChart: () => fetchAPI<ApiListResponse<any>>("/api/admin/db-info/db-size-chart"),
+    getDbSizeBreakdown: () => fetchAPI<ApiListResponse<any>>("/api/admin/db-info/db-size-breakdown"),
   },
 
   /**

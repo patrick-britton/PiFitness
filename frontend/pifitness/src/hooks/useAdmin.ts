@@ -24,6 +24,9 @@ export const adminKeys = {
   credentialRequirements: () => [...adminKeys.all, "credentials", "requirements"] as const,
   logTables: () => [...adminKeys.all, "logs", "tables"] as const,
   logData: (tableName: string) => [...adminKeys.all, "logs", "data", tableName] as const,
+  taskSummaryChart: () => [...adminKeys.all, "db-info", "task-summary"] as const,
+  dbSizeChart: () => [...adminKeys.all, "db-info", "db-size-chart"] as const,
+  dbSizeBreakdown: () => [...adminKeys.all, "db-info", "db-size-breakdown"] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -312,6 +315,43 @@ export function useDeleteCredentials() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.credentialRequirements() });
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// DB Info (Charting) Hooks
+// ---------------------------------------------------------------------------
+
+/**
+ * Hook to fetch task summary chart data for DB Info.
+ */
+export function useTaskSummaryChart() {
+  return useQuery({
+    queryKey: adminKeys.taskSummaryChart(),
+    queryFn: () => API.admin.getTaskSummaryChart(),
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Hook to fetch historical DB size chart data.
+ */
+export function useDbSizeChart() {
+  return useQuery({
+    queryKey: adminKeys.dbSizeChart(),
+    queryFn: () => API.admin.getDbSizeChart(),
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * Hook to fetch current DB size breakdown data.
+ */
+export function useDbSizeBreakdown() {
+  return useQuery({
+    queryKey: adminKeys.dbSizeBreakdown(),
+    queryFn: () => API.admin.getDbSizeBreakdown(),
+    staleTime: 60_000,
   });
 }
 
