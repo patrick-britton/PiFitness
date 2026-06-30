@@ -14,23 +14,23 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import DBInfo from './components/DBInfo';
 import TaskList from './components/TaskList';
 import DBSessions from './components/DBSessions';
 import EventHistory from './components/EventHistory';
 import ServiceConfig from './components/ServiceConfig';
 import CredentialManager from './components/CredentialManager';
-import RawLogViewer from './components/RawLogViewer';
 
 /**
  * Tab configuration
  */
 const TABS = [
+  { id: 'db-info', label: 'DB Info', icon: '📊', component: DBInfo },
   { id: 'tasks', label: 'Tasks', icon: '⚙️', component: TaskList },
   { id: 'sessions', label: 'DB Sessions', icon: '🛢️', component: DBSessions },
   { id: 'events', label: 'Events', icon: '📋', component: EventHistory },
   { id: 'services', label: 'Services', icon: '🔌', component: ServiceConfig },
   { id: 'credentials', label: 'Credentials', icon: '🔐', component: CredentialManager },
-  { id: 'logs', label: 'Raw Logs', icon: '📈', component: RawLogViewer },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -39,7 +39,7 @@ type TabId = (typeof TABS)[number]['id'];
  * Admin page with tab navigation
  */
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('tasks');
+  const [activeTab, setActiveTab] = useState<TabId>('db-info');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleTabChange = useCallback((tabId: TabId) => {
