@@ -64,6 +64,9 @@ from .admin_queries import (
     get_log_tables_simple,
     get_log_data_simple,
     update_task_configuration,
+    get_task_summary_chart,
+    get_db_size_chart,
+    get_db_size_breakdown,
 )
 from .activities_queries import (
     get_activities_list,
@@ -129,6 +132,9 @@ __all__ = [
     'get_log_tables_simple',
     'get_log_data_simple',
     'update_task_configuration',
+    'get_task_summary_chart',
+    'get_db_size_chart',
+    'get_db_size_breakdown',
     # Activities
     'get_activities_list',
     'get_activity_by_id',
