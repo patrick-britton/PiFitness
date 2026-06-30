@@ -11,7 +11,15 @@ import time
 
 from backend_functions.helper_functions import list_to_dict_by_key
 
-load_dotenv()
+# Load .env from project root and backend/ subdirectory.
+# load_dotenv() does NOT override already-set environment variables.
+load_dotenv()  # Try CWD (project root) first
+_load_dotenv_backend = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backend', '.env')
+if os.path.exists(_load_dotenv_backend):
+    load_dotenv(_load_dotenv_backend, override=False)
+
+# Import config for platform-aware DB host detection
+from backend.config import get_settings
 
 
 def start_timer():
@@ -22,26 +30,35 @@ def elapsed_ms(start_time):
     return int((time.perf_counter() - start_time) * 1000)
 
 
+def get_settings_for_db():
+    """Get platform-aware DB settings, favoring existing env vars if set."""
+    settings = get_settings()
+    return {
+        "host": os.getenv("PG_HOST") or settings.db_host,
+        "port": int(os.getenv("PG_PORT", str(settings.db_port))),
+        "dbname": os.getenv("PG_DB") or settings.db_name,
+        "user": os.getenv("PG_USER") or settings.db_user,
+        "password": os.getenv("PG_PASSWORD") or settings.db_password,
+        "sslmode": os.getenv("PGSSLMODE") or settings.db_sslmode,
+    }
+
+
 def get_conn(alchemy=False):
     # returns the raw psycopg2 connection unless pandas/alchemy is requested.
+    db = get_settings_for_db()
 
     if alchemy:
-        host = os.getenv("PG_HOST")
-        port = os.getenv("PG_PORT")
-        dbname = os.getenv("PG_DB")
-        user = os.getenv("PG_USER")
-        password = os.getenv("PG_PASSWORD")
-        conn_str = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}"
+        conn_str = f"postgresql+psycopg2://{db['user']}:{db['password']}@{db['host']}:{db['port']}/{db['dbname']}"
         engine = create_engine(conn_str)
         return engine
     else:
         c = psycopg2.connect(
-            host=os.getenv("PG_HOST"),
-            port=os.getenv("PG_PORT"),
-            dbname=os.getenv("PG_DB"),
-            user=os.getenv("PG_USER"),
-            password=os.getenv("PG_PASSWORD"),
-            sslmode=os.getenv("PGSSLMODE", "disable")
+            host=db["host"],
+            port=db["port"],
+            dbname=db["dbname"],
+            user=db["user"],
+            password=db["password"],
+            sslmode=db["sslmode"],
         )
         return c
 

@@ -31,7 +31,10 @@ from backend_functions.queries import (
     delete_fact_configuration,
     upsert_fact_configuration,
     update_task_configuration,
-    kill_db_session
+    kill_db_session,
+    get_task_summary_chart,
+    get_db_size_chart,
+    get_db_size_breakdown,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -596,6 +599,60 @@ async def get_log_tables_endpoint():
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch log tables: {str(e)}",
+        )
+
+
+@router.get("/db-info/task-summary")
+async def get_task_summary():
+    """
+    Get task summary chart data.
+
+    Returns:
+        List of task summary records with timing, execution count, and recency details
+    """
+    try:
+        data = get_task_summary_chart()
+        return {"data": data, "count": len(data)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task summary chart: {str(e)}",
+        )
+
+
+@router.get("/db-info/db-size-chart")
+async def get_db_size_history():
+    """
+    Get historical database size growth data.
+
+    Returns:
+        List of records with date_utc, table_size_mb, index_size_mb, other_size_mb
+    """
+    try:
+        data = get_db_size_chart()
+        return {"data": data, "count": len(data)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch DB size chart: {str(e)}",
+        )
+
+
+@router.get("/db-info/db-size-breakdown")
+async def get_db_size_breakdown_endpoint():
+    """
+    Get current database size breakdown by table.
+
+    Returns:
+        List of records with table_name, table_size_mb, index_size_mb, other_size_mb
+    """
+    try:
+        data = get_db_size_breakdown()
+        return {"data": data, "count": len(data)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch DB size breakdown: {str(e)}",
         )
 
 

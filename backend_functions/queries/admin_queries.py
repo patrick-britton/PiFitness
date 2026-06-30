@@ -386,6 +386,53 @@ def kill_db_session(pid: int) -> Union[str, List[str], None]:
 
 
 # ---------------------------------------------------------------------------
+# DB Info — Task Summary Chart
+# ---------------------------------------------------------------------------
+
+def get_task_summary_chart() -> Sequence[Dict[str, Any]]:
+    """
+    Retrieve task summary chart data from the database.
+
+    Returns:
+        Sequence[Dict[str, Any]]: List of task summary records with timing,
+        execution count, and recency details from tasks.vw_task_summary_chart.
+    """
+    sql = "SELECT * FROM tasks.vw_task_summary_chart"
+    result = sql_to_dict(sql)
+    return result if result else []
+
+
+# ---------------------------------------------------------------------------
+# DB Info — Database Size
+# ---------------------------------------------------------------------------
+
+def get_db_size_chart() -> Sequence[Dict[str, Any]]:
+    """
+    Retrieve historical database size growth data.
+
+    Returns:
+        Sequence[Dict[str, Any]]: List of records with date_utc, table_size_mb,
+        index_size_mb, other_size_mb, total_size_mb from logging.vw_db_size_chart.
+    """
+    sql = "SELECT * FROM logging.vw_db_size_chart ORDER BY date_utc ASC"
+    result = sql_to_dict(sql)
+    return result if result else []
+
+
+def get_db_size_breakdown() -> Sequence[Dict[str, Any]]:
+    """
+    Retrieve current database size breakdown by table.
+
+    Returns:
+        Sequence[Dict[str, Any]]: List of records with table_name, table_size_mb,
+        index_size_mb, other_size_mb, total_size_mb from logging.vw_db_size.
+    """
+    sql = "SELECT * FROM logging.vw_db_size ORDER BY total_size_mb DESC"
+    result = sql_to_dict(sql)
+    return result if result else []
+
+
+# ---------------------------------------------------------------------------
 # Log & Event History
 # ---------------------------------------------------------------------------
 
@@ -502,4 +549,7 @@ __all__ = [
     'get_log_tables_simple',
     'get_log_data_simple',
     'update_task_configuration',
+    'get_task_summary_chart',
+    'get_db_size_chart',
+    'get_db_size_breakdown',
 ]

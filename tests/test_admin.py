@@ -71,3 +71,39 @@ def test_admin_events_with_filters():
     if data["count"] > 0:
         assert isinstance(data["data"], list)
         assert len(data["data"]) <= 50
+
+def test_admin_db_info_task_summary():
+    """Test GET /api/admin/db-info/task-summary returns successfully."""
+    response = client.get("/api/admin/db-info/task-summary")
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    assert "count" in data
+    assert isinstance(data["count"], int)
+    if data["count"] > 0:
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) > 0
+
+def test_admin_db_info_db_size_chart():
+    """Test GET /api/admin/db-info/db-size-chart returns successfully."""
+    response = client.get("/api/admin/db-info/db-size-chart")
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    assert "count" in data
+    assert isinstance(data["count"], int)
+    if data["count"] > 0:
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) > 0
+
+def test_admin_db_info_db_size_breakdown():
+    """Test GET /api/admin/db-info/db-size-breakdown returns successfully."""
+    response = client.get("/api/admin/db-info/db-size-breakdown")
+    assert response.status_code == 200
+    data = response.json()
+    assert "data" in data
+    assert "count" in data
+    assert isinstance(data["count"], int)
+    if data["count"] > 0:
+        assert isinstance(data["data"], list)
+        assert len(data["data"]) > 0
