@@ -69,6 +69,7 @@ from .admin_queries import (
     get_db_size_breakdown,
     get_task_logs,
     insert_task_configuration,
+    get_task_performance_data,
 )
 from .activities_queries import (
     get_activities_list,
@@ -139,6 +140,7 @@ __all__ = [
     'get_db_size_breakdown',
     'get_task_logs',
     'insert_task_configuration',
+    'get_task_performance_data',
     # Activities
     'get_activities_list',
     'get_activity_by_id',

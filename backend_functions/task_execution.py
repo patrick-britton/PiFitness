@@ -17,6 +17,17 @@ def task_executioner(force_task_name=None, force_task=False):
     task_dict = sql_to_dict(query_str=task_sql)
     all_task_start = start_timer()
 
+    # Create a mapping of task_name to task_id for task_log calls
+    task_id_mapping = {}
+    if task_dict:
+        task_names = [task.get('task_name') for task in task_dict if task.get('task_name')]
+        if task_names:
+            id_sql = f"""SELECT task_name, task_id FROM tasks.task_config
+                        WHERE task_name = ANY(%s)"""
+            id_results = sql_to_dict(id_sql, params=(task_names,))
+            for row in id_results:
+                task_id_mapping[row.get('task_name')] = row.get('task_id')
+
     client_dict = None
     svc_function_name = None
     recency_ctr = 0
@@ -99,6 +110,7 @@ def task_executioner(force_task_name=None, force_task=False):
                 local_function()
                 if svc_function_name not in independent_logging_functions:
                     task_log(task.get("task_name"),
+                             task_id_mapping.get(task.get("task_name")),
                              e_time=None,
                              l_time=None,
                              t_time=elapsed_ms(pf_t0))
@@ -110,6 +122,7 @@ def task_executioner(force_task_name=None, force_task=False):
                 print(f"Logging Failure for {task_name}: {e}")
 
                 task_log(task.get("task_name"),
+                         task_id_mapping.get(task.get("task_name")),
                          e_time=None,
                          l_time=None,
                          t_time=elapsed_ms(pf_t0),
@@ -139,6 +152,7 @@ def task_executioner(force_task_name=None, force_task=False):
                 # skip task if there's an invalid client
                 if not client:
                     task_log(task.get("task_name"),
+                         task_id_mapping.get(task.get("task_name")),
                          fail_type='Connection', fail_text='No Valid client')
                     continue
 
@@ -181,7 +195,7 @@ def task_executioner(force_task_name=None, force_task=False):
                 extract_time = elapsed_ms(extract_start)
             except Exception as e:
                 extract_time = elapsed_ms(extract_start)
-                task_log(task.get("task_name"), e_time=extract_time, fail_type='extract', fail_text=str(e))
+                task_log(task.get("task_name"), task_id_mapping.get(task.get("task_name")), e_time=extract_time, fail_type='extract', fail_text=str(e))
                 failure_ctr += 1
                 continue
             print(f"Extract: {extract_time}")
@@ -197,6 +211,7 @@ def task_executioner(force_task_name=None, force_task=False):
             except Exception as e:
                 load_time = elapsed_ms(load_start)
                 task_log(task.get("task_name"),
+                         task_id_mapping.get(task.get("task_name")),
                          e_time=extract_time,
                          l_time=load_time,
                          fail_type='load_time', fail_text=str(e))
@@ -213,6 +228,7 @@ def task_executioner(force_task_name=None, force_task=False):
             if sproc is None:
                 t_time = elapsed_ms(t_start)
                 task_log(task.get("task_name"),
+                         task_id_mapping.get(task.get("task_name")),
                          e_time=extract_time,
                          l_time=load_time,
                          t_time=t_time)
@@ -223,6 +239,7 @@ def task_executioner(force_task_name=None, force_task=False):
                     qec(call_sql, auto_commit=True)
                     t_time = elapsed_ms(t_start)
                     task_log(task.get("task_name"),
+                         task_id_mapping.get(task.get("task_name")),
                          e_time=extract_time,
                          l_time=load_time,
                          t_time=t_time)
@@ -279,16 +296,17 @@ def task_executioner(force_task_name=None, force_task=False):
     return
 
 
-def task_log(task_name=None, e_time=None, l_time=None, t_time=None, fail_type=None, fail_text=None):
+def task_log(task_name=None, task_id=None, e_time=None, l_time=None, t_time=None, fail_type=None, fail_text=None):
     insert_sql = """INSERT INTO logging.task_executions (
+                              task_id,
                               task_name,
                               extract_time_ms,
                               load_time_ms,
                               transform_time_ms,
                               failure_type,
                               error_text) VALUES (
-     %s, %s, %s, %s, %s, %s)"""
-    params = (task_name, e_time, l_time, t_time, fail_type, fail_text)
+     %s, %s, %s, %s, %s, %s, %s)"""
+    params = (task_id, task_name, e_time, l_time, t_time, fail_type, fail_text)
     qec(insert_sql, params)
     return
 

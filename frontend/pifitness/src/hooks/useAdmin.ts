@@ -16,6 +16,7 @@ export const adminKeys = {
   tasks: () => [...adminKeys.all, "tasks"] as const,
   taskSchedule: () => [...adminKeys.all, "tasks", "schedule"] as const,
   taskNames: () => [...adminKeys.all, "tasks", "names"] as const,
+  taskPerformance: (taskId: number) => [...adminKeys.all, "tasks", taskId, "performance"] as const,
   events: (filters?: Record<string, unknown>) =>
     [...adminKeys.all, "events", filters] as const,
   dbSessions: () => [...adminKeys.all, "db-sessions"] as const,
@@ -102,16 +103,16 @@ export function useUpdateTaskConfig() {
   return useMutation({
     mutationFn: ({ taskId, config }: { 
       taskId: number; 
-      config: { 
-        task_frequency: string;
-        description?: string;
-        display_icon?: string;
-        priority?: number;
-        hours?: number;
-        interval_minutes?: number;
-        api_function?: string;
-        python_function?: string;
-      } 
+  config: {
+    task_frequency: string;
+    description?: string;
+    display_icon?: string;
+    priority?: number;
+    hours?: number;
+    interval_minutes?: number;
+    api_function?: string;
+    python_function?: string;
+  }
     }) =>
       API.admin.updateTaskConfig(taskId, config),
     onSuccess: () => {
@@ -147,7 +148,6 @@ export function useDeleteTaskConfig() {
         task_name: string; 
         description?: string; 
         task_frequency?: string;
-        is_active?: boolean;
         display_icon?: string;
         priority?: number;
         hours?: number;
@@ -184,6 +184,18 @@ export function useTaskLogs(taskId: number) {
   return useQuery({
     queryKey: [...adminKeys.all, "tasks", taskId, "logs"] as const,
     queryFn: () => API.admin.getTaskLogs(taskId),
+    enabled: !!taskId,
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Query to fetch task performance data for a specific task.
+ */
+export function useTaskPerformance(taskId: number | null) {
+  return useQuery({
+    queryKey: adminKeys.taskPerformance(taskId as number),
+    queryFn: () => API.admin.getTaskPerformance(taskId as number),
     enabled: !!taskId,
     staleTime: 30_000,
   });

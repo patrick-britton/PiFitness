@@ -12,7 +12,6 @@ from datetime import datetime
 import math
 from backend_functions.database_functions import qec, sql_to_dict, sql_to_list
 
-
 # ---------------------------------------------------------------------------
 # Service Management
 # ---------------------------------------------------------------------------
@@ -29,7 +28,6 @@ def get_api_service_list() -> Sequence[Dict[str, Any]]:
     result = sql_to_dict(sql)
     return result if result else []
 
-
 def get_distinct_api_service_names() -> List[str]:
     """
     Get distinct API service names.
@@ -39,7 +37,6 @@ def get_distinct_api_service_names() -> List[str]:
     """
     sql = "SELECT DISTINCT api_service_name FROM api_services.api_service_list"
     return sql_to_list(sql)
-
 
 def insert_api_service(service_name: str) -> Union[str, List[str], None]:
     """
@@ -54,7 +51,6 @@ def insert_api_service(service_name: str) -> Union[str, List[str], None]:
     sql = "INSERT INTO api_services.api_service_list (api_service_name) VALUES (%s)"
     return qec(sql, [service_name])
 
-
 def delete_api_service(service_name: str) -> Union[str, List[str], None]:
     """
     Delete an API service by name.
@@ -67,7 +63,6 @@ def delete_api_service(service_name: str) -> Union[str, List[str], None]:
     """
     sql = "DELETE FROM api_services.api_service_list WHERE api_service_name = %s"
     return qec(sql, [service_name])
-
 
 def get_function_library() -> Sequence[Dict[str, Any]]:
     """
@@ -82,7 +77,6 @@ def get_function_library() -> Sequence[Dict[str, Any]]:
     """
     result = sql_to_dict(sql)
     return result if result else []
-
 
 def insert_function_library_entry(fields: Dict[str, Any]) -> Union[str, List[str], None]:
     """
@@ -100,7 +94,6 @@ def insert_function_library_entry(fields: Dict[str, Any]) -> Union[str, List[str
     sql = f"INSERT INTO api_services.function_library ({columns}) VALUES ({placeholders})"
     return qec(sql, params)
 
-
 def update_function_library_entry(friendly_name: str, updates: Dict[str, Any]) -> Union[str, List[str], None]:
     """
     Update an existing entry in the function library.
@@ -117,7 +110,6 @@ def update_function_library_entry(friendly_name: str, updates: Dict[str, Any]) -
     sql = f"UPDATE api_services.function_library SET {set_clause} WHERE friendly_name = %s"
     return qec(sql, params)
 
-
 def delete_function_library_entry(friendly_name: str) -> Union[str, List[str], None]:
     """
     Delete an entry from the function library.
@@ -130,7 +122,6 @@ def delete_function_library_entry(friendly_name: str) -> Union[str, List[str], N
     """
     sql = "DELETE FROM api_services.function_library WHERE friendly_name = %s"
     return qec(sql, [friendly_name])
-
 
 # ---------------------------------------------------------------------------
 # Credential Management
@@ -147,7 +138,6 @@ def get_credential_requirements() -> Sequence[Dict[str, Any]]:
     sql = "SELECT api_service_name, api_credential_requirements FROM api_services.api_service_list"
     result = sql_to_dict(sql)
     return result if result else []
-
 
 def upsert_credentials(service_name: str, encrypted_credentials: str) -> Union[str, List[str], None]:
     """
@@ -168,7 +158,6 @@ def upsert_credentials(service_name: str, encrypted_credentials: str) -> Union[s
     """
     return qec(sql, (service_name, encrypted_credentials))
 
-
 def delete_credentials(service_name: str) -> Union[str, List[str], None]:
     """
     Delete credentials for a service.
@@ -181,7 +170,6 @@ def delete_credentials(service_name: str) -> Union[str, List[str], None]:
     """
     sql = "DELETE FROM api_services.credentials WHERE api_service_name = %s"
     return qec(sql, [service_name])
-
 
 # ---------------------------------------------------------------------------
 # Task Management
@@ -205,7 +193,6 @@ def get_task_configuration(task_id: Optional[int] = None) -> Sequence[Dict[str, 
         result = sql_to_dict(sql)
     return result if result else []
 
-
 def get_placeholder_task_id() -> Optional[int]:
     """
     Get the task_id for the 'placeholder_task' configuration entry.
@@ -217,7 +204,6 @@ def get_placeholder_task_id() -> Optional[int]:
     sql = "SELECT MIN(task_id) FROM tasks.task_configuration WHERE task_name = 'placeholder_task'"
     return one_sql_result(sql)
 
-
 def insert_placeholder_task() -> Union[str, List[str], None]:
     """
     Insert a placeholder task into task_configuration.
@@ -227,7 +213,6 @@ def insert_placeholder_task() -> Union[str, List[str], None]:
     """
     sql = "INSERT INTO tasks.task_configuration (task_name) VALUES (%s)"
     return qec(sql, ['placeholder_task'])
-
 
 def get_task_config_by_id(task_id: int) -> Optional[Dict[str, Any]]:
     """
@@ -242,7 +227,6 @@ def get_task_config_by_id(task_id: int) -> Optional[Dict[str, Any]]:
     sql = "SELECT * FROM tasks.task_configuration WHERE task_id = %s"
     result = sql_to_dict(sql, (task_id,))
     return result[0] if result else None
-
 
 def insert_task_configuration(fields: Dict[str, Any]) -> Union[str, List[str], None]:
     """
@@ -262,7 +246,6 @@ def insert_task_configuration(fields: Dict[str, Any]) -> Union[str, List[str], N
     sql = f"INSERT INTO tasks.task_configuration ({columns}) VALUES ({placeholders})"
     return qec(sql, params)
 
-
 def delete_task_configuration(task_id: int) -> Union[str, List[str], None]:
     """
     Delete a task configuration entry.
@@ -275,7 +258,6 @@ def delete_task_configuration(task_id: int) -> Union[str, List[str], None]:
     """
     sql = "DELETE FROM tasks.task_configuration WHERE task_id = %s"
     return qec(sql, (task_id,))
-
 
 def delete_fact_configuration(fact_id: int) -> Union[str, List[str], None]:
     """
@@ -290,21 +272,17 @@ def delete_fact_configuration(fact_id: int) -> Union[str, List[str], None]:
     sql = "DELETE FROM tasks.fact_configuration WHERE fact_id = %s"
     return qec(sql, (int(fact_id),))
 
-
-def update_task_configuration(task_id: int, is_active: bool, task_frequency: str, **kwargs) -> Union[str, List[str], None]:
+def update_task_configuration(task_id: int, task_frequency: str, **kwargs) -> Union[str, List[str], None]:
     """
     Update a task configuration entry.
 
     NOTE: The tasks.task_configuration table does NOT have an 'is_active' column.
-    Instead, the active/inactive state is represented by the task_frequency value:
+    The active/inactive state is represented by the task_frequency value:
     - Active tasks: task_frequency = 'Hourly', 'Daily', 'Weekly', 'Monthly'
     - Inactive tasks: task_frequency = 'Inactive'
 
     Args:
         task_id (int): The task ID to update.
-        is_active (bool): Whether the task should be active.
-            If True, task_frequency is used as provided.
-            If False, task_frequency is forced to 'Inactive'.
         task_frequency (str): The new frequency for the task.
         **kwargs: Additional fields to update (frontend names, mapped below).
 
@@ -312,10 +290,10 @@ def update_task_configuration(task_id: int, is_active: bool, task_frequency: str
         Union[str, List[str], None]: Error messages if any, None on success.
     """
     set_clauses = ["task_frequency = %s"]
-    # When is_active is False, force frequency to 'Inactive'
-    resolved_frequency = 'Inactive' if not is_active else task_frequency
+    # task_frequency alone determines active state
+    resolved_frequency = task_frequency
     params = [resolved_frequency]
-    
+
     # Map frontend field names to database column names
     # The task_configuration table uses legacy column names different from the React UI
     field_mapping = {
@@ -327,17 +305,16 @@ def update_task_configuration(task_id: int, is_active: bool, task_frequency: str
         'api_function': 'api_function_name',
         'python_function': 'python_execution_function',
     }
-    
+
     for key, db_field in field_mapping.items():
         if key in kwargs:
             set_clauses.append(f"{db_field} = %s")
             params.append(kwargs[key])
-    
+
     sql = f"UPDATE tasks.task_configuration SET {', '.join(set_clauses)} WHERE task_id = %s"
     params.append(str(task_id))
-    
-    return qec(sql, params)
 
+    return qec(sql, params)
 
 def upsert_fact_configuration(fields: Dict[str, Any], is_insert: bool = True,
                               fact_id: Optional[int] = None) -> Union[str, List[str], None]:
@@ -364,7 +341,6 @@ def upsert_fact_configuration(fields: Dict[str, Any], is_insert: bool = True,
         sql = f"UPDATE tasks.fact_configuration SET {set_clause} WHERE fact_id = %s"
         return qec(sql, params)
 
-
 def get_distinct_task_names() -> Sequence[str]:
     """
     Get distinct task names from the task execution view.
@@ -373,7 +349,6 @@ def get_distinct_task_names() -> Sequence[str]:
         Sequence[str]: List of distinct task names.
     """
     return sql_to_list("SELECT DISTINCT task_name FROM tasks.vw_task_execution ORDER BY task_name")
-
 
 def get_task_execution_view() -> Sequence[Dict[str, Any]]:
     """
@@ -386,7 +361,6 @@ def get_task_execution_view() -> Sequence[Dict[str, Any]]:
     result = sql_to_dict(sql)
     return result if result else []
 
-
 def get_task_scheduling_view() -> Sequence[Dict[str, Any]]:
     """
     Get the task scheduling view data (task_config table).
@@ -398,6 +372,46 @@ def get_task_scheduling_view() -> Sequence[Dict[str, Any]]:
     result = sql_to_dict(sql)
     return result if result else []
 
+# ---------------------------------------------------------------------------
+# Task Performance Monitoring
+# ---------------------------------------------------------------------------
+
+def get_task_performance_data(task_id: int) -> Sequence[Dict[str, Any]]:
+    """
+    Retrieve task performance data from the vw_task_performance view.
+
+    This view provides aggregated timing data for task execution events,
+    grouped by task_id and 30-minute time intervals.
+
+    Args:
+        task_id (int): The task ID to fetch performance data for.
+
+    Returns:
+        Sequence[Dict[str, Any]]: List of task performance records with timing
+        metrics for different execution phases (login, extract, load, etc.)
+        and the event_date timestamp.
+    """
+    sql = """
+        SELECT
+            task_id,
+            event_date,
+            login_ms,
+            extract_ms,
+            load_ms,
+            flatten_ms,
+            parse_ms,
+            interpolation_ms,
+            forecasting_ms,
+            python_ms,
+            admin_ms,
+            total_ms,
+            is_failure
+        FROM tasks.vw_task_performance
+        WHERE task_id = %s
+        ORDER BY event_date ASC
+    """
+    result = sql_to_dict(sql, (task_id,))
+    return result if result else []
 
 # ---------------------------------------------------------------------------
 # Database Session Monitoring
@@ -422,7 +436,6 @@ def get_active_db_sessions() -> Sequence[Dict[str, Any]]:
     result = sql_to_dict(sql)
     return result if result else []
 
-
 def kill_db_session(pid: int) -> Union[str, List[str], None]:
     """
     Terminate a database session by PID.
@@ -435,7 +448,6 @@ def kill_db_session(pid: int) -> Union[str, List[str], None]:
     """
     sql = "SELECT pg_terminate_backend(%s)"
     return qec(sql, (int(pid),))
-
 
 # ---------------------------------------------------------------------------
 # DB Info — Task Summary Chart
@@ -453,7 +465,6 @@ def get_task_summary_chart() -> Sequence[Dict[str, Any]]:
     result = sql_to_dict(sql)
     return result if result else []
 
-
 def get_task_logs(task_id: int, limit: int = 100) -> Sequence[Dict[str, Any]]:
     """
     Retrieve execution log entries for a specific task.
@@ -465,13 +476,12 @@ def get_task_logs(task_id: int, limit: int = 100) -> Sequence[Dict[str, Any]]:
     Returns:
         Sequence[Dict[str, Any]]: List of task execution log records from application_events.
     """
-    sql = """SELECT * FROM logging.application_events 
-             WHERE event_category LIKE %s 
-             ORDER BY event_time_utc DESC 
+    sql = """SELECT * FROM logging.application_events
+             WHERE event_category LIKE %s
+             ORDER BY event_time_utc DESC
              LIMIT %s"""
     result = sql_to_dict(sql, (f'%Task #{task_id}%', limit))
     return result if result else []
-
 
 # ---------------------------------------------------------------------------
 # DB Info — Database Size
@@ -489,7 +499,6 @@ def get_db_size_chart() -> Sequence[Dict[str, Any]]:
     result = sql_to_dict(sql)
     return result if result else []
 
-
 def get_db_size_breakdown() -> Sequence[Dict[str, Any]]:
     """
     Retrieve current database size breakdown by table.
@@ -501,7 +510,6 @@ def get_db_size_breakdown() -> Sequence[Dict[str, Any]]:
     sql = "SELECT * FROM logging.vw_db_size ORDER BY total_size_mb DESC"
     result = sql_to_dict(sql)
     return result if result else []
-
 
 # ---------------------------------------------------------------------------
 # Log & Event History
@@ -547,7 +555,6 @@ def get_event_history(search_val: Optional[str] = None,
     result = sql_to_dict(sql, params)
     return result if result else []
 
-
 def get_log_tables_simple() -> Sequence[str]:
     """
     Get list of log table names from the logging schema.
@@ -557,7 +564,6 @@ def get_log_tables_simple() -> Sequence[str]:
     """
     from backend_functions.database_functions import get_log_tables
     return list(get_log_tables())
-
 
 def get_log_data_simple(log_table: str, limit: int = 100) -> Sequence[Dict[str, Any]]:
     """
@@ -576,7 +582,6 @@ def get_log_data_simple(log_table: str, limit: int = 100) -> Sequence[Dict[str, 
     # sql_to_dict() returns None for NULL values, no pandas NaN cleanup needed
     return logs[:limit] if logs else []
 
-
 # ---------------------------------------------------------------------------
 # Task Execution (direct table queries)
 # ---------------------------------------------------------------------------
@@ -589,7 +594,6 @@ def insert_api_service_list_entry(service_name: str):
         service_name (str): Name of the service.
     """
     return insert_api_service(service_name)
-
 
 __all__ = [
     'get_api_service_list',
@@ -623,4 +627,5 @@ __all__ = [
     'get_db_size_chart',
     'get_db_size_breakdown',
     'get_task_logs',
+    'get_task_performance_data',
 ]

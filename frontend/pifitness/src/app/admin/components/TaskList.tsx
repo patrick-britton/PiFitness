@@ -10,6 +10,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTasks, useTaskSchedule, useTaskNames, useExecuteTask, useExecuteTaskV2, useUpdateTaskConfig, useDeleteTaskConfig, useTaskSummaryChart, useCreateTask, useTaskLogs, useTaskConfig, adminKeys } from '@/hooks/useAdmin';
 import TaskLogView from './TaskLogView';
+import TaskPerformanceChart from './TaskPerformanceChart';
 
 /**
  * Status badge component with color coding
@@ -77,7 +78,6 @@ function EditTaskDialog({
       { 
         taskId: task.task_id, 
         config: { 
-          is_active: frequency !== 'Inactive',
           task_frequency: frequency,
           description: description || undefined,
           display_icon: displayIcon || undefined,
@@ -234,6 +234,9 @@ function EditTaskDialog({
                 />
               </div>
             </div>
+
+            {/* Task Performance Chart */}
+            <TaskPerformanceChart taskId={task.task_id} />
 
             {/* Recent Execution Logs */}
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -997,7 +1000,6 @@ function CreateTaskForm({
         task_name: taskName,
         description: description || undefined,
         task_frequency: frequency,
-        is_active: frequency !== 'inactive',
         display_icon: displayIcon,
         priority: priority,
         hours: hours,
