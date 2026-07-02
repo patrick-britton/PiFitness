@@ -81,16 +81,44 @@ export function useExecuteTask() {
 }
 
 /**
+ * Mutation to execute a task by name using the enhanced v2 execution engine.
+ */
+export function useExecuteTaskV2() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (taskName: string) => API.admin.executeTaskV2(taskName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.taskSummaryChart() });
+    },
+  });
+}
+
+/**
  * Mutation to update a task configuration.
  */
 export function useUpdateTaskConfig() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ taskId, config }: { taskId: number; config: { is_active: boolean; task_frequency: string } }) =>
+    mutationFn: ({ taskId, config }: { 
+      taskId: number; 
+      config: { 
+        is_active: boolean; 
+        task_frequency: string;
+        description?: string;
+        display_icon?: string;
+        priority?: number;
+        hours?: number;
+        interval_minutes?: number;
+        api_function?: string;
+        python_function?: string;
+      } 
+    }) =>
       API.admin.updateTaskConfig(taskId, config),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.taskSchedule() });
       queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.taskSummaryChart() });
     },
   });
 }
@@ -104,7 +132,60 @@ export function useDeleteTaskConfig() {
     mutationFn: (taskId: number) => API.admin.deleteTaskConfig(taskId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.taskSchedule() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.taskNames() });
     },
+  });
+}
+
+/**
+ * Mutation to create a new task.
+ */
+export function useCreateTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (task: { 
+      task_name: string; 
+      description?: string; 
+      task_frequency?: string;
+      display_icon?: string;
+      priority?: number;
+      hours?: number;
+      interval_minutes?: number;
+      api_function?: string;
+      python_function?: string;
+    }) =>
+      API.admin.createTask(task),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.taskSchedule() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.taskNames() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.taskSummaryChart() });
+    },
+  });
+}
+
+/**
+ * Query to fetch full task configuration for a specific task (for edit dialog).
+ */
+export function useTaskConfig(taskId: number) {
+  return useQuery({
+    queryKey: [...adminKeys.all, "tasks", taskId, "config"] as const,
+    queryFn: () => API.admin.getTaskConfig(taskId),
+    enabled: !!taskId,
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * Query to fetch execution logs for a specific task.
+ */
+export function useTaskLogs(taskId: number) {
+  return useQuery({
+    queryKey: [...adminKeys.all, "tasks", taskId, "logs"] as const,
+    queryFn: () => API.admin.getTaskLogs(taskId),
+    enabled: !!taskId,
+    staleTime: 30_000,
   });
 }
 

@@ -35,6 +35,8 @@ from backend_functions.queries import (
     get_task_summary_chart,
     get_db_size_chart,
     get_db_size_breakdown,
+    get_task_logs,
+    insert_task_configuration,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -42,9 +44,15 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 # Pydantic models for request bodies
 class TaskConfigEdit(BaseModel):
-    task_id: int
     is_active: bool
     task_frequency: str
+    description: Optional[str] = None
+    display_icon: Optional[str] = None
+    priority: Optional[int] = None
+    hours: Optional[int] = None
+    interval_minutes: Optional[int] = None
+    api_function: Optional[str] = None
+    python_function: Optional[str] = None
 
 class FactConfigUpsert(BaseModel):
     fact_id: Optional[int] = None
@@ -142,6 +150,50 @@ async def execute_task(task_name: str):
             detail=f"Failed to execute task: {str(e)}",
         )
 
+@router.post("/tasks/v2/{task_name}/execute")
+def execute_task_v2(task_name: str):
+    """
+    Trigger execution of a background task using the enhanced v2 execution engine.
+
+    Args:
+        task_name: The name of the task to execute
+
+    Returns:
+        Execution result or error
+    """
+    try:
+        from backend_functions.ultimate_task_executioner_v2 import ultimate_task_executioner
+        from fastapi.responses import JSONResponse
+        
+        # Execute the task using the new v2 execution engine
+        # Returns per-task outcomes so the frontend can display success/failure
+        result = ultimate_task_executioner(force_task_name=task_name)
+        
+        # Determine overall status from results
+        if result and isinstance(result, dict):
+            results = result.get('results', [])
+            failed = [r for r in results if not r.get('success')]
+            if failed:
+                # Return 200 with failure details so the frontend can display them via onSuccess
+                return JSONResponse(
+                    status_code=200,
+                    content={
+                        "status": "error",
+                        "message": f"Task execution completed with {len(failed)} failure(s)",
+                        "failures": [{"task_id": r['task_id'], "task_name": r['task_name'], "error": r['error']} for r in failed]
+                    }
+                )
+            return {"status": "ok", "message": f"Task {task_name} executed successfully", "results": results}
+        
+        return {"status": "ok", "message": f"Task {task_name} executed successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to execute task with v2 engine: {str(e)}",
+        )
+
 
 @router.put("/tasks/{task_id}")
 async def update_task_configuration_endpoint(task_id: int, task_config: TaskConfigEdit):
@@ -156,10 +208,28 @@ async def update_task_configuration_endpoint(task_id: int, task_config: TaskConf
         Success message or error
     """
     try:
+        # Build kwargs dict with only provided (non-None) optional fields
+        kwargs = {}
+        if task_config.description is not None:
+            kwargs['description'] = task_config.description
+        if task_config.display_icon is not None:
+            kwargs['display_icon'] = task_config.display_icon
+        if task_config.priority is not None:
+            kwargs['priority'] = task_config.priority
+        if task_config.hours is not None:
+            kwargs['hours'] = task_config.hours
+        if task_config.interval_minutes is not None:
+            kwargs['interval_minutes'] = task_config.interval_minutes
+        if task_config.api_function is not None:
+            kwargs['api_function'] = task_config.api_function
+        if task_config.python_function is not None:
+            kwargs['python_function'] = task_config.python_function
+        
         result = update_task_configuration(
             task_id=task_id,
             is_active=task_config.is_active,
-            task_frequency=task_config.task_frequency
+            task_frequency=task_config.task_frequency,
+            **kwargs
         )
         if result:
             raise HTTPException(
@@ -599,6 +669,148 @@ async def get_log_tables_endpoint():
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch log tables: {str(e)}",
+        )
+
+
+@router.get("/tasks/{task_id}/logs")
+async def get_task_logs_endpoint(task_id: int, limit: int = 100):
+    """
+    Retrieve execution log entries for a specific task.
+
+    Args:
+        task_id: The task ID to filter logs by
+        limit: Maximum number of rows to return (default: 100)
+
+    Returns:
+        List of task execution log records
+    """
+    try:
+        logs = get_task_logs(task_id, limit)
+        return {"data": logs, "count": len(logs)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task logs: {str(e)}",
+        )
+
+
+@router.get("/tasks/{task_id}/config")
+async def get_task_config_endpoint(task_id: int):
+    """
+    Get full task configuration for a specific task.
+    Fetches ALL columns from tasks.task_configuration for the edit dialog.
+
+    Args:
+        task_id: The task ID to fetch config for
+
+    Returns:
+        Single task configuration record with mapped frontend field names
+    """
+    try:
+        from backend_functions.queries import get_task_config_by_id
+        config = get_task_config_by_id(task_id)
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task configuration {task_id} not found"
+            )
+        # Map DB column names back to frontend field names for the edit dialog
+        db_to_frontend = {
+            'task_id': 'task_id',
+            'task_name': 'task_name',
+            'task_description': 'description',
+            'display_icon': 'display_icon',
+            'task_frequency': 'task_frequency',
+            'task_priority': 'priority',
+            'task_start_hour': 'hours',
+            'task_interval': 'interval_minutes',
+            'api_function_name': 'api_function',
+            'python_execution_function': 'python_function',
+        }
+        mapped = {}
+        for db_key, frontend_key in db_to_frontend.items():
+            if db_key in config:
+                mapped[frontend_key] = config[db_key]
+        # Derive is_active from task_frequency
+        active_frequencies = {'Hourly', 'Daily', 'Weekly', 'Monthly'}
+        mapped['is_active'] = config.get('task_frequency') in active_frequencies
+        return {"data": mapped}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task configuration: {str(e)}",
+        )
+
+
+class TaskCreate(BaseModel):
+    task_name: str
+    description: Optional[str] = None
+    task_frequency: Optional[str] = "daily"
+    display_icon: Optional[str] = "⚙️"
+    priority: Optional[int] = 0
+    hours: Optional[int] = 0
+    interval_minutes: Optional[int] = 0
+    api_function: Optional[str] = None
+    python_function: Optional[str] = None
+
+
+# Mapping from React/API frontend field names to actual database column names
+# The task_configuration table uses legacy column names different from what the React UI sends
+TASK_CONFIG_FIELD_MAPPING = {
+    'task_name': 'task_name',
+    'description': 'task_description',
+    'task_frequency': 'task_frequency',
+    'display_icon': 'display_icon',
+    'priority': 'task_priority',
+    'hours': 'task_start_hour',
+    'interval_minutes': 'task_interval',
+    'api_function': 'api_function_name',
+    'python_function': 'python_execution_function',
+}
+
+
+def map_task_fields(fields: Dict[str, Any]) -> Dict[str, Any]:
+    """Map React frontend field names to database column names."""
+    mapped = {}
+    for frontend_key, db_key in TASK_CONFIG_FIELD_MAPPING.items():
+        if frontend_key in fields:
+            mapped[db_key] = fields[frontend_key]
+    # task_stop_hour defaults to 23 if task_start_hour is set
+    if 'hours' in fields and 'task_start_hour' in mapped:
+        mapped.setdefault('task_stop_hour', 23)
+    return mapped
+
+
+@router.post("/tasks")
+async def create_task_endpoint(task: TaskCreate):
+    """
+    Create a new task configuration entry.
+
+    Args:
+        task: The task configuration to create
+
+    Returns:
+        Success message or error
+    """
+    try:
+        fields = task.dict(exclude_none=True)
+        if not fields.get("task_frequency"):
+            fields["task_frequency"] = "daily"
+        # Map frontend field names to database column names
+        db_fields = map_task_fields(fields)
+        result = insert_task_configuration(db_fields)
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create task: {result}"
+            )
+        return {"status": "ok", "message": f"Task '{task.task_name}' created successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create task: {str(e)}",
         )
 
 

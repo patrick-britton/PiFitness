@@ -16,19 +16,17 @@
 import { useState, useCallback } from 'react';
 import DBInfo from './components/DBInfo';
 import TaskList from './components/TaskList';
-import DBSessions from './components/DBSessions';
-import EventHistory from './components/EventHistory';
 import ServiceConfig from './components/ServiceConfig';
 import CredentialManager from './components/CredentialManager';
+
+
 
 /**
  * Tab configuration
  */
 const TABS = [
   { id: 'db-info', label: 'DB Info', icon: '📊', component: DBInfo },
-  { id: 'tasks', label: 'Tasks', icon: '⚙️', component: TaskList },
-  { id: 'sessions', label: 'DB Sessions', icon: '🛢️', component: DBSessions },
-  { id: 'events', label: 'Events', icon: '📋', component: EventHistory },
+  { id: 'task-management', label: 'Task Management', icon: '⚙️', component: TaskList },
   { id: 'services', label: 'Services', icon: '🔌', component: ServiceConfig },
   { id: 'credentials', label: 'Credentials', icon: '🔐', component: CredentialManager },
 ] as const;

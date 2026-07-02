@@ -1,13 +1,15 @@
 /**
- * TaskList Component
- * Displays task execution history with status badges, execute button, and edit dialog.
+ * Enhanced Task Management Component
+ * Replaces Task Execution History with Task Summary view and adds full CRUD functionality.
  * Auto-refreshes every 10 seconds via React Query.
  */
 
 'use client';
 
-import { useState } from 'react';
-import { useTasks, useTaskSchedule, useExecuteTask, useUpdateTaskConfig } from '@/hooks/useAdmin';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTasks, useTaskSchedule, useTaskNames, useExecuteTask, useExecuteTaskV2, useUpdateTaskConfig, useDeleteTaskConfig, useTaskSummaryChart, useCreateTask, useTaskLogs, useTaskConfig, adminKeys } from '@/hooks/useAdmin';
+import TaskLogView from './TaskLogView';
 
 /**
  * Status badge component with color coding
@@ -34,77 +36,294 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 /**
- * Edit Task Config Dialog
+ * Edit Task Config Dialog with Delete button and embedded logs
  */
 function EditTaskDialog({
   task,
   onClose,
+  onDelete,
 }: {
-  task: { task_id: number; task_name: string; is_active: boolean; task_frequency: string };
+  task: { 
+    task_id: number; 
+    task_name: string; 
+    is_active: boolean; 
+    task_frequency: string;
+    description?: string;
+    display_icon?: string;
+    priority?: number;
+    hours?: number;
+    interval_minutes?: number;
+    api_function?: string;
+    python_function?: string;
+  };
   onClose: () => void;
+  onDelete?: () => void;
 }) {
   const [isActive, setIsActive] = useState(task.is_active);
   const [frequency, setFrequency] = useState(task.task_frequency || '');
+  const [description, setDescription] = useState(task.description || '');
+  const [displayIcon, setDisplayIcon] = useState(task.display_icon || '⚙️');
+  const [priority, setPriority] = useState(task.priority ?? 0);
+  const [hours, setHours] = useState(task.hours ?? 0);
+  const [intervalMinutes, setIntervalMinutes] = useState(task.interval_minutes ?? 0);
+  const [apiFunction, setApiFunction] = useState(task.api_function || '');
+  const [pythonFunction, setPythonFunction] = useState(task.python_function || '');
   const updateConfig = useUpdateTaskConfig();
+
+  // Fetch logs for this task
+  const { data: logsData } = useTaskLogs(task.task_id);
+  const logs = logsData?.data || [];
 
   const handleSave = () => {
     updateConfig.mutate(
-      { taskId: task.task_id, config: { is_active: isActive, task_frequency: frequency } },
+      { 
+        taskId: task.task_id, 
+        config: { 
+          is_active: isActive, 
+          task_frequency: frequency,
+          description: description || undefined,
+          display_icon: displayIcon || undefined,
+          priority: priority,
+          hours: hours,
+          interval_minutes: intervalMinutes,
+          api_function: apiFunction || undefined,
+          python_function: pythonFunction || undefined,
+        } 
+      },
       { onSuccess: () => onClose() }
     );
   };
 
+  const handleDeleteClick = () => {
+    if (onDelete) {
+      onDelete();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Edit Task: {task.task_name}
-        </h3>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Active
-            </label>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
-            </label>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Frequency
-            </label>
-            <input
-              type="text"
-              value={frequency}
-              onChange={(e) => setFrequency(e.target.value)}
-              placeholder="e.g. hourly, daily, cron expression"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-start mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Edit Task: {task.task_name}
+          </h3>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
-            Cancel
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
-          <button
-            onClick={handleSave}
-            disabled={updateConfig.isPending}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-          >
-            {updateConfig.isPending ? 'Saving...' : 'Save'}
-          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Active
+              </label>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Frequency
+              </label>
+              <select
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              >
+                <option value="hourly">Hourly</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="cron">Custom Cron</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Description
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Display Icon
+                </label>
+                <input
+                  type="text"
+                  value={displayIcon}
+                  onChange={(e) => setDisplayIcon(e.target.value)}
+                  placeholder="⚙️"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Priority
+                </label>
+                <input
+                  type="number"
+                  value={priority}
+                  onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Hours
+                </label>
+                <input
+                  type="number"
+                  value={hours}
+                  onChange={(e) => setHours(parseInt(e.target.value) || 0)}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Interval (min)
+                </label>
+                <input
+                  type="number"
+                  value={intervalMinutes}
+                  onChange={(e) => setIntervalMinutes(parseInt(e.target.value) || 0)}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  API Function
+                </label>
+                <input
+                  type="text"
+                  value={apiFunction}
+                  onChange={(e) => setApiFunction(e.target.value)}
+                  placeholder="e.g. get_activities"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Python Function
+                </label>
+                <input
+                  type="text"
+                  value={pythonFunction}
+                  onChange={(e) => setPythonFunction(e.target.value)}
+                  placeholder="e.g. process_data"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Recent Execution Logs */}
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                Recent Execution Logs
+              </h4>
+              {logs.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">No execution logs found.</p>
+              ) : (
+                <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Timestamp
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Event
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                      {logs.slice(0, 10).map((log: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            {log.event_time_utc ? new Date(log.event_time_utc).toLocaleString() : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-700 dark:text-gray-300">
+                            {log.event_description || '-'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              log.error_text
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                                : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                            }`}>
+                              {log.error_text ? 'Failed' : 'Success'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-between gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div>
+              {onDelete && (
+                <button
+                  onClick={handleDeleteClick}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                >
+                  Delete Configuration
+                </button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={updateConfig.isPending}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {updateConfig.isPending ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -112,38 +331,272 @@ function EditTaskDialog({
 }
 
 /**
- * TaskList Component
+ * Enhanced Task Management Component
+ * Replaces Task Execution History with Task Summary view and adds full CRUD functionality
  */
 export default function TaskList() {
-  const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useTasks();
+  const { data: summaryData, isLoading: summaryLoading, error: summaryError } = useTaskSummaryChart();
   const { data: scheduleData } = useTaskSchedule();
-  const executeTask = useExecuteTask();
+  const { data: taskNamesData } = useTaskNames();
+  const executeTask = useExecuteTaskV2(); // Updated to use v2 execution engine
+  const deleteTaskConfig = useDeleteTaskConfig();
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null);
   const [executeStatus, setExecuteStatus] = useState<string | null>(null);
+  const [executingTaskName, setExecutingTaskName] = useState<string | null>(null);
+  const [executeProgress, setExecuteProgress] = useState<number>(0);
+  const [lastExecutionFailed, setLastExecutionFailed] = useState<boolean>(false);
+  const [lastExecutionError, setLastExecutionError] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [viewingLogsTaskId, setViewingLogs] = useState<number | null>(null);
+  const [showFailureModal, setShowFailureModal] = useState<boolean>(false);
+  const createTask = useCreateTask();
+  const queryClient = useQueryClient();
 
-  // Build a map of task_id -> schedule config
-  const scheduleMap = new Map<number, any>();
-  if (scheduleData?.data) {
-    scheduleData.data.forEach((s: any) => {
-      scheduleMap.set(s.task_id, s);
+  // Build maps for easier data access
+  // NOTE: tasks.task_config view uses task_name as key (no task_id column)
+  const scheduleMap = useMemo(() => {
+    const map = new Map<string, any>();
+    if (scheduleData?.data) {
+      scheduleData.data.forEach((s: any) => {
+        map.set(s.task_name, s);
+      });
+    }
+    return map;
+  }, [scheduleData]);
+
+  const taskNameToIdMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (scheduleData?.data) {
+      scheduleData.data.forEach((s: any) => {
+        map.set(s.task_name, s.task_name);
+      });
+    }
+    return map;
+  }, [scheduleData]);
+
+  // Normalize task summary data (from TaskSummary component)
+  // Moved to top level to ensure consistent hook ordering
+  const summaryRows = useMemo(() => {
+    const rows = summaryData?.data ?? [];
+    return rows.map((r) => {
+      const executionMinutesAgo = r.execution_minutes_ago ?? r.execution_minutes;
+      const nextPlannedMinutes = r.next_planned_execution_minutes ?? r.next_minutes;
+      const executionCount = r.execution_count ?? r.last_week_count ?? r.week_count ?? r.count;
+      const successCount = r.success_count ?? r.successes ?? r.successful_count ?? r.successes_count;
+      const successPercentage = r.success_percentage ?? r.success_rate ?? r.success_pct;
+
+      let computedSuccessPercentage: number | null = null;
+      if (successPercentage !== null && Number.isFinite(successPercentage)) {
+        computedSuccessPercentage = successPercentage;
+      } else if (successCount !== null && executionCount !== null && executionCount > 0) {
+        computedSuccessPercentage = (successCount / executionCount) * 100;
+      }
+
+      const timeAgoExecution = executionMinutesAgo !== null ? executionMinutesAgo * 60 : null;
+      const timeAgoNext = nextPlannedMinutes !== null ? nextPlannedMinutes * 60 : null;
+
+      const totalDurationMs = [
+        r.login_ms, r.extract_ms, r.load_ms, r.flatten_ms, r.parse_ms,
+        r.interpolation_ms, r.forecasting_ms, r.python_ms, r.admin_ms
+      ].reduce((sum, val) => sum + (val ? Number(val) : 0), 0);
+
+      return {
+        task_name: String(r.task_name ?? r.name ?? 'Unknown'),
+        task_id: r.task_id,
+        is_active_failure: !!r.is_active_failure,
+        last_executed_utc: r.last_executed_utc ?? null,
+        last_execution_utc: r.last_execution_utc ?? null,
+        last_executed: r.last_executed ?? null,
+        next_planned_execution_utc: r.next_planned_execution_utc ?? null,
+        next_execution_utc: r.next_execution_utc ?? null,
+        next_planned: r.next_planned ?? null,
+        __timeAgoExecution: timeAgoExecution,
+        __timeAgoNext: timeAgoNext,
+        __executionCount: executionCount,
+        __successPercentage: computedSuccessPercentage,
+        __successCount: successCount,
+        __totalDurationMs: totalDurationMs,
+      };
     });
-  }
+  }, [summaryData]);
 
+  // Real-time progress bar timer using historical duration as estimate
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const progressStartRef = useRef<number>(0);
+
+  // Get estimated duration for the currently executing task
+  const estimatedDurationMs = useMemo(() => {
+    if (!executingTaskName) return 30000;
+    const row = summaryRows.find(r => r.task_name === executingTaskName);
+    return row?.__totalDurationMs || 30000;
+  }, [summaryRows, executingTaskName]);
+
+  // Timer effect: advances progress from 0% to 90% over the estimated duration
+  useEffect(() => {
+    if (executeTask.isPending && executingTaskName) {
+      progressStartRef.current = Date.now();
+      const step = 200; // update every 200ms
+      const totalSteps = estimatedDurationMs / step;
+      let currentStep = 0;
+
+      progressIntervalRef.current = setInterval(() => {
+        currentStep++;
+        const elapsed = Date.now() - progressStartRef.current;
+        // Use a non-linear curve: fast at start, slows toward 90%
+        const progress = Math.min(90, (elapsed / estimatedDurationMs) * 100);
+        setExecuteProgress(Math.round(progress));
+      }, step);
+    } else {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    };
+  }, [executeTask.isPending, executingTaskName, estimatedDurationMs]);
+
+  // Handle task execution
   const handleExecute = (taskName: string) => {
-    setExecuteStatus(`Triggering ${taskName}...`);
+    setExecutingTaskName(taskName);
+    setExecuteProgress(0);
+    setShowFailureModal(false);
+    setExecuteStatus(`Executing ${taskName}...`);
     executeTask.mutate(taskName, {
       onSuccess: (data) => {
-        setExecuteStatus(`${taskName}: ${data.message || 'executed'}`);
-        setTimeout(() => setExecuteStatus(null), 3000);
+        setExecutingTaskName(null);
+        setExecuteProgress(100);
+        if (data.status === 'error') {
+          const failureMsgs = ((data as any).failures || [])
+            .map((f: any) => `${f.task_name}: ${f.error || 'failed'}`)
+            .join('\n');
+          const errorMsg = `Failed: ${data.message}\n${failureMsgs}`;
+          setExecuteStatus(errorMsg);
+          setLastExecutionFailed(true);
+          setLastExecutionError(errorMsg);
+          setShowFailureModal(true);
+        } else {
+          setExecuteStatus(`${taskName}: ${data.message || 'completed'}`);
+          setLastExecutionFailed(false);
+          setLastExecutionError(null);
+          setTimeout(() => setExecuteStatus(null), 3000);
+        }
       },
       onError: (err) => {
-        setExecuteStatus(`Error: ${err}`);
-        setTimeout(() => setExecuteStatus(null), 5000);
+        setExecutingTaskName(null);
+        setExecuteProgress(0);
+        const errorMsg = `Error: ${err}`;
+        setExecuteStatus(errorMsg);
+        setLastExecutionFailed(true);
+        setLastExecutionError(errorMsg);
+        setShowFailureModal(true);
       },
     });
   };
 
-  if (tasksLoading) {
+  // Handle opening edit dialog - fetch full config from API
+  const handleEdit = (taskId: number) => {
+    setEditingTaskId(taskId);
+  };
+
+  // Handle task deletion
+  const handleDelete = (taskId: number) => {
+    setDeletingTaskId(taskId);
+  };
+
+  const confirmDelete = () => {
+    if (deletingTaskId !== null) {
+      deleteTaskConfig.mutate(deletingTaskId, {
+        onSuccess: () => {
+          // FIRST: Close dialogs to unmount EditingTaskLoader and cancel its subscriptions
+          setEditingTaskId(null);
+          setEditingTask(null);
+          setDeletingTaskId(null);
+          // THEN: Refresh task list on next tick (after React unmounts loader)
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: adminKeys.taskSummaryChart() });
+            queryClient.invalidateQueries({ queryKey: adminKeys.taskSchedule() });
+            queryClient.invalidateQueries({ queryKey: adminKeys.taskNames() });
+          }, 0);
+          // Show success message
+          setExecuteStatus(`Task configuration deleted successfully`);
+          setTimeout(() => setExecuteStatus(null), 5000);
+        },
+        onError: (err) => {
+          setDeletingTaskId(null);
+          setExecuteStatus(`Failed to delete task: ${err}`);
+          setTimeout(() => setExecuteStatus(null), 5000);
+        },
+      });
+    }
+  };
+
+  // Format functions from TaskSummary component
+  function formatRelativeTime(seconds: number | null): string {
+    if (seconds === null || seconds === undefined) return '-';
+    const absSeconds = Math.abs(seconds);
+    const prefix = seconds < 0 ? 'in ' : '';
+    const suffix = seconds > 0 ? ' ago' : '';
+    if (absSeconds < 60) return `${prefix}just now${suffix}`;
+    if (absSeconds < 3600) return `${prefix}${Math.floor(absSeconds / 60)} min${suffix}`;
+    if (absSeconds < 86400) return `${prefix}${Math.floor(absSeconds / 3600)} hours${suffix}`;
+    return `${prefix}${Math.floor(absSeconds / 86400)} days${suffix}`;
+  }
+
+  function formatDuration(totalMs: number | null): string {
+    if (!totalMs && totalMs !== 0) return '-';
+    if (totalMs < 1000) return `${Math.round(totalMs)}ms`;
+    const seconds = totalMs / 1000;
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    const minutes = seconds / 60;
+    return `${minutes.toFixed(1)} min`;
+  }
+
+  function getStatusBadge(isFailure: boolean) {
+    const label = isFailure ? 'Error' : 'Success';
+    const colorClass = isFailure
+      ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+      : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
+        {label}
+      </span>
+    );
+  }
+
+  function getTimeChipColor(seconds: number | null) {
+    if (seconds === null || seconds === undefined) return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+    if (seconds < 12 * 3600) return 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
+    if (seconds > 48 * 3600) return 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300';
+    return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300';
+  }
+
+  function MiniBar({ value, max, colorClass = 'bg-blue-600 dark:bg-blue-400', showLabel = true, suffix = '' }: { value: number | null; max: number; colorClass?: string; showLabel?: boolean; suffix?: string }) {
+    const safeValue = value != null && Number.isFinite(value) ? value : 0;
+    const safeMax = Number.isFinite(max) && max > 0 ? max : 1;
+    const percent = Math.round((safeValue / safeMax) * 100);
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className={`h-2 ${colorClass} rounded-full`} style={{ width: `${percent}%` }} />
+        </div>
+        {showLabel && (
+          <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+            {suffix === '%' ? `${percent}%` : `${Math.round(safeValue)}${suffix}`}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // Loading and error states
+  if (summaryLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
@@ -151,90 +604,181 @@ export default function TaskList() {
     );
   }
 
-  if (tasksError) {
+  if (summaryError) {
     return (
       <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
-        <p className="text-red-700 dark:text-red-300">Failed to load tasks: {String(tasksError)}</p>
+        <p className="text-red-700 dark:text-red-300">Failed to load task summary: {String(summaryError)}</p>
       </div>
     );
   }
 
-  const tasks = tasksData?.data || [];
+  const maxExecutionCount = Math.max(0, ...summaryRows.map((r) => r.__executionCount ?? 0));
+  const maxDuration = Math.max(0, ...summaryRows.map((r) => r.__totalDurationMs ?? 0));
+  const taskNames = taskNamesData?.data || [];
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Task Execution History</h2>
-        {executeStatus && (
-          <span className="text-sm text-blue-600 dark:text-blue-400 animate-pulse">{executeStatus}</span>
-        )}
+    <div className="space-y-6">
+      {/* Header with title and actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Task Management</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Monitor, configure, and execute background tasks
+          </p>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          {executeStatus && (
+            <span className={`text-sm ${executeStatus.includes('Error') ? 'text-red-600' : 'text-green-600'} animate-pulse`}>
+              {executeStatus}
+            </span>
+          )}
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+          >
+            Add New Task
+          </button>
+        </div>
       </div>
 
-      {tasks.length === 0 ? (
-        <p className="text-gray-500 dark:text-gray-400">No task execution records found.</p>
+      {/* Execution Progress Overlay (Popup Modal) */}
+      {(executeTask.isPending && executingTaskName) && !showFailureModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Executing Task</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{executingTaskName}</p>
+              </div>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden mb-2">
+              <div
+                className="h-3 bg-blue-600 rounded-full transition-all duration-200 ease-out"
+                style={{ width: `${executeProgress}%` }}
+              />
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500 dark:text-gray-400">In progress...</span>
+              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">{executeProgress}%</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Execution Failure Modal */}
+      {showFailureModal && lastExecutionFailed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="rounded-full h-6 w-6 bg-red-600 flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">Task Execution Failed</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{executingTaskName || 'Unknown Task'}</p>
+              </div>
+            </div>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3 mb-4">
+              <p className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap">{lastExecutionError}</p>
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              The task status below will update shortly to reflect the failure.
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowFailureModal(false)}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                Acknowledge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task Summary Table (replaces old Task Execution History) */}
+      {summaryRows.length === 0 ? (
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-md p-6 text-center">
+          <p className="text-gray-500 dark:text-gray-400">No task summary data available.</p>
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Task</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Task Name</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Time</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Execution</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Next Scheduled</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Week Count</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Success %</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-              {tasks.map((task: any, idx: number) => {
-                const schedule = scheduleMap.get(task.task_id);
-                const totalMs =
-                  (task.extract_time_ms || 0) +
-                  (task.transform_time_ms || 0) +
-                  (task.load_time_ms || 0) +
-                  (task.forecast_time_ms || 0) +
-                  (task.interpolation_time_ms || 0);
+              {summaryRows.map((row) => {
+                const duration = row.__totalDurationMs ?? 0;
+                const lastExecutedUtc = row.last_executed_utc ?? row.last_execution_utc ?? row.last_executed ?? null;
+                const nextPlannedExecutionUtc = row.next_planned_execution_utc ?? row.next_execution_utc ?? row.next_planned ?? null;
+
+                const timeAgoExecution = row.__timeAgoExecution;
+                const timeAgoNext = row.__timeAgoNext;
+                const lastExecutionChipClass = getTimeChipColor(timeAgoExecution);
+                const nextExecutionChipClass = getTimeChipColor(timeAgoNext);
+
+                const schedule = scheduleMap.get(row.task_name);
 
                 return (
-                  <tr key={task.event_time_utc ? `${task.event_time_utc}-${idx}` : idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                      {task.task_name}
+                  <tr key={row.task_name} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                      {schedule?.display_icon ? <span className="mr-1.5">{schedule.display_icon}</span> : ''}
+                      {row.task_name}
                     </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={task.error_text ? 'error' : 'success'} />
-                      {task.error_text && (
-                        <p className="text-xs text-red-500 mt-1 truncate max-w-[200px]" title={task.error_text}>
-                          {task.error_text}
-                        </p>
-                      )}
+                    <td className="px-4 py-3">{getStatusBadge(!!row.is_active_failure)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      <span
+                        title={lastExecutedUtc ? new Date(lastExecutedUtc).toLocaleString() : '-'}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lastExecutionChipClass}`}
+                      >
+                        {formatRelativeTime(timeAgoExecution)}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                      {task.event_time_utc ? new Date(task.event_time_utc).toLocaleString() : '-'}
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      <span
+                        title={nextPlannedExecutionUtc ? new Date(nextPlannedExecutionUtc).toLocaleString() : '-'}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${nextExecutionChipClass}`}
+                      >
+                        {formatRelativeTime(timeAgoNext)}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                      {totalMs > 0 ? `${(totalMs / 1000).toFixed(1)}s` : '-'}
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 min-w-[160px]">
+                      <MiniBar value={row.__executionCount} max={maxExecutionCount} colorClass="bg-gray-600 dark:bg-gray-400" suffix="" />
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 min-w-[160px]">
+                      <MiniBar value={row.__successPercentage ?? 0} max={100} colorClass="bg-gray-600 dark:bg-gray-400" suffix="%" />
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 min-w-[180px]">
+                      <MiniBar value={duration} max={maxDuration} colorClass="bg-gray-600 dark:bg-gray-400" suffix="" showLabel={false} />
+                      <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDuration(duration)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm">
+                      <div className="flex flex-col sm:flex-row gap-2 justify-end">
                         <button
-                          onClick={() => handleExecute(task.task_name)}
-                          disabled={executeTask.isPending}
-                          className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+                          onClick={() => handleExecute(row.task_name)}
+                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Execute
+                          Execute Now
                         </button>
-                        {schedule && (
-                          <button
-                            onClick={() => setEditingTask({
-                              task_id: task.task_id,
-                              task_name: task.task_name,
-                              is_active: schedule.is_active ?? true,
-                              task_frequency: schedule.task_frequency || '',
-                            })}
-                            className="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-                          >
-                            Edit
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleEdit(row.task_id)}
+                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-xs font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        >
+                          Edit
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -245,10 +789,369 @@ export default function TaskList() {
         </div>
       )}
 
-      {/* Edit Dialog */}
-      {editingTask && (
+      {/* Edit Dialog - fetches full config from API */}
+      {editingTaskId !== null && deletingTaskId === null && (
+        <EditingTaskLoader 
+          taskId={editingTaskId} 
+          onClose={() => { setEditingTaskId(null); setEditingTask(null); }}
+          onDelete={() => handleDelete(editingTaskId)}
+        />
+      )}
+
+      {/* Legacy edit dialog (kept for backward compat) */}
+      {editingTask && !editingTaskId && (
         <EditTaskDialog task={editingTask} onClose={() => setEditingTask(null)} />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      {deletingTaskId !== null && (
+        <DeleteConfirmDialog
+          taskId={deletingTaskId}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeletingTaskId(null)}
+        />
+      )}
+
+      {/* Task Log View */}
+      {viewingLogsTaskId !== null && (
+        <TaskLogView
+          taskId={viewingLogsTaskId}
+          onClose={() => setViewingLogs(null)}
+        />
+      )}
+
+      {/* Create Task Form */}
+      {showCreateForm && (
+        <CreateTaskForm
+          existingTaskNames={taskNames}
+          onClose={() => setShowCreateForm(false)}
+          createTask={createTask}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * EditingTaskLoader - Fetches full task config from API and renders EditTaskDialog
+ * This ensures ALL fields are pre-populated when editing.
+ */
+function EditingTaskLoader({
+  taskId,
+  onClose,
+  onDelete,
+}: {
+  taskId: number;
+  onClose: () => void;
+  onDelete?: () => void;
+}) {
+  const { data: configData, isLoading, error } = useTaskConfig(taskId);
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">Loading task configuration...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !configData?.data) {
+    // Check if this is a 404 Not Found error (task was deleted)
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isNotFound = errorMessage.includes('"status":404') || errorMessage.includes('"status": 404');
+    
+    if (isNotFound) {
+      // Task was deleted - silently close by signaling parent
+      return null;
+    }
+    
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md mx-4">
+          <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">Failed to Load Task</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            {error ? String(error) : 'Task configuration not found'}
+          </p>
+          <div className="flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <EditTaskDialog task={configData.data} onClose={onClose} onDelete={onDelete} />;
+}
+
+/**
+ * Delete Confirmation Dialog
+ */
+function DeleteConfirmDialog({
+  taskId,
+  onConfirm,
+  onCancel,
+}: {
+  taskId: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          Delete Task Configuration?
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          This will remove the task configuration but preserve execution history.
+          The task can be recreated later if needed.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+          >
+            Delete Configuration
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Create Task Form (placeholder - disabled until backend endpoint available)
+ */
+function CreateTaskForm({
+  existingTaskNames,
+  onClose,
+  createTask,
+}: {
+  existingTaskNames: string[];
+  onClose: () => void;
+  createTask: ReturnType<typeof useCreateTask>;
+}) {
+  const [taskName, setTaskName] = useState('');
+  const [description, setDescription] = useState('');
+  const [frequency, setFrequency] = useState('daily');
+  const [displayIcon, setDisplayIcon] = useState('⚙️');
+  const [priority, setPriority] = useState(0);
+  const [hours, setHours] = useState(0);
+  const [intervalMinutes, setIntervalMinutes] = useState(0);
+  const [apiFunction, setApiFunction] = useState('');
+  const [pythonFunction, setPythonFunction] = useState('');
+  const createTaskMutation = createTask;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskName.trim()) return;
+
+    createTaskMutation.mutate(
+      {
+        task_name: taskName,
+        description: description || undefined,
+        task_frequency: frequency,
+        display_icon: displayIcon,
+        priority: priority,
+        hours: hours,
+        interval_minutes: intervalMinutes,
+        api_function: apiFunction || undefined,
+        python_function: pythonFunction || undefined,
+      },
+      {
+        onSuccess: () => {
+          setTaskName('');
+          setDescription('');
+          setFrequency('daily');
+          setDisplayIcon('⚙️');
+          setPriority(0);
+          setHours(0);
+          setIntervalMinutes(0);
+          setApiFunction('');
+          setPythonFunction('');
+          onClose();
+        },
+      }
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl mx-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          Create New Task
+        </h3>
+
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Task Name *
+              </label>
+              <input
+                type="text"
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                placeholder="e.g. process_garmin_data, generate_reports"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Description
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe what this task does"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm min-h-[80px]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Frequency
+                </label>
+                <select
+                  value={frequency}
+                  onChange={(e) => setFrequency(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                >
+                  <option value="hourly">Hourly</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="cron">Custom Cron</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Display Icon
+                </label>
+                <input
+                  type="text"
+                  value={displayIcon}
+                  onChange={(e) => setDisplayIcon(e.target.value)}
+                  placeholder="⚙️"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Priority
+                </label>
+                <input
+                  type="number"
+                  value={priority}
+                  onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Hours
+                </label>
+                <input
+                  type="number"
+                  value={hours}
+                  onChange={(e) => setHours(parseInt(e.target.value) || 0)}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Interval (min)
+                </label>
+                <input
+                  type="number"
+                  value={intervalMinutes}
+                  onChange={(e) => setIntervalMinutes(parseInt(e.target.value) || 0)}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  API Function
+                </label>
+                <input
+                  type="text"
+                  value={apiFunction}
+                  onChange={(e) => setApiFunction(e.target.value)}
+                  placeholder="e.g. get_activities"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Python Function
+                </label>
+                <input
+                  type="text"
+                  value={pythonFunction}
+                  onChange={(e) => setPythonFunction(e.target.value)}
+                  placeholder="e.g. process_data"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          {createTaskMutation.isError && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3 mb-4">
+              <p className="text-sm text-red-700 dark:text-red-300">
+                Failed to create task: {String(createTaskMutation.error)}
+              </p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={createTaskMutation.isPending}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={createTaskMutation.isPending || !taskName.trim()}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {createTaskMutation.isPending ? 'Creating...' : 'Create Task'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
