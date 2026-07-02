@@ -63,13 +63,45 @@ export const API = {
     getTaskSchedule: () => fetchAPI<ApiListResponse<any>>("/api/admin/tasks/schedule"),
     getTaskNames: () => fetchAPI<ApiListResponse<string>>("/api/admin/tasks/names"),
     executeTask: (taskName: string) => fetchAPI<ApiStatusResponse>(`/api/admin/tasks/${encodeURIComponent(taskName)}/execute`, { method: "POST" }),
-    updateTaskConfig: (taskId: number, config: { is_active: boolean; task_frequency: string }) =>
+    executeTaskV2: (taskName: string) => fetchAPI<ApiStatusResponse>(`/api/admin/tasks/v2/${encodeURIComponent(taskName)}/execute`, { method: "POST" }),
+    updateTaskConfig: (taskId: number, config: {
+      is_active: boolean; 
+      task_frequency: string;
+      description?: string;
+      display_icon?: string;
+      priority?: number;
+      hours?: number;
+      interval_minutes?: number;
+      api_function?: string;
+      python_function?: string;
+    }) =>
       fetchAPI<ApiStatusResponse>(`/api/admin/tasks/${taskId}`, {
         method: "PUT",
         body: JSON.stringify(config),
       }),
     deleteTaskConfig: (taskId: number) =>
       fetchAPI<ApiStatusResponse>(`/api/admin/tasks/schedule/${taskId}`, { method: "DELETE" }),
+    createTask: (task: { 
+      task_name: string; 
+      description?: string; 
+      task_frequency?: string;
+      display_icon?: string;
+      priority?: number;
+      hours?: number;
+      interval_minutes?: number;
+      api_function?: string;
+      python_function?: string;
+    }) =>
+      fetchAPI<ApiStatusResponse>("/api/admin/tasks", {
+        method: "POST",
+        body: JSON.stringify(task),
+      }),
+    getTaskConfig: (taskId: number) =>
+      fetchAPI<{ data: any }>(`/api/admin/tasks/${taskId}/config`),
+    getTaskLogs: (taskId: number, limit?: number) => {
+      const params = limit ? `?limit=${limit}` : "";
+      return fetchAPI<ApiListResponse<any>>(`/api/admin/tasks/${taskId}/logs${params}`);
+    },
 
     // Fact Configuration
     upsertFactConfig: (config: { fact_id?: number | null; task_id: number; staging_id: number; is_active: boolean; custom_params?: any }) =>

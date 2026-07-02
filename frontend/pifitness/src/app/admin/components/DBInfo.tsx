@@ -16,17 +16,16 @@ import { useState, useCallback } from 'react';
 import TaskSummary from './TaskSummary';
 import DbSizeView from './DbSizeView';
 import EventHistory from './EventHistory';
-import ActiveSqlView from './ActiveSqlView';
+import ActiveQueriesView from './ActiveQueriesView';
 import RawLogViewer from './RawLogViewer';
 
 /**
  * Sub-tab configuration for DB Info
  */
 const SUB_TABS = [
-  { id: 'task-summary', label: 'Task Summary' },
   { id: 'db-size', label: 'DB Size' },
   { id: 'log-search', label: 'Log Search' },
-  { id: 'active-sql', label: 'Active SQL' },
+  { id: 'active-queries', label: 'Active Queries' },
   { id: 'raw-logs', label: 'Raw Logs' },
 ] as const;
 
@@ -36,7 +35,7 @@ type SubTabId = (typeof SUB_TABS)[number]['id'];
  * DB Info component with sub-tab navigation
  */
 export default function DBInfo() {
-  const [activeSubTab, setActiveSubTab] = useState<SubTabId>('task-summary');
+  const [activeSubTab, setActiveSubTab] = useState<SubTabId>('db-size');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSubTabChange = useCallback((tabId: SubTabId) => {
@@ -107,7 +106,7 @@ export default function DBInfo() {
         {activeSubTab === 'task-summary' && <TaskSummary />}
         {activeSubTab === 'db-size' && <DbSizeView />}
         {activeSubTab === 'log-search' && <EventHistory />}
-        {activeSubTab === 'active-sql' && <ActiveSqlView />}
+        {activeSubTab === 'active-queries' && <ActiveQueriesView />}
         {activeSubTab === 'raw-logs' && <RawLogViewer />}
       </div>
     </div>

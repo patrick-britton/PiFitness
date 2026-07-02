@@ -244,6 +244,25 @@ def get_task_config_by_id(task_id: int) -> Optional[Dict[str, Any]]:
     return result[0] if result else None
 
 
+def insert_task_configuration(fields: Dict[str, Any]) -> Union[str, List[str], None]:
+    """
+    Insert a new task configuration record.
+
+    Args:
+        fields (Dict[str, Any]): Column-value pairs for the task configuration.
+            Expected fields include: task_name, description, display_icon, task_frequency,
+            priority, hours, interval_minutes, api_function, python_function.
+
+    Returns:
+        Union[str, List[str], None]: Error messages if any, None on success.
+    """
+    columns = ", ".join(fields.keys())
+    placeholders = ", ".join(["%s"] * len(fields))
+    params = list(fields.values())
+    sql = f"INSERT INTO tasks.task_configuration ({columns}) VALUES ({placeholders})"
+    return qec(sql, params)
+
+
 def delete_task_configuration(task_id: int) -> Union[str, List[str], None]:
     """
     Delete a task configuration entry.
@@ -272,20 +291,52 @@ def delete_fact_configuration(fact_id: int) -> Union[str, List[str], None]:
     return qec(sql, (int(fact_id),))
 
 
-def update_task_configuration(task_id: int, is_active: bool, task_frequency: str) -> Union[str, List[str], None]:
+def update_task_configuration(task_id: int, is_active: bool, task_frequency: str, **kwargs) -> Union[str, List[str], None]:
     """
     Update a task configuration entry.
+
+    NOTE: The tasks.task_configuration table does NOT have an 'is_active' column.
+    Instead, the active/inactive state is represented by the task_frequency value:
+    - Active tasks: task_frequency = 'Hourly', 'Daily', 'Weekly', 'Monthly'
+    - Inactive tasks: task_frequency = 'Inactive'
 
     Args:
         task_id (int): The task ID to update.
         is_active (bool): Whether the task should be active.
+            If True, task_frequency is used as provided.
+            If False, task_frequency is forced to 'Inactive'.
         task_frequency (str): The new frequency for the task.
+        **kwargs: Additional fields to update (frontend names, mapped below).
 
     Returns:
         Union[str, List[str], None]: Error messages if any, None on success.
     """
-    sql = "UPDATE tasks.task_configuration SET is_active = %s, task_frequency = %s WHERE task_id = %s"
-    return qec(sql, [is_active, task_frequency, task_id])
+    set_clauses = ["task_frequency = %s"]
+    # When is_active is False, force frequency to 'Inactive'
+    resolved_frequency = 'Inactive' if not is_active else task_frequency
+    params = [resolved_frequency]
+    
+    # Map frontend field names to database column names
+    # The task_configuration table uses legacy column names different from the React UI
+    field_mapping = {
+        'description': 'task_description',
+        'display_icon': 'display_icon',
+        'priority': 'task_priority',
+        'hours': 'task_start_hour',
+        'interval_minutes': 'task_interval',
+        'api_function': 'api_function_name',
+        'python_function': 'python_execution_function',
+    }
+    
+    for key, db_field in field_mapping.items():
+        if key in kwargs:
+            set_clauses.append(f"{db_field} = %s")
+            params.append(kwargs[key])
+    
+    sql = f"UPDATE tasks.task_configuration SET {', '.join(set_clauses)} WHERE task_id = %s"
+    params.append(str(task_id))
+    
+    return qec(sql, params)
 
 
 def upsert_fact_configuration(fields: Dict[str, Any], is_insert: bool = True,
@@ -400,6 +451,25 @@ def get_task_summary_chart() -> Sequence[Dict[str, Any]]:
     """
     sql = "SELECT * FROM tasks.vw_task_summary_chart"
     result = sql_to_dict(sql)
+    return result if result else []
+
+
+def get_task_logs(task_id: int, limit: int = 100) -> Sequence[Dict[str, Any]]:
+    """
+    Retrieve execution log entries for a specific task.
+
+    Args:
+        task_id (int): The task ID to filter logs by.
+        limit (int): Maximum number of rows to return (default: 100).
+
+    Returns:
+        Sequence[Dict[str, Any]]: List of task execution log records from application_events.
+    """
+    sql = """SELECT * FROM logging.application_events 
+             WHERE event_category LIKE %s 
+             ORDER BY event_time_utc DESC 
+             LIMIT %s"""
+    result = sql_to_dict(sql, (f'%Task #{task_id}%', limit))
     return result if result else []
 
 
@@ -552,4 +622,5 @@ __all__ = [
     'get_task_summary_chart',
     'get_db_size_chart',
     'get_db_size_breakdown',
+    'get_task_logs',
 ]
