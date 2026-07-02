@@ -65,7 +65,7 @@ export const API = {
     executeTask: (taskName: string) => fetchAPI<ApiStatusResponse>(`/api/admin/tasks/${encodeURIComponent(taskName)}/execute`, { method: "POST" }),
     executeTaskV2: (taskName: string) => fetchAPI<ApiStatusResponse>(`/api/admin/tasks/v2/${encodeURIComponent(taskName)}/execute`, { method: "POST" }),
     updateTaskConfig: (taskId: number, config: {
-      is_active: boolean; 
+      is_active: boolean;
       task_frequency: string;
       description?: string;
       display_icon?: string;
@@ -85,6 +85,7 @@ export const API = {
       task_name: string; 
       description?: string; 
       task_frequency?: string;
+      is_active?: boolean;
       display_icon?: string;
       priority?: number;
       hours?: number;

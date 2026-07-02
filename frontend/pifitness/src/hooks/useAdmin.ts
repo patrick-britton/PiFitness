@@ -103,7 +103,6 @@ export function useUpdateTaskConfig() {
     mutationFn: ({ taskId, config }: { 
       taskId: number; 
       config: { 
-        is_active: boolean; 
         task_frequency: string;
         description?: string;
         display_icon?: string;
@@ -138,32 +137,33 @@ export function useDeleteTaskConfig() {
   });
 }
 
-/**
- * Mutation to create a new task.
- */
-export function useCreateTask() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (task: { 
-      task_name: string; 
-      description?: string; 
-      task_frequency?: string;
-      display_icon?: string;
-      priority?: number;
-      hours?: number;
-      interval_minutes?: number;
-      api_function?: string;
-      python_function?: string;
-    }) =>
-      API.admin.createTask(task),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
-      queryClient.invalidateQueries({ queryKey: adminKeys.taskSchedule() });
-      queryClient.invalidateQueries({ queryKey: adminKeys.taskNames() });
-      queryClient.invalidateQueries({ queryKey: adminKeys.taskSummaryChart() });
-    },
-  });
-}
+  /**
+   * Mutation to create a new task.
+   */
+  export function useCreateTask() {
+    const queryClient = useQueryClient();
+    return useMutation({
+      mutationFn: (task: { 
+        task_name: string; 
+        description?: string; 
+        task_frequency?: string;
+        is_active?: boolean;
+        display_icon?: string;
+        priority?: number;
+        hours?: number;
+        interval_minutes?: number;
+        api_function?: string;
+        python_function?: string;
+      }) =>
+        API.admin.createTask(task),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
+        queryClient.invalidateQueries({ queryKey: adminKeys.taskSchedule() });
+        queryClient.invalidateQueries({ queryKey: adminKeys.taskNames() });
+        queryClient.invalidateQueries({ queryKey: adminKeys.taskSummaryChart() });
+      },
+    });
+  }
 
 /**
  * Query to fetch full task configuration for a specific task (for edit dialog).

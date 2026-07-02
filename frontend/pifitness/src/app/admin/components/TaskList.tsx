@@ -46,7 +46,6 @@ function EditTaskDialog({
   task: { 
     task_id: number; 
     task_name: string; 
-    is_active: boolean; 
     task_frequency: string;
     description?: string;
     display_icon?: string;
@@ -59,7 +58,6 @@ function EditTaskDialog({
   onClose: () => void;
   onDelete?: () => void;
 }) {
-  const [isActive, setIsActive] = useState(task.is_active);
   const [frequency, setFrequency] = useState(task.task_frequency || '');
   const [description, setDescription] = useState(task.description || '');
   const [displayIcon, setDisplayIcon] = useState(task.display_icon || '⚙️');
@@ -79,7 +77,7 @@ function EditTaskDialog({
       { 
         taskId: task.task_id, 
         config: { 
-          is_active: isActive, 
+          is_active: frequency !== 'Inactive',
           task_frequency: frequency,
           description: description || undefined,
           display_icon: displayIcon || undefined,
@@ -121,34 +119,24 @@ function EditTaskDialog({
           <div className="space-y-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Active
-              </label>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600" />
-              </label>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Frequency
               </label>
-              <select
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-              >
-                <option value="hourly">Hourly</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="cron">Custom Cron</option>
-              </select>
+              <div className="flex flex-wrap gap-2">
+                {['Hourly', 'Daily', 'Weekly', 'Monthly', 'Inactive'].map((freq) => (
+                  <button
+                    key={freq.toLowerCase()}
+                    type="button"
+                    onClick={() => setFrequency(freq.toLowerCase())}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                      frequency === freq.toLowerCase()
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {freq}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>
@@ -394,8 +382,8 @@ export default function TaskList() {
         computedSuccessPercentage = (successCount / executionCount) * 100;
       }
 
-      const timeAgoExecution = executionMinutesAgo !== null ? executionMinutesAgo * 60 : null;
-      const timeAgoNext = nextPlannedMinutes !== null ? nextPlannedMinutes * 60 : null;
+      const timeAgoExecution = executionMinutesAgo !== null ? -executionMinutesAgo * 60 : null;
+      const timeAgoNext = nextPlannedMinutes !== null ? -nextPlannedMinutes * 60 : null;
 
       const totalDurationMs = [
         r.login_ms, r.extract_ms, r.load_ms, r.flatten_ms, r.parse_ms,
@@ -405,6 +393,8 @@ export default function TaskList() {
       return {
         task_name: String(r.task_name ?? r.name ?? 'Unknown'),
         task_id: r.task_id,
+        task_frequency: r.task_frequency ?? null,
+        consecutive_failures: r.consecutive_failures ?? 0,
         is_active_failure: !!r.is_active_failure,
         last_executed_utc: r.last_executed_utc ?? null,
         last_execution_utc: r.last_execution_utc ?? null,
@@ -577,6 +567,49 @@ export default function TaskList() {
     return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300';
   }
 
+  /**
+   * Get the next execution chip with conditional logic for inactive/failing tasks
+   */
+  function getNextExecutionChip(row: any) {
+    // Priority 1: Inactive tasks with failures
+    if (row.consecutive_failures >= 5 && row.task_frequency === 'inactive') {
+      return {
+        colorClass: 'bg-red-900 text-red-100 dark:bg-red-800 dark:text-red-100',
+        text: 'Inactive - Failing'
+      };
+    }
+
+    // Priority 2: Inactive tasks
+    if (row.task_frequency === 'inactive') {
+      return {
+        colorClass: 'bg-gray-300 text-gray-700 dark:bg-gray-600 dark:text-gray-300',
+        text: 'Inactive'
+      };
+    }
+
+    // Priority 3: Failing tasks (active but failing)
+    if (row.consecutive_failures >= 5) {
+      return {
+        colorClass: 'bg-red-900 text-red-100 dark:bg-red-800 dark:text-red-100',
+        text: 'Failing'
+      };
+    }
+
+    // Priority 4: Normal timing-based logic
+    const timeAgoNext = row.__timeAgoNext;
+    if (timeAgoNext === null || timeAgoNext === undefined) {
+      return {
+        colorClass: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+        text: '-'
+      };
+    }
+
+    return {
+      colorClass: getTimeChipColor(timeAgoNext),
+      text: formatRelativeTime(timeAgoNext)
+    };
+  }
+
   function MiniBar({ value, max, colorClass = 'bg-blue-600 dark:bg-blue-400', showLabel = true, suffix = '' }: { value: number | null; max: number; colorClass?: string; showLabel?: boolean; suffix?: string }) {
     const safeValue = value != null && Number.isFinite(value) ? value : 0;
     const safeMax = Number.isFinite(max) && max > 0 ? max : 1;
@@ -741,7 +774,7 @@ export default function TaskList() {
                     <td className="px-4 py-3">{getStatusBadge(!!row.is_active_failure)}</td>
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                       <span
-                        title={lastExecutedUtc ? new Date(lastExecutedUtc).toLocaleString() : '-'}
+                        title={lastExecutedUtc ? new Date(lastExecutedUtc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }) : '-'}
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lastExecutionChipClass}`}
                       >
                         {formatRelativeTime(timeAgoExecution)}
@@ -749,10 +782,10 @@ export default function TaskList() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                       <span
-                        title={nextPlannedExecutionUtc ? new Date(nextPlannedExecutionUtc).toLocaleString() : '-'}
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${nextExecutionChipClass}`}
+                        title={nextPlannedExecutionUtc ? new Date(nextPlannedExecutionUtc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }) : '-'}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getNextExecutionChip(row).colorClass}`}
                       >
-                        {formatRelativeTime(timeAgoNext)}
+                        {getNextExecutionChip(row).text}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 min-w-[160px]">
@@ -964,6 +997,7 @@ function CreateTaskForm({
         task_name: taskName,
         description: description || undefined,
         task_frequency: frequency,
+        is_active: frequency !== 'inactive',
         display_icon: displayIcon,
         priority: priority,
         hours: hours,
@@ -1023,24 +1057,29 @@ function CreateTaskForm({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Frequency
-                </label>
-                <select
-                  value={frequency}
-                  onChange={(e) => setFrequency(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                >
-                  <option value="hourly">Hourly</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="cron">Custom Cron</option>
-                </select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Frequency
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {['Hourly', 'Daily', 'Weekly', 'Monthly', 'Inactive'].map((freq) => (
+                  <button
+                    key={freq.toLowerCase()}
+                    type="button"
+                    onClick={() => setFrequency(freq.toLowerCase())}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                      frequency === freq.toLowerCase()
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {freq}
+                  </button>
+                ))}
               </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Display Icon
@@ -1050,6 +1089,18 @@ function CreateTaskForm({
                   value={displayIcon}
                   onChange={(e) => setDisplayIcon(e.target.value)}
                   placeholder="⚙️"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Priority
+                </label>
+                <input
+                  type="number"
+                  value={priority}
+                  onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
+                  min="0"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                 />
               </div>

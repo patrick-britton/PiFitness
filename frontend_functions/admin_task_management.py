@@ -156,14 +156,17 @@ def render_task_edit(task_id):
         with header_col:
             default_name = d.get('task_name')
             msg = f":blue[Editing: __{d.get("task_name")}__] :gray[*ID# {task_id}*]  \n"
-            msg = f"{msg}Last Executed: {d.get('last_executed_utc')}  \n"
+            last_exec = d.get('last_executed_utc')
+            msg = f"{msg}Last Executed: {last_exec}  \n" if last_exec else f"{msg}Last Executed: never  \n"
             if d.get('last_executed_utc') == d.get('last_succeeded_utc'):
                 is_failure = False
 
             else:
                 is_failure = True
-                msg = f"{msg}Last Succeeded: {d.get('last_succeeded_utc')}  \n"
-            msg = f"{msg}Next planned execution: {d.get('next_planned_execution_utc')}  \n"
+                last_succ = d.get('last_succeeded_utc')
+                msg = f"{msg}Last Succeeded: {last_succ}  \n" if last_succ else f"{msg}Last Succeeded: never  \n"
+            next_exec = d.get('next_planned_execution_utc')
+            msg = f"{msg}Next planned execution: {next_exec}  \n" if next_exec else f"{msg}Next planned execution: not scheduled  \n"
             if d.get('last_failed_utc'):
                 if not is_failure:
                     msg = f"{msg}Last Failed: {d.get('last_failed_utc')}  \n"
@@ -348,7 +351,7 @@ def recent_execution_log(task_id):
         max_time = safe_minmax(recent_df, 'execution_time_ms', min_default=0, return_max=True)
         max_time = 1 if max_time == 0 else max_time
         cols = ['event_time_utc', 'event_description', 'execution_time_ms', 'error_text']
-        col_config = {'event_time_utc': st.column_config.DatetimeColumn(label='Age', format='distance', width="small"),
+        col_config = {'event_time_utc': st.column_config.DatetimeColumn(label='Timestamp', format='YYYY-MM-DD HH:mm:ss', width="medium"),
                       'event_description': st.column_config.TextColumn(label='Desc', width="medium"),
                       'execution_time_ms': st.column_config.ProgressColumn(label='ms',
                                                                            min_value=0,
@@ -375,8 +378,8 @@ def render_task_rescheduling():
 
     task_df = pd.read_sql(text(task_sql), con=get_conn(alchemy=True))
     column_config = {'task_name': st.column_config.TextColumn(label='Name'),
-                     'last_executed_utc': st.column_config.DatetimeColumn(label='Last', format='distance'),
-                     'next_planned_execution_utc': st.column_config.DatetimeColumn(label='Next', format='distance')}
+                     'last_executed_utc': st.column_config.DatetimeColumn(label='Last Executed', format='YYYY-MM-DD HH:mm:ss'),
+                     'next_planned_execution_utc': st.column_config.DatetimeColumn(label='Next Scheduled', format='YYYY-MM-DD HH:mm:ss')}
     st.dataframe(task_df, column_config=column_config, hide_index=True)
     return
 
