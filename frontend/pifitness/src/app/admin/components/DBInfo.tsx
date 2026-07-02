@@ -13,7 +13,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import TaskSummary from './TaskSummary';
 import DbSizeView from './DbSizeView';
 import EventHistory from './EventHistory';
 import ActiveQueriesView from './ActiveQueriesView';
@@ -103,7 +102,6 @@ export default function DBInfo() {
 
       {/* Active Sub-tab Content */}
       <div>
-        {activeSubTab === 'task-summary' && <TaskSummary />}
         {activeSubTab === 'db-size' && <DbSizeView />}
         {activeSubTab === 'log-search' && <EventHistory />}
         {activeSubTab === 'active-queries' && <ActiveQueriesView />}
