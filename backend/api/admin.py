@@ -37,6 +37,7 @@ from backend_functions.queries import (
     get_db_size_breakdown,
     get_task_logs,
     insert_task_configuration,
+    get_task_performance_data,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -44,7 +45,6 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 # Pydantic models for request bodies
 class TaskConfigEdit(BaseModel):
-    is_active: bool
     task_frequency: str
     description: Optional[str] = None
     display_icon: Optional[str] = None
@@ -227,7 +227,6 @@ async def update_task_configuration_endpoint(task_id: int, task_config: TaskConf
         
         result = update_task_configuration(
             task_id=task_id,
-            is_active=task_config.is_active,
             task_frequency=task_config.task_frequency,
             **kwargs
         )
@@ -694,6 +693,30 @@ async def get_task_logs_endpoint(task_id: int, limit: int = 100):
         )
 
 
+@router.get("/tasks/{task_id}/performance")
+async def get_task_performance_endpoint(task_id: int):
+    """
+    Get task performance data for a specific task.
+
+    This endpoint retrieves aggregated timing data from tasks.vw_task_performance
+    view, which provides execution metrics grouped by 30-minute intervals.
+
+    Args:
+        task_id: The task ID to fetch performance data for
+
+    Returns:
+        List of task performance records with timing metrics for different
+        execution phases and event_date timestamps
+    """
+    try:
+        performance_data = get_task_performance_data(task_id)
+        return {"data": performance_data, "count": len(performance_data)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task performance data: {str(e)}",
+        )
+
 @router.get("/tasks/{task_id}/config")
 async def get_task_config_endpoint(task_id: int):
     """
@@ -731,9 +754,7 @@ async def get_task_config_endpoint(task_id: int):
         for db_key, frontend_key in db_to_frontend.items():
             if db_key in config:
                 mapped[frontend_key] = config[db_key]
-        # Derive is_active from task_frequency
-        active_frequencies = {'Hourly', 'Daily', 'Weekly', 'Monthly'}
-        mapped['is_active'] = config.get('task_frequency') in active_frequencies
+        # is_active field has been removed - task_frequency alone determines active state
         return {"data": mapped}
     except HTTPException:
         raise
