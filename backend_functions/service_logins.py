@@ -3,6 +3,7 @@ import os
 import random
 import sys
 import time
+import hashlib
 
 import requests
 import spotipy
@@ -225,7 +226,24 @@ def get_spotify_token():
         log_app_event(cat='API Login Failure', desc="Missing Spotify Credentials", exec_time=elapsed_ms(t0))
         return None
 
-    # Declare the scope
+    # Step 1: Check DB for stored token (Pi fallback — no local cache file)
+    db_token_info = load_token_from_db('Spotify')
+    if db_token_info:
+        try:
+            # Try to use the DB-stored token directly with a fresh auth manager
+            spotify_client = spotipy.Spotify(auth=db_token_info.get("access_token"))
+            spotify_client.current_user()  # Validate it still works
+            login_time = time.time()
+            log_api_event(service='Spotify', event='Token reuse from DB')
+            final_token = {"client": spotify_client,
+                           "token": db_token_info["access_token"],
+                           "token_age": login_time}
+            return final_token
+        except Exception as e:
+            # DB token failed — fall through to local cache flow
+            log_api_event(service='Spotify', event='DB token failed, falling through to cache', err=e)
+
+    # Step 2: Build scope and auth manager for local cache / full refresh
     scope_list = ['user-read-recently-played',
                   'user-library-read',
                   'user-modify-playback-state',
@@ -258,13 +276,132 @@ def get_spotify_token():
         access_token = token_info["access_token"]
         login_time = time.time()
         log_api_event(service='Spotify', event='login with New Token')
+
+        # Store authorization metadata if we got a new refresh token
+        if token_info.get("refresh_token"):
+            store_spotify_auth_metadata(token_info["refresh_token"])
+
+        # Step 3: Save token to DB for cross-device sync (Pi fallback)
+        save_token_to_db('Spotify', token_info)
+
         final_token = {"client": None,
                        "token": access_token,
                        "token_age": login_time}
         return final_token
+    except SpotifyException as e:
+        # Check for invalid_grant specifically — refresh token expired
+        if hasattr(e, 'http_status') and e.http_status == 400:
+            error_body = str(e)
+            if 'invalid_grant' in error_body:
+                log_api_event(
+                    service='Spotify',
+                    event='Refresh token expired — re-authorization required',
+                    err='invalid_grant: Refresh token expired. User must re-authorize.',
+                )
+                # Clear the cached token so next attempt starts fresh
+                clear_spotify_cache()
+                return None
+
+        # Generic Spotify failure
+        log_api_event(service='Spotify', event='token acquisition failure', err=e)
+        return None
     except Exception as e:
         log_api_event(service='Spotify', event='token acquisition failure', err=e)
         return None
+
+
+def store_spotify_auth_metadata(refresh_token):
+    """Store authorization timestamp and calculate 6-month expiry.
+
+    Args:
+        refresh_token: The Spotify refresh token obtained during authorization.
+    """
+    from backend_functions.database_functions import qec
+
+    token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+    sql = """INSERT INTO _migration.spotify_auth_metadata 
+             (authorized_at_utc, refresh_token_hash, expires_at_utc)
+             VALUES (CURRENT_TIMESTAMP, %s, CURRENT_TIMESTAMP + INTERVAL '6 months')
+             ON CONFLICT (refresh_token_hash) 
+             DO UPDATE SET authorized_at_utc = CURRENT_TIMESTAMP,
+                           expires_at_utc = CURRENT_TIMESTAMP + INTERVAL '6 months'"""
+    qec(sql, [token_hash])
+    log_api_event(service='Spotify', event='Authorization metadata stored', err=f'hash={token_hash[:16]}...')
+
+
+def clear_spotify_cache():
+    """Delete the Spotify token cache file to force fresh OAuth flow."""
+    cache_path = Path(os.getenv("LOCAL_STORAGE_PATH")) / ".spotify_cache"
+    if cache_path.exists():
+        cache_path.unlink()
+        log_api_event(service='Spotify', event='Cache cleared for re-authorization')
+        print(f"Spotify cache cleared: {cache_path}")
+
+
+def get_spotify_token_expiry():
+    """Return the estimated token expiry date for UI display.
+
+    Returns:
+        str | None: The latest expiry timestamp from _migration.spotify_auth_metadata,
+                    or None if no data exists.
+    """
+    from backend_functions.database_functions import one_sql_result
+    sql = "SELECT MAX(expires_at_utc) FROM _migration.spotify_auth_metadata WHERE is_active = true"
+    return one_sql_result(sql)
+
+
+def load_token_from_db(service_name):
+    """Load a stored token from the database for the given service.
+
+    This is the Pi fallback path — when no local cache file exists (e.g. on
+    a headless Pi), the token can be retrieved from the database where it
+    was saved by the Windows dev machine.
+
+    Args:
+        service_name: 'Spotify' or other service name.
+
+    Returns:
+        dict | None: The deserialized token dict, or None if no token found.
+    """
+    from backend_functions.database_functions import one_sql_result
+    import json
+
+    sql = f"""SELECT token_data FROM _migration.api_tokens
+             WHERE service_name = '{service_name}' AND is_active = true
+             ORDER BY updated_at_utc DESC LIMIT 1"""
+    result = one_sql_result(sql)
+    if result:
+        try:
+            return json.loads(result)
+        except (json.JSONDecodeError, TypeError):
+            log_api_event(service=service_name, event='Failed to decode stored token from DB')
+            return None
+    return None
+
+
+def save_token_to_db(service_name, token_info):
+    """Save a token dict to the database for cross-device sync.
+
+    After a successful OAuth flow, the token is stored in the DB so that
+    other devices (e.g. the headless Pi) can retrieve it.
+
+    Args:
+        service_name: 'Spotify' or other service name.
+        token_info: The token dict from Spotipy (or similar).
+    """
+    from backend_functions.database_functions import qec
+    import json
+
+    token_json = json.dumps(token_info)
+    # Deactivate old tokens, then insert new
+    deactivate_sql = f"""UPDATE _migration.api_tokens
+                        SET is_active = false
+                        WHERE service_name = '{service_name}' AND is_active = true"""
+    qec(deactivate_sql)
+    insert_sql = f"""INSERT INTO _migration.api_tokens (service_name, token_data, updated_at_utc)
+                     VALUES ('{service_name}', '{token_json}', CURRENT_TIMESTAMP)"""
+    qec(insert_sql)
+    log_api_event(service=service_name, event=f'Token saved to DB for {service_name}')
 
 
 def garmin_login():
@@ -297,8 +434,7 @@ def garmin_login():
         except Exception as e:
             print(f'Garmin Login Exception for token reuse: {e}')
             client = Garmin(email, password)
-            client.login()
-            client.garth.dump(cache_loc)
+            client.login(tokenstore=cache_loc)
             log_api_event(service='Garmin', event='Official login')
         return client
     except GarminConnectAuthenticationError as e:
@@ -362,6 +498,132 @@ def insert_client(incoming_dict, client):
                      "token": incoming_dict.get("token"),
                      "token_age": incoming_dict.get("token_age")}
     return outgoing_dict
+
+
+def get_auth_status():
+    """Return current auth status for all services as a structured dict.
+    
+    Returns:
+        dict: {
+            "services": {
+                "Spotify": {
+                    "status": "ok" | "expired" | "rate_limited" | "missing_credentials" | "error" | "unknown",
+                    "last_login_utc": str | None,
+                    "token_expires_utc": str | None,
+                    "rate_limited_until": str | None
+                },
+                "Garmin": {
+                    "status": "ok" | "missing_credentials" | "error" | "unknown",
+                    "last_login_utc": str | None,
+                    "last_error": str | None
+                }
+            }
+        }
+    """
+    from backend_functions.database_functions import one_sql_result
+
+    spotify_status = {
+        "status": "unknown",
+        "last_login_utc": None,
+        "token_expires_utc": None,
+        "rate_limited_until": None,
+    }
+
+    garmin_status = {
+        "status": "unknown",
+        "last_login_utc": None,
+        "last_error": None,
+    }
+
+    # --- Spotify ---
+    # Check rate limit
+    try:
+        is_limited = sql_rate_limited()
+        if is_limited:
+            cleared = one_sql_result(
+                "SELECT rate_limit_cleared_utc FROM api_services.api_service_list "
+                "WHERE api_service_name = 'Spotify'"
+            )
+            spotify_status["rate_limited_until"] = str(cleared) if cleared else None
+            spotify_status["status"] = "rate_limited"
+    except Exception:
+        pass
+
+    # Check last login
+    try:
+        last = one_sql_result(
+            "SELECT event_time_utc FROM logging.api_logins "
+            "WHERE api_service_name = 'Spotify' "
+            "AND event_name LIKE '%New Token%' "
+            "ORDER BY event_time_utc DESC LIMIT 1"
+        )
+        spotify_status["last_login_utc"] = str(last) if last else None
+    except Exception:
+        pass
+
+    # Check credentials exist
+    try:
+        cid, csec, uri = spotify_creds()
+        if cid and csec and uri:
+            if spotify_status["status"] == "unknown":
+                spotify_status["status"] = "ok"
+        else:
+            spotify_status["status"] = "missing_credentials"
+    except Exception:
+        spotify_status["status"] = "error"
+
+    # Check token expiry from _migration table if it exists
+    try:
+        expires = one_sql_result(
+            "SELECT MAX(expires_at_utc) FROM _migration.spotify_auth_metadata "
+            "WHERE is_active = true"
+        )
+        spotify_status["token_expires_utc"] = str(expires) if expires else None
+    except Exception:
+        pass
+
+    # --- Garmin ---
+    # Check last login
+    try:
+        last = one_sql_result(
+            "SELECT event_time_utc FROM logging.api_logins "
+            "WHERE api_service_name = 'Garmin' "
+            "AND event_name LIKE '%New Token%' "
+            "ORDER BY event_time_utc DESC LIMIT 1"
+        )
+        garmin_status["last_login_utc"] = str(last) if last else None
+    except Exception:
+        pass
+
+    # Check last error
+    try:
+        last_err = one_sql_result(
+            "SELECT error_text FROM logging.api_logins "
+            "WHERE api_service_name = 'Garmin' "
+            "AND error_text IS NOT NULL "
+            "ORDER BY event_time_utc DESC LIMIT 1"
+        )
+        garmin_status["last_error"] = str(last_err) if last_err else None
+    except Exception:
+        pass
+
+    # Check credentials exist
+    try:
+        email, password = garmin_creds()
+        if email and password:
+            if garmin_status["status"] == "unknown":
+                garmin_status["status"] = "ok"
+        else:
+            garmin_status["status"] = "missing_credentials"
+    except Exception:
+        garmin_status["status"] = "error"
+
+    return {
+        "services": {
+            "Spotify": spotify_status,
+            "Garmin": garmin_status,
+        }
+    }
 
 
 def test_login(service_name):
