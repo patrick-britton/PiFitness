@@ -8,7 +8,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTasks, useTaskSchedule, useTaskNames, useExecuteTask, useExecuteTaskV2, useUpdateTaskConfig, useDeleteTaskConfig, useTaskSummaryChart, useCreateTask, useTaskLogs, useTaskConfig, adminKeys } from '@/hooks/useAdmin';
+import { useTasks, useTaskSchedule, useTaskNames, useExecuteTask, useExecuteTaskV2, useUpdateTaskConfig, useDeleteTaskConfig, useTaskSummaryChart, useCreateTask, useTaskLogs, useTaskConfig, useTaskExecution, adminKeys } from '@/hooks/useAdmin';
 import TaskLogView from './TaskLogView';
 import TaskPerformanceChart from './TaskPerformanceChart';
 
@@ -101,10 +101,10 @@ function EditTaskDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
-        <div className="flex justify-between items-start mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Edit Task: {task.task_name}
-          </h3>
+         <div className="flex justify-between items-start mb-4">
+           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+             {task.task_name} <span className="text-gray-500 dark:text-gray-400 italic text-base font-normal">task_id={task.task_id}</span>
+           </h3>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -124,11 +124,11 @@ function EditTaskDialog({
               <div className="flex flex-wrap gap-2">
                 {['Hourly', 'Daily', 'Weekly', 'Monthly', 'Inactive'].map((freq) => (
                   <button
-                    key={freq.toLowerCase()}
+                    key={freq}
                     type="button"
-                    onClick={() => setFrequency(freq.toLowerCase())}
+                    onClick={() => setFrequency(freq)}
                     className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                      frequency === freq.toLowerCase()
+                      frequency === freq
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
@@ -336,6 +336,7 @@ export default function TaskList() {
   const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null);
   const [executeStatus, setExecuteStatus] = useState<string | null>(null);
   const [executingTaskName, setExecutingTaskName] = useState<string | null>(null);
+  const [currentExecutionId, setCurrentExecutionId] = useState<number | null>(null);
   const [executeProgress, setExecuteProgress] = useState<number>(0);
   const [lastExecutionFailed, setLastExecutionFailed] = useState<boolean>(false);
   const [lastExecutionError, setLastExecutionError] = useState<string | null>(null);
@@ -344,6 +345,9 @@ export default function TaskList() {
   const [showFailureModal, setShowFailureModal] = useState<boolean>(false);
   const createTask = useCreateTask();
   const queryClient = useQueryClient();
+
+  // Poll for task execution status
+  const { data: executionStatus } = useTaskExecution(currentExecutionId);
 
   // Build maps for easier data access
   // NOTE: tasks.task_config view uses task_name as key (no task_id column)
@@ -456,26 +460,24 @@ export default function TaskList() {
   }, [executeTask.isPending, executingTaskName, estimatedDurationMs]);
 
   // Handle task execution
-  const handleExecute = (taskName: string) => {
+  const handleExecute = (taskName: string, taskId?: number) => {
     setExecutingTaskName(taskName);
+    setCurrentExecutionId(null);
     setExecuteProgress(0);
     setShowFailureModal(false);
-    setExecuteStatus(`Executing ${taskName}...`);
-    executeTask.mutate(taskName, {
+    setExecuteStatus(`Starting ${taskName}...`);
+    executeTask.mutate({ taskName, taskId }, {
       onSuccess: (data) => {
-        setExecutingTaskName(null);
-        setExecuteProgress(100);
-        if (data.status === 'error') {
-          const failureMsgs = ((data as any).failures || [])
-            .map((f: any) => `${f.task_name}: ${f.error || 'failed'}`)
-            .join('\n');
-          const errorMsg = `Failed: ${data.message}\n${failureMsgs}`;
-          setExecuteStatus(errorMsg);
-          setLastExecutionFailed(true);
-          setLastExecutionError(errorMsg);
-          setShowFailureModal(true);
+        // data should contain execution_id
+        const executionId = (data as any).execution_id;
+        if (executionId) {
+          setCurrentExecutionId(executionId);
+          setExecuteStatus(`Executing ${taskName}...`);
         } else {
-          setExecuteStatus(`${taskName}: ${data.message || 'completed'}`);
+          // Fallback for non-async response
+          setExecutingTaskName(null);
+          setExecuteProgress(100);
+          setExecuteStatus(`${taskName}: ${(data as any).message || 'completed'}`);
           setLastExecutionFailed(false);
           setLastExecutionError(null);
           setTimeout(() => setExecuteStatus(null), 3000);
@@ -492,6 +494,49 @@ export default function TaskList() {
       },
     });
   };
+
+  // Handle execution status updates from polling
+  useEffect(() => {
+    if (!executionStatus) return;
+
+    // Handle 404 errors from polling - execution record not found yet
+    if ((executionStatus as any).status === 404 || (executionStatus as any).detail?.includes('not found')) {
+      // Don't treat as failure - just ignore and keep polling
+      return;
+    }
+
+    if (executionStatus.status === 'success') {
+      setExecutingTaskName(null);
+      setCurrentExecutionId(null);
+      setExecuteProgress(100);
+      setExecuteStatus(`${executionStatus.task_name}: completed successfully`);
+      setLastExecutionFailed(false);
+      setLastExecutionError(null);
+      setTimeout(() => setExecuteStatus(null), 3000);
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.taskSummaryChart() });
+    } else if (executionStatus.status === 'failed') {
+      setExecutingTaskName(null);
+      setCurrentExecutionId(null);
+      setExecuteProgress(0);
+      const errorMsg = `Failed: ${executionStatus.error_message || 'Task execution failed'}`;
+      setExecuteStatus(errorMsg);
+      setLastExecutionFailed(true);
+      setLastExecutionError(errorMsg);
+      setShowFailureModal(true);
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
+      queryClient.invalidateQueries({ queryKey: adminKeys.taskSummaryChart() });
+    } else if (executionStatus.status === 'running') {
+      // Still running, update status with timing estimate if available
+      const elapsed = executionStatus.started_at ? 
+        Math.floor((Date.now() - new Date(executionStatus.started_at).getTime()) / 1000) : 0;
+      setExecuteStatus(`Executing ${executionStatus.task_name}... (${elapsed}s)`);
+    }
+  }, [executionStatus, queryClient]);
 
   // Handle opening edit dialog - fetch full config from API
   const handleEdit = (taskId: number) => {
@@ -575,7 +620,7 @@ export default function TaskList() {
    */
   function getNextExecutionChip(row: any) {
     // Priority 1: Inactive tasks with failures
-    if (row.consecutive_failures >= 5 && row.task_frequency === 'inactive') {
+    if (row.consecutive_failures >= 5 && row.task_frequency === 'Inactive') {
       return {
         colorClass: 'bg-red-900 text-red-100 dark:bg-red-800 dark:text-red-100',
         text: 'Inactive - Failing'
@@ -583,7 +628,7 @@ export default function TaskList() {
     }
 
     // Priority 2: Inactive tasks
-    if (row.task_frequency === 'inactive') {
+    if (row.task_frequency === 'Inactive') {
       return {
         colorClass: 'bg-gray-300 text-gray-700 dark:bg-gray-600 dark:text-gray-300',
         text: 'Inactive'
@@ -804,7 +849,7 @@ export default function TaskList() {
                     <td className="px-4 py-3 text-right text-sm">
                       <div className="flex flex-col sm:flex-row gap-2 justify-end">
                         <button
-                          onClick={() => handleExecute(row.task_name)}
+                          onClick={() => handleExecute(row.task_name, row.task_id)}
                           className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Execute Now
@@ -982,7 +1027,7 @@ function CreateTaskForm({
 }) {
   const [taskName, setTaskName] = useState('');
   const [description, setDescription] = useState('');
-  const [frequency, setFrequency] = useState('daily');
+  const [frequency, setFrequency] = useState('Inactive');
   const [displayIcon, setDisplayIcon] = useState('⚙️');
   const [priority, setPriority] = useState(0);
   const [hours, setHours] = useState(0);

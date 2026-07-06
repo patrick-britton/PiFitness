@@ -5,7 +5,7 @@ Admin API Endpoints
 FastAPI endpoints for administrative functions (task monitoring, DB stats, etc.).
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
 
@@ -38,6 +38,9 @@ from backend_functions.queries import (
     get_task_logs,
     insert_task_configuration,
     get_task_performance_data,
+    create_task_execution,
+    update_task_execution,
+    get_task_execution,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -150,48 +153,153 @@ async def execute_task(task_name: str):
             detail=f"Failed to execute task: {str(e)}",
         )
 
+class TaskExecuteRequest(BaseModel):
+    task_id: Optional[int] = None
+
+
 @router.post("/tasks/v2/{task_name}/execute")
-def execute_task_v2(task_name: str):
+def execute_task_v2_async(task_name: str, request: Optional[TaskExecuteRequest] = Body(default=None)):
     """
     Trigger execution of a background task using the enhanced v2 execution engine.
+    Uses async pattern: returns immediately with execution_id, runs in background.
 
     Args:
         task_name: The name of the task to execute
+        request: Optional request body containing task_id
 
     Returns:
-        Execution result or error
+        execution_id and status for polling
     """
     try:
-        from backend_functions.ultimate_task_executioner_v2 import ultimate_task_executioner
-        from fastapi.responses import JSONResponse
+        task_id = None
         
-        # Execute the task using the new v2 execution engine
-        # Returns per-task outcomes so the frontend can display success/failure
-        result = ultimate_task_executioner(force_task_name=task_name)
+        # Prefer task_id from request body if provided
+        if request and request.task_id is not None:
+            task_id = request.task_id
+        else:
+            # Fallback: look up by name
+            from backend_functions.queries import get_task_scheduling_view, get_task_execution_view
+            
+            # First try scheduling view
+            for task in get_task_scheduling_view():
+                if task.get('task_name') == task_name:
+                    task_id = task.get('task_id')
+                    break
+            
+            # If not found, try execution view
+            if task_id is None:
+                for task in get_task_execution_view():
+                    if task.get('task_name') == task_name:
+                        task_id = task.get('task_id')
+                        break
+            
+            # If still not found, try querying task_configuration directly
+            if task_id is None:
+                from backend_functions.database_functions import one_sql_result
+                sql = "SELECT task_id FROM tasks.task_configuration WHERE task_name = %s LIMIT 1"
+                result = one_sql_result(sql, (task_name,))
+                if result:
+                    task_id = result
+
+        if task_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not find task_id for task_name: {task_name}"
+            )
+
+        # Create execution record
+        from backend_functions.database_functions import sql_insert_returning
+        sql = """
+            INSERT INTO tasks.task_executions (task_id, task_name, status, started_at)
+            VALUES (%s, %s, 'running', CURRENT_TIMESTAMP)
+            RETURNING execution_id
+        """
+        params = [task_id, task_name]
+        result = sql_insert_returning(sql, params)
         
-        # Determine overall status from results
-        if result and isinstance(result, dict):
-            results = result.get('results', [])
-            failed = [r for r in results if not r.get('success')]
-            if failed:
-                # Return 200 with failure details so the frontend can display them via onSuccess
-                return JSONResponse(
-                    status_code=200,
-                    content={
-                        "status": "error",
-                        "message": f"Task execution completed with {len(failed)} failure(s)",
-                        "failures": [{"task_id": r['task_id'], "task_name": r['task_name'], "error": r['error']} for r in failed]
-                    }
+        if not result or not result[0].get('execution_id'):
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to create task execution record"
+            )
+        
+        execution_id = result[0]['execution_id']
+
+        # Start background execution in a thread
+        import threading
+        def run_async():
+            try:
+                from backend_functions.ultimate_task_executioner_v2 import ultimate_task_executioner
+                result = ultimate_task_executioner(force_task_name=task_name)
+                
+                # Determine success/failure
+                failed = []
+                if result and isinstance(result, dict):
+                    results = result.get('results', [])
+                    failed = [r for r in results if not r.get('success')]
+                
+                if failed:
+                    update_task_execution(
+                        execution_id,
+                        status='failed',
+                        result=result,
+                        error_message=f"Task execution completed with {len(failed)} failure(s)"
+                    )
+                else:
+                    update_task_execution(
+                        execution_id,
+                        status='success',
+                        result=result
+                    )
+            except Exception as e:
+                update_task_execution(
+                    execution_id,
+                    status='failed',
+                    error_message=str(e)
                 )
-            return {"status": "ok", "message": f"Task {task_name} executed successfully", "results": results}
-        
-        return {"status": "ok", "message": f"Task {task_name} executed successfully"}
+
+        thread = threading.Thread(target=run_async, daemon=True)
+        thread.start()
+
+        # Return immediately with execution_id
+        return {
+            "execution_id": execution_id,
+            "status": "started",
+            "message": f"Task {task_name} execution started"
+        }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to execute task with v2 engine: {str(e)}",
+            detail=f"Failed to start task execution: {str(e)}",
+        )
+
+@router.get("/tasks/executions/{execution_id}")
+def get_task_execution_status(execution_id: int):
+    """
+    Get the status of an async task execution.
+
+    Args:
+        execution_id: The execution ID to check
+
+    Returns:
+        Execution record with current status
+    """
+    try:
+        execution = get_task_execution(execution_id)
+        if not execution:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Execution {execution_id} not found"
+            )
+        return execution
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch execution status: {str(e)}",
         )
 
 

@@ -7,10 +7,11 @@ admin_task_management.py, and admin_control_panel.py.
 These functions return plain Python data structures with no Streamlit dependencies.
 """
 
+import json
 from typing import List, Dict, Any, Optional, Union, Sequence, cast
 from datetime import datetime
 import math
-from backend_functions.database_functions import qec, sql_to_dict, sql_to_list
+from backend_functions.database_functions import qec, sql_to_dict, sql_to_list, sql_insert_returning
 
 # ---------------------------------------------------------------------------
 # Service Management
@@ -414,6 +415,94 @@ def get_task_performance_data(task_id: int) -> Sequence[Dict[str, Any]]:
     return result if result else []
 
 # ---------------------------------------------------------------------------
+# Task Execution Tracking (Async Pattern)
+# ---------------------------------------------------------------------------
+
+def create_task_execution(task_name: str, task_id: Optional[int] = None) -> Optional[int]:
+    """
+    Create a new task execution record for async task tracking.
+
+    Args:
+        task_name: Name of the task being executed
+        task_id: Optional task ID if known (can be None)
+
+    Returns:
+        Optional[int]: The execution_id of the created record, or None on failure
+    """
+    sql = """
+        INSERT INTO tasks.task_executions (task_id, task_name, status, started_at)
+        VALUES (%s, %s, 'running', CURRENT_TIMESTAMP)
+        RETURNING execution_id
+    """
+    # If task_id is None, we still insert NULL - the database column must allow NULLs
+    params = [task_id, task_name]
+    result = sql_insert_returning(sql, params)
+    return result[0]['execution_id'] if result else None
+
+
+def update_task_execution(execution_id: int, status: str, result: Optional[Dict[str, Any]] = None,
+                          error_message: Optional[str] = None) -> bool:
+    """
+    Update task execution status and optionally store results or error.
+
+    Args:
+        execution_id: The execution ID to update
+        status: New status ('success', 'failed', 'running')
+        result: Optional result data to store as JSONB
+        error_message: Optional error message if failed
+
+    Returns:
+        bool: True if update succeeded, False otherwise
+    """
+    sql = """
+        UPDATE tasks.task_executions
+        SET status = %s,
+            completed_at = CURRENT_TIMESTAMP,
+            result = %s,
+            error_message = %s
+        WHERE execution_id = %s
+    """
+    params = [status, json.dumps(result) if result else None, error_message, execution_id]
+    error = qec(sql, params)
+    return error is None
+
+
+def get_task_execution(execution_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve a task execution record by execution_id.
+
+    Args:
+        execution_id: The execution ID to fetch
+
+    Returns:
+        Optional[Dict[str, Any]]: The execution record, or None if not found
+    """
+    sql = "SELECT * FROM tasks.task_executions WHERE execution_id = %s"
+    result = sql_to_dict(sql, (execution_id,))
+    return result[0] if result else None
+
+
+def get_recent_task_executions(limit: int = 50) -> Sequence[Dict[str, Any]]:
+    """
+    Retrieve recent task execution records.
+
+    Args:
+        limit: Maximum number of records to return (default: 50)
+
+    Returns:
+        Sequence[Dict[str, Any]]: List of recent execution records
+    """
+    sql = """
+        SELECT *
+        FROM tasks.task_executions
+        ORDER BY started_at DESC
+        LIMIT %s
+    """
+    result = sql_to_dict(sql, (limit,))
+    return result if result else []
+
+
+# ---------------------------------------------------------------------------
 # Database Session Monitoring
 # ---------------------------------------------------------------------------
 
@@ -628,4 +717,8 @@ __all__ = [
     'get_db_size_breakdown',
     'get_task_logs',
     'get_task_performance_data',
+    'create_task_execution',
+    'update_task_execution',
+    'get_task_execution',
+    'get_recent_task_executions',
 ]
