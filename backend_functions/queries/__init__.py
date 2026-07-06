@@ -70,6 +70,10 @@ from .admin_queries import (
     get_task_logs,
     insert_task_configuration,
     get_task_performance_data,
+    create_task_execution,
+    update_task_execution,
+    get_task_execution,
+    get_recent_task_executions,
 )
 from .activities_queries import (
     get_activities_list,
@@ -141,6 +145,10 @@ __all__ = [
     'get_task_logs',
     'insert_task_configuration',
     'get_task_performance_data',
+    'create_task_execution',
+    'update_task_execution',
+    'get_task_execution',
+    'get_recent_task_executions',
     # Activities
     'get_activities_list',
     'get_activity_by_id',

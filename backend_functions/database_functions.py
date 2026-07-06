@@ -95,12 +95,15 @@ def qec(t_sql=None, p=None, auto_commit=False):
     return None
 
 
-def one_sql_result(sql=None):
+def one_sql_result(sql=None, params=None):
     # returns a single value from a sql query
     if not sql:
         return None
     conn, cursor = con_cur()
-    cursor.execute(sql)
+    if params is None:
+        cursor.execute(sql)
+    else:
+        cursor.execute(sql, params)
     row = cursor.fetchone()
     cursor.close()
     conn.close()
@@ -122,6 +125,40 @@ def sql_to_dict(query_str, params=None):
     cur.close()
     conn.close()
     return rows
+
+
+def sql_insert_returning(query_str, params=None):
+    """
+    Execute an INSERT...RETURNING query and commit the transaction.
+    
+    Unlike sql_to_dict, this function commits the transaction before closing
+    the connection, ensuring the inserted data persists.
+    
+    Args:
+        query_str: SQL INSERT...RETURNING statement
+        params: Optional tuple/list of parameters
+        
+    Returns:
+        List of dicts with returned values (from RETURNING clause), or None on error
+    """
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        if params:
+            cur.execute(query_str, params)
+        else:
+            cur.execute(query_str)
+        rows = cur.fetchall()
+        conn.commit()
+        return rows
+    except Exception as e:
+        conn.rollback()
+        print(f"sql_insert_returning failed: {e}")
+        return None
+    finally:
+        cur.close()
+        conn.close()
+
 
 def sql_to_lookup_dict(query_str, params=None):
     data = sql_to_dict(query_str, params)

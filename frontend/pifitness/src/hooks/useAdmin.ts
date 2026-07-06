@@ -87,11 +87,40 @@ export function useExecuteTask() {
 export function useExecuteTaskV2() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (taskName: string) => API.admin.executeTaskV2(taskName),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
-      queryClient.invalidateQueries({ queryKey: adminKeys.taskSummaryChart() });
+    mutationFn: ({ taskName, taskId }: { taskName: string; taskId?: number }) => API.admin.executeTaskV2(taskName, taskId),
+    onSuccess: (data) => {
+      // Don't invalidate yet - the task is still running
+      // The polling hook will handle updates when the task completes
     },
+  });
+}
+
+/**
+ * Hook to poll for task execution status.
+ * Auto-refreshes every 2 seconds while task is running, stops when complete.
+ */
+export function useTaskExecution(executionId: number | null) {
+  return useQuery({
+    queryKey: [...adminKeys.all, "task-executions", executionId],
+    queryFn: () => API.admin.getTaskExecutionStatus(executionId as number),
+    enabled: !!executionId,
+    refetchInterval: (query) => {
+      // Stop polling if no executionId or if execution is complete
+      if (!executionId) return false;
+      
+      // If we got a 404 or error, stop polling
+      if (query.state.error) {
+        return false;
+      }
+      
+      const data = query.state.data;
+      if (data && (data.status === 'success' || data.status === 'failed')) {
+        return false; // Stop polling
+      }
+      return 2000; // Poll every 2 seconds while running
+    },
+    staleTime: 1000,
+    retry: false, // Don't retry on 404
   });
 }
 

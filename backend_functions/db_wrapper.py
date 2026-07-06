@@ -60,18 +60,22 @@ async def async_sql_to_list(query: str) -> list:
     return await loop.run_in_executor(None, partial(sql_to_list, query))
 
 
-async def async_one_sql_result(query: str) -> Any:
+async def async_one_sql_result(query: str, params: Optional[tuple] = None) -> Any:
     """
     Execute a SQL query asynchronously and return a single scalar value.
 
     Args:
         query (str): The SQL query string.
+        params (Optional[tuple]): Query parameters for parameterized execution.
 
     Returns:
         Any: The first column of the first row, or None if no results.
     """
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, partial(one_sql_result, query))
+    if params is not None:
+        return await loop.run_in_executor(None, partial(one_sql_result, query, params))
+    else:
+        return await loop.run_in_executor(None, partial(one_sql_result, query))
 
 
 async def async_qec(

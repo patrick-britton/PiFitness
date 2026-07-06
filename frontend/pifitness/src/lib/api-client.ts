@@ -63,7 +63,10 @@ export const API = {
     getTaskSchedule: () => fetchAPI<ApiListResponse<any>>("/api/admin/tasks/schedule"),
     getTaskNames: () => fetchAPI<ApiListResponse<string>>("/api/admin/tasks/names"),
     executeTask: (taskName: string) => fetchAPI<ApiStatusResponse>(`/api/admin/tasks/${encodeURIComponent(taskName)}/execute`, { method: "POST" }),
-    executeTaskV2: (taskName: string) => fetchAPI<ApiStatusResponse>(`/api/admin/tasks/v2/${encodeURIComponent(taskName)}/execute`, { method: "POST" }),
+    executeTaskV2: (taskName: string, taskId?: number) => fetchAPI<{ execution_id: number; status: string; message: string }>(`/api/admin/tasks/v2/${encodeURIComponent(taskName)}/execute`, { 
+      method: "POST", 
+      body: taskId !== undefined ? JSON.stringify({ task_id: taskId }) : undefined
+    }),
     updateTaskConfig: (taskId: number, config: {
       task_frequency: string;
       description?: string;
@@ -103,6 +106,8 @@ export const API = {
     },
     getTaskPerformance: (taskId: number) =>
       fetchAPI<ApiListResponse<any>>(`/api/admin/tasks/${taskId}/performance`),
+    getTaskExecutionStatus: (executionId: number) =>
+      fetchAPI<any>(`/api/admin/tasks/executions/${executionId}`),
 
     // Fact Configuration
     upsertFactConfig: (config: { fact_id?: number | null; task_id: number; staging_id: number; is_active: boolean; custom_params?: any }) =>
