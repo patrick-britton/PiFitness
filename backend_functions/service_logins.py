@@ -226,24 +226,7 @@ def get_spotify_token():
         log_app_event(cat='API Login Failure', desc="Missing Spotify Credentials", exec_time=elapsed_ms(t0))
         return None
 
-    # Step 1: Check DB for stored token (Pi fallback — no local cache file)
-    db_token_info = load_token_from_db('Spotify')
-    if db_token_info:
-        try:
-            # Try to use the DB-stored token directly with a fresh auth manager
-            spotify_client = spotipy.Spotify(auth=db_token_info.get("access_token"))
-            spotify_client.current_user()  # Validate it still works
-            login_time = time.time()
-            log_api_event(service='Spotify', event='Token reuse from DB')
-            final_token = {"client": spotify_client,
-                           "token": db_token_info["access_token"],
-                           "token_age": login_time}
-            return final_token
-        except Exception as e:
-            # DB token failed — fall through to local cache flow
-            log_api_event(service='Spotify', event='DB token failed, falling through to cache', err=e)
-
-    # Step 2: Build scope and auth manager for local cache / full refresh
+    # Step 1: Build scope and auth manager
     scope_list = ['user-read-recently-played',
                   'user-library-read',
                   'user-modify-playback-state',
@@ -271,8 +254,53 @@ def get_spotify_token():
         cache_path=os.path.join(cache_loc, ".spotify_cache")
     )
 
+    # Step 2: Check DB for stored token (Pi fallback — no local cache file)
+    db_token_info = load_token_from_db('Spotify')
+    if db_token_info:
+        try:
+            # Use Spotipy's built-in validate_token to check expiry and automatically refresh if needed!
+            validated_token = auth_manager.validate_token(db_token_info)
+            if validated_token:
+                # If the token was refreshed, update it in the database
+                if validated_token.get("access_token") != db_token_info.get("access_token"):
+                    log_api_event(service='Spotify', event='Token refreshed via DB stored refresh token')
+                    save_token_to_db('Spotify', validated_token)
+                else:
+                    log_api_event(service='Spotify', event='Token reuse from DB')
+
+                spotify_client = spotipy.Spotify(auth=validated_token["access_token"])
+                login_time = time.time()
+                final_token = {"client": spotify_client,
+                               "token": validated_token["access_token"],
+                               "token_age": login_time}
+                return final_token
+            else:
+                log_api_event(service='Spotify', event='DB token invalid/expired and could not be refreshed')
+        except SpotifyException as e:
+            # Check for invalid_grant specifically — refresh token expired
+            if hasattr(e, 'http_status') and e.http_status == 400:
+                error_body = str(e)
+                if 'invalid_grant' in error_body:
+                    log_api_event(
+                        service='Spotify',
+                        event='Refresh token expired — re-authorization required',
+                        err='invalid_grant: Refresh token expired. User must re-authorize.',
+                    )
+                    # Clear the cached token so next attempt starts fresh
+                    clear_spotify_cache()
+                    return None
+            log_api_event(service='Spotify', event='DB token refresh failed with SpotifyException', err=e)
+        except Exception as e:
+            # DB token validation/refresh failed — fall through to local cache flow
+            log_api_event(service='Spotify', event='DB token validation/refresh failed, falling through to cache', err=e)
+
+    # Step 3: Fall back to local cache / full refresh
     try:
         token_info = auth_manager.get_access_token(as_dict=True)
+        if not token_info or "access_token" not in token_info:
+            log_api_event(service='Spotify', event='token acquisition failure — no token returned')
+            return None
+
         access_token = token_info["access_token"]
         login_time = time.time()
         log_api_event(service='Spotify', event='login with New Token')
@@ -281,7 +309,7 @@ def get_spotify_token():
         if token_info.get("refresh_token"):
             store_spotify_auth_metadata(token_info["refresh_token"])
 
-        # Step 3: Save token to DB for cross-device sync (Pi fallback)
+        # Save token to DB for cross-device sync (Pi fallback)
         save_token_to_db('Spotify', token_info)
 
         final_token = {"client": None,
