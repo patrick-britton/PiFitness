@@ -2,12 +2,14 @@
  * ServiceConfig Component
  * Manages API service integrations and function library entries.
  * Dual-panel layout: API Services list + Function Library.
+ * Includes ServiceAuthStatus indicators at the top.
  */
 
 'use client';
 
 import { useState } from 'react';
 import { useServices, useAddService, useDeleteService, useFunctions, useAddFunction, useUpdateFunction, useDeleteFunction } from '@/hooks/useAdmin';
+import ServiceAuthStatus from './ServiceAuthStatus';
 
 /**
  * Add Service Form
@@ -231,6 +233,9 @@ export default function ServiceConfig() {
       <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
         Service & Function Library Configuration
       </h2>
+
+      {/* Auth Status Indicators - At top of Services tab */}
+      <ServiceAuthStatus />
 
       {/* API Services Panel */}
       <div className="mb-8">

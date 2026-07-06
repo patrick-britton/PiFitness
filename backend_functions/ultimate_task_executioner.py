@@ -62,29 +62,39 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
                 api_service_name = task_dict.get('api_service_name')
 
             module_function = task_dict.get('python_login_function')
-            print(f"Refreshing client for {api_service_name}")
-            try:
-                module_name, login_function_name = module_function.rsplit('.', 1)
-                module = importlib.import_module(module_name)
-                login_function = getattr(module, login_function_name)
-                l_t0 = start_timer()
-                client_dict = login_function(client_dict)
-                # print(f"Login function: {login_function} returning dict: {client_dict}")
+            
+            # If no login function configured, skip login and proceed to extraction
+            # This is used by Pirate Garmin tasks which handle auth internally
+            if not module_function:
+                print(f"No login function configured for {api_service_name} — skipping login")
                 log_app_event(cat=f"Task #{task_id}: {task_name}",
-                              desc='Login Success',
+                              desc='No login function — skipping',
                               task_id=task_id,
-                              exec_time=elapsed_ms(l_t0),
                               data_event='Login')
-            except Exception as e:
-                log_app_event(cat=f"Task #{task_id}: {task_name}",
-                              desc='Failed to establish client',
-                              task_id=task_id,
-                              err=f"Client error: {e}",
-                              data_event='Login')
-                reconcile_task_dates(task_dict, task_fail=True, e=e)
-                client_dict = None
-                print(f"Failed client initialization for task #{task_id}: {task_name}")
-                continue
+            else:
+                print(f"Refreshing client for {api_service_name}")
+                try:
+                    module_name, login_function_name = module_function.rsplit('.', 1)
+                    module = importlib.import_module(module_name)
+                    login_function = getattr(module, login_function_name)
+                    l_t0 = start_timer()
+                    client_dict = login_function(client_dict)
+                    # print(f"Login function: {login_function} returning dict: {client_dict}")
+                    log_app_event(cat=f"Task #{task_id}: {task_name}",
+                                  desc='Login Success',
+                                  task_id=task_id,
+                                  exec_time=elapsed_ms(l_t0),
+                                  data_event='Login')
+                except Exception as e:
+                    log_app_event(cat=f"Task #{task_id}: {task_name}",
+                                  desc='Failed to establish client',
+                                  task_id=task_id,
+                                  err=f"Client error: {e}",
+                                  data_event='Login')
+                    reconcile_task_dates(task_dict, task_fail=True, e=e)
+                    client_dict = None
+                    print(f"Failed client initialization for task #{task_id}: {task_name}")
+                    continue
 
             task_fail, client_dict = extract_load_flatten(client_dict, task_dict)
 
@@ -112,12 +122,21 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
 def extract_load_flatten(cd, td):
     # Ensure client is established
     if not cd:
+        service = td.get('api_service_name', 'Unknown')
+        if service == 'Spotify':
+            err_msg = 'Spotify login failed — token may be expired. Re-authorization required.'
+        elif service == 'Pirate Garmin':
+            err_msg = 'Garmin login failed — check credentials or pirate-garmin CLI status.'
+        elif service == 'Garmin':
+            err_msg = 'Garmin login failed — check credentials or pirate-garmin CLI status.'
+        else:
+            err_msg = f'Login failed for {service}'
         log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
                       desc=f"Failed Extraction",
-                      err='No Client dictionary',
+                      err=err_msg,
                       task_id=td.get('task_id'),
                       data_event='Login')
-        reconcile_task_dates(td, task_fail=True, e='No Client Dictionary')
+        reconcile_task_dates(td, task_fail=True, e=err_msg)
         return True, None
 
     if not cd.get('client'):

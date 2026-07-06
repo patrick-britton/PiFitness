@@ -219,6 +219,23 @@ export const API = {
   },
 
   /**
+   * Auth API endpoints
+   */
+  auth: {
+    getStatus: () => fetchAPI<{ services: Record<string, any> }>("/api/auth/status"),
+    refreshSpotify: () => fetchAPI<ApiStatusResponse>("/api/auth/spotify/refresh", { method: "POST" }),
+    getSpotifyAuthUrl: () => fetchAPI<{ auth_url: string; redirect_uri: string }>("/api/auth/spotify/auth-url"),
+    spotifyCallback: (redirectUrl: string) =>
+      fetchAPI<ApiStatusResponse>("/api/auth/spotify/callback", {
+        method: "POST",
+        body: JSON.stringify({ redirect_url: redirectUrl }),
+      }),
+    testSpotify: () => fetchAPI<ApiStatusResponse>("/api/auth/spotify/test", { method: "POST" }),
+    testGarmin: () => fetchAPI<ApiStatusResponse>("/api/auth/garmin/test", { method: "POST" }),
+    getHealth: () => fetchAPI<Record<string, any>>("/api/auth/health"),
+  },
+
+  /**
    * Activities API endpoints
    */
   activities: {
