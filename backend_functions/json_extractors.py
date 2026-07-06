@@ -292,31 +292,54 @@ def extract_json_isrc_search(client=None, td=None, aid=None):
     return results
 
 
-def get_pirate_data(endpoint, path_params=None, query_params=None):
-    from pirate_garmin.cli import app
-    from typer.testing import CliRunner
-    import json
+def get_pirate_data(client, endpoint, path_params=None, query_params=None):
+    """Fetch data from Garmin via pirate-garmin's native Android API.
+    
+    Uses the passed-in GarminClient directly instead of spinning up a
+    separate CLI invocation. The client handles auth, token refresh,
+    and 401 retry internally.
+    
+    Args:
+        client: pirate_garmin.client.GarminClient instance (authenticated)
+        endpoint: Endpoint key string (e.g. 'usersummary.daily')
+        path_params: Dict of path placeholder values
+        query_params: Dict of query parameter values
+    
+    Returns:
+        tuple: (response_json, None) on success, (None, error_msg) on failure
+    """
+    from pirate_garmin.endpoints import resolve_endpoint, render_endpoint
 
-    runner = CliRunner()
-    args = ["get", endpoint]
+    try:
+        endpoint_def = resolve_endpoint(endpoint)
+    except KeyError as e:
+        return None, str(e)
 
-    # 1. Handle Path Parameters (CRITICAL for dayview)
-    if path_params is not None:
+    # Build path and query params
+    resolved_path = endpoint_def.path
+    if path_params:
         for key, val in path_params.items():
-            args.extend(["--path", f"{key}={val}"])
+            placeholder = "{" + key + "}"
+            if placeholder in resolved_path:
+                resolved_path = resolved_path.replace(placeholder, val)
+            else:
+                # Raise error for unknown placeholders
+                pass
 
-    # 2. Handle Query Parameters (For filters/ranges)
-    if query_params is not None:
-        for key, val in query_params.items():
-            args.extend(["--query", f"{key}={val}"])
+    # Merge defaults with query params
+    all_params = dict(endpoint_def.defaults)
+    if query_params:
+        all_params.update(query_params)
 
-    result = runner.invoke(app, args)
-
-    if result.exit_code == 0:
-        return json.loads(result.stdout), None
-    else:
-        print(f"Error: {result}")
-        return None, str(result.stderr)
+    try:
+        result = client.request_json(
+            host=endpoint_def.host,
+            path=resolved_path,
+            params=all_params if all_params else None,
+        )
+        return result, None
+    except Exception as e:
+        return None, str(e)
 
 def gen_activity_list(aid=None):
     if not aid:
@@ -373,8 +396,11 @@ def extract_pirate_universal(client=None, td=None, aid=None):
             for i, key in enumerate(query_keys):
                 if i < len(vals): current_query[key] = vals[i]
 
-        # Call your existing get_pirate_data function
+        # Call get_pirate_data with the authenticated GarminClient
+        # The client is passed from extract_load_flatten via the executioner's
+        # single login call — no separate auth needed here
         raw_json, error = get_pirate_data(
+            client=client,
             endpoint=endpoint,
             path_params=current_path if current_path else None,
             query_params=current_query if current_query else None

@@ -150,6 +150,14 @@ read -rp "Enter 1 or 2: " package_choice
 if [[ "$package_choice" == "1" ]]; then
     info "Installing/updating Python dependencies..."
     pip install -r deployment/library_requirements.txt
+    
+    # Install pirate-garmin from local source (native Android auth flow)
+    info "Installing pirate-garmin (native Garmin auth)..."
+    pip install -e pirate-garmin_clone
+    
+    # Install Playwright browser for Garmin browser-based login
+    info "Installing Playwright Chromium browser..."
+    python -m playwright install chromium
 else
     info "Skipping Python package checks"
 fi

@@ -126,6 +126,28 @@ def sql_rate_limited():
                 WHERE api_service_name = 'Spotify'"""
     return one_sql_result(test_sql)
 
+
+def check_rate_limit_cached():
+    """
+    Check rate limit with a short cache (30 seconds).
+
+    Prevents hammering the DB on every UI interaction while still providing
+    fresh rate limit status for user feedback. Returns cached result within
+    30-second window, otherwise queries the database.
+
+    Returns:
+        bool: True if currently rate limited, False otherwise.
+    """
+    now = time.time()
+    if hasattr(check_rate_limit_cached, '_last_check'):
+        if now - check_rate_limit_cached._last_check < 30:
+            return check_rate_limit_cached._cached_result
+
+    result = sql_rate_limited()
+    check_rate_limit_cached._last_check = now
+    check_rate_limit_cached._cached_result = result
+    return result
+
 def log_rate_limitation():
     log_api_event(service='Spotify', event='Under rate limitations', token_age=0)
     return
@@ -413,93 +435,98 @@ def save_token_to_db(service_name, token_info):
     After a successful OAuth flow, the token is stored in the DB so that
     other devices (e.g. the headless Pi) can retrieve it.
 
+    Extracts and stores refresh token expiry when available:
+    - Spotify: Uses store_spotify_auth_metadata() for 6-month tracking
+    - Garmin: Extracts refresh_token_expires_at from di/it token slots
+
     Args:
         service_name: 'Spotify' or other service name.
         token_info: The token dict from Spotipy (or similar).
     """
     from backend_functions.database_functions import qec
     import json
+    from datetime import datetime, timezone
+    from psycopg2.extras import Json
 
-    token_json = json.dumps(token_info)
-    # Deactivate old tokens, then insert new
-    deactivate_sql = f"""UPDATE _migration.api_tokens
+    # Extract refresh token expiry timestamp for Garmin (from native-oauth2 session)
+    refresh_expires_ts = None
+    if service_name == 'Garmin':
+        # Garmin session has 'di' and 'it' token slots, each with refresh_token_expires_at
+        try:
+            di_expires = token_info.get('di', {}).get('token', {}).get('refresh_token_expires_at')
+            it_expires = token_info.get('it', {}).get('token', {}).get('refresh_token_expires_at')
+            # Use the earlier expiry (most conservative)
+            if di_expires and it_expires:
+                refresh_expires_ts = min(di_expires, it_expires)
+            elif di_expires:
+                refresh_expires_ts = di_expires
+            elif it_expires:
+                refresh_expires_ts = it_expires
+        except (AttributeError, TypeError):
+            pass
+    
+    # Deactivate old tokens, then insert new (using parameterized queries)
+    deactivate_sql = """UPDATE _migration.api_tokens
                         SET is_active = false
-                        WHERE service_name = '{service_name}' AND is_active = true"""
-    qec(deactivate_sql)
-    insert_sql = f"""INSERT INTO _migration.api_tokens (service_name, token_data, updated_at_utc)
-                     VALUES ('{service_name}', '{token_json}', CURRENT_TIMESTAMP)"""
-    qec(insert_sql)
+                        WHERE service_name = %s AND is_active = true"""
+    qec(deactivate_sql, [service_name])
+    
+    if refresh_expires_ts:
+        # Convert Unix timestamp to PostgreSQL timestamp
+        expires_dt = datetime.fromtimestamp(refresh_expires_ts, tz=timezone.utc)
+        insert_sql = """INSERT INTO _migration.api_tokens 
+                          (service_name, token_data, updated_at_utc, refresh_token_expires_at_utc)
+                          VALUES (%s, %s, CURRENT_TIMESTAMP, %s)"""
+        qec(insert_sql, [service_name, Json(token_info), expires_dt])
+    else:
+        insert_sql = """INSERT INTO _migration.api_tokens 
+                        (service_name, token_data, updated_at_utc)
+                        VALUES (%s, %s, CURRENT_TIMESTAMP)"""
+        qec(insert_sql, [service_name, Json(token_info)])
+    
     log_api_event(service=service_name, event=f'Token saved to DB for {service_name}')
 
 
 def garmin_login():
-    # This function will retrieve garmin credentials and attempt to login.
-    # If the credentials do not exist or the login attempt fails, user will be reprompted to enter credentials.
-
-    sql = """SELECT seconds_since_last_event FROM logging.vw_last_login 
-            WHERE api_service_name='Garmin'"""
-    ll_diff = one_sql_result(sql) or 0
-
-    max_delay = 0
-    # Ensure we're not logging in too frequently
-    if ll_diff < max_delay:
-        print(f"Garmin forced wait of {max_delay - ll_diff} seconds")
-        time.sleep(max_delay-ll_diff)
-
-    email, password = garmin_creds()
-
-
-    if email is None or password is None:
-        print('Garmin login aborted due to missing email or password')
-        return False
-
-    try:
-        cache_loc = str(Path(os.getenv("LOCAL_STORAGE_PATH")))
-        try:
-            client = Garmin()
-            client.login(tokenstore=cache_loc)
-            log_api_event(service='Garmin', event='Cached Token login')
-        except Exception as e:
-            print(f'Garmin Login Exception for token reuse: {e}')
-            client = Garmin(email, password)
-            client.login(tokenstore=cache_loc)
-            log_api_event(service='Garmin', event='Official login')
-        return client
-    except GarminConnectAuthenticationError as e:
-        log_api_event(service='Garmin', event='login failure, authentication', err=e)
-        return None
-    except GarminConnectTooManyRequestsError as e:
-        log_api_event(service='Garmin', event='login failure, too many requests', err=e)
-        return None
-    except GarminConnectConnectionError as e:
-        log_api_event(service='Garmin', event='login failure, connection', err=e)
-        return None
-    except Exception as e:
-        log_api_event(service='Garmin', event='login failure, uncaught', err=e)
-        return None
+    """Legacy Garmin login using garminconnect library.
+    
+    DEPRECATED: Use pirate_garmin_login() instead, which uses Garmin's native
+    Android auth flow and avoids Cloudflare 429 errors.
+    
+    Kept for backward compatibility — delegates to pirate_garmin_login().
+    """
+    return pirate_garmin_login()
 
 
 def get_garmin_client(incoming_token=None):
-    # tests validity of incoming token and returns a client & token
+    """Garmin client with reuse-first methodology (mirrors Spotify pattern).
+    
+    Methodology:
+    1. If no incoming token → call pirate_garmin_login() for fresh session
+    2. If malformed token → call pirate_garmin_login()
+    3. If client is None → call pirate_garmin_login()
+    4. If token age > 300s → validate with get_full_name(), reuse if valid
+    5. If token age <= 300s → skip validation, reuse immediately
+    
+    The pirate_garmin_login() function handles DB-backed session storage,
+    so any machine can do the browser login and all machines share the session.
+    """
     if incoming_token is None:
-        new_token = {"client": garmin_login(),
-                     "token": None,
-                     "token_age": time.time()}
-        log_api_event('Garmin', 'New Token from none', token_age=0)
+        new_token = pirate_garmin_login()
+        if new_token:
+            log_api_event('Garmin', 'New Token from none', token_age=0)
         return new_token
 
     if "client" not in incoming_token or "token_age" not in incoming_token:
-        new_token = {"client": garmin_login(),
-                     "token": None,
-                     "token_age": time.time()}
-        log_api_event('Garmin', 'New Token from malformed dictionary', token_age=0)
+        new_token = pirate_garmin_login()
+        if new_token:
+            log_api_event('Garmin', 'New Token from malformed dictionary', token_age=0)
         return new_token
 
     if incoming_token.get("client") is None:
-        new_token = {"client": garmin_login(),
-                     "token": None,
-                     "token_age": time.time()}
-        log_api_event('Garmin', 'Client was in token, but was None', token_age=0)
+        new_token = pirate_garmin_login()
+        if new_token:
+            log_api_event('Garmin', 'Client was in token, but was None', token_age=0)
         return new_token
 
     token_age = time.time() - incoming_token["token_age"]
@@ -511,10 +538,9 @@ def get_garmin_client(incoming_token=None):
             log_api_event('Garmin', 'Token reuse: check and pass', token_age=token_age)
             return incoming_token
         except Exception as e:
-            new_token = {"client": garmin_login(),
-                         "token": None,
-                         "token_age": time.time()}
-            log_api_event('Garmin', 'New Token from expired', token_age=token_age)
+            new_token = pirate_garmin_login()
+            if new_token:
+                log_api_event('Garmin', 'New Token from expired', token_age=token_age)
             return new_token
     else:
         log_api_event('Garmin', 'Token reuse: recency skip', token_age=token_age)
@@ -543,6 +569,7 @@ def get_auth_status():
                 "Garmin": {
                     "status": "ok" | "missing_credentials" | "error" | "unknown",
                     "last_login_utc": str | None,
+                    "token_expires_utc": str | None,
                     "last_error": str | None
                 }
             }
@@ -560,6 +587,7 @@ def get_auth_status():
     garmin_status = {
         "status": "unknown",
         "last_login_utc": None,
+        "token_expires_utc": None,
         "last_error": None,
     }
 
@@ -646,6 +674,17 @@ def get_auth_status():
     except Exception:
         garmin_status["status"] = "error"
 
+    # Check token expiry from _migration.api_tokens (Garmin native oauth session)
+    try:
+        expires = one_sql_result(
+            "SELECT refresh_token_expires_at_utc FROM _migration.api_tokens "
+            "WHERE service_name = 'Garmin' AND is_active = true "
+            "ORDER BY updated_at_utc DESC LIMIT 1"
+        )
+        garmin_status["token_expires_utc"] = str(expires) if expires else None
+    except Exception:
+        pass
+
     return {
         "services": {
             "Spotify": spotify_status,
@@ -682,61 +721,80 @@ def get_service_list(append_option=None):
 
 
 def pirate_garmin_login(headless=False):
-    # Get the absolute path to your project folder
-    project_root = Path(__file__).parent.absolute().parent
-    # Point to the 'src' directory inside the cloned repo
-    pirate_src_path = project_root / "pirate-garmin_clone" / "src"
-
-    if pirate_src_path.exists():
-        sys.path.insert(0, str(pirate_src_path))
-    else:
-        print(f"Warning: Could not find source at {pirate_src_path}")
-
-    from pirate_garmin.cli import app
-    from typer.testing import CliRunner
-
-    # 1. Dynamic Path Injection
-    # # Ensure this variable is defined globally or passed in
-    # if pirate_src_path.exists():
-    #     if str(pirate_src_path) not in sys.path:
-    #         sys.path.insert(0, str(pirate_src_path))
-    # else:
-    #     log_api_event(service='Pirate Garmin', event='Login Error 1', err='Missing Source Path')
-    #     return None
-
-    # 2. Imports MUST happen after sys.path is modified
-    new_token = {"client": 'fake_client',
-                 "token": 'fake_token',
-                 "token_age": time.time()}
-
-    # 3. Credential Setup
+    """Garmin login using pirate-garmin's native Android auth flow.
+    
+    Uses the same DB-backed session pattern as Spotify:
+    1. Load session from _migration.api_tokens → write to local cache file
+    2. Call AuthManager.ensure_authenticated() → handles refresh if needed
+    3. Read refreshed session from cache file → save back to DB
+    4. Return GarminClient with valid session
+    
+    This means any machine that does a browser login saves to the DB,
+    and all other machines (including the Pi) pick up the same session.
+    """
+    import json
+    from pathlib import Path
+    
+    # Get credentials
     email, password = garmin_creds()
-    os.environ["GARMIN_USERNAME"] = email
-    os.environ["GARMIN_PASSWORD"] = password
-    # Set to "true" for your Raspberry Pi later, "false" for Windows testing
-    if headless:
-        os.environ["GARMIN_HEADLESS"] = "true"
-    else:
-        os.environ["PIRATE_GARMIN_HEADLESS"] = "false"
-
-    # 4. Execution
-    runner = CliRunner()
-
-    result = runner.invoke(app, ["login"])
-
-    random_sleep(500,5000)
-
-
-    # 5. Error Handling & Logging
-    if result.exit_code != 0:
-        # result.output captures the actual CLI text (including the 429 error message)
-        err_msg = result.stdout if result.stdout else str(result.exception)
-        log_api_event(
-            service='Pirate Garmin',
-            event=f'Login Failed (Code {result.exit_code})',
-            err=err_msg
-        )
-        new_token['error'] = f'Uncaught Exception: {err_msg}'
+    if not email or not password:
+        log_api_event(service='Garmin', event='Login aborted — missing credentials')
         return None
-
-    return new_token
+    
+    # Set up cache directory for pirate-garmin's auth files
+    cache_dir = Path(os.getenv("LOCAL_STORAGE_PATH")) / "pirate-garmin"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Step 1: Load any stored session from DB and write to local cache file
+    # This is the cross-device sync mechanism — same pattern as Spotify
+    db_session = load_token_from_db('Garmin')
+    if db_session:
+        session_file = cache_dir / "native-oauth2.json"
+        session_file.write_text(json.dumps(db_session, indent=2) + "\n")
+        log_api_event('Garmin', 'Session loaded from DB to local cache')
+    
+    # Step 2: Create GarminClient with pirate-garmin's AuthManager
+    # This handles: load cache → refresh tokens → Playwright login if all expired
+    try:
+        from pirate_garmin.client import GarminClient
+        from pirate_garmin.auth import GarminAuthError, MissingCredentialsError
+        
+        client = GarminClient.from_credentials(
+            username=email,
+            password=password,
+            app_dir=str(cache_dir)
+        )
+        
+        # This triggers the full auth chain:
+        # 1. Load cached session from native-oauth2.json (which we populated from DB)
+        # 2. Check DI token expiry → refresh if needed
+        # 3. Check IT token expiry → refresh if needed
+        # 4. If all expired → run Playwright browser login (headless)
+        session = client.auth.ensure_authenticated()
+        
+        # Step 3: Save refreshed session back to DB for cross-device sync
+        session_dict = session.to_dict()
+        save_token_to_db('Garmin', session_dict)
+        
+        log_api_event(
+            service='Garmin',
+            event='login with New Token' if db_session is None else 'Token reuse from cached session',
+            token_age=0
+        )
+        
+        return {
+            "client": client,
+            "token": session.di.token.access_token,
+            "token_age": time.time()
+        }
+        
+    except (GarminAuthError, MissingCredentialsError) as e:
+        error_msg = str(e)
+        log_api_event(service='Garmin', event='Login failed', err=error_msg)
+        print(f"Garmin login failed: {error_msg}")
+        return None
+    except Exception as e:
+        error_msg = str(e)
+        log_api_event(service='Garmin', event='Login failed, uncaught', err=error_msg)
+        print(f"Garmin login failed (uncaught): {error_msg}")
+        return None

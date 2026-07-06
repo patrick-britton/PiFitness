@@ -285,7 +285,7 @@ async def trigger_garmin_login():
     """
     Trigger a Garmin login attempt.
 
-    Attempts to log in to Garmin using stored credentials.
+    Used by the React UI to trigger Garmin sync.
     Returns success/failure with details.
     """
     try:
@@ -304,6 +304,75 @@ async def trigger_garmin_login():
         raise HTTPException(
             status_code=500,
             detail=f"Failed to trigger Garmin login: {str(e)}",
+        )
+
+
+@router.post("/spotify/test")
+async def test_spotify_auth():
+    """
+    Test Spotify authentication - refresh token as needed and verify connectivity.
+    
+    Called when user clicks the Spotify status indicator in Admin module.
+    Refreshes token if needed and verifies API connectivity.
+    Returns success/failure with details.
+    """
+    try:
+        import spotipy
+        
+        # Get token (will refresh if needed)
+        token_dict = get_spotify_token()
+        
+        if token_dict and token_dict.get("token"):
+            # Verify connectivity with lightweight API call
+            client = spotipy.Spotify(auth=token_dict["token"])
+            user = client.current_user()
+            display_name = user.get("display_name", "unknown") if user else "unknown"
+            
+            return {
+                "status": "ok",
+                "message": "Spotify authentication verified",
+                "user": display_name,
+                "token_preview": token_dict["token"][:20] + "...",
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Spotify token could not be obtained — re-authorization required",
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to test Spotify authentication: {str(e)}",
+        )
+
+
+@router.post("/garmin/test")
+async def test_garmin_auth():
+    """
+    Test Garmin authentication - verify connectivity.
+    
+    Called when user clicks the Garmin status indicator in Admin module.
+    Verifies the Garmin session is valid by checking the client exists.
+    Returns success/failure with details.
+    """
+    try:
+        client_dict = garmin_login()
+        
+        if client_dict and client_dict.get("client"):
+            # Client exists - session is valid (pirate-garmin doesn't need get_full_name)
+            return {
+                "status": "ok",
+                "message": "Garmin authentication verified",
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Garmin login failed — check credentials or rate limit status",
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to test Garmin authentication: {str(e)}",
         )
 
 
@@ -341,21 +410,14 @@ async def auth_health():
             "detail": str(e),
         }
 
-    # Garmin: try a cached token check
+    # Garmin: verify client exists (pirate-garmin doesn't expose get_full_name)
     try:
-        client = garmin_login()
-        if client:
-            try:
-                name = client.get_full_name()
-                results["garmin"] = {
-                    "status": "ok",
-                    "user": name,
-                }
-            except Exception:
-                results["garmin"] = {
-                    "status": "ok",
-                    "detail": "Client obtained but user info unavailable",
-                }
+        client_dict = garmin_login()
+        if client_dict and client_dict.get("client"):
+            results["garmin"] = {
+                "status": "ok",
+                "detail": "Client obtained successfully",
+            }
         else:
             results["garmin"] = {
                 "status": "login_failed",

@@ -94,6 +94,17 @@ def db_query(sql, params=None):
         return f"DB_ERROR: {e}"
 
 
+def get_last_spotify_login_event():
+    """Return the most recent Spotify login event from api_logins."""
+    from backend_functions.database_functions import sql_to_dict
+    sql = """SELECT event_time_utc, event_name, error_text 
+             FROM logging.api_logins 
+             WHERE api_service_name = 'Spotify' 
+             ORDER BY event_time_utc DESC LIMIT 1"""
+    rows = sql_to_dict(sql)
+    return rows[0] if rows else None
+
+
 # ---------------------------------------------------------------------------
 # Test: Database Connectivity
 # ---------------------------------------------------------------------------
@@ -154,17 +165,58 @@ def test_spotify_last_login(results):
 
 
 def test_spotify_token_acquisition(results, verbose=False):
-    """Attempt to acquire a Spotify token and report result."""
+    """Attempt to acquire a Spotify token and report result.
+    
+    When --verbose is used, this test demonstrates the 'reuse-first-then-reacquire'
+    methodology step by step: it checks whether the token was reused from the DB,
+    refreshed via a refresh token, or freshly acquired via full OAuth.
+    """
     print("\n--- Spotify Token Acquisition ---")
     try:
-        from backend_functions.service_logins import get_spotify_token
+        from backend_functions.service_logins import get_spotify_token, load_token_from_db
+        from backend_functions.database_functions import sql_to_dict
+
+        # Step 1: Check if a token exists in the DB
+        db_token = load_token_from_db('Spotify')
+        if verbose:
+            if db_token:
+                has_refresh = "refresh_token" in db_token
+                has_access = "access_token" in db_token
+                print(f"    [VERBOSE] Step 1: Checking DB for stored token... Found!")
+                print(f"    [VERBOSE]   - access_token present: {has_access}")
+                print(f"    [VERBOSE]   - refresh_token present: {has_refresh}")
+            else:
+                print(f"    [VERBOSE] Step 1: Checking DB for stored token... Not found")
+
+        # Step 2: Acquire token (this will try DB reuse first, then fall through)
         token = get_spotify_token()
         if token and token.get("token"):
             token_preview = token["token"][:20] + "..."
             results.add_pass("Token acquisition", f"Token obtained: {token_preview}")
             if verbose:
-                print(f"    Token age: {time.time() - token['token_age']:.0f}s ago")
-                print(f"    Client present: {token.get('client') is not None}")
+                print(f"    [VERBOSE] Step 2: get_spotify_token() returned:")
+                print(f"    [VERBOSE]   - token: {token_preview}")
+                print(f"    [VERBOSE]   - token_age: {time.time() - token['token_age']:.0f}s ago (since validation/creation)")
+                print(f"    [VERBOSE]   - client present: {token.get('client') is not None}")
+
+            # Step 3: Determine what actually happened by checking the log
+            if verbose:
+                print(f"    [VERBOSE] Step 3: Checking api_logins to determine what get_spotify_token() did...")
+                last_event = get_last_spotify_login_event()
+                if last_event:
+                    event_name = last_event['event_name']
+                    event_time = last_event['event_time_utc']
+                    print(f"    [VERBOSE]   Most recent login event: '{event_name}' at {event_time}")
+                    if event_name == 'Token reuse from DB':
+                        print(f"    [VERBOSE]   ✅ Token was REUSED from database (no OAuth call needed)")
+                    elif 'refreshed' in event_name.lower():
+                        print(f"    [VERBOSE]   ✅ Token was REFRESHED via stored refresh token (no full OAuth)")
+                    elif 'New Token' in event_name:
+                        print(f"    [VERBOSE]   ⚠️  Token was FRESHLY ACQUIRED via OAuth (reuse path was unavailable)")
+                    else:
+                        print(f"    [VERBOSE]   ℹ️  Event: {event_name}")
+                else:
+                    print(f"    [VERBOSE]   No login events found in api_logins")
         else:
             results.add_fail("Token acquisition", "get_spotify_token() returned None or empty token")
     except Exception as e:
@@ -192,6 +244,111 @@ def test_spotify_token_validation(results):
             results.add_fail("Token validation", "get_spotify_client() returned invalid result")
     except Exception as e:
         results.add_fail("Token validation", f"Exception: {e}")
+
+
+def test_spotify_reuse_demonstration(results, verbose=False):
+    """Demonstrate the 'reuse-first-then-reacquire' methodology by calling
+    get_spotify_token() twice in sequence, showing that the second call
+    reuses the token saved by the first call."""
+    print("\n--- Spotify Reuse Methodology Demonstration ---")
+    if not verbose:
+        print("  (Use --verbose for detailed step-by-step demonstration)")
+        results.add_skip("Reuse demo", "Skipped — use --verbose to enable")
+        return
+
+    try:
+        from backend_functions.service_logins import get_spotify_token, load_token_from_db
+        from backend_functions.database_functions import sql_to_dict
+
+        print("  ╔══════════════════════════════════════════════════════════╗")
+        print("  ║     TOKEN REUSE METHODOLOGY DEMONSTRATION               ║")
+        print("  ║                                                        ║")
+        print("  ║  Methodology:                                           ║")
+        print("  ║  1. Check DB for stored token (reuse if valid)          ║")
+        print("  ║  2. If valid, try to refresh via refresh_token          ║")
+        print("  ║  3. Only fall through to full OAuth if 1 & 2 fail       ║")
+        print("  ╚══════════════════════════════════════════════════════════╝")
+        print()
+
+        # --- Call 1 ---
+        print("  ─── Call #1: get_spotify_token() ───")
+        db_token_before = load_token_from_db('Spotify')
+        if db_token_before:
+            print(f"    DB token found: access_token={'Yes' if 'access_token' in db_token_before else 'No'}, "
+                  f"refresh_token={'Yes' if 'refresh_token' in db_token_before else 'No'}")
+        else:
+            print("    DB token: Not found")
+
+        last_event_before = get_last_spotify_login_event()
+        print(f"    Last login event before call: {last_event_before['event_name'] if last_event_before else 'None'}")
+
+        token1 = get_spotify_token()
+
+        last_event_after = get_last_spotify_login_event()
+        print(f"    Last login event AFTER  call: {last_event_after['event_name'] if last_event_after else 'None'}")
+        if token1:
+            print(f"    Result: Token {'acquired' if token1.get('token') else 'FAILED'}, "
+                  f"age={time.time() - token1['token_age']:.0f}s")
+            # Interpret
+            event_name = last_event_after['event_name'] if last_event_after else ''
+            if event_name == 'Token reuse from DB':
+                print(f"    ➡️  REUSE: Token was reused from database — no OAuth call needed")
+            elif 'refreshed via DB' in event_name:
+                print(f"    ➡️  REFRESH: Token was refreshed via stored refresh token — quick, no user interaction")
+            elif 'New Token' in event_name or 'login with New Token' in event_name:
+                print(f"    ➡️  ACQUIRE: Token was freshly acquired via OAuth (reuse/refresh paths unavailable)")
+            else:
+                print(f"    ➡️  METHOD: {event_name}")
+        else:
+            print(f"    Result: get_spotify_token() returned None")
+            results.add_warning("Reuse demo call #1", "First token acquisition returned None")
+            return
+        print()
+
+        # --- Call 2 (should reuse) ---
+        print("  ─── Call #2: get_spotify_token() (should reuse from DB) ───")
+
+        last_event_before2 = get_last_spotify_login_event()
+
+        token2 = get_spotify_token()
+
+        last_event_after2 = get_last_spotify_login_event()
+        print(f"    Last login event BEFORE call #2: {last_event_before2['event_name'] if last_event_before2 else 'None'}")
+        print(f"    Last login event AFTER  call #2: {last_event_after2['event_name'] if last_event_after2 else 'None'}")
+
+        if token2:
+            event_name2 = last_event_after2['event_name'] if last_event_after2 else ''
+            print(f"    Result: Token {'acquired' if token2.get('token') else 'FAILED'}")
+            
+            if event_name2 == 'Token reuse from DB':
+                print(f"    ✅ VERIFIED: Second call reused token from database")
+                print()
+                print(f"  ╔══════════════════════════════════════════════════════════╗")
+                print(f"  ║  ✅  REUSE-FIRST METHODOLOGY CONFIRMED                  ║")
+                print(f"  ║                                                        ║")
+                print(f"  ║  The second call to get_spotify_token() successfully    ║")
+                print(f"  ║  reused the DB-stored token without making a new        ║")
+                print(f"  ║  OAuth request.                                         ║")
+                print(f"  ╚══════════════════════════════════════════════════════════╝")
+                results.add_pass("Reuse methodology", "Second call reused token from DB (confirmed via api_logins)")
+            elif 'refreshed' in event_name2.lower():
+                print(f"    ⚠️  VERIFIED: Second call refreshed via DB refresh token")
+                print(f"    (This is still reuse-first — no full OAuth was needed)")
+                results.add_pass("Reuse methodology", "Second call refreshed via refresh token (no full OAuth)")
+            else:
+                print(f"    ⚠️  Note: event_name='{event_name2}' — unexpected for call #2")
+                results.add_warning("Reuse methodology", f"Call #2 resulted in {event_name2}")
+        else:
+            print(f"    Result: get_spotify_token() returned None")
+            results.add_fail("Reuse demo call #2", "Second token acquisition returned None")
+        
+        print()
+
+    except Exception as e:
+        results.add_fail("Reuse demonstration", f"Exception: {e}")
+        import traceback
+        if verbose:
+            traceback.print_exc()
 
 
 def test_spotify_rate_limit_test(results):
@@ -329,6 +486,51 @@ def test_garmin_pirate_login_dry_run(results, verbose=False):
         results.add_fail("CLI dry run", str(e))
 
 
+def test_token_expiration_tracking(results, verbose=False):
+    """Test that token expiration values are being tracked correctly.
+    
+    For Spotify: Checks that _migration.spotify_auth_metadata has expiry data.
+    For Garmin: Checks that _migration.api_tokens has refresh_token_expires_at_utc.
+    """
+    print("\n--- Token Expiration Tracking ---")
+    try:
+        from backend_functions.service_logins import get_auth_status
+        
+        status = get_auth_status()
+        
+        # Check Spotify expiry
+        spotify_expires = status.get("services", {}).get("Spotify", {}).get("token_expires_utc")
+        if spotify_expires:
+            try:
+                expires_dt = datetime.fromisoformat(spotify_expires.replace("Z", "+00:00"))
+                days_until_expiry = (expires_dt - datetime.now(timezone.utc)).days
+                if days_until_expiry < 0:
+                    results.add_warning("Spotify expiry", f"Token expired {abs(days_until_expiry)} days ago")
+                else:
+                    results.add_pass("Spotify expiry", f"{days_until_expiry} days until refresh token expiry (6 months)")
+            except Exception as e:
+                results.add_warning("Spotify expiry parse", str(e))
+        else:
+            results.add_warning("Spotify expiry", "No expiry data found in _migration.spotify_auth_metadata")
+        
+        # Check Garmin expiry
+        garmin_expires = status.get("services", {}).get("Garmin", {}).get("token_expires_utc")
+        if garmin_expires:
+            try:
+                expires_dt = datetime.fromisoformat(garmin_expires.replace("Z", "+00:00"))
+                days_until_expiry = (expires_dt - datetime.now(timezone.utc)).days
+                if days_until_expiry < 0:
+                    results.add_warning("Garmin expiry", f"Token expired {abs(days_until_expiry)} days ago")
+                else:
+                    results.add_pass("Garmin expiry", f"{days_until_expiry} days until refresh token expiry (from native-oauth2)")
+            except Exception as e:
+                results.add_warning("Garmin expiry parse", str(e))
+        else:
+            results.add_warning("Garmin expiry", "No expiry data found in _migration.api_tokens")
+    except Exception as e:
+        results.add_fail("Token expiration tracking", str(e))
+
+
 # ---------------------------------------------------------------------------
 # Test: Task Executioner Login Dispatch
 # ---------------------------------------------------------------------------
@@ -385,6 +587,7 @@ def run_all_tests(args):
         test_spotify_last_login(results)
         test_spotify_token_acquisition(results, args.verbose)
         test_spotify_token_validation(results)
+        test_spotify_reuse_demonstration(results, args.verbose)
         if not args.status:
             test_spotify_rate_limit_test(results)
 
@@ -400,12 +603,13 @@ def run_all_tests(args):
         if not args.status:
             test_garmin_pirate_login_dry_run(results, args.verbose)
 
-    # --- Cross-cutting Tests ---
-    if args.all:
+# --- Cross-cutting Tests ---
+    if args.all or args.status:
         print("\n" + "=" * 60)
         print("CROSS-CUTTING TESTS")
         print("=" * 60)
         test_task_login_configuration(results)
+        test_token_expiration_tracking(results, args.verbose)
 
     # --- Summary ---
     success = results.summary()
