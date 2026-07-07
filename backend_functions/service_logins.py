@@ -663,27 +663,41 @@ def get_auth_status():
     except Exception:
         pass
 
-    # Check credentials exist
-    try:
-        email, password = garmin_creds()
-        if email and password:
-            if garmin_status["status"] == "unknown":
-                garmin_status["status"] = "ok"
-        else:
-            garmin_status["status"] = "missing_credentials"
-    except Exception:
-        garmin_status["status"] = "error"
-
     # Check token expiry from _migration.api_tokens (Garmin native oauth session)
+    # If the refresh token has expired, show yellow "Expired" — user can click to re-auth
     try:
-        expires = one_sql_result(
+        expires_val = one_sql_result(
             "SELECT refresh_token_expires_at_utc FROM _migration.api_tokens "
             "WHERE service_name = 'Garmin' AND is_active = true "
             "ORDER BY updated_at_utc DESC LIMIT 1"
         )
-        garmin_status["token_expires_utc"] = str(expires) if expires else None
+        garmin_status["token_expires_utc"] = str(expires_val) if expires_val else None
     except Exception:
         pass
+
+    # Determine status from credentials + token expiry (never contacts the API provider)
+    # The user clicks the button to actually test the connection.
+    try:
+        email, password = garmin_creds()
+        if email and password:
+            if garmin_status["status"] == "unknown":
+                # If we have a token_expires_utc, check if it's expired
+                if garmin_status["token_expires_utc"]:
+                    try:
+                        from datetime import datetime, timezone
+                        expires_dt = datetime.fromisoformat(garmin_status["token_expires_utc"])
+                        if expires_dt < datetime.now(timezone.utc):
+                            garmin_status["status"] = "expired"
+                        else:
+                            garmin_status["status"] = "ok"
+                    except (ValueError, TypeError):
+                        garmin_status["status"] = "ok"
+                else:
+                    garmin_status["status"] = "ok"
+        else:
+            garmin_status["status"] = "missing_credentials"
+    except Exception:
+        garmin_status["status"] = "error"
 
     return {
         "services": {
@@ -720,6 +734,16 @@ def get_service_list(append_option=None):
     return service_list
 
 
+# Import pirate-garmin exception classes at module level with fallback
+# This avoids UnboundLocalError if the installed package version doesn't export them
+try:
+    from pirate_garmin.auth import GarminAuthError, MissingCredentialsError
+except ImportError:
+    # Fallback stubs — allows except clauses to resolve even on version mismatch
+    class GarminAuthError(Exception): pass
+    class MissingCredentialsError(GarminAuthError): pass
+
+
 def pirate_garmin_login(headless=False):
     """Garmin login using pirate-garmin's native Android auth flow.
     
@@ -750,14 +774,17 @@ def pirate_garmin_login(headless=False):
     db_session = load_token_from_db('Garmin')
     if db_session:
         session_file = cache_dir / "native-oauth2.json"
-        session_file.write_text(json.dumps(db_session, indent=2) + "\n")
-        log_api_event('Garmin', 'Session loaded from DB to local cache')
+        try:
+            session_file.write_text(json.dumps(db_session, indent=2) + "\n")
+        except OSError:
+            log_api_event('Garmin', 'Could not write session to cache file (non-fatal)')
+        else:
+            log_api_event('Garmin', 'Session loaded from DB to local cache')
     
     # Step 2: Create GarminClient with pirate-garmin's AuthManager
     # This handles: load cache → refresh tokens → Playwright login if all expired
     try:
         from pirate_garmin.client import GarminClient
-        from pirate_garmin.auth import GarminAuthError, MissingCredentialsError
         
         client = GarminClient.from_credentials(
             username=email,

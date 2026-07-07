@@ -29,7 +29,7 @@ function StatusBadge({
 
   if (status === 'ok') {
     bgColor = 'bg-green-500';
-    label = 'Connected';
+    label = 'Valid Token';
   } else if (status === 'rate_limited') {
     bgColor = 'bg-red-500';
     label = 'Rate Limited';
