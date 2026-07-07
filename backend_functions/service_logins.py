@@ -734,14 +734,13 @@ def get_service_list(append_option=None):
     return service_list
 
 
-# Import pirate-garmin exception classes at module level with fallback
-# This avoids UnboundLocalError if the installed package version doesn't export them
-try:
-    from pirate_garmin.auth import GarminAuthError, MissingCredentialsError
-except ImportError:
-    # Fallback stubs — allows except clauses to resolve even on version mismatch
-    class GarminAuthError(Exception): pass
-    class MissingCredentialsError(GarminAuthError): pass
+# Import Garmin auth classes from the inlined local module
+# (replaces the previously broken pip package import)
+from backend_functions.pirate_garmin_auth import (
+    GarminAuthError,
+    MissingCredentialsError,
+    GarminClient,
+)
 
 
 def pirate_garmin_login(headless=False):
@@ -784,8 +783,6 @@ def pirate_garmin_login(headless=False):
     # Step 2: Create GarminClient with pirate-garmin's AuthManager
     # This handles: load cache → refresh tokens → Playwright login if all expired
     try:
-        from pirate_garmin.client import GarminClient
-        
         client = GarminClient.from_credentials(
             username=email,
             password=password,
