@@ -337,6 +337,7 @@ export default function TaskList() {
   const [executeStatus, setExecuteStatus] = useState<string | null>(null);
   const [executingTaskName, setExecutingTaskName] = useState<string | null>(null);
   const [currentExecutionId, setCurrentExecutionId] = useState<number | null>(null);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
   const [executeProgress, setExecuteProgress] = useState<number>(0);
   const [lastExecutionFailed, setLastExecutionFailed] = useState<boolean>(false);
   const [lastExecutionError, setLastExecutionError] = useState<string | null>(null);
@@ -431,15 +432,13 @@ export default function TaskList() {
   }, [summaryRows, executingTaskName]);
 
   // Timer effect: advances progress from 0% to 90% over the estimated duration
+  // Uses isRunning to track async task execution state (not just mutation pending)
   useEffect(() => {
-    if (executeTask.isPending && executingTaskName) {
+    if (isRunning && executingTaskName) {
       progressStartRef.current = Date.now();
       const step = 200; // update every 200ms
-      const totalSteps = estimatedDurationMs / step;
-      let currentStep = 0;
 
       progressIntervalRef.current = setInterval(() => {
-        currentStep++;
         const elapsed = Date.now() - progressStartRef.current;
         // Use a non-linear curve: fast at start, slows toward 90%
         const progress = Math.min(90, (elapsed / estimatedDurationMs) * 100);
@@ -457,12 +456,13 @@ export default function TaskList() {
         progressIntervalRef.current = null;
       }
     };
-  }, [executeTask.isPending, executingTaskName, estimatedDurationMs]);
+  }, [isRunning, executingTaskName, estimatedDurationMs]);
 
   // Handle task execution
   const handleExecute = (taskName: string, taskId?: number) => {
     setExecutingTaskName(taskName);
     setCurrentExecutionId(null);
+    setIsRunning(true);
     setExecuteProgress(0);
     setShowFailureModal(false);
     setExecuteStatus(`Starting ${taskName}...`);
@@ -476,6 +476,7 @@ export default function TaskList() {
         } else {
           // Fallback for non-async response
           setExecutingTaskName(null);
+          setIsRunning(false);
           setExecuteProgress(100);
           setExecuteStatus(`${taskName}: ${(data as any).message || 'completed'}`);
           setLastExecutionFailed(false);
@@ -485,6 +486,7 @@ export default function TaskList() {
       },
       onError: (err) => {
         setExecutingTaskName(null);
+        setIsRunning(false);
         setExecuteProgress(0);
         const errorMsg = `Error: ${err}`;
         setExecuteStatus(errorMsg);
@@ -508,6 +510,7 @@ export default function TaskList() {
     if (executionStatus.status === 'success') {
       setExecutingTaskName(null);
       setCurrentExecutionId(null);
+      setIsRunning(false);
       setExecuteProgress(100);
       setExecuteStatus(`${executionStatus.task_name}: completed successfully`);
       setLastExecutionFailed(false);
@@ -520,6 +523,7 @@ export default function TaskList() {
     } else if (executionStatus.status === 'failed') {
       setExecutingTaskName(null);
       setCurrentExecutionId(null);
+      setIsRunning(false);
       setExecuteProgress(0);
       const errorMsg = `Failed: ${executionStatus.error_message || 'Task execution failed'}`;
       setExecuteStatus(errorMsg);
@@ -531,9 +535,10 @@ export default function TaskList() {
       queryClient.invalidateQueries({ queryKey: adminKeys.tasks() });
       queryClient.invalidateQueries({ queryKey: adminKeys.taskSummaryChart() });
     } else if (executionStatus.status === 'running') {
-      // Still running, update status with timing estimate if available
+      // Still running - keep modal visible
+      setIsRunning(true);
       const elapsed = executionStatus.started_at ? 
-        Math.floor((Date.now() - new Date(executionStatus.started_at).getTime()) / 1000) : 0;
+        Math.max(0, Math.floor((Date.now() - new Date(executionStatus.started_at).getTime()) / 1000)) : 0;
       setExecuteStatus(`Executing ${executionStatus.task_name}... (${elapsed}s)`);
     }
   }, [executionStatus, queryClient]);
@@ -723,7 +728,7 @@ export default function TaskList() {
       </div>
 
       {/* Execution Progress Overlay (Popup Modal) */}
-      {(executeTask.isPending && executingTaskName) && !showFailureModal && (
+      {(isRunning && executingTaskName) && !showFailureModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
             <div className="flex items-center gap-3 mb-4">
