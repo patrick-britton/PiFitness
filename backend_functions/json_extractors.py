@@ -300,7 +300,7 @@ def get_pirate_data(client, endpoint, path_params=None, query_params=None):
     and 401 retry internally.
     
     Args:
-        client: pirate_garmin.client.GarminClient instance (authenticated)
+        client: GarminClient instance from backend_functions.pirate_garmin_auth (authenticated)
         endpoint: Endpoint key string (e.g. 'usersummary.daily')
         path_params: Dict of path placeholder values
         query_params: Dict of query parameter values
@@ -308,7 +308,7 @@ def get_pirate_data(client, endpoint, path_params=None, query_params=None):
     Returns:
         tuple: (response_json, None) on success, (None, error_msg) on failure
     """
-    from pirate_garmin.endpoints import resolve_endpoint, render_endpoint
+    from backend_functions.pirate_garmin_endpoints import resolve_endpoint, render_endpoint
 
     try:
         endpoint_def = resolve_endpoint(endpoint)

@@ -1,19 +1,22 @@
-"""
-Inlined pirate-garmin authentication module
-============================================
+"""Inlined pirate-garmin authentication module.
 
 Consolidated Garmin native Android OAuth2 authentication logic, extracted from
 the `pirate-garmin_clone/` source directory. This eliminates the need for a
 separate pip-installed package and avoids import confusion.
 
 Source: pirate-garmin_clone/src/pirate_garmin/
-    - auth.py       → AuthManager, OAuth2Token, NativeOAuth2Session, etc.
-    - client.py     → GarminClient
+    - auth.py         → AuthManager, OAuth2Token, NativeOAuth2Session, etc.
+    - client.py       → GarminClient
     - browser_login.py → login_via_browser(), BrowserLoginError
+
+The Garmin endpoint registry (Endpoint, resolve_endpoint, render_endpoint,
+parse_kv_pairs) is provided by the sibling module
+`backend_functions.pirate_garmin_endpoints` so the backend does not depend on
+the cloned package being importable at runtime.
 
 Usage:
     from backend_functions.pirate_garmin_auth import (
-        GarminAuthError, MissingCredentialsError, GarminClient
+        GarminAuthError, MissingCredentialsError, GarminClient,
     )
 """
 
@@ -590,7 +593,7 @@ class AuthManager:
     def __init__(
         self,
         credentials: Credentials | None = None,
-        app_dir: Path | None = None,
+        app_dir: str | Path | None = None,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
         self.credentials = credentials

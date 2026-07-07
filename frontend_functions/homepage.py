@@ -7,70 +7,54 @@ from streamlit import session_state as ss
 
 from backend_functions.database_functions import one_sql_result
 from backend_functions.elevation_tiles import reconcile_elevation_tiles
-from backend_functions.service_logins import sql_rate_limited, rate_limit_test, garmin_creds
+from backend_functions.service_logins import (
+    sql_rate_limited,
+    rate_limit_test,
+    garmin_creds,
+    pirate_garmin_login,
+)
+from backend_functions.json_extractors import get_pirate_data
 from frontend_functions.music_module import rating_display_module
 from frontend_functions.streamlit_helpers import sse
 
 
 def render_test_widget():
+    """Dev-only widget to exercise the inlined Garmin auth client.
+
+    Uses the backend's inlined pirate-garmin auth (backend_functions.pirate_garmin_auth
+    via service_logins.pirate_garmin_login) — no dependency on the pirate-garmin_clone
+    package being importable.
+    """
     if not sse('step_no'):
-        ss.step_no=0
+        ss.step_no = 0
 
-    if ss.step_no==0:
-        if st.button('Path Test'):
-            ss.project_root = Path(__file__).parent.absolute().parent
-        # Point to the 'src' directory inside the cloned repo
-            ss.pirate_src_path = ss.project_root / "pirate-garmin_clone" / "src"
-            st.write(f"Root: {ss.project_root} || Path: {ss.pirate_src_path}")
-            ss.step_no=1
-
-    if ss.step_no==1:
-        if ss.pirate_src_path.exists():
-            sys.path.insert(0, str(ss.pirate_src_path))
-            ss.step_no = 2
-        else:
-            st.error(f"Warning: Could not find source at {ss.pirate_src_path}")
-
-
-    if ss.step_no==2:
-        if st.button('Imports'):
+    if ss.step_no == 0:
+        if st.button('Garmin Login Test'):
             try:
-                from pirate_garmin.cli import app
-                from typer.testing import CliRunner
-                ss.step_no = 3
+                result = pirate_garmin_login()
             except Exception as e:
-                st.error(f'Imports Failed: {e}')
-                ss.step_no = 3
+                st.error(f'Garmin login failed: {e}')
+                result = None
 
+            if result and result.get("client"):
+                ss.garmin_client = result["client"]
+                st.success('Garmin client established')
+                ss.step_no = 1
+            else:
+                st.error('Garmin login returned no client')
 
-            # 3. Credential Setup
-    if ss.step_no==3:
-        if st.button('Cred Setup'):
-
-            ss.email, ss.password = garmin_creds()
-            os.environ["GARMIN_USERNAME"] = ss.email
-            os.environ["GARMIN_PASSWORD"] = ss.password
-            # Set to "true" for your Raspberry Pi later, "false" for Windows testing
-            os.environ["PIRATE_GARMIN_HEADLESS"] = "false"
-            st.success('Creds Established')
-            ss.step_no=4
-
-    if ss.step_no==4:
-        if st.button('Client Runner'):
-
-            # 4. Execution
-            from typer.testing import CliRunner
-            from pirate_garmin.cli import app
-            ss.runner = CliRunner()
-            st.success('Client Runner established')
-            ss.step_no=5
-
-    if ss.step_no==5:
-        if st.button('Final Login'):
-            from typer.testing import CliRunner
-            from pirate_garmin.cli import app
-            result = ss.runner.invoke(app, ["login"])
-            st.info(f'Full success: {result}')
+    if ss.step_no == 1:
+        if st.button('Test Endpoint'):
+            try:
+                client = ss.garmin_client
+                # Exercise a simple endpoint through the inlined client
+                data, error = get_pirate_data(client, "usersummary.daily")
+                if error:
+                    st.error(f'Endpoint error: {error}')
+                else:
+                    st.json(data)
+            except Exception as e:
+                st.error(f'Request failed: {e}')
 
     st.write(f"Step no: {ss.get('step_no')}")
     return
