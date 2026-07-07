@@ -5,7 +5,7 @@ from scipy.signal import savgol_filter
 from psycopg2.extras import execute_values
 
 from backend_functions.database_functions import get_conn, sql_to_list, qec, one_sql_result
-from backend_functions.logging_functions import start_timer, elapsed_ms
+from backend_functions.logging_functions import start_timer, elapsed_ms, log_app_event
 
 
 def apply_savgol_filter(records, polyorder=3, is_time=False):
@@ -127,12 +127,22 @@ def activity_post_processing(manual_list=None):
         activity_list = manual_list
     else:
         activity_list = sql_to_list(
-            f"SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc")
+            f"SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5")
 
     if not activity_list:
-        return
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Early Exit with no activities',
+                      err=None,
+                      data_event=None)
+        return True
     ac = len(activity_list)
     ctr=1
+
+    log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: List has {ac} activities.',
+                      err=None,
+                      data_event=None)
+
     for a in activity_list:
         int_a = int(a)
         t0 = start_timer()
@@ -146,30 +156,81 @@ def activity_post_processing(manual_list=None):
                 WHERE health.heartrate_raw.heartrate_bpm IS DISTINCT FROM EXCLUDED.heartrate_bpm;"""
         qec(hr_sql)
 
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: HR Insertion {a}',
+                      err=None,
+                      data_event=None)
+
         # Assign elevation_reference
         qec(f"CALL activities.assign_elevation_reference_time({int_a});")
+
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Elevation Reference Time {a}',
+                      err=None,
+                      data_event=None)
 
         # Smooth raw elevation by time
         qec(f"CALL activities.smooth_elevation_spikes_by_time({int_a});")
 
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Smooth in SQL {a}',
+                      err=None,
+                      data_event=None)
+
         # Smooth again in python
         process_all_activities([int_a], is_reference=False, is_time=True)
+
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Smooth in Python {a}',
+                      err=None,
+                      data_event=None)
 
         # Update elevation reference table
         qec(f"CALL activities.update_elevation_reference_by_time({int_a});")
 
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Elev Reference Update {a}',
+                      err=None,
+                      data_event=None)
+
         # Resample to 1m; assigns elevation_reference
         qec(f'CALL activities.resample_activity_to_distance({int_a});')
+
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Resampling to distance {a}',
+                      err=None,
+                      data_event=None)
 
         # Smooth Elevation Spikes (smooths elevation_m and elevation_reference
         qec(f"CALL activities.smooth_elevation_spikes_by_distance({int_a});")
 
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Spike Smooth by distance {a}',
+                      err=None,
+                      data_event=None)
+
         # Smooth again in python
         process_all_activities([int_a], is_reference=False, is_time=False)
+
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Reprocessing 2 {a}',
+                      err=None,
+                      data_event=None)
+        
         process_all_activities([int_a], is_reference=True, is_time=False)
+
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Reprocessing 3 {a}',
+                      err=None,
+                      data_event=None)
 
         # Update elevation reference again
         qec(f"CALL activities.update_elevation_reference_by_distance({int_a});")
+
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Elev Reference #2 {a}',
+                      err=None,
+                      data_event=None)
 
         # Build the path
         path_sql = f"""UPDATE activities.activities
@@ -191,6 +252,11 @@ def activity_post_processing(manual_list=None):
                 WHERE activities.activity_id = sub.activity_id;"""
         qec(path_sql)
 
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Path Building {a}',
+                      err=None,
+                      data_event=None)
+
         segment_match_workflow = [f"CALL activities.segment_matching_match_segments({int_a});",
                              f"CALL activities.segment_matching_activity_pair_generation({int_a});",
                              f"CALL activities.segment_matches_all_polygon();",
@@ -203,10 +269,20 @@ def activity_post_processing(manual_list=None):
 
         for seg_sql in segment_match_workflow:
             qec(seg_sql)
+            log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Segment Matching {a} : {seg_sql}',
+                      err=None,
+                      data_event=None)
 
         qec(f"""DELETE FROM activities.activity_processing_queue WHERE activity_id = {int_a}""")
+        
+        log_app_event(cat='Task Executioner',
+                      desc='Activity Post Processing: Queue Deletion {a} : {seg_sql}',
+                      err=None,
+                      data_event=None)
+        
         print(f"{ctr}/{ac} | ID# {int_a} | {elapsed_ms(t0)} ms")
         ctr += 1
 
 
-    return
+    return True

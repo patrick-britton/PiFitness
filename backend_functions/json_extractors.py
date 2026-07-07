@@ -321,7 +321,7 @@ def get_pirate_data(client, endpoint, path_params=None, query_params=None):
         for key, val in path_params.items():
             placeholder = "{" + key + "}"
             if placeholder in resolved_path:
-                resolved_path = resolved_path.replace(placeholder, val)
+                resolved_path = resolved_path.replace(placeholder, str(val))
             else:
                 # Raise error for unknown placeholders
                 pass
