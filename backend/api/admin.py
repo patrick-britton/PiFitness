@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Body
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
 
+from backend_functions.credential_management import encrypt_dict
 from backend_functions.queries import (
     get_task_execution_view,
     get_task_scheduling_view,
@@ -26,6 +27,7 @@ from backend_functions.queries import (
     get_log_tables_simple,
     get_log_data_simple,
     insert_api_service,
+    update_api_service,
     delete_api_service,
     delete_task_configuration,
     delete_fact_configuration,
@@ -71,6 +73,10 @@ class CredentialUpsert(BaseModel):
 
 class APIServiceCreate(BaseModel):
     service_name: str
+    credential_requirements: Optional[str] = None
+
+class APIServiceUpdate(BaseModel):
+    credential_requirements: str
 
 class FunctionLibraryEntry(BaseModel):
     friendly_name: str
@@ -541,13 +547,16 @@ async def add_service_endpoint(service: APIServiceCreate):
     Add a new API service.
 
     Args:
-        service: The service to add
+        service: The service to add (includes credential_requirements optional)
 
     Returns:
         Success message or error
     """
     try:
-        result = insert_api_service(service.service_name)
+        result = insert_api_service(
+            service_name=service.service_name,
+            credential_requirements=service.credential_requirements
+        )
         if result:
             raise HTTPException(
                 status_code=500,
@@ -558,6 +567,36 @@ async def add_service_endpoint(service: APIServiceCreate):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to add service: {str(e)}",
+        )
+
+
+@router.put("/services/{service_name}")
+async def update_service_endpoint(service_name: str, service_update: APIServiceUpdate):
+    """
+    Update an API service's credential requirements.
+
+    Args:
+        service_name: The name of the service to update
+        service_update: The updated credential requirements
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = update_api_service(
+            service_name=service_name,
+            credential_requirements=service_update.credential_requirements
+        )
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update service: {result}"
+            )
+        return {"status": "ok", "message": f"Service '{service_name}' updated successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update service: {str(e)}",
         )
 
 
@@ -712,18 +751,20 @@ async def upsert_credentials_endpoint(credential: CredentialUpsert):
     Encrypt and upsert credentials for a service.
 
     Args:
-        credential: The service name and credentials to encrypt and store
+        credential: The service name and raw credentials JSON to encrypt and store
 
     Returns:
         Success message or error
     """
     try:
-        # Note: In a real implementation, we would encrypt the credentials here
-        # For now, we'll pass them as-is to the upsert_credentials function
-        # which should handle encryption internally
+        # Parse JSON string into dict, then encrypt
+        import json
+        credentials_dict = json.loads(credential.raw_credentials_json_string)
+        encrypted_credentials = encrypt_dict(credentials_dict)
+        
         result = upsert_credentials(
             service_name=credential.api_service_name,
-            encrypted_credentials=credential.raw_credentials_json_string
+            encrypted_credentials=encrypted_credentials
         )
         if result:
             raise HTTPException(

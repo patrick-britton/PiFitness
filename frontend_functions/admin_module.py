@@ -34,7 +34,6 @@ from frontend_functions.streamlit_helpers import reconcile_with_postgres, ss_pop
 #                    'db_size': {'icon': 'database', 'label': 'DB Size'}},
 
 
-
 def render_admin_module():
     nav_selection = nav_widget('admin', 'Admin Options:')
 
@@ -330,10 +329,10 @@ def render_task_mgmt_submodule():
                                                                        options=ss.svc_list,
                                                                        ),
                         "api_loop_type": st.column_config.SelectboxColumn(label="Loop Type",
-                                                                    pinned=False,
-                                                                    disabled=False,
-                                                                    options=['Day', 'Range', 'Next', 'N/A'],
-                                                                    default='N/A'),
+                                                                     pinned=False,
+                                                                     disabled=False,
+                                                                     options=['Day', 'Range', 'Next', 'N/A'],
+                                                                     default='N/A'),
                         'api_post_processing': st.column_config.SelectboxColumn(label='SPROC',
                                                                           pinned=False,
                                                                           disabled=False,

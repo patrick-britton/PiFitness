@@ -138,10 +138,18 @@ export const API = {
 
     // API Services
     getServices: () => fetchAPI<ApiListResponse<any>>("/api/admin/services"),
-    addService: (serviceName: string) =>
+    addService: (serviceName: string, credentialRequirements?: string) =>
       fetchAPI<ApiStatusResponse>("/api/admin/services", {
         method: "POST",
-        body: JSON.stringify({ service_name: serviceName }),
+        body: JSON.stringify({ 
+          service_name: serviceName, 
+          credential_requirements: credentialRequirements 
+        }),
+      }),
+    updateService: (serviceName: string, credentialRequirements: string) =>
+      fetchAPI<ApiStatusResponse>(`/api/admin/services/${encodeURIComponent(serviceName)}`, {
+        method: "PUT",
+        body: JSON.stringify({ credential_requirements: credentialRequirements }),
       }),
     deleteService: (serviceName: string) =>
       fetchAPI<ApiStatusResponse>(`/api/admin/services/${encodeURIComponent(serviceName)}`, { method: "DELETE" }),

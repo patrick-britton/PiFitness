@@ -39,18 +39,33 @@ def get_distinct_api_service_names() -> List[str]:
     sql = "SELECT DISTINCT api_service_name FROM api_services.api_service_list"
     return sql_to_list(sql)
 
-def insert_api_service(service_name: str) -> Union[str, List[str], None]:
+def insert_api_service(service_name: str, credential_requirements: Optional[str] = None) -> Union[str, List[str], None]:
     """
     Insert a new API service.
 
     Args:
         service_name (str): Name of the service to create.
+        credential_requirements (Optional[str]): Comma-separated credential field names.
 
     Returns:
         Union[str, List[str], None]: Error messages if any, None on success.
     """
-    sql = "INSERT INTO api_services.api_service_list (api_service_name) VALUES (%s)"
-    return qec(sql, [service_name])
+    sql = "INSERT INTO api_services.api_service_list (api_service_name, api_credential_requirements) VALUES (%s, %s)"
+    return qec(sql, [service_name, credential_requirements])
+
+def update_api_service(service_name: str, credential_requirements: str) -> Union[str, List[str], None]:
+    """
+    Update an API service's credential requirements.
+
+    Args:
+        service_name (str): Name of the service to update.
+        credential_requirements (str): Comma-separated credential field names.
+
+    Returns:
+        Union[str, List[str], None]: Error messages if any, None on success.
+    """
+    sql = "UPDATE api_services.api_service_list SET api_credential_requirements = %s WHERE api_service_name = %s"
+    return qec(sql, [credential_requirements, service_name])
 
 def delete_api_service(service_name: str) -> Union[str, List[str], None]:
     """
@@ -689,6 +704,7 @@ __all__ = [
     'get_api_service_list',
     'get_distinct_api_service_names',
     'insert_api_service',
+    'update_api_service',
     'delete_api_service',
     'get_function_library',
     'insert_function_library_entry',
