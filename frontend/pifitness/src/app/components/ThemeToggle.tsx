@@ -1,16 +1,28 @@
 'use client';
 
-import { useUIStore } from '../../stores/uiStore';
+import { useTheme } from 'next-themes';
 import WbSunnyIcon from '@mui/icons-material/WbSunny';
+import { useEffect, useState } from 'react';
 
 export default function ThemeToggle() {
-  const { theme, toggleTheme } = useUIStore();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // Avoid hydration mismatch by only rendering after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleClick = () => {
-    toggleTheme();
+    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   const isDark = theme === 'dark';
+
+  // Don't render until mounted to avoid hydration mismatch
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <button
