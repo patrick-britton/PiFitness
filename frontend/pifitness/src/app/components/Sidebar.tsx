@@ -24,10 +24,7 @@ export default function Sidebar() {
     const module = NAVIGATION_MODULES.find(m => m.id === moduleId);
     if (module) {
       setActiveModule(moduleId);
-      // Use window.location for static export compatibility
-      if (typeof window !== 'undefined') {
-        window.location.href = module.path;
-      }
+      router.push(module.path);
     }
   };
 

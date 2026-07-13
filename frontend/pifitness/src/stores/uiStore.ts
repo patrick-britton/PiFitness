@@ -1,6 +1,7 @@
 /**
  * Zustand store for UI state management
  * Handles navigation, theme, and global UI state
+ * Note: Theme is managed by next-themes for SSR safety; this store syncs for compatibility
  */
 
 import { create } from 'zustand';
@@ -17,7 +18,7 @@ interface UIState {
   // Navigation state
   activeModule: NavigationModule;
 
-  // Theme state
+  // Theme state (synced with next-themes)
   theme: 'light' | 'dark';
   colorScheme: 'default' | 'high-contrast';
 
@@ -26,9 +27,9 @@ interface UIState {
 
   // Navigation actions
   setActiveModule: (module: NavigationModule) => void;
+  syncActiveModuleFromPath: () => void;
 
-  // Theme actions
-  toggleTheme: () => void;
+  // Theme actions (not used - next-themes handles this, kept for compatibility)
   setTheme: (theme: 'light' | 'dark') => void;
   setColorScheme: (scheme: 'default' | 'high-contrast') => void;
 }
@@ -44,58 +45,40 @@ export const useUIStore = create<UIState>((set) => ({
 
   /**
    * Initialize the store
+   * Note: Theme is handled by next-themes ThemeProvider for SSR safety.
+   * This function only handles non-theme initialization.
    */
   initialize: () => {
-    // Load preferences from localStorage if available
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('pifitness-theme') as 'light' | 'dark' | null;
-      const prefersDark =
-        window.matchMedia &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const resolvedTheme: 'light' | 'dark' = savedTheme || (prefersDark ? 'dark' : 'light');
-
-      // Apply the resolved theme to the document so the painted UI matches the store
-      document.documentElement.classList.remove('light', 'dark');
-      document.documentElement.classList.add(resolvedTheme);
-
-      set({
-        theme: resolvedTheme,
-      });
-    }
+    // Theme is now handled by next-themes in providers.tsx
+    // This method is kept for any future non-theme initialization needs
   },
 
   /**
-   * Set the active navigation module
-   */
+    * Set the active navigation module
+    */
   setActiveModule: (module: NavigationModule) => {
     set({ activeModule: module });
   },
 
   /**
-   * Toggle between light and dark theme
-   */
-  toggleTheme: () => {
-    set((state) => {
-      const newTheme = state.theme === 'light' ? 'dark' : 'light';
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('pifitness-theme', newTheme);
-        document.documentElement.classList.remove(state.theme);
-        document.documentElement.classList.add(newTheme);
+    * Sync activeModule from current URL path (for SPA navigation persistence)
+    */
+  syncActiveModuleFromPath: () => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const module = NAVIGATION_MODULES.find(m => m.path === path);
+      if (module) {
+        set({ activeModule: module.id });
       }
-      return { theme: newTheme };
-    });
+    }
   },
 
   /**
-   * Set theme explicitly
+   * Set theme explicitly (deprecated - next-themes handles this)
+   * Kept for backward compatibility if any component still uses it
    */
   setTheme: (theme: 'light' | 'dark') => {
     set({ theme });
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('pifitness-theme', theme);
-      document.documentElement.classList.remove(theme === 'light' ? 'dark' : 'light');
-      document.documentElement.classList.add(theme);
-    }
   },
 
   /**

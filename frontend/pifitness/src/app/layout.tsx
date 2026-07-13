@@ -22,7 +22,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('pifitness-theme');
+                  if (!theme) {
+                    var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    theme = isDark ? 'dark' : 'light';
+                    localStorage.setItem('pifitness-theme', theme);
+                  }
+                  if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-screen text-gray-900 antialiased">
         <Providers>
           <Layout>
