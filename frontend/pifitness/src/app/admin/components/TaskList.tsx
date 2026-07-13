@@ -54,6 +54,7 @@ function EditTaskDialog({
     priority?: number;
     hours?: number;
     interval_minutes?: number;
+    stop_hour?: number;
     api_function?: string;
     python_function?: string;
   };
@@ -66,6 +67,7 @@ function EditTaskDialog({
   const [priority, setPriority] = useState(task.priority ?? 0);
   const [hours, setHours] = useState(task.hours ?? 0);
   const [intervalMinutes, setIntervalMinutes] = useState(task.interval_minutes ?? 0);
+  const [stopHour, setStopHour] = useState(task.stop_hour ?? 20);
   const [apiFunction, setApiFunction] = useState(task.api_function || '');
   const [pythonFunction, setPythonFunction] = useState(task.python_function || '');
   const updateConfig = useUpdateTaskConfig();
@@ -74,21 +76,51 @@ function EditTaskDialog({
   const { data: logsData } = useTaskLogs(task.task_id);
   const logs = logsData?.data || [];
 
+  // Derived UI state based on selected task_frequency
+  const isInactive = frequency === 'Inactive';
+  const isHourly = frequency === 'Hourly';
+  const isDaily = frequency === 'Daily';
+  const isWeeklyMonthly = frequency === 'Weekly' || frequency === 'Monthly';
+
+  // Scheduling fields visibility
+  const showHours = isHourly;
+  const showInterval = !isInactive;
+  const showStopHour = isHourly;
+
+  // Labels
+  const hoursLabel = isHourly ? 'Do not run before' : 'Hours';
+  const intervalLabel = (isDaily || isWeeklyMonthly) ? 'Execution Hour of Day' : 'Hours between executions';
+
   const handleSave = () => {
+    const config: { 
+      task_frequency: string;
+      description?: string;
+      display_icon?: string;
+      priority?: number;
+      hours?: number;
+      interval_minutes?: number;
+      api_function?: string;
+      python_function?: string;
+      stop_hour?: number;
+    } = { 
+      task_frequency: frequency,
+    };
+
+    // Only include description/display icon if provided
+    if (description) config.description = description;
+    if (displayIcon) config.display_icon = displayIcon;
+    config.priority = priority;
+
+    // Only include scheduling fields when they are visible
+    if (showHours) config.hours = hours;
+    if (showInterval) config.interval_minutes = intervalMinutes;
+    if (showStopHour) config.stop_hour = stopHour;
+
+    if (apiFunction) config.api_function = apiFunction;
+    if (pythonFunction) config.python_function = pythonFunction;
+
     updateConfig.mutate(
-      { 
-        taskId: task.task_id, 
-        config: { 
-          task_frequency: frequency,
-          description: description || undefined,
-          display_icon: displayIcon || undefined,
-          priority: priority,
-          hours: hours,
-          interval_minutes: intervalMinutes,
-          api_function: apiFunction || undefined,
-          python_function: pythonFunction || undefined,
-        } 
-      },
+      { taskId: task.task_id, config },
       { onSuccess: () => onClose() }
     );
   };
@@ -180,33 +212,55 @@ function EditTaskDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Hours
-                </label>
-                <input
-                  type="number"
-                  value={hours}
-                  onChange={(e) => setHours(parseInt(e.target.value) || 0)}
-                  min="0"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                />
+            {(!isInactive) && (
+              <div className="grid grid-cols-3 gap-4">
+                {showHours && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {hoursLabel}
+                    </label>
+                    <input
+                      type="number"
+                      value={hours}
+                      onChange={(e) => setHours(parseInt(e.target.value) || 0)}
+                      min="0"
+                      max="23"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    />
+                  </div>
+                )}
+                {showStopHour && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Do not run after:
+                    </label>
+                    <input
+                      type="number"
+                      value={stopHour}
+                      onChange={(e) => setStopHour(parseInt(e.target.value) || 0)}
+                      min="1"
+                      max="23"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    />
+                  </div>
+                )}
+                {showInterval && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {intervalLabel}
+                    </label>
+                    <input
+                      type="number"
+                      value={intervalMinutes}
+                      onChange={(e) => setIntervalMinutes(parseInt(e.target.value) || 0)}
+                      min={isHourly ? 1 : 0}
+                      max={isHourly ? 11 : 23}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    />
+                  </div>
+                )}
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Interval (min)
-                </label>
-                <input
-                  type="number"
-                  value={intervalMinutes}
-                  onChange={(e) => setIntervalMinutes(parseInt(e.target.value) || 0)}
-                  min="0"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                />
-              </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

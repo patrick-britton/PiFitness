@@ -74,6 +74,7 @@ export const API = {
       priority?: number;
       hours?: number;
       interval_minutes?: number;
+      stop_hour?: number;
       api_function?: string;
       python_function?: string;
     }) =>

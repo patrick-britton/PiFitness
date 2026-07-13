@@ -54,6 +54,7 @@ class TaskConfigEdit(BaseModel):
     priority: Optional[int] = None
     hours: Optional[int] = None
     interval_minutes: Optional[int] = None
+    stop_hour: Optional[int] = None
     api_function: Optional[str] = None
     python_function: Optional[str] = None
 
@@ -328,6 +329,8 @@ async def update_task_configuration_endpoint(task_id: int, task_config: TaskConf
             kwargs['hours'] = task_config.hours
         if task_config.interval_minutes is not None:
             kwargs['interval_minutes'] = task_config.interval_minutes
+        if task_config.stop_hour is not None:
+            kwargs['stop_hour'] = task_config.stop_hour
         if task_config.api_function is not None:
             kwargs['api_function'] = task_config.api_function
         if task_config.python_function is not None:
@@ -855,6 +858,7 @@ async def get_task_config_endpoint(task_id: int):
             'task_priority': 'priority',
             'task_start_hour': 'hours',
             'task_interval': 'interval_minutes',
+            'task_stop_hour': 'stop_hour',
             'api_function_name': 'api_function',
             'python_execution_function': 'python_function',
         }
@@ -895,6 +899,7 @@ TASK_CONFIG_FIELD_MAPPING = {
     'priority': 'task_priority',
     'hours': 'task_start_hour',
     'interval_minutes': 'task_interval',
+    'stop_hour': 'task_stop_hour',
     'api_function': 'api_function_name',
     'python_function': 'python_execution_function',
 }

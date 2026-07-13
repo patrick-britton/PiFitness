@@ -303,6 +303,7 @@ def update_task_configuration(task_id: int, task_frequency: str, **kwargs) -> Un
         'priority': 'task_priority',
         'hours': 'task_start_hour',
         'interval_minutes': 'task_interval',
+        'stop_hour': 'task_stop_hour',
         'api_function': 'api_function_name',
         'python_function': 'python_execution_function',
     }
