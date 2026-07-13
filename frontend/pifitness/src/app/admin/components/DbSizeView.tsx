@@ -13,7 +13,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -136,9 +136,6 @@ export default function DbSizeView() {
   const breakdownChart = useMemo(() => buildBreakdownChartData(breakdownData), [breakdownData]);
 
   const [themeVersion, setThemeVersion] = useState(0);
-  const chart30Ref = useRef<ChartJS | null>(null);
-  const chart12Ref = useRef<ChartJS | null>(null);
-  const breakdownRef = useRef<ChartJS | null>(null);
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -152,15 +149,6 @@ export default function DbSizeView() {
 
     return () => observer.disconnect();
   }, []);
-
-  useEffect(() => {
-    const timers = [
-      setTimeout(() => chart30Ref.current?.update(), 0),
-      setTimeout(() => chart12Ref.current?.update(), 0),
-      setTimeout(() => breakdownRef.current?.update(), 0),
-    ];
-    return () => timers.forEach(clearTimeout);
-  }, [themeVersion]);
 
   const getIsDark = (): boolean => {
     if (typeof window === 'undefined') return false;
@@ -310,7 +298,7 @@ export default function DbSizeView() {
                 Last 30 Days
               </h3>
               <div className="h-[292px]">
-                {chart30 ? <Bar ref={chart30Ref} data={chart30} options={options} /> : <p className="text-sm text-gray-500 dark:text-gray-400">No recent data.</p>}
+                {chart30 ? <Bar data={chart30} options={options} /> : <p className="text-sm text-gray-500 dark:text-gray-400">No recent data.</p>}
               </div>
             </div>
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-4 h-[340px]">
@@ -318,7 +306,7 @@ export default function DbSizeView() {
                 Last 12 Months
               </h3>
               <div className="h-[292px]">
-                {chart12 ? <Bar ref={chart12Ref} data={chart12} options={options} /> : <p className="text-sm text-gray-500 dark:text-gray-400">No monthly data.</p>}
+                {chart12 ? <Bar data={chart12} options={options} /> : <p className="text-sm text-gray-500 dark:text-gray-400">No monthly data.</p>}
               </div>
             </div>
           </div>
@@ -329,7 +317,7 @@ export default function DbSizeView() {
                 Current Breakdown
               </h3>
               <div className="h-[652px]">
-                {breakdownChart ? <Bar ref={breakdownRef} data={breakdownChart} options={breakdownOptions} /> : <p className="text-sm text-gray-500 dark:text-gray-400">No breakdown data.</p>}
+                {breakdownChart ? <Bar data={breakdownChart} options={breakdownOptions} /> : <p className="text-sm text-gray-500 dark:text-gray-400">No breakdown data.</p>}
               </div>
             </div>
           </div>
