@@ -1,6 +1,6 @@
 /**
  * Debug Panel Component
- * Toggleable debug information display
+ * Read-only debug information display
  */
 
 'use client';
@@ -9,9 +9,13 @@ import { useState, useEffect } from 'react';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore } from '../../stores/uiStore';
 
+// Exposed from backend/.env via next.config.ts (process.env.NEXT_PUBLIC_BOX)
+const BOX = process.env.NEXT_PUBLIC_BOX || 'local';
+const IS_PRD = BOX === 'pi_5';
+
 export default function DebugPanel() {
   const [isDebugVisible, setIsDebugVisible] = useState(false);
-  const { width, height, breakpoint, orientation, isMobile, isMobileOverride } = useViewportStore();
+  const { width, height, breakpoint, orientation, isMobile, layoutMode, layoutVariant } = useViewportStore();
   const { activeModule, theme } = useUIStore();
   const [environmentInfo, setEnvironmentInfo] = useState('');
   const [mobileDetectionReason, setMobileDetectionReason] = useState('');
@@ -19,14 +23,13 @@ export default function DebugPanel() {
   // Detect environment and mobile reasons
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Environment detection
-      const isStaticExport = document.getElementById('__next') !== null;
-      setEnvironmentInfo(isStaticExport ? 'Static Export' : 'Dev Server');
+      // Environment detection: derived from the BOX config value
+      setEnvironmentInfo(IS_PRD ? 'PRD (Pi 5)' : 'Dev Server');
 
       // Mobile detection reasoning
       let reason = '';
-      if (isMobileOverride) {
-        reason = 'Manual override';
+      if (layoutMode !== 'native') {
+        reason = `Forced (${layoutMode})`;
       } else if (breakpoint === 'xs') {
         reason = 'Breakpoint xs';
       } else if (breakpoint === 'sm' && orientation === 'portrait') {
@@ -41,7 +44,7 @@ export default function DebugPanel() {
       }
       setMobileDetectionReason(reason);
     }
-  }, [breakpoint, orientation, isMobileOverride]);
+  }, [breakpoint, orientation, layoutMode]);
 
   // Load debug visibility from localStorage
   useEffect(() => {
@@ -81,9 +84,11 @@ export default function DebugPanel() {
 
       <div className="space-y-1">
         <div><span className="text-gray-400">Environment:</span> {environmentInfo}</div>
+        <div><span className="text-gray-400">Box:</span> {BOX}</div>
         <div><span className="text-gray-400">Viewport:</span> {width}x{height}</div>
         <div><span className="text-gray-400">Breakpoint:</span> {breakpoint}</div>
         <div><span className="text-gray-400">Orientation:</span> {orientation}</div>
+        <div><span className="text-gray-400">Layout Variant:</span> {layoutVariant}</div>
         <div><span className="text-gray-400">Mobile:</span> {isMobile ? 'YES' : 'NO'}</div>
         <div><span className="text-gray-400">Mobile Reason:</span> {mobileDetectionReason}</div>
         <div><span className="text-gray-400">Active Module:</span> {activeModule}</div>

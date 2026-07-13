@@ -6,6 +6,28 @@
 import { create } from 'zustand';
 
 /**
+ * Layout mode for the developer toggle:
+ * - native: use the real browser window dimensions (default)
+ * - mobile-portrait: force 448x931, mobile layout
+ * - mobile-landscape: force 931x448, mobile layout
+ */
+export type LayoutMode = 'native' | 'mobile-portrait' | 'mobile-landscape';
+
+/**
+ * Three-state layout variant resolved from viewport dimensions.
+ * - desktop:  width >= 1024px
+ * - portrait: width < 1024px, orientation portrait
+ * - landscape: width < 1024px, orientation landscape
+ */
+export type LayoutVariant = 'desktop' | 'portrait' | 'landscape';
+
+// Forced device dimensions used by the developer toggle
+const FORCED_DIMENSIONS: Record<Exclude<LayoutMode, 'native'>, { width: number; height: number }> = {
+  'mobile-portrait': { width: 448, height: 931 },
+  'mobile-landscape': { width: 931, height: 448 },
+};
+
+/**
  * Viewport store state interface
  */
 interface ViewportState {
@@ -16,13 +38,22 @@ interface ViewportState {
   isMobile: boolean;
   isPortrait: boolean;
   isLandscape: boolean;
+  layoutVariant: LayoutVariant;
   manualOrientation: 'portrait' | 'landscape' | null;
-  isMobileOverride: boolean;
+  layoutMode: LayoutMode;
   initialize: () => void;
   setViewport: (width: number, height: number) => void;
   toggleOrientation: () => void;
   clearOrientationOverride: () => void;
-  toggleMobileOverride: () => void;
+  setLayoutMode: (mode: LayoutMode) => void;
+}
+
+/**
+ * Resolve the three-state layout variant from width and orientation.
+ */
+function resolveLayoutVariant(width: number, orientation: 'portrait' | 'landscape'): LayoutVariant {
+  if (width >= 1024) return 'desktop';
+  return orientation === 'portrait' ? 'portrait' : 'landscape';
 }
 
 /**
@@ -36,8 +67,9 @@ export const useViewportStore = create<ViewportState>((set, get) => ({
   isMobile: false,
   isPortrait: true,
   isLandscape: false,
+  layoutVariant: 'portrait',
   manualOrientation: null,
-  isMobileOverride: false,
+  layoutMode: 'native',
 
   /**
    * Initialize the store with current viewport values
@@ -63,6 +95,7 @@ export const useViewportStore = create<ViewportState>((set, get) => ({
 
       const breakpoint = getBreakpoint(width);
       const orientation = getOrientation(width, height);
+      const layoutVariant = resolveLayoutVariant(width, orientation);
 
       // Check URL for mobile parameter
       const isMobileFromURL = () => {
@@ -70,7 +103,7 @@ export const useViewportStore = create<ViewportState>((set, get) => ({
         return urlParams.has('mobile') && (urlParams.get('mobile') === 'true' || urlParams.get('mobile') === '');
       };
 
-      const isMobile = isMobileFromURL() || breakpoint === 'xs' || (breakpoint === 'sm' && orientation === 'portrait');
+      const isMobile = isMobileFromURL() || breakpoint === 'xs' || breakpoint === 'sm';
 
       set({
         width,
@@ -80,6 +113,7 @@ export const useViewportStore = create<ViewportState>((set, get) => ({
         isMobile,
         isPortrait: orientation === 'portrait',
         isLandscape: orientation === 'landscape',
+        layoutVariant,
       });
     }
   },
@@ -106,7 +140,8 @@ export const useViewportStore = create<ViewportState>((set, get) => ({
 
     const breakpoint = getBreakpoint(width);
     const orientation = getOrientation(width, height);
-    const isMobileOverride = get().isMobileOverride;
+    const layoutVariant = resolveLayoutVariant(width, orientation);
+    const layoutMode = get().layoutMode;
 
     // Check URL for mobile parameter
     const isMobileFromURL = () => {
@@ -117,7 +152,8 @@ export const useViewportStore = create<ViewportState>((set, get) => ({
       return false;
     };
 
-    const isMobile = isMobileOverride || isMobileFromURL() || breakpoint === 'xs' || (breakpoint === 'sm' && orientation === 'portrait');
+    // In a forced layout mode, isMobile is always true
+    const isMobile = layoutMode !== 'native' || isMobileFromURL() || breakpoint === 'xs' || breakpoint === 'sm';
 
     set({
       width,
@@ -127,6 +163,7 @@ export const useViewportStore = create<ViewportState>((set, get) => ({
       isMobile,
       isPortrait: orientation === 'portrait',
       isLandscape: orientation === 'landscape',
+      layoutVariant,
     });
   },
 
@@ -148,8 +185,9 @@ export const useViewportStore = create<ViewportState>((set, get) => ({
       return false;
     };
 
-    const isMobile = get().isMobileOverride || isMobileFromURL() || get().breakpoint === 'xs' || (get().breakpoint === 'sm' && newOrientation === 'portrait');
-    set({ isMobile, isPortrait: newOrientation === 'portrait', isLandscape: newOrientation === 'landscape' });
+    const isMobile = get().layoutMode !== 'native' || isMobileFromURL() || get().breakpoint === 'xs' || get().breakpoint === 'sm';
+    const layoutVariant = resolveLayoutVariant(width, newOrientation);
+    set({ isMobile, isPortrait: newOrientation === 'portrait', isLandscape: newOrientation === 'landscape', layoutVariant });
   },
 
   /**
@@ -158,14 +196,29 @@ export const useViewportStore = create<ViewportState>((set, get) => ({
   clearOrientationOverride: () => {
     const { width, height } = get();
     const autoOrientation = width > height ? 'landscape' : 'portrait';
-    set({ manualOrientation: null, orientation: autoOrientation, isPortrait: autoOrientation === 'portrait', isLandscape: autoOrientation === 'landscape' });
+    const layoutVariant = resolveLayoutVariant(width, autoOrientation);
+    set({ manualOrientation: null, orientation: autoOrientation, isPortrait: autoOrientation === 'portrait', isLandscape: autoOrientation === 'landscape', layoutVariant });
   },
 
   /**
-   * Toggle mobile override
+   * Set the layout mode (developer toggle). Forces dimensions when not native.
    */
-  toggleMobileOverride: () => {
-    const current = get().isMobileOverride;
-    set({ isMobileOverride: !current, isMobile: !current });
+  setLayoutMode: (mode: LayoutMode) => {
+    const prevMode = get().layoutMode;
+    set({ layoutMode: mode });
+
+    if (mode === 'native') {
+      // Restore to real window size
+      if (typeof window !== 'undefined') {
+        get().setViewport(window.innerWidth, window.innerHeight);
+      }
+      return;
+    }
+
+    // Avoid a redundant recompute if already in the same forced mode
+    if (prevMode === mode) return;
+
+    const dims = FORCED_DIMENSIONS[mode];
+    get().setViewport(dims.width, dims.height);
   },
 }));

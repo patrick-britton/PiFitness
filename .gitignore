@@ -237,4 +237,5 @@ backend/static/
 .agents/
 frontend/DEPLOYMENT_GUIDE.md
 .debug/
-.bugs
+.bugs/
+.features/

@@ -49,9 +49,17 @@ export const useUIStore = create<UIState>((set) => ({
     // Load preferences from localStorage if available
     if (typeof window !== 'undefined') {
       const savedTheme = localStorage.getItem('pifitness-theme') as 'light' | 'dark' | null;
+      const prefersDark =
+        window.matchMedia &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const resolvedTheme: 'light' | 'dark' = savedTheme || (prefersDark ? 'dark' : 'light');
+
+      // Apply the resolved theme to the document so the painted UI matches the store
+      document.documentElement.classList.remove('light', 'dark');
+      document.documentElement.classList.add(resolvedTheme);
 
       set({
-        theme: savedTheme || 'light',
+        theme: resolvedTheme,
       });
     }
   },
