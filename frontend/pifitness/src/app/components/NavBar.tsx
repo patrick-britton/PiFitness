@@ -1,6 +1,7 @@
 /**
  * NavBar Component
  * Mobile bottom navigation bar with Material UI icons
+ * Supports three-state rendering: desktop/portrait show labels, landscape icon-only.
  */
 
 'use client';
@@ -10,7 +11,14 @@ import { NAVIGATION_MODULES } from '../../stores/uiStore';
 import { useUIStore } from '../../stores/uiStore';
 import * as Icons from '@mui/icons-material';
 
-export default function NavBar() {
+interface NavBarProps {
+  /** Whether to show text labels alongside icons. False = icon-only (landscape). */
+  showLabels?: boolean;
+  /** Render vertically (left sidebar) instead of horizontal bottom bar. */
+  vertical?: boolean;
+}
+
+export default function NavBar({ showLabels = true, vertical = false }: NavBarProps) {
   const router = useRouter();
   const { activeModule, setActiveModule } = useUIStore();
 
@@ -26,20 +34,23 @@ export default function NavBar() {
   };
 
   return (
-    <nav className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-      <div className="flex justify-around">
+    <nav className={`bg-white dark:bg-gray-800 ${vertical ? '' : 'border-t border-gray-200 dark:border-gray-700'}`}>
+      <div className={vertical ? 'flex flex-col items-center py-2 space-y-2' : 'flex justify-around'}>
         {NAVIGATION_MODULES.map((module) => (
           <button
             key={module.id}
             onClick={() => handleNavigation(module)}
-            className={`flex flex-col items-center justify-center p-3 flex-1 ${
+            className={`flex items-center justify-center ${
+              vertical ? 'p-2 w-full' : 'flex-col p-3 flex-1'
+            } ${
               activeModule === module.id
                 ? 'text-blue-600 dark:text-blue-300'
                 : 'text-gray-600 dark:text-gray-300'
             }`}
+            title={!showLabels ? module.label : undefined}
           >
-            <span className="mb-1">{getIcon(module.iconName)}</span>
-            <span className="text-xs">{module.label}</span>
+            <span className={showLabels && !vertical ? 'mb-1' : ''}>{getIcon(module.iconName)}</span>
+            {showLabels && <span className="text-xs">{module.label}</span>}
           </button>
         ))}
       </div>

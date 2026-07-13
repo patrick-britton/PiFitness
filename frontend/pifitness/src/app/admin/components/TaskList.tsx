@@ -8,6 +8,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useViewportStore } from '../../../stores/viewportStore';
 import { useTasks, useTaskSchedule, useTaskNames, useExecuteTask, useExecuteTaskV2, useUpdateTaskConfig, useDeleteTaskConfig, useTaskSummaryChart, useCreateTask, useTaskLogs, useTaskConfig, useTaskExecution, adminKeys } from '@/hooks/useAdmin';
 import TaskLogView from './TaskLogView';
 import TaskPerformanceChart from './TaskPerformanceChart';
@@ -326,6 +327,8 @@ function EditTaskDialog({
  * Replaces Task Execution History with Task Summary view and adds full CRUD functionality
  */
 export default function TaskList() {
+  const { layoutVariant } = useViewportStore();
+  const isPortrait = layoutVariant === 'portrait';
   const { data: summaryData, isLoading: summaryLoading, error: summaryError } = useTaskSummaryChart();
   const { data: scheduleData } = useTaskSchedule();
   const { data: taskNamesData } = useTaskNames();
@@ -796,9 +799,16 @@ export default function TaskList() {
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Task Name</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Execution</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Next Scheduled</th>
+                {!isPortrait && (
+                  <>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Execution</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Next Scheduled</th>
+                  </>
+                )}
+                {isPortrait && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status / Schedule</th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Week Count</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Success %</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
@@ -824,23 +834,52 @@ export default function TaskList() {
                       {schedule?.display_icon ? <span className="mr-1.5">{schedule.display_icon}</span> : ''}
                       {row.task_name}
                     </td>
-                    <td className="px-4 py-3">{getStatusBadge(!!row.is_active_failure)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                      <span
-                        title={lastExecutedUtc ? new Date(lastExecutedUtc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }) : '-'}
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lastExecutionChipClass}`}
-                      >
-                        {formatRelativeTime(timeAgoExecution)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                      <span
-                        title={nextPlannedExecutionUtc ? new Date(nextPlannedExecutionUtc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }) : '-'}
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getNextExecutionChip(row).colorClass}`}
-                      >
-                        {getNextExecutionChip(row).text}
-                      </span>
-                    </td>
+                    {!isPortrait && (
+                      <>
+                        <td className="px-4 py-3">{getStatusBadge(!!row.is_active_failure)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          <span
+                            title={lastExecutedUtc ? new Date(lastExecutedUtc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }) : '-'}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${lastExecutionChipClass}`}
+                          >
+                            {formatRelativeTime(timeAgoExecution)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          <span
+                            title={nextPlannedExecutionUtc ? new Date(nextPlannedExecutionUtc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }) : '-'}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getNextExecutionChip(row).colorClass}`}
+                          >
+                            {getNextExecutionChip(row).text}
+                          </span>
+                        </td>
+                      </>
+                    )}
+                    {isPortrait && (
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1 min-w-[140px]">
+                          <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium w-full text-center whitespace-nowrap ${
+                            row.is_active_failure
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                              : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                          }`}>
+                            {row.is_active_failure ? 'Error' : 'Success'}
+                          </span>
+                          <span
+                            title={lastExecutedUtc ? new Date(lastExecutedUtc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }) : '-'}
+                            className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium w-full text-center whitespace-nowrap ${lastExecutionChipClass}`}
+                          >
+                            {formatRelativeTime(timeAgoExecution)}
+                          </span>
+                          <span
+                            title={nextPlannedExecutionUtc ? new Date(nextPlannedExecutionUtc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }) : '-'}
+                            className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium w-full text-center whitespace-nowrap ${getNextExecutionChip(row).colorClass}`}
+                          >
+                            {getNextExecutionChip(row).text}
+                          </span>
+                        </div>
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 min-w-[160px]">
                       <MiniBar value={row.__executionCount} max={maxExecutionCount} colorClass="bg-gray-600 dark:bg-gray-400" suffix="" />
                     </td>
