@@ -49,7 +49,7 @@ function ConfirmDeleteDialog({
 }
 
 /**
- * Credential Form for a specific service
+ * Credential Form for a specific service - dynamically generates fields based on requirements
  */
 function CredentialForm({
   serviceName,
@@ -60,27 +60,38 @@ function CredentialForm({
   requirements?: string;
   onSuccess: () => void;
 }) {
-  const [credentialsJson, setCredentialsJson] = useState('');
+  // Parse requirements into field names (comma-separated)
+  const credentialFields: string[] = requirements
+    ? requirements.split(',').map(f => f.trim()).filter(f => f)
+    : [];
+
+  // State: one input per credential field
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [showForm, setShowForm] = useState(false);
   const upsertCredentials = useUpsertCredentials();
 
+  // Handle individual field changes
+  const handleFieldChange = (fieldName: string, value: string) => {
+    setFieldValues(prev => ({ ...prev, [fieldName]: value }));
+  };
+
+  // Check if all required fields are filled
+  const allFieldsFilled = credentialFields.length > 0 &&
+    credentialFields.every(field => fieldValues[field]?.trim());
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!credentialsJson.trim()) return;
+    if (!allFieldsFilled) return;
 
-    // Validate JSON
-    try {
-      JSON.parse(credentialsJson);
-    } catch {
-      alert('Invalid JSON. Please check your input.');
-      return;
-    }
+    // Build credential object from individual field values
+    const credentialsObject = { ...fieldValues };
+    const rawCredentialsJson = JSON.stringify(credentialsObject);
 
     upsertCredentials.mutate(
-      { serviceName, rawCredentialsJson: credentialsJson.trim() },
+      { serviceName, rawCredentialsJson },
       {
         onSuccess: () => {
-          setCredentialsJson('');
+          setFieldValues({});
           setShowForm(false);
           onSuccess();
         },
@@ -99,24 +110,37 @@ function CredentialForm({
     );
   }
 
+  // No requirements defined - show error state
+  if (credentialFields.length === 0) {
+    return (
+      <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-md border border-yellow-200 dark:border-yellow-800">
+        <p className="text-yellow-700 dark:text-yellow-300 text-sm">
+          No credential requirements defined for this service. Configure requirements in the Services tab.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Credentials JSON for <span className="font-semibold">{serviceName}</span>
-        </label>
-        {requirements && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-mono">
-            Requirements hint: {requirements}
-          </p>
-        )}
-        <textarea
-          value={credentialsJson}
-          onChange={(e) => setCredentialsJson(e.target.value)}
-          placeholder='{"username": "...", "password": "..."}'
-          rows={4}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono"
-        />
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Enter credentials for <span className="font-semibold">{serviceName}</span>
+        </p>
+        {credentialFields.map((field) => (
+          <div key={field} className="mb-2">
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 capitalize">
+              {field}
+            </label>
+            <input
+              type="password"
+              value={fieldValues[field] || ''}
+              onChange={(e) => handleFieldChange(field, e.target.value)}
+              placeholder={`Enter ${field}`}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+            />
+          </div>
+        ))}
       </div>
       <div className="flex justify-end gap-2">
         <button
@@ -128,10 +152,10 @@ function CredentialForm({
         </button>
         <button
           type="submit"
-          disabled={!credentialsJson.trim() || upsertCredentials.isPending}
+          disabled={!allFieldsFilled || upsertCredentials.isPending}
           className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
         >
-          {upsertCredentials.isPending ? 'Encrypting & Saving...' : 'Save Credentials'}
+          {upsertCredentials.isPending ? 'Saving...' : 'Save Credentials'}
         </button>
       </div>
     </form>
@@ -234,7 +258,7 @@ export default function CredentialManager() {
 
                 {hasRequirements && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 font-mono">
-                    {svc.api_credential_requirements}
+                    Required: {svc.api_credential_requirements}
                   </p>
                 )}
 

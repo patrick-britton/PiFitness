@@ -323,7 +323,22 @@ export function useServices() {
 export function useAddService() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (serviceName: string) => API.admin.addService(serviceName),
+    mutationFn: ({ serviceName, credentialRequirements }: { serviceName: string; credentialRequirements?: string }) => 
+      API.admin.addService(serviceName, credentialRequirements),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminKeys.services() });
+    },
+  });
+}
+
+/**
+ * Mutation to update an API service's credential requirements.
+ */
+export function useUpdateService() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serviceName, credentialRequirements }: { serviceName: string; credentialRequirements: string }) =>
+      API.admin.updateService(serviceName, credentialRequirements),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.services() });
     },
