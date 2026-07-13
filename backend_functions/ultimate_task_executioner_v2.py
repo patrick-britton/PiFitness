@@ -490,28 +490,28 @@ def reconcile_task_dates(task_dict, task_fail=False, e=None):
                 interval_val = 1
             int_sql = f"next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '{int(interval_val)} hours'"
         elif freq == 'Daily':
-            start_hour = task_dict.get('task_start_hour', 8)
-            if start_hour is None:
-                start_hour = 8
+            interval_val = task_dict.get('task_interval', 8)
+            if interval_val is None:
+                interval_val = 8
             int_sql = f"""next_planned_execution_utc =
                         (date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '1 day')
-                        + INTERVAL '{int(start_hour)} hours')
+                        + INTERVAL '{int(interval_val)} hours')
                         AT TIME ZONE 'America/Los_Angeles'"""
         elif freq == 'Weekly':
-            start_hour = task_dict.get('task_start_hour', 8)
-            if start_hour is None:
-                start_hour = 8
+            interval_val = task_dict.get('task_interval', 8)
+            if interval_val is None:
+                interval_val = 8
             int_sql = f"""next_planned_execution_utc =
                             (date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '7 days')
-                            + INTERVAL '{int(start_hour)} hours')
+                            + INTERVAL '{int(interval_val)} hours')
                             AT TIME ZONE 'America/Los_Angeles'"""
         elif freq == 'Monthly':
-            start_hour = task_dict.get('task_start_hour', 8)
-            if start_hour is None:
-                start_hour = 8
+            interval_val = task_dict.get('task_interval', 8)
+            if interval_val is None:
+                interval_val = 8
             int_sql = f"""next_planned_execution_utc =
                             (date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles' + INTERVAL '30 days')
-                            + INTERVAL '{int(start_hour)} hours')
+                            + INTERVAL '{int(interval_val)} hours')
                             AT TIME ZONE 'America/Los_Angeles'"""
         else:
             int_sql = "next_planned_execution_utc = CURRENT_TIMESTAMP + INTERVAL '24 hours'"
