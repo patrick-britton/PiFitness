@@ -22,7 +22,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { initialize: initializeViewport, setViewport, layoutMode, layoutVariant } = useViewportStore();
-  const { initialize: initializeUI, syncActiveModuleFromPath } = useUIStore();
+  const { initialize: initializeUI, syncActiveModuleFromPath, syncActiveSubPageFromPath } = useUIStore();
 
   // Initialize stores on mount
   useEffect(() => {
@@ -30,6 +30,7 @@ export default function Layout({ children }: LayoutProps) {
     initializeUI();
     // Sync navigation state from URL path on initial load
     syncActiveModuleFromPath();
+    syncActiveSubPageFromPath();
 
     const handleResize = () => {
       // Only track the real window in native mode; forced modes keep their
@@ -47,7 +48,7 @@ export default function Layout({ children }: LayoutProps) {
 
     // Cleanup
     return () => window.removeEventListener('resize', handleResize);
-  }, [initializeViewport, initializeUI, setViewport, syncActiveModuleFromPath]);
+  }, [initializeViewport, initializeUI, setViewport, syncActiveModuleFromPath, syncActiveSubPageFromPath]);
 
   const { width, height } = useViewportStore();
 

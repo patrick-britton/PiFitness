@@ -36,6 +36,21 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Redirect /running to /activities (module renamed)
+  async redirects() {
+    return [
+      {
+        source: "/running",
+        destination: "/activities",
+        permanent: true,
+      },
+      {
+        source: "/running/:path*",
+        destination: "/activities/:path*",
+        permanent: true,
+      },
+    ];
+  },
   // Fix workspace root detection when multiple package-lock.json exist
   // Prevents Turbopack from inferring the wrong root and missing @/* alias
   turbopack: {
