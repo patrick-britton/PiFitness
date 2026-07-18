@@ -20,7 +20,7 @@ interface NavBarProps {
 
 export default function NavBar({ showLabels = true, vertical = false }: NavBarProps) {
   const router = useRouter();
-  const { activeModule, setActiveModule } = useUIStore();
+  const { activeModule, setActiveModule, setActiveSubPage } = useUIStore();
 
   // Get the appropriate Material UI icon for each module
   const getIcon = (iconName: string) => {
@@ -30,6 +30,7 @@ export default function NavBar({ showLabels = true, vertical = false }: NavBarPr
 
   const handleNavigation = (module: typeof NAVIGATION_MODULES[number]) => {
     setActiveModule(module.id);
+    setActiveSubPage(null);
     router.push(module.path);
   };
 

@@ -11,7 +11,7 @@ import * as Icons from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 
 export default function Sidebar() {
-  const { activeModule, setActiveModule } = useUIStore();
+  const { activeModule, setActiveModule, setActiveSubPage } = useUIStore();
   const router = useRouter();
 
   // Get the appropriate Material UI icon for each module
@@ -24,6 +24,7 @@ export default function Sidebar() {
     const module = NAVIGATION_MODULES.find(m => m.id === moduleId);
     if (module) {
       setActiveModule(moduleId);
+      setActiveSubPage(null);
       router.push(module.path);
     }
   };

@@ -1,7 +1,7 @@
 /**
- * Music Module Page
+ * Activities Module Page
  * Inline tab navigation matching admin module pattern.
- * Sub-pages: Now Playing, Ratings, Playlist Shuffle, ISRC Review, Playlist Configuration, Playlist Sync
+ * Sub-pages: Recent Activity Report, Leaderboards, Run Predictions, Segment Management, Activity Processing, Training Cycle Management
  */
 
 'use client';
@@ -11,11 +11,11 @@ import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore, MODULE_SUB_PAGES } from '../../stores/uiStore';
 import * as Icons from '@mui/icons-material';
 
-const TABS = MODULE_SUB_PAGES.music;
+const TABS = MODULE_SUB_PAGES.activities;
 
 type TabId = (typeof TABS)[number]['id'];
 
-export default function MusicPage() {
+export default function ActivitiesPage() {
   const { activeSubPage, setActiveSubPage } = useUIStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { layoutVariant } = useViewportStore();
@@ -43,7 +43,7 @@ export default function MusicPage() {
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 sm:px-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Music</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Activities</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               {activeTabConfig.label}
             </p>
@@ -69,7 +69,7 @@ export default function MusicPage() {
       {/* Tab Navigation — Desktop (full labels) */}
       {isDesktop && (
         <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-          <nav className="flex overflow-x-auto px-4 sm:px-6" aria-label="Music Tabs">
+          <nav className="flex overflow-x-auto px-4 sm:px-6" aria-label="Activities Tabs">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -113,7 +113,7 @@ export default function MusicPage() {
       {/* Tab Navigation — Landscape (icon-only horizontal scroll) */}
       {isLandscape && (
         <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-          <nav className="flex overflow-x-auto px-2" aria-label="Music Tabs">
+          <nav className="flex overflow-x-auto px-2" aria-label="Activities Tabs">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
