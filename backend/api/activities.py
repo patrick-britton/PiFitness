@@ -3,9 +3,14 @@ Activities API Endpoints
 ========================
 
 FastAPI endpoints for activity data (GPS tracks, segments, metrics).
+Includes the Activity Processing & Playlist Shuffle pipeline.
 """
 
+import json
+import time
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+from starlette.responses import JSONResponse
 from typing import Optional
 from datetime import date
 
@@ -15,9 +20,296 @@ from backend_functions.queries import (
     get_activity_telemetry,
     get_segment_matches,
 )
-from backend_functions.database_functions import sql_to_dict
+from backend_functions.database_functions import sql_to_dict, get_conn, qec, one_sql_result
+from backend_functions.music_functions import auto_shuffle_playlists
+from backend_functions.ultimate_task_executioner_v2 import ultimate_task_executioner
+
+from backend.schemas.activity_schemas import (
+    ProcessActivityRequest,
+    ProcessActivityResponse,
+    ProcessStepResult,
+    ProcessStepResultData,
+)
 
 router = APIRouter(prefix="/api/activities", tags=["activities"])
+
+
+# ---------------------------------------------------------------------------
+# Helper: run a step with timing, return a ProcessStepResult
+# ---------------------------------------------------------------------------
+
+def _run_step(step_id: str, fn, *args, **kwargs) -> ProcessStepResult:
+    """Execute a step function, measure elapsed time, do not return internal result data."""
+    t0 = time.perf_counter()
+    try:
+        fn(*args, **kwargs)
+        elapsed = int((time.perf_counter() - t0) * 1000)
+        return ProcessStepResult(
+            step_id=step_id,
+            status="complete",
+            elapsed_ms=elapsed,
+            result=None,
+        )
+    except Exception as e:
+        elapsed = int((time.perf_counter() - t0) * 1000)
+        return ProcessStepResult(
+            step_id=step_id,
+            status="error",
+            elapsed_ms=elapsed,
+            error=str(e),
+        )
+
+
+def _skip_step(step_id: str) -> ProcessStepResult:
+    """Return a skipped step result."""
+    return ProcessStepResult(
+        step_id=step_id,
+        status="skipped",
+        elapsed_ms=0,
+    )
+
+
+def _step_to_dict(step: ProcessStepResult) -> dict:
+    """Convert a ProcessStepResult to a JSON-safe dict for NDJSON streaming."""
+    d = {
+        "step_id": step.step_id,
+        "status": step.status,
+        "elapsed_ms": step.elapsed_ms,
+    }
+    if step.error:
+        d["error"] = step.error
+    if step.result:
+        try:
+            d["result"] = dict(step.result)
+        except Exception:
+            try:
+                d["result"] = step.result.model_dump(mode="json")
+            except Exception:
+                d["result"] = {}
+    return d
+
+
+# ---------------------------------------------------------------------------
+# Activity Processing Endpoint (NDJSON stream)
+# ---------------------------------------------------------------------------
+
+
+def _process_generator(req: ProcessActivityRequest):
+    """
+    Generator that yields one NDJSON line per step completion.
+    Final line is a terminal event with `complete: true`.
+    """
+    try:
+        playlist_name: str | None = req.playlist_name
+        is_manual = playlist_name == "Manual Processing"
+        is_no_playlist = playlist_name == "No Playlist"
+        has_error = False
+
+        # -----------------------------------------------------------------------
+        # Step 1: Sync Activities
+        # -----------------------------------------------------------------------
+        result = _run_step("sync_activities", ultimate_task_executioner, force_task_id=4)
+        yield json.dumps(_step_to_dict(result)) + "\n"
+        if result.status == "error":
+            has_error = True
+
+        # -----------------------------------------------------------------------
+        # Step 2: Sync Activity Details
+        # -----------------------------------------------------------------------
+        if not has_error:
+            result = _run_step("sync_details", ultimate_task_executioner, force_task_id=19)
+            yield json.dumps(_step_to_dict(result)) + "\n"
+            if result.status == "error":
+                has_error = True
+
+        # -----------------------------------------------------------------------
+        # Step 3: Match Segments
+        # -----------------------------------------------------------------------
+        if not has_error:
+            result = _run_step("match_segments", ultimate_task_executioner, force_task_id=21)
+            yield json.dumps(_step_to_dict(result)) + "\n"
+            if result.status == "error":
+                has_error = True
+
+        # -----------------------------------------------------------------------
+        # Step 4: Look Up Playlist (skip if No Playlist)
+        # -----------------------------------------------------------------------
+        if not has_error:
+            if is_no_playlist:
+                yield json.dumps(_step_to_dict(_skip_step("lookup_playlist"))) + "\n"
+                yield json.dumps(_step_to_dict(_skip_step("insert_history"))) + "\n"
+                yield json.dumps(_step_to_dict(_skip_step("auto_shuffle"))) + "\n"
+            else:
+                pn = "Running" if is_manual else (playlist_name or "Running")
+                lookup_result = _lookup_playlist(pn)
+                yield json.dumps(_step_to_dict(lookup_result)) + "\n"
+                if lookup_result.status == "error":
+                    has_error = True
+
+                # ---------------------------------------------------------------
+                # Step 5: Insert Listening History
+                # ---------------------------------------------------------------
+                if not has_error:
+                    result = _run_step("insert_history", _insert_listening_history, pn)
+                    yield json.dumps(_step_to_dict(result)) + "\n"
+                    if result.status == "error":
+                        has_error = True
+
+                # ---------------------------------------------------------------
+                # Step 6: Auto Shuffle
+                # ---------------------------------------------------------------
+                if not has_error:
+                    result = _run_step("auto_shuffle", _do_auto_shuffle, pn)
+                    yield json.dumps(_step_to_dict(result)) + "\n"
+                    if result.status == "error":
+                        has_error = True
+
+        # -----------------------------------------------------------------------
+        # Step 7: Cleanup (Manual Processing only)
+        # -----------------------------------------------------------------------
+        if not has_error:
+            if is_manual:
+                result = _run_step("cleanup", _cleanup_fake_activity)
+                yield json.dumps(_step_to_dict(result)) + "\n"
+            else:
+                yield json.dumps(_step_to_dict(_skip_step("cleanup"))) + "\n"
+
+        # Terminal event
+        yield json.dumps({"complete": True, "success": not has_error}) + "\n"
+
+    except Exception as e:
+        yield json.dumps({"complete": True, "success": False, "error": f"Internal server error: {str(e)}"}) + "\n"
+
+
+@router.post("/process")
+async def process_activity(req: ProcessActivityRequest):
+    """
+    Run the activity processing pipeline.
+
+    Steps (sequential, halts on first error):
+      1. sync_activities  — ultimate_task_executioner(task_id=4)
+      2. sync_details     — ultimate_task_executioner(task_id=19)
+      3. match_segments   — ultimate_task_executioner(task_id=21)
+      4. lookup_playlist  — query vw_watch_music_heard
+      5. insert_history   — truncate temp_listening_history, insert, reconcile
+      6. auto_shuffle     — auto_shuffle_playlists()
+      7. cleanup          — delete fake activity (Manual Processing only)
+
+    Returns NDJSON stream with one event per step, plus a terminal event.
+    """
+    return StreamingResponse(
+        _process_generator(req),
+        media_type="application/x-ndjson",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Internal step implementations
+# ---------------------------------------------------------------------------
+
+
+def _lookup_playlist(playlist_name: str) -> ProcessStepResult:
+    """Query vw_watch_music_heard for the given playlist name."""
+    t0 = time.perf_counter()
+    try:
+        conn = get_conn(alchemy=True)
+        import pandas as pd
+        sql = f"SELECT * FROM activities.vw_watch_music_heard WHERE playlist_name = '{playlist_name}'"
+        df = pd.read_sql(sql, con=conn)
+        conn.dispose()
+        song_count = len(df)
+        if song_count == 0:
+            raise ValueError(f"No songs found for playlist '{playlist_name}'")
+        first_song = str(df["track_name_clean"].iloc[0])
+        last_song = str(df["track_name_clean"].iloc[song_count - 1])
+        playlist_id = str(df["playlist_id"].iloc[0])
+        elapsed = int((time.perf_counter() - t0) * 1000)
+        return ProcessStepResult(
+            step_id="lookup_playlist",
+            status="complete",
+            elapsed_ms=elapsed,
+            result=ProcessStepResultData(
+                song_count=song_count,
+                first_song=first_song,
+                last_song=last_song,
+                playlist_id=playlist_id,
+            ),
+        )
+    except Exception as e:
+        elapsed = int((time.perf_counter() - t0) * 1000)
+        return ProcessStepResult(
+            step_id="lookup_playlist",
+            status="error",
+            elapsed_ms=elapsed,
+            error=str(e),
+        )
+
+
+def _insert_listening_history(playlist_name: str) -> Optional[ProcessStepResultData]:
+    """Truncate temp_listening_history, insert from vw_watch_music_heard, reconcile."""
+    import pandas as pd
+    conn = get_conn(alchemy=True)
+    sql = f"SELECT played_at_utc, isrc, playlist_id FROM activities.vw_watch_music_heard WHERE playlist_name = '{playlist_name}'"
+    df = pd.read_sql(sql, con=conn)
+    if df.empty:
+        conn.dispose()
+        raise ValueError(f"No listening history data for playlist '{playlist_name}'")
+
+    # Truncate temp table
+    err = qec("TRUNCATE music.temp_listening_history")
+    if err:
+        conn.dispose()
+        raise ValueError(f"Error truncating temp_listening_history: {err}")
+
+    # Insert into temp table
+    df.to_sql(
+        schema="music",
+        name="temp_listening_history",
+        con=conn,
+        if_exists="replace",
+        index=False,
+    )
+    conn.dispose()
+
+    # Reconcile into listening_history
+    reconcile_sql = """INSERT INTO music.listening_history (
+        played_at_utc, isrc, playlist_id)
+        SELECT played_at_utc::TIMESTAMPTZ, isrc, playlist_id
+        FROM music.temp_listening_history
+        ON CONFLICT(played_at_utc, isrc) DO NOTHING;"""
+    err = qec(reconcile_sql)
+    if err:
+        raise ValueError(f"Error reconciling listening history: {err}")
+
+    return None
+
+
+def _do_auto_shuffle(playlist_name: str) -> Optional[ProcessStepResultData]:
+    """Get the playlist ID and call auto_shuffle_playlists."""
+    import pandas as pd
+    conn = get_conn(alchemy=True)
+    sql = f"SELECT DISTINCT playlist_id FROM activities.vw_watch_music_heard WHERE playlist_name = '{playlist_name}'"
+    df = pd.read_sql(sql, con=conn)
+    conn.dispose()
+    if df.empty:
+        raise ValueError(f"No playlist_id found for '{playlist_name}'")
+    target_id = str(df["playlist_id"].iloc[0])
+    auto_shuffle_playlists(target_id, limit_minutes=True)
+    return ProcessStepResultData(playlist_shuffled=True, playlist_id=str(target_id))
+
+
+def _cleanup_fake_activity() -> Optional[ProcessStepResultData]:
+    """Delete the fake activity used for Manual Processing."""
+    del_sql = "DELETE FROM activities.activities WHERE activity_id = 9223372036854775800"
+    err = qec(del_sql)
+    if err:
+        raise ValueError(f"Error deleting fake activity: {err}")
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Existing endpoints
+# ---------------------------------------------------------------------------
 
 
 @router.get("")
@@ -122,4 +414,3 @@ async def get_activity_segment_matches(activity_id: int):
             status_code=500,
             detail=f"Failed to fetch segment matches: {str(e)}",
         )
-

@@ -1,0 +1,128 @@
+/**
+ * Activity Processing Types
+ * 
+ * Cross-surface data contract for the Activity Processing & Playlist Shuffle feature.
+ * Shared between frontend (React) and backend (FastAPI Pydantic models).
+ * 
+ * POST /api/activities/process returns NDJSON stream
+ */
+
+/**
+ * Request body for POST /api/activities/process
+ */
+export interface ProcessActivityRequest {
+  /** Playlist name selection. 'Manual Processing' shows datetime inputs. */
+  playlist_name?: 'Running' | 'Jogging' | 'No Playlist' | 'Manual Processing';
+  /** ISO 8601 datetime — required when playlist_name is 'Manual Processing' */
+  manual_start_utc?: string;
+  /** ISO 8601 datetime — required when playlist_name is 'Manual Processing' */
+  manual_end_utc?: string;
+}
+
+/**
+ * Response body for POST /api/activities/process
+ */
+export interface ProcessActivityResponse {
+  /** True if all steps completed successfully */
+  success: boolean;
+  /** Ordered array of step results */
+  steps: ProcessStepResult[];
+  /** Overall error message if a step failed fatally */
+  error?: string;
+}
+
+/**
+ * Result of a single processing step
+ */
+export interface ProcessStepResult {
+  /** Step identifier */
+  step_id: ProcessStepId;
+  /** Step status */
+  status: 'complete' | 'error' | 'skipped' | 'running' | 'pending';
+  /** Elapsed time in milliseconds */
+  elapsed_ms: number;
+  /** Error message if status is 'error' */
+  error?: string;
+  /** Optional result data from the step */
+  result?: ProcessStepResultData;
+}
+
+/**
+ * Step identifier constants
+ */
+export type ProcessStepId =
+  | 'sync_activities'
+  | 'sync_details'
+  | 'match_segments'
+  | 'lookup_playlist'
+  | 'insert_history'
+  | 'auto_shuffle'
+  | 'cleanup';
+
+/**
+ * Step result data (populated on completion of relevant steps)
+ */
+export interface ProcessStepResultData {
+  /** Number of songs heard (from lookup_playlist) */
+  song_count?: number;
+  /** First song heard (from lookup_playlist) */
+  first_song?: string;
+  /** Last song heard (from lookup_playlist) */
+  last_song?: string;
+  /** Whether the playlist was successfully shuffled (from auto_shuffle) */
+  playlist_shuffled?: boolean;
+  /** The Spotify playlist ID (from lookup_playlist) */
+  playlist_id?: string;
+}
+
+/**
+ * Streaming NDJSON event for a single step completion.
+ * Each line in the NDJSON stream is one of these (except the terminal event).
+ */
+export interface ProcessStepEvent {
+  step_id: ProcessStepId;
+  status: 'complete' | 'error' | 'skipped';
+  elapsed_ms: number;
+  error?: string;
+  result?: ProcessStepResultData;
+}
+
+/**
+ * Terminal event marking the end of the NDJSON stream.
+ */
+export interface ProcessCompleteEvent {
+  complete: true;
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Union type for all NDJSON stream events.
+ */
+export type NdjsonEvent = ProcessStepEvent | ProcessCompleteEvent;
+
+/**
+ * Human-readable labels for each step, used by the StepChecklist component
+ */
+export const STEP_LABELS: Record<ProcessStepId, string> = {
+  sync_activities: 'Syncing Activities',
+  sync_details: 'Syncing Activity Details',
+  match_segments: 'Matching Segments',
+  lookup_playlist: 'Looking Up Playlist',
+  insert_history: 'Inserting Listening History',
+  auto_shuffle: 'Reshuffling Playlist',
+  cleanup: 'Cleanup',
+};
+
+/**
+ * Ordered list of all step IDs (execution order)
+ */
+export const STEP_ORDER: readonly ProcessStepId[] = [
+  'sync_activities',
+  'sync_details',
+  'match_segments',
+  'lookup_playlist',
+  'insert_history',
+  'auto_shuffle',
+  'cleanup',
+];
