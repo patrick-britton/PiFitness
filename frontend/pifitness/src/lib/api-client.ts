@@ -3,6 +3,12 @@
  * Environment-aware fetch wrapper with comprehensive error handling
  */
 
+import {
+  ProcessActivityRequest,
+  ProcessStepEvent,
+  ProcessCompleteEvent,
+} from './types/activity-processing';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 /**
@@ -48,6 +54,57 @@ export interface ApiStatusResponse {
   status: string;
   message?: string;
   result?: any;
+}
+
+/**
+ * Read an NDJSON stream from a Response body, calling onStep for each event.
+ * Returns a promise that resolves with the terminal ProcessCompleteEvent.
+ */
+export async function readNdjsonStream(
+  response: Response,
+  onStep: (event: ProcessStepEvent) => void
+): Promise<ProcessCompleteEvent> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Response body is not readable");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete lines from the buffer
+      const lines = buffer.split("\n");
+      // Keep the last (potentially incomplete) line in the buffer
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        const event = JSON.parse(trimmed);
+
+        // Check if this is the terminal event
+        if (event.complete === true) {
+          return event as ProcessCompleteEvent;
+        }
+
+        // Otherwise it's a step event
+        onStep(event as ProcessStepEvent);
+      }
+    }
+
+    // If we exit the loop without a terminal event, something went wrong
+    throw new Error("Stream ended without terminal event");
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 /**
@@ -257,5 +314,28 @@ export const API = {
     getActivity: (activityId: string) => fetchAPI<any>(`/api/activities/${activityId}`),
     getSegments: () => fetchAPI<any[]>("/api/segments"),
     getSegmentMatches: (segmentId: string) => fetchAPI<any[]>(`/api/segments/${segmentId}/matches`),
+    /**
+     * Process an activity via NDJSON streaming.
+     * Calls onStep for each step-completion event.
+     * Returns a promise that resolves with the terminal event on stream completion.
+     */
+    processActivity: async (
+      request: ProcessActivityRequest,
+      onStep: (event: ProcessStepEvent) => void
+    ): Promise<ProcessCompleteEvent> => {
+      const url = `${API_BASE}/api/activities/process`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `API request failed with status ${response.status}`);
+      }
+
+      return readNdjsonStream(response, onStep);
+    },
   },
 };
