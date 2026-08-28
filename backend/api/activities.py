@@ -20,7 +20,7 @@ from backend_functions.queries import (
     get_activity_telemetry,
     get_segment_matches,
 )
-from backend_functions.database_functions import sql_to_dict, get_conn, qec, one_sql_result
+from backend_functions.database_functions import sql_to_dict, get_conn, qec, one_sql_result, sql_to_list
 from backend_functions.music_functions import auto_shuffle_playlists
 from backend_functions.ultimate_task_executioner_v2 import ultimate_task_executioner
 
@@ -48,6 +48,7 @@ def _run_step(step_id: str, fn, *args, **kwargs) -> ProcessStepResult:
             step_id=step_id,
             status="complete",
             elapsed_ms=elapsed,
+            error=None,
             result=None,
         )
     except Exception as e:
@@ -57,6 +58,7 @@ def _run_step(step_id: str, fn, *args, **kwargs) -> ProcessStepResult:
             status="error",
             elapsed_ms=elapsed,
             error=str(e),
+            result=None,
         )
 
 
@@ -66,6 +68,8 @@ def _skip_step(step_id: str) -> ProcessStepResult:
         step_id=step_id,
         status="skipped",
         elapsed_ms=0,
+        error=None,
+        result=None,
     )
 
 
@@ -122,14 +126,65 @@ def _process_generator(req: ProcessActivityRequest):
             if result.status == "error":
                 has_error = True
 
-        # -----------------------------------------------------------------------
-        # Step 3: Match Segments
-        # -----------------------------------------------------------------------
-        if not has_error:
-            result = _run_step("match_segments", ultimate_task_executioner, force_task_id=21)
-            yield json.dumps(_step_to_dict(result)) + "\n"
-            if result.status == "error":
-                has_error = True
+            # -----------------------------------------------------------------------
+            # Step 3: Activity Post-processing substeps (elevation/smoothing + segment matching)
+            # -----------------------------------------------------------------------
+            if not has_error:
+                from backend_functions.activity_smoothing import activity_post_processing_steps
+
+                post_sql = """SELECT activity_id FROM activities.activities
+                              WHERE activity_type_name in ('running', 'trail_running')
+                              ORDER BY activity_id DESC LIMIT 1"""
+                post_row = one_sql_result(post_sql)
+
+                if not post_row:
+                    # No running/trail activity: skip all known substeps
+                    skipped_substeps = [
+                        "insert_heartrate",
+                        "assign_elevation_reference_time",
+                        "smooth_elevation_spikes_by_time",
+                        "smooth_elevation_python_time",
+                        "update_elevation_reference_by_time",
+                        "resample_activity_to_distance",
+                        "smooth_elevation_spikes_by_distance",
+                        "smooth_elevation_python_distance",
+                        "smooth_elevation_python_reference",
+                        "update_elevation_reference_by_distance",
+                        "build_activity_path",
+                        "segment_match_segments",
+                        "segment_pair_generation",
+                        "segment_polygon_match",
+                        "segment_mass_confirm_1",
+                        "segment_hausdorff_match",
+                        "segment_mass_confirm_2",
+                        "segment_frechet_match",
+                        "segment_mass_confirm_3",
+                        "segment_update_details",
+                    ]
+                    for sid in skipped_substeps:
+                        yield json.dumps(_step_to_dict(_skip_step(sid))) + "\n"
+                else:
+                    for step_id, elapsed_ms, error in activity_post_processing_steps(post_row):
+                        if error:
+                            has_error = True
+                            step = ProcessStepResult(
+                                step_id=step_id,
+                                status="error",
+                                elapsed_ms=elapsed_ms,
+                                error=error,
+                                result=None,
+                            )
+                        else:
+                            step = ProcessStepResult(
+                                step_id=step_id,
+                                status="complete",
+                                elapsed_ms=elapsed_ms,
+                                error=None,
+                                result=None,
+                            )
+                        yield json.dumps(_step_to_dict(step)) + "\n"
+                        if has_error:
+                            break
 
         # -----------------------------------------------------------------------
         # Step 4: Look Up Playlist (skip if No Playlist)
@@ -228,10 +283,12 @@ def _lookup_playlist(playlist_name: str) -> ProcessStepResult:
             step_id="lookup_playlist",
             status="complete",
             elapsed_ms=elapsed,
+            error=None,
             result=ProcessStepResultData(
                 song_count=song_count,
                 first_song=first_song,
                 last_song=last_song,
+                playlist_shuffled=None,
                 playlist_id=playlist_id,
             ),
         )
@@ -242,6 +299,7 @@ def _lookup_playlist(playlist_name: str) -> ProcessStepResult:
             status="error",
             elapsed_ms=elapsed,
             error=str(e),
+            result=None,
         )
 
 
@@ -295,7 +353,13 @@ def _do_auto_shuffle(playlist_name: str) -> Optional[ProcessStepResultData]:
         raise ValueError(f"No playlist_id found for '{playlist_name}'")
     target_id = str(df["playlist_id"].iloc[0])
     auto_shuffle_playlists(target_id, limit_minutes=True)
-    return ProcessStepResultData(playlist_shuffled=True, playlist_id=str(target_id))
+    return ProcessStepResultData(
+        song_count=None,
+        first_song=None,
+        last_song=None,
+        playlist_shuffled=True,
+        playlist_id=str(target_id),
+    )
 
 
 def _cleanup_fake_activity() -> Optional[ProcessStepResultData]:

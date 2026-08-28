@@ -116,18 +116,262 @@ def process_all_activities(activity_ids, is_reference=False, is_time=False):
         except Exception as e:
             print(f"\nERROR on activity {act_id}: {e}")
             conn.rollback()  # Important: reset the transaction block if an error occurs
+            raise e  # Propagate the error so atomic step functions can fail properly
 
     conn.close()
 
     total_time = time.time() - start_time
 
 
+# ---------------------------------------------------------------------------
+# Helper: Run SQL via qec and raise on error to prevent silent failures
+# ---------------------------------------------------------------------------
+
+def _run_sql_step(sql: str, params=None):
+    res = qec(sql, params)
+    if res is not None:
+        raise RuntimeError(f"SQL Execution Error: {res[0]}")
+
+
+# ---------------------------------------------------------------------------
+# Atomic Step Functions for Activity Post Processing
+# ---------------------------------------------------------------------------
+
+def insert_heartrate_for_activity(int_a: int):
+    hr_sql = f"""INSERT INTO health.heartrate_raw (ts_utc, heartrate_bpm)
+            SELECT ts_utc, heartrate_bpm FROM activities.activity_details
+            WHERE activity_id = {int_a} AND heartrate_bpm IS NOT NULL
+            ON CONFLICT(ts_utc) DO UPDATE SET heartrate_bpm = EXCLUDED.heartrate_bpm
+            WHERE health.heartrate_raw.heartrate_bpm IS DISTINCT FROM EXCLUDED.heartrate_bpm;"""
+    _run_sql_step(hr_sql)
+
+
+def call_assign_elevation_reference_time(int_a: int):
+    _run_sql_step(f"CALL activities.assign_elevation_reference_time({int_a});")
+
+
+def call_smooth_elevation_spikes_by_time(int_a: int):
+    _run_sql_step(f"CALL activities.smooth_elevation_spikes_by_time({int_a});")
+
+
+def smooth_elevation_python_time(int_a: int):
+    process_all_activities([int_a], is_reference=False, is_time=True)
+
+
+def call_update_elevation_reference_by_time(int_a: int):
+    _run_sql_step(f"CALL activities.update_elevation_reference_by_time({int_a});")
+
+
+def call_resample_activity_to_distance(int_a: int):
+    _run_sql_step(f"CALL activities.resample_activity_to_distance({int_a});")
+
+
+def call_smooth_elevation_spikes_by_distance(int_a: int):
+    _run_sql_step(f"CALL activities.smooth_elevation_spikes_by_distance({int_a});")
+
+
+def smooth_elevation_python_distance(int_a: int):
+    process_all_activities([int_a], is_reference=False, is_time=False)
+
+
+def smooth_elevation_python_reference(int_a: int):
+    process_all_activities([int_a], is_reference=True, is_time=False)
+
+
+def call_update_elevation_reference_by_distance(int_a: int):
+    _run_sql_step(f"CALL activities.update_elevation_reference_by_distance({int_a});")
+
+
+def build_activity_path(int_a: int):
+    path_sql = f"""UPDATE activities.activities
+            SET activity_path = sub.path, is_downloaded=TRUE
+            FROM (
+                     SELECT
+                         rd.activity_id,
+                         ST_SetSRID(
+                                 ST_MakeLine(
+                                         ST_MakePoint(longitude, latitude, elevation_m_smooth, distance_m)
+                                         ORDER BY distance_m ASC
+                                 ),
+                                 4326
+                         ) AS path
+                     FROM activities.activity_details_distance rd
+                     WHERE activity_id = {int_a} 
+                     GROUP BY rd.activity_id
+                 ) AS sub
+            WHERE activities.activity_id = sub.activity_id;"""
+    _run_sql_step(path_sql)
+
+
+# Segment matching steps:
+def call_segment_match_segments(int_a: int):
+    _run_sql_step(f"CALL activities.segment_matching_match_segments({int_a});")
+
+
+def call_segment_pair_generation(int_a: int):
+    _run_sql_step(f"CALL activities.segment_matching_activity_pair_generation({int_a});")
+
+
+def call_segment_polygon_match(int_a: int):
+    _run_sql_step("CALL activities.segment_matches_all_polygon();")
+
+
+def call_segment_mass_confirm_1(int_a: int):
+    _run_sql_step("CALL activities.segment_matching_mass_confirmation(1);")
+
+
+def call_segment_hausdorff_match(int_a: int):
+    _run_sql_step("CALL activities.segment_matches_all_hausdorff();")
+
+
+def call_segment_mass_confirm_2(int_a: int):
+    _run_sql_step("CALL activities.segment_matching_mass_confirmation(2);")
+
+
+def call_segment_frechet_match(int_a: int):
+    _run_sql_step("CALL activities.segment_matches_all_freschet();")
+
+
+def call_segment_mass_confirm_3(int_a: int):
+    _run_sql_step("CALL activities.segment_matching_mass_confirmation(3);")
+
+
+def call_segment_update_details(int_a: int):
+    _run_sql_step(f"CALL staging.update_segment_details({int_a});")
+
+
+def delete_queue_for_activity(int_a: int):
+    _run_sql_step(f"DELETE FROM activities.activity_processing_queue WHERE activity_id = {int_a};")
+
+
+# ---------------------------------------------------------------------------
+# Generator Orchestrator yielding (step_id, elapsed_ms, error)
+# ---------------------------------------------------------------------------
+
+def activity_post_processing_steps(activity_id: int):
+    """
+    Generator that yields (step_id, elapsed_ms, error) for each sub-step of post processing for a single activity.
+    """
+    int_a = int(activity_id)
+
+    # Elevation & Smoothing pipeline (runs for any activity type)
+    steps = [
+        ('insert_heartrate', insert_heartrate_for_activity),
+        ('assign_elevation_reference_time', call_assign_elevation_reference_time),
+        ('smooth_elevation_spikes_by_time', call_smooth_elevation_spikes_by_time),
+        ('smooth_elevation_python_time', smooth_elevation_python_time),
+        ('update_elevation_reference_by_time', call_update_elevation_reference_by_time),
+        ('resample_activity_to_distance', call_resample_activity_to_distance),
+        ('smooth_elevation_spikes_by_distance', call_smooth_elevation_spikes_by_distance),
+        ('smooth_elevation_python_distance', smooth_elevation_python_distance),
+        ('smooth_elevation_python_reference', smooth_elevation_python_reference),
+        ('update_elevation_reference_by_distance', call_update_elevation_reference_by_distance),
+        ('build_activity_path', build_activity_path),
+    ]
+
+    for step_id, fn in steps:
+        t0 = start_timer()
+        error = None
+        try:
+            fn(int_a)
+            try:
+                log_app_event(cat='Task Executioner',
+                              desc=f'Activity Post Processing Substep: {step_id} for {int_a}',
+                              err=None,
+                              data_event=None)
+            except Exception as log_err:
+                print(f"\nLOGGING ERROR after step {step_id} for {int_a}: {log_err}")
+        except Exception as e:
+            error = str(e)
+            try:
+                log_app_event(cat='Task Executioner',
+                              desc=f'Activity Post Processing Substep Error: {step_id} for {int_a}',
+                              err=error,
+                              data_event=None)
+            except Exception as log_err:
+                print(f"\nLOGGING ERROR after step {step_id} for {int_a}: {log_err}")
+
+        ms = elapsed_ms(t0)
+        yield (step_id, ms, error)
+        if error:
+            return  # Halt pipeline on first error
+
+    # Segment matching (running/trail_running only)
+    is_running = False
+    try:
+        activity_type_row = one_sql_result(
+            "SELECT activity_type_name FROM activities.activities WHERE activity_id = %s", (int_a,)
+        )
+        if activity_type_row and activity_type_row in ('running', 'trail_running'):
+            is_running = True
+    except Exception as e:
+        log_app_event(cat='Task Executioner',
+                      desc=f'Activity Post Processing: failed to get activity type for {int_a}',
+                      err=str(e),
+                      data_event=None)
+
+    if is_running:
+        segment_steps = [
+            ('segment_match_segments', call_segment_match_segments),
+            ('segment_pair_generation', call_segment_pair_generation),
+            ('segment_polygon_match', call_segment_polygon_match),
+            ('segment_mass_confirm_1', call_segment_mass_confirm_1),
+            ('segment_hausdorff_match', call_segment_hausdorff_match),
+            ('segment_mass_confirm_2', call_segment_mass_confirm_2),
+            ('segment_frechet_match', call_segment_frechet_match),
+            ('segment_mass_confirm_3', call_segment_mass_confirm_3),
+            ('segment_update_details', call_segment_update_details),
+        ]
+
+        for step_id, fn in segment_steps:
+            t0 = start_timer()
+            error = None
+            try:
+                fn(int_a)
+                try:
+                    log_app_event(cat='Task Executioner',
+                                  desc=f'Activity Post Processing Substep: {step_id} for {int_a}',
+                                  err=None,
+                                  data_event=None)
+                except Exception as log_err:
+                    print(f"\nLOGGING ERROR after step {step_id} for {int_a}: {log_err}")
+            except Exception as e:
+                error = str(e)
+                try:
+                    log_app_event(cat='Task Executioner',
+                                  desc=f'Activity Post Processing Substep Error: {step_id} for {int_a}',
+                                  err=error,
+                                  data_event=None)
+                except Exception as log_err:
+                    print(f"\nLOGGING ERROR after step {step_id} for {int_a}: {log_err}")
+
+            ms = elapsed_ms(t0)
+            yield (step_id, ms, error)
+            if error:
+                return  # Halt pipeline on first error
+
+    # Delete queue entry on successful completion of all steps
+    try:
+        delete_queue_for_activity(int_a)
+        log_app_event(cat='Task Executioner',
+                      desc=f'Activity Post Processing Queue Deletion: {int_a}',
+                      err=None,
+                      data_event=None)
+    except Exception as e:
+        log_app_event(cat='Task Executioner',
+                      desc=f'Activity Post Processing Queue Deletion Error: {int_a}',
+                      err=str(e),
+                      data_event=None)
+
+
+# Backwards compatibility wrapper
 def activity_post_processing(manual_list=None):
     if manual_list:
         activity_list = manual_list
     else:
         activity_list = sql_to_list(
-            f"SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5")
+            "SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5"
+        )
 
     if not activity_list:
         log_app_event(cat='Task Executioner',
@@ -135,154 +379,29 @@ def activity_post_processing(manual_list=None):
                       err=None,
                       data_event=None)
         return True
+
     ac = len(activity_list)
-    ctr=1
+    ctr = 1
 
     log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: List has {ac} activities.',
-                      err=None,
-                      data_event=None)
+                  desc=f'Activity Post Processing: List has {ac} activities.',
+                  err=None,
+                  data_event=None)
 
     for a in activity_list:
         int_a = int(a)
         t0 = start_timer()
-
-
-        # Insert heartrate values:
-        hr_sql = f"""INSERT INTO health.heartrate_raw (ts_utc, heartrate_bpm)
-                SELECT ts_utc, heartrate_bpm FROM activities.activity_details
-                WHERE activity_id = {int_a} AND heartrate_bpm IS NOT NULL
-                ON CONFLICT(ts_utc) DO UPDATE SET heartrate_bpm = EXCLUDED.heartrate_bpm
-                WHERE health.heartrate_raw.heartrate_bpm IS DISTINCT FROM EXCLUDED.heartrate_bpm;"""
-        qec(hr_sql)
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: HR Insertion {a}',
-                      err=None,
-                      data_event=None)
-
-        # Assign elevation_reference
-        qec(f"CALL activities.assign_elevation_reference_time({int_a});")
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Elevation Reference Time {a}',
-                      err=None,
-                      data_event=None)
-
-        # Smooth raw elevation by time
-        qec(f"CALL activities.smooth_elevation_spikes_by_time({int_a});")
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Smooth in SQL {a}',
-                      err=None,
-                      data_event=None)
-
-        # Smooth again in python
-        process_all_activities([int_a], is_reference=False, is_time=True)
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Smooth in Python {a}',
-                      err=None,
-                      data_event=None)
-
-        # Update elevation reference table
-        qec(f"CALL activities.update_elevation_reference_by_time({int_a});")
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Elev Reference Update {a}',
-                      err=None,
-                      data_event=None)
-
-        # Resample to 1m; assigns elevation_reference
-        qec(f'CALL activities.resample_activity_to_distance({int_a});')
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Resampling to distance {a}',
-                      err=None,
-                      data_event=None)
-
-        # Smooth Elevation Spikes (smooths elevation_m and elevation_reference
-        qec(f"CALL activities.smooth_elevation_spikes_by_distance({int_a});")
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Spike Smooth by distance {a}',
-                      err=None,
-                      data_event=None)
-
-        # Smooth again in python
-        process_all_activities([int_a], is_reference=False, is_time=False)
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Reprocessing 2 {a}',
-                      err=None,
-                      data_event=None)
         
-        process_all_activities([int_a], is_reference=True, is_time=False)
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Reprocessing 3 {a}',
-                      err=None,
-                      data_event=None)
-
-        # Update elevation reference again
-        qec(f"CALL activities.update_elevation_reference_by_distance({int_a});")
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Elev Reference #2 {a}',
-                      err=None,
-                      data_event=None)
-
-        # Build the path
-        path_sql = f"""UPDATE activities.activities
-                SET activity_path = sub.path, is_downloaded=TRUE
-                FROM (
-                         SELECT
-                             rd.activity_id,
-                             ST_SetSRID(
-                                     ST_MakeLine(
-                                             ST_MakePoint(longitude, latitude, elevation_m_smooth, distance_m)
-                                             ORDER BY distance_m ASC
-                                     ),
-                                     4326
-                             ) AS path
-                         FROM activities.activity_details_distance rd
-                         WHERE activity_id = {int_a} 
-                         GROUP BY rd.activity_id
-                     ) AS sub
-                WHERE activities.activity_id = sub.activity_id;"""
-        qec(path_sql)
-
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Path Building {a}',
-                      err=None,
-                      data_event=None)
-
-        segment_match_workflow = [f"CALL activities.segment_matching_match_segments({int_a});",
-                             f"CALL activities.segment_matching_activity_pair_generation({int_a});",
-                             f"CALL activities.segment_matches_all_polygon();",
-                             f"CALL activities.segment_matching_mass_confirmation(1);",
-                             f"CALL activities.segment_matches_all_hausdorff();",
-                             f"CALL activities.segment_matching_mass_confirmation(2);",
-                            f"CALL activities.segment_matches_all_freschet();",
-                                  f"CALL activities.segment_matching_mass_confirmation(3);"
-                                  f"CALL staging.update_segment_details({int_a});"]
-
-        for seg_sql in segment_match_workflow:
-            qec(seg_sql)
-            log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Segment Matching {a} : {seg_sql}',
-                      err=None,
-                      data_event=None)
-
-        qec(f"""DELETE FROM activities.activity_processing_queue WHERE activity_id = {int_a}""")
+        has_error = False
+        for step_id, ms, error in activity_post_processing_steps(int_a):
+            if error:
+                has_error = True
+                break
         
-        log_app_event(cat='Task Executioner',
-                      desc='Activity Post Processing: Queue Deletion {a} : {seg_sql}',
-                      err=None,
-                      data_event=None)
-        
-        print(f"{ctr}/{ac} | ID# {int_a} | {elapsed_ms(t0)} ms")
+        if not has_error:
+            print(f"{ctr}/{ac} | ID# {int_a} | {elapsed_ms(t0)} ms")
+        else:
+            print(f"{ctr}/{ac} | ID# {int_a} | FAILED")
         ctr += 1
-
 
     return True

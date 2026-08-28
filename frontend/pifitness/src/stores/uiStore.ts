@@ -220,6 +220,7 @@ export const MODULE_SUB_PAGES: Record<NavigationModule, SubNavigationConfig[]> =
     { id: 'segment-management', label: 'Segment Management', iconName: 'Route', path: '/segment-management' },
     { id: 'activity-processing', label: 'Activity Processing', iconName: 'Cached', path: '/activity-processing' },
     { id: 'training-cycles', label: 'Training Cycle Management', iconName: 'Repeat', path: '/training-cycles' },
+    { id: 'beach', label: 'Beach', iconName: 'SportsVolleyball', path: '/beach' },
   ],
   health: [
     { id: 'charting', label: 'Charting', iconName: 'BarChart', path: '/charting' },
