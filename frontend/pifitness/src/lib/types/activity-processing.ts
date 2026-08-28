@@ -54,6 +54,26 @@ export type ProcessStepId =
   | 'sync_activities'
   | 'sync_details'
   | 'match_segments'
+  | 'insert_heartrate'
+  | 'assign_elevation_reference_time'
+  | 'smooth_elevation_spikes_by_time'
+  | 'smooth_elevation_python_time'
+  | 'update_elevation_reference_by_time'
+  | 'resample_activity_to_distance'
+  | 'smooth_elevation_spikes_by_distance'
+  | 'smooth_elevation_python_distance'
+  | 'smooth_elevation_python_reference'
+  | 'update_elevation_reference_by_distance'
+  | 'build_activity_path'
+  | 'segment_match_segments'
+  | 'segment_pair_generation'
+  | 'segment_polygon_match'
+  | 'segment_mass_confirm_1'
+  | 'segment_hausdorff_match'
+  | 'segment_mass_confirm_2'
+  | 'segment_frechet_match'
+  | 'segment_mass_confirm_3'
+  | 'segment_update_details'
   | 'lookup_playlist'
   | 'insert_history'
   | 'auto_shuffle'
@@ -108,6 +128,26 @@ export const STEP_LABELS: Record<ProcessStepId, string> = {
   sync_activities: 'Syncing Activities',
   sync_details: 'Syncing Activity Details',
   match_segments: 'Matching Segments',
+  insert_heartrate: 'Inserting Heart Rate Data',
+  assign_elevation_reference_time: 'Assigning Elevation Reference (time)',
+  smooth_elevation_spikes_by_time: 'Smoothing Elevation Spikes (time)',
+  smooth_elevation_python_time: 'Applying Savitzky-Golay Smoothing (time)',
+  update_elevation_reference_by_time: 'Updating Elevation Reference (time)',
+  resample_activity_to_distance: 'Resampling Activity to Distance',
+  smooth_elevation_spikes_by_distance: 'Smoothing Elevation Spikes (distance)',
+  smooth_elevation_python_distance: 'Applying Savitzky-Golay Smoothing (distance)',
+  smooth_elevation_python_reference: 'Applying Savitzky-Golay Smoothing (reference)',
+  update_elevation_reference_by_distance: 'Updating Elevation Reference (distance)',
+  build_activity_path: 'Building Activity Path',
+  segment_match_segments: 'Matching Segments',
+  segment_pair_generation: 'Generating Segment Pairs',
+  segment_polygon_match: 'Polygon Matching',
+  segment_mass_confirm_1: 'Mass Confirmation (pass 1)',
+  segment_hausdorff_match: 'Hausdorff Matching',
+  segment_mass_confirm_2: 'Mass Confirmation (pass 2)',
+  segment_frechet_match: 'Frechet Matching',
+  segment_mass_confirm_3: 'Mass Confirmation (pass 3)',
+  segment_update_details: 'Updating Segment Details',
   lookup_playlist: 'Looking Up Playlist',
   insert_history: 'Inserting Listening History',
   auto_shuffle: 'Reshuffling Playlist',
@@ -121,6 +161,26 @@ export const STEP_ORDER: readonly ProcessStepId[] = [
   'sync_activities',
   'sync_details',
   'match_segments',
+  'insert_heartrate',
+  'assign_elevation_reference_time',
+  'smooth_elevation_spikes_by_time',
+  'smooth_elevation_python_time',
+  'update_elevation_reference_by_time',
+  'resample_activity_to_distance',
+  'smooth_elevation_spikes_by_distance',
+  'smooth_elevation_python_distance',
+  'smooth_elevation_python_reference',
+  'update_elevation_reference_by_distance',
+  'build_activity_path',
+  'segment_match_segments',
+  'segment_pair_generation',
+  'segment_polygon_match',
+  'segment_mass_confirm_1',
+  'segment_hausdorff_match',
+  'segment_mass_confirm_2',
+  'segment_frechet_match',
+  'segment_mass_confirm_3',
+  'segment_update_details',
   'lookup_playlist',
   'insert_history',
   'auto_shuffle',

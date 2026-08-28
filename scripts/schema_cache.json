@@ -3747,5 +3747,47 @@
       "nullable": true,
       "type": "smallint"
     }
+  ],
+  "tasks.task_executions": [
+    {
+      "name": "execution_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "task_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "task_name",
+      "nullable": false,
+      "type": "character varying"
+    },
+    {
+      "name": "status",
+      "nullable": true,
+      "type": "character varying"
+    },
+    {
+      "name": "started_at",
+      "nullable": true,
+      "type": "timestamp without time zone"
+    },
+    {
+      "name": "completed_at",
+      "nullable": true,
+      "type": "timestamp without time zone"
+    },
+    {
+      "name": "result",
+      "nullable": true,
+      "type": "jsonb"
+    },
+    {
+      "name": "error_message",
+      "nullable": true,
+      "type": "text"
+    }
   ]
 }

@@ -84,6 +84,40 @@ from .activities_queries import (
     get_recent_activities,
     get_activity_stats,
 )
+from .tri_tip_queries import (
+    get_tri_tip_event,
+    list_tri_tip_events,
+    get_event_readings,
+    get_active_event,
+    initiate_tri_tip,
+    place_tri_tip,
+    add_tri_tip_reading,
+    complete_tri_tip,
+    abandon_tri_tip,
+    # Exceptions
+    TriTipError,
+    TriTipActiveEventExistsError,
+    TriTipStateError,
+    TriTipNotFoundError,
+)
+from .volleyball_queries import (
+    get_game,
+    get_active_game,
+    get_game_points,
+    get_game_score,
+    get_game_detail,
+    list_game_history,
+    create_game,
+    add_point,
+    remove_last_point,
+    end_game,
+    abandon_game,
+    # Exceptions
+    VolleyballError,
+    VolleyballActiveGameExistsError,
+    VolleyballStateError,
+    VolleyballNotFoundError,
+)
 
 __all__ = [
     # Health
@@ -157,4 +191,34 @@ __all__ = [
     'get_segment_matches',
     'get_recent_activities',
     'get_activity_stats',
+    # Tri-tip Timer
+    'get_tri_tip_event',
+    'list_tri_tip_events',
+    'get_event_readings',
+    'get_active_event',
+    'initiate_tri_tip',
+    'place_tri_tip',
+    'add_tri_tip_reading',
+    'complete_tri_tip',
+    'abandon_tri_tip',
+    'TriTipError',
+    'TriTipActiveEventExistsError',
+    'TriTipStateError',
+    'TriTipNotFoundError',
+    # Volleyball Scorekeeping
+    'get_game',
+    'get_active_game',
+    'get_game_points',
+    'get_game_score',
+    'get_game_detail',
+    'list_game_history',
+    'create_game',
+    'add_point',
+    'remove_last_point',
+    'end_game',
+    'abandon_game',
+    'VolleyballError',
+    'VolleyballActiveGameExistsError',
+    'VolleyballStateError',
+    'VolleyballNotFoundError',
 ]

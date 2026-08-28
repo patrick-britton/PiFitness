@@ -1,0 +1,3 @@
+from backend_functions.music_functions import auto_shuffle_playlists
+
+auto_shuffle_playlists(list_id='1zhLhV1j8y08gIH387MA2p')

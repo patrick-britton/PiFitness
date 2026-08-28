@@ -8,6 +8,24 @@ import {
   ProcessStepEvent,
   ProcessCompleteEvent,
 } from './types/activity-processing';
+import {
+  TriTipEvent,
+  TriTipReading,
+  TriTipEventDetail,
+  TriTipActiveResponse,
+  TriTipInitiateRequest,
+  TriTipPlaceRequest,
+  TriTipReadingRequest,
+} from './types/tri-tip';
+import {
+  VolleyballGame,
+  VolleyballPoint,
+  VolleyballActiveResponse,
+  VolleyballHistoryResponse,
+  VolleyballCreateGameRequest,
+  VolleyballAddPointRequest,
+  VolleyballScoringTeam,
+} from './types/volleyball';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -304,6 +322,61 @@ export const API = {
     testSpotify: () => fetchAPI<ApiStatusResponse>("/api/auth/spotify/test", { method: "POST" }),
     testGarmin: () => fetchAPI<ApiStatusResponse>("/api/auth/garmin/test", { method: "POST" }),
     getHealth: () => fetchAPI<Record<string, any>>("/api/auth/health"),
+  },
+
+  /**
+   * Tri-tip Timer API endpoints
+   */
+  triTip: {
+    getEvents: () => fetchAPI<ApiListResponse<TriTipEvent>>("/api/food/tri-tip"),
+    getActive: () => fetchAPI<TriTipActiveResponse>("/api/food/tri-tip/active"),
+    getEvent: (id: number) => fetchAPI<TriTipEventDetail>(`/api/food/tri-tip/${id}`),
+    initiate: (req: TriTipInitiateRequest) =>
+      fetchAPI<TriTipEvent>("/api/food/tri-tip", {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    placeMeat: (id: number, req: TriTipPlaceRequest) =>
+      fetchAPI<TriTipEvent>(`/api/food/tri-tip/${id}/place`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    addReading: (id: number, req: TriTipReadingRequest) =>
+      fetchAPI<TriTipReading>(`/api/food/tri-tip/${id}/readings`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    complete: (id: number) =>
+      fetchAPI<TriTipEvent>(`/api/food/tri-tip/${id}/complete`, { method: "POST" }),
+    abandon: (id: number) =>
+      fetchAPI<{ success: boolean }>(`/api/food/tri-tip/${id}`, { method: "DELETE" }),
+  },
+
+  /**
+   * Volleyball Scorekeeping API endpoints (Activities -> Beach)
+   */
+  volleyball: {
+    getHistory: () => fetchAPI<VolleyballHistoryResponse>("/api/sports/volleyball"),
+    getActive: () => fetchAPI<VolleyballActiveResponse>("/api/sports/volleyball/active"),
+    createGame: (req: VolleyballCreateGameRequest) =>
+      fetchAPI<VolleyballGame>("/api/sports/volleyball", {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    addPoint: (id: number, req: VolleyballAddPointRequest) =>
+      fetchAPI<VolleyballPoint>(`/api/sports/volleyball/${id}/points`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    removeLastPoint: (id: number, scoringTeam: VolleyballScoringTeam) =>
+      fetchAPI<{ success: boolean }>(
+        `/api/sports/volleyball/${id}/points/${scoringTeam}`,
+        { method: "DELETE" }
+      ),
+    endGame: (id: number) =>
+      fetchAPI<VolleyballGame>(`/api/sports/volleyball/${id}/end`, { method: "POST" }),
+    abandonGame: (id: number) =>
+      fetchAPI<{ success: boolean }>(`/api/sports/volleyball/${id}`, { method: "DELETE" }),
   },
 
   /**
