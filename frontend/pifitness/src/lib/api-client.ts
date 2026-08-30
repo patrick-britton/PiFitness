@@ -26,6 +26,16 @@ import {
   VolleyballAddPointRequest,
   VolleyballScoringTeam,
 } from './types/volleyball';
+import {
+  ExerciseTimer,
+  ExerciseAttempt,
+  ExerciseTimerSummary,
+  ExerciseListResponse,
+  ExerciseDetailResponse,
+  ExerciseCreateRequest,
+  ExerciseUpdateRequest,
+  ExerciseAttemptCreateRequest,
+} from './types/exercises';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -377,6 +387,31 @@ export const API = {
       fetchAPI<VolleyballGame>(`/api/sports/volleyball/${id}/end`, { method: "POST" }),
     abandonGame: (id: number) =>
       fetchAPI<{ success: boolean }>(`/api/sports/volleyball/${id}`, { method: "DELETE" }),
+  },
+
+  /**
+   * Exercise Timer API endpoints (Exercises -> Timer Activation / Timer Creation)
+   */
+  exercises: {
+    listSummaries: () => fetchAPI<ExerciseListResponse>("/api/exercises"),
+    getDetail: (id: number) => fetchAPI<ExerciseDetailResponse>(`/api/exercises/${id}`),
+    create: (req: ExerciseCreateRequest) =>
+      fetchAPI<ExerciseTimer>("/api/exercises", {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    update: (id: number, req: ExerciseUpdateRequest) =>
+      fetchAPI<ExerciseTimer>(`/api/exercises/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(req),
+      }),
+    remove: (id: number) =>
+      fetchAPI<{ success: boolean }>(`/api/exercises/${id}`, { method: "DELETE" }),
+    saveAttempt: (id: number, req: ExerciseAttemptCreateRequest) =>
+      fetchAPI<ExerciseAttempt>(`/api/exercises/${id}/attempts`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
   },
 
   /**

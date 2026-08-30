@@ -118,6 +118,20 @@ from .volleyball_queries import (
     VolleyballStateError,
     VolleyballNotFoundError,
 )
+from .exercise_queries import (
+    get_exercise_timer,
+    get_last_attempt,
+    list_exercise_summaries,
+    create_exercise,
+    update_exercise,
+    delete_exercise,
+    create_attempt,
+    # Exceptions
+    ExerciseError,
+    ExerciseNotFoundError,
+    ExerciseNameConflictError,
+    ExerciseValidationError,
+)
 
 __all__ = [
     # Health
@@ -221,4 +235,16 @@ __all__ = [
     'VolleyballActiveGameExistsError',
     'VolleyballStateError',
     'VolleyballNotFoundError',
+    # Exercise Timer
+    'get_exercise_timer',
+    'get_last_attempt',
+    'list_exercise_summaries',
+    'create_exercise',
+    'update_exercise',
+    'delete_exercise',
+    'create_attempt',
+    'ExerciseError',
+    'ExerciseNotFoundError',
+    'ExerciseNameConflictError',
+    'ExerciseValidationError',
 ]

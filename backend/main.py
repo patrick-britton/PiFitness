@@ -26,7 +26,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.config import get_settings
-from backend.api import activities, health, admin, music, segments, auth, tri_tip, volleyball
+from backend.api import activities, health, admin, music, segments, auth, tri_tip, volleyball, exercises
 
 # ---------------------------------------------------------------------------
 # Application Initialization
@@ -123,6 +123,7 @@ app.include_router(segments.router)
 app.include_router(auth.router)
 app.include_router(tri_tip.router)
 app.include_router(volleyball.router)
+app.include_router(exercises.router)
 
 @app.get("/api/health")
 async def health():
