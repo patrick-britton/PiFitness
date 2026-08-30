@@ -9,6 +9,8 @@
 import { useState, useCallback } from 'react';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore, MODULE_SUB_PAGES } from '../../stores/uiStore';
+import TimerCreation from './components/TimerCreation';
+import TimerActivation from './components/TimerActivation';
 import * as Icons from '@mui/icons-material';
 
 const TABS = MODULE_SUB_PAGES.exercises;
@@ -135,14 +137,11 @@ export default function ExercisesPage() {
       {/* Active Tab Content */}
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="p-8 text-center">
-            <p className="text-gray-500 dark:text-gray-400 text-lg">
-              wow such empty
-            </p>
-            <p className="text-gray-400 dark:text-gray-500 mt-2">
-              future home of {activeTabConfig.label}
-            </p>
-          </div>
+          {activeTab === 'timer-creation' ? (
+            <TimerCreation />
+          ) : (
+            <TimerActivation />
+          )}
         </div>
       </div>
     </div>

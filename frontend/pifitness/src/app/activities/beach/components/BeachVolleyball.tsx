@@ -263,9 +263,7 @@ export default function BeachVolleyball() {
         className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4"
       >
         <p className="font-semibold text-gray-900 dark:text-white">Start a new game</p>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          Team A is always <span className="font-semibold">Scripps Ranch</span>. Enter the opponent (Team B).
-        </p>
+
         <div className="flex gap-2 mt-3">
           <input
             value={opponentName}
