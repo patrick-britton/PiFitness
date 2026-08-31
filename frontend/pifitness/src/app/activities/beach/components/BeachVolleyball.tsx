@@ -1,11 +1,13 @@
 /**
  * Beach Volleyball Scorekeeping Component
  * Activities -> Beach. Branches on backend state:
- *   - no active game -> start form + game history
- *   - active game    -> scoreboard (click score = +point, "-" below = undo),
- *     chart, then End Game / Abandon buttons below the chart.
- * Colors: Scripps Ranch = #750530 (dark) / #05C460 (light); opponent = neutral
- * gray. Same colors feed the chart lines.
+ *   - no active game -> start form (partner # + name, opponent) + game history
+ *   - active game    -> italic "Playing with #N <name>" line, scoreboard
+ *     (click score = +point, "-" below = undo), Ace/Block/Spike/Dive tag row
+ *     (annotates the most recent point, either team's), chart, then End Game /
+ *     Abandon buttons below the chart.
+ * Colors: Scripps Ranch = #750530 (dark) / #050C46 (light, corrected 006-002);
+ * opponent = neutral gray. Same colors feed the chart lines.
  *
  * Auto-detect: the active query refreshes on every mount; while the first
  * fetch or a background refresh is in flight and no game is known, the
@@ -27,6 +29,7 @@ import {
 } from '../../../../hooks/useVolleyball';
 import {
   VolleyballBlockedResponse,
+  VolleyballEventType,
   VolleyballScoringTeam,
 } from '../../../../lib/types/volleyball';
 import VolleyballScoreChart from './VolleyballScoreChart';
@@ -70,6 +73,9 @@ export default function BeachVolleyball() {
   const abandonGame = useAbandonVolleyballGame();
 
   const [opponentName, setOpponentName] = useState('');
+  const [partnerNumber, setPartnerNumber] = useState('');
+  const [partnerName, setPartnerName] = useState('');
+  const [pendingEvent, setPendingEvent] = useState<VolleyballEventType | null>(null);
   const [confirmAbandon, setConfirmAbandon] = useState(false);
   const [isDark, setIsDark] = useState(false);
 
@@ -117,9 +123,21 @@ export default function BeachVolleyball() {
     const { game: g, score } = game;
     const srCount = game.points.filter((p) => p.scoring_team === 'SR').length;
     const oppCount = game.points.filter((p) => p.scoring_team === 'OPPONENT').length;
+    // Match context line (006-002): "Playing with #<number> <name>", name
+    // omitted when absent; the whole line is omitted for pre-006-002 rows
+    // that have no partner number.
+    const partnerLine =
+      g.partner_number === null
+        ? null
+        : `Playing with #${g.partner_number}${g.partner_name ? ` ${g.partner_name}` : ''}`;
 
     const handleAdd = (team: VolleyballScoringTeam) => {
-      addPoint.mutate({ id: g.game_id, scoringTeam: team });
+      // Bug T08-3: the held event is written atomically with this point;
+      // the highlight clears once the point (and its event) is recorded.
+      addPoint.mutate(
+        { id: g.game_id, scoringTeam: team, eventType: pendingEvent },
+        { onSuccess: () => setPendingEvent(null) }
+      );
     };
     const handleRemove = (team: VolleyballScoringTeam, count: number) => {
       if (count <= 0) return;
@@ -128,10 +146,9 @@ export default function BeachVolleyball() {
     const teamCard = (team: VolleyballScoringTeam) => {
       const isSR = team === 'SR';
       const teamScore = isSR ? score.sr : score.opponent;
-      const teamCount = isSR ? srCount : oppCount;
       const name = isSR ? 'Scripps Ranch' : g.team_b_name;
       const bgColor = isSR
-        ? isDark ? '#750530' : '#05C460'
+        ? isDark ? '#750530' : '#050C46'
         : isDark ? '#374151' : '#9ca3af';
       const scoreColor = isSR ? '#ffffff' : isDark ? '#e5e7eb' : '#111827';
       const sizeCls = isLandscape ? 'text-5xl' : isDesktop ? 'text-7xl' : 'text-6xl';
@@ -158,28 +175,18 @@ export default function BeachVolleyball() {
           >
             {teamScore}
           </button>
-          <button
-            type="button"
-            onClick={() => handleRemove(team, teamCount)}
-            disabled={removePoint.isPending || teamCount <= 0}
-            className={[
-              'mt-2 min-h-[44px] w-12 rounded-full text-xl font-bold',
-              'text-gray-900 dark:text-white bg-white dark:bg-gray-800',
-              'border border-gray-300 dark:border-gray-600',
-              'hover:bg-gray-100 dark:hover:bg-gray-700',
-              'disabled:opacity-40 disabled:cursor-not-allowed',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-            ].join(' ')}
-            aria-label={'Remove last point for ' + name}
-          >
-            −
-          </button>
         </div>
       );
     };
 
     return (
       <div className={'space-y-4 ' + (isLandscape || isDesktop ? 'max-w-4xl mx-auto' : '')}>
+        {/* Match context: SR's partner for this game (006-002), positioned
+            above the score display. Omitted for pre-006-002 rows without a
+            partner number. */}
+        {partnerLine && (
+          <p className="text-sm italic text-gray-600 dark:text-gray-300">{partnerLine}</p>
+        )}
         {/* Prominent scoreboard */}
         <div className="flex items-stretch gap-3">
           {teamCard('SR')}
@@ -189,9 +196,76 @@ export default function BeachVolleyball() {
           {teamCard('OPPONENT')}
         </div>
 
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Started {fmtTime(g.started_at)} · Live updates every 10 s
-        </p>
+        {/* Per-team undo row — below the score display (Bug T08-2): removes
+            that team's most recent point together with any event on it. */}
+        <div className="flex items-stretch gap-3">
+          <div className="flex-1 flex justify-center">
+            <button
+              type="button"
+              onClick={() => handleRemove('SR', srCount)}
+              disabled={removePoint.isPending || srCount <= 0}
+              className={[
+                'min-h-[44px] w-12 rounded-full text-xl font-bold',
+                'text-gray-900 dark:text-white bg-white dark:bg-gray-800',
+                'border border-gray-300 dark:border-gray-600',
+                'hover:bg-gray-100 dark:hover:bg-gray-700',
+                'disabled:opacity-40 disabled:cursor-not-allowed',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+              ].join(' ')}
+              aria-label="Remove last point for Scripps Ranch"
+            >
+              −
+            </button>
+          </div>
+          <div className="flex items-center justify-center px-1">
+            <span className="text-xl font-bold opacity-0">–</span>
+          </div>
+          <div className="flex-1 flex justify-center">
+            <button
+              type="button"
+              onClick={() => handleRemove('OPPONENT', oppCount)}
+              disabled={removePoint.isPending || oppCount <= 0}
+              className={[
+                'min-h-[44px] w-12 rounded-full text-xl font-bold',
+                'text-gray-900 dark:text-white bg-white dark:bg-gray-800',
+                'border border-gray-300 dark:border-gray-600',
+                'hover:bg-gray-100 dark:hover:bg-gray-700',
+                'disabled:opacity-40 disabled:cursor-not-allowed',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+              ].join(' ')}
+              aria-label={'Remove last point for ' + g.team_b_name}
+            >
+              −
+            </button>
+          </div>
+        </div>
+
+        {/* Notable-play selector (006-002, Bug T08-3): pressing holds the
+            event (highlighted) and it is written atomically with the NEXT
+            recorded point, whichever team scores it. Press the highlighted
+            button again to clear; press another to switch. Full-width row. */}
+        <div className="grid grid-cols-4 gap-2 w-full">
+          {(['Ace', 'Block', 'Spike', 'Dive'] as VolleyballEventType[]).map((evt) => {
+            const selected = pendingEvent === evt;
+            return (
+              <button
+                key={evt}
+                type="button"
+                onClick={() => setPendingEvent((cur) => (cur === evt ? null : evt))}
+                aria-pressed={selected}
+                className={[
+                  'min-h-[44px] rounded-md border text-sm font-medium',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+                  selected
+                    ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:border-blue-500 dark:hover:bg-blue-600'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700',
+                ].join(' ')}
+              >
+                {evt}
+              </button>
+            );
+          })}
+        </div>
 
         {/* Score chart */}
         <VolleyballScoreChart detail={game} />
@@ -254,16 +328,56 @@ export default function BeachVolleyball() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (!opponentName.trim() || createGame.isPending) return;
+          const partnerNum = Number(partnerNumber);
+          if (
+            !opponentName.trim() ||
+            partnerNumber.trim() === '' ||
+            !Number.isInteger(partnerNum) ||
+            partnerNum < 0 ||
+            createGame.isPending
+          ) {
+            return;
+          }
           createGame.mutate(
-            { team_b_name: opponentName.trim() },
-            { onSuccess: () => setOpponentName('') }
+            {
+              team_b_name: opponentName.trim(),
+              partner_number: partnerNum,
+              partner_name: partnerName.trim() || null,
+            },
+            {
+              onSuccess: () => {
+                setOpponentName('');
+                setPartnerNumber('');
+                setPartnerName('');
+              },
+            }
           );
         }}
         className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4"
       >
         <p className="font-semibold text-gray-900 dark:text-white">Start a new game</p>
 
+        <div className="flex gap-2 mt-3">
+          <input
+            value={partnerNumber}
+            onChange={(e) => setPartnerNumber(e.target.value)}
+            placeholder="Partner #"
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            className="w-24 min-h-[44px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Partner jersey number"
+          />
+          <input
+            value={partnerName}
+            onChange={(e) => setPartnerName(e.target.value)}
+            placeholder="Partner name (optional)"
+            maxLength={120}
+            className="flex-1 min-h-[44px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Partner name"
+          />
+        </div>
         <div className="flex gap-2 mt-3">
           <input
             value={opponentName}
@@ -275,7 +389,7 @@ export default function BeachVolleyball() {
           />
           <button
             type="submit"
-            disabled={!opponentName.trim() || createGame.isPending}
+            disabled={!opponentName.trim() || partnerNumber.trim() === '' || createGame.isPending}
             className="min-h-[44px] px-4 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
             {createGame.isPending ? 'Starting…' : 'Start Game'}

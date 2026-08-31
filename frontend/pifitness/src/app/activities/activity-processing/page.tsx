@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useViewportStore } from '@/stores/viewportStore';
 import { API } from '@/lib/api-client';
-import { ProcessActivityRequest, ProcessStepResult, ProcessStepEvent, STEP_ORDER } from '@/lib/types/activity-processing';
+import { ProcessActivityRequest, ProcessStepResult, ProcessStepEvent, ProcessSummaryData, STEP_ORDER } from '@/lib/types/activity-processing';
 import StepChecklist from './StepChecklist';
 
 export default function ActivityProcessingPage() {
@@ -17,6 +17,7 @@ export default function ActivityProcessingPage() {
   const [loadingStart, setLoadingStart] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<ProcessStepResult[]>([]);
+  const [summary, setSummary] = useState<ProcessSummaryData | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   const isManual = playlist === 'Manual Processing';
@@ -25,6 +26,7 @@ export default function ActivityProcessingPage() {
     setLoading(true);
     setError(null);
     setSteps([]);
+    setSummary(null);
     setSubmitted(true);
 
     const startTime = Date.now();
@@ -79,6 +81,8 @@ export default function ActivityProcessingPage() {
 
       const terminal = await API.activities.processActivity(request, onStep);
 
+      setSummary(terminal.summary ?? null);
+
       if (!terminal.success && terminal.error) {
         setError(terminal.error);
       }
@@ -95,6 +99,7 @@ export default function ActivityProcessingPage() {
     setManualEnd('');
     setError(null);
     setSteps([]);
+    setSummary(null);
     setSubmitted(false);
     setLoadingStart(null);
   }, []);
@@ -193,6 +198,31 @@ export default function ActivityProcessingPage() {
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Processing activity...</p>
           )}
           <StepChecklist steps={steps} loadingStart={loading ? loadingStart : null} />
+        </div>
+      )}
+
+      {/* End-of-run confirmation (AC-9) */}
+      {!loading && summary && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4">
+          <p className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">Processing complete</p>
+          <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+            <p>
+              Playlist shuffled:{' '}
+              {summary.playlist_shuffled == null ? '—' : summary.playlist_shuffled ? 'Yes' : 'No'}
+            </p>
+            <p>
+              Segments matched:{' '}
+              {summary.segments_matched == null ? '—' : summary.segments_matched.toLocaleString()}
+            </p>
+            <p>
+              Course found:{' '}
+              {summary.course_found == null
+                ? '—'
+                : summary.course_found
+                ? `Yes${summary.course_name ? ` — ${summary.course_name}` : ''}`
+                : 'No'}
+            </p>
+          </div>
         </div>
       )}
 

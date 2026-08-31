@@ -1,0 +1,35 @@
+
+> pifitness-frontend@0.1.0 build
+> next build
+
+▲ Next.js 16.2.9 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 14.4s
+  Running TypeScript ...
+  Finished TypeScript in 4.3s ...
+  Collecting page data using 14 workers ...
+  Generating static pages using 14 workers (0/13) ...
+  Generating static pages using 14 workers (3/13) 
+  Generating static pages using 14 workers (6/13) 
+  Generating static pages using 14 workers (9/13) 
+✓ Generating static pages using 14 workers (13/13) in 722ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /activities
+├ ○ /activities/activity-processing
+├ ○ /activities/beach
+├ ○ /admin
+├ ○ /beachchanger
+├ ○ /exercises
+├ ○ /food
+├ ○ /health
+├ ○ /music
+└ ○ /running
+
+
+○  (Static)  prerendered as static content
+

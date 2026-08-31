@@ -19,6 +19,9 @@ Lifecycle: active -> completed, or active -> (abandoned/deleted).
   keeps `started_at` = MIN(recorded_at).
 - `remove_last_point` deletes the most recent point of ONE team only
   (each side undoes its own last point) and recomputes `started_at`.
+- `tag_last_point` (006-002) annotates the most recently recorded point
+  (whichever team scored it) with a notable-play event_type; it never
+  creates a point and overwriting the last point's tag is allowed.
 - `end_game` sets status='completed' and `completed_at` = MAX(recorded_at).
 - `abandon_game` deletes the game (points cascade).
 
@@ -59,6 +62,9 @@ class VolleyballNotFoundError(VolleyballError):
 
 VALID_SCORING_TEAMS = ("SR", "OPPONENT")
 
+# Notable-play tags writable onto a point (006-002).
+VALID_EVENT_TYPES = ("Ace", "Block", "Spike", "Dive")
+
 # ---------------------------------------------------------------------------
 # Readers
 # ---------------------------------------------------------------------------
@@ -71,6 +77,8 @@ _GAME_COLUMNS = """
             completed_at,
             label,
             notes,
+            partner_number,
+            partner_name,
             created_at
 """
 
@@ -78,6 +86,7 @@ _POINT_COLUMNS = """
             point_id,
             game_id,
             scoring_team,
+            event_type,
             recorded_at,
             created_at
 """
@@ -166,6 +175,8 @@ def list_game_history() -> Sequence[Dict[str, Any]]:
             g.completed_at,
             g.label,
             g.notes,
+            g.partner_number,
+            g.partner_name,
             g.created_at,
             COUNT(p.*) FILTER (WHERE p.scoring_team = 'SR') AS sr,
             COUNT(p.*) FILTER (WHERE p.scoring_team = 'OPPONENT') AS opponent
@@ -186,6 +197,8 @@ def list_game_history() -> Sequence[Dict[str, Any]]:
                 "completed_at": r["completed_at"],
                 "label": r["label"],
                 "notes": r["notes"],
+                "partner_number": r["partner_number"],
+                "partner_name": r["partner_name"],
                 "created_at": r["created_at"],
             },
             "score": {"sr": int(r["sr"] or 0), "opponent": int(r["opponent"] or 0)},
@@ -199,9 +212,16 @@ def list_game_history() -> Sequence[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def create_game(team_b_name: str) -> Dict[str, Any]:
+def create_game(
+    team_b_name: str,
+    partner_number: int,
+    partner_name: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Create a new game in status='active'. Team A is implicitly "SR".
+    Records the SR side's partner for the match (006-002): the jersey
+    number is mandatory (validated upstream by the API schema), the name
+    is optional (None stored as NULL).
 
     Raises:
         VolleyballActiveGameExistsError: another game is already active
@@ -213,31 +233,43 @@ def create_game(team_b_name: str) -> Dict[str, Any]:
 
     rows = sql_insert_returning(
         f"""
-            INSERT INTO volleyball.games (team_b_name, status)
-            VALUES (%s, 'active')
+            INSERT INTO volleyball.games (team_b_name, status, partner_number, partner_name)
+            VALUES (%s, 'active', %s, %s)
             RETURNING
                 {_GAME_COLUMNS}
         """,
-        (team_b_name,),
+        (team_b_name, partner_number, partner_name),
     )
     if not rows:
         raise VolleyballError("Failed to create game.")
     return rows[0]
 
 
-def add_point(game_id: int, scoring_team: str) -> Dict[str, Any]:
+def add_point(
+    game_id: int,
+    scoring_team: str,
+    event_type: Optional[str] = None,
+) -> Dict[str, Any]:
     """
-    Record one point for a team. Only valid while the game is 'active'.
-    The point's recorded_at is server-assigned (DEFAULT now()); started_at
-    is kept equal to MIN(recorded_at) of the game's points.
+    Record one point for a team, optionally carrying a notable-play
+    event_type written at creation (006-002, Bug T08-3: the UI holds a
+    selected event and writes it alongside the next point). Only valid
+    while the game is 'active'. The point's recorded_at is server-assigned
+    (DEFAULT now()); started_at is kept equal to MIN(recorded_at) of the
+    game's points.
 
     Raises:
         VolleyballNotFoundError: game does not exist.
-        VolleyballStateError: game is not 'active', or bad scoring_team.
+        VolleyballStateError: game is not 'active', bad scoring_team, or bad
+            event_type (must be one of VALID_EVENT_TYPES when provided).
     """
     if scoring_team not in VALID_SCORING_TEAMS:
         raise VolleyballStateError(
             f"Invalid scoring_team '{scoring_team}' (expected one of {VALID_SCORING_TEAMS})."
+        )
+    if event_type is not None and event_type not in VALID_EVENT_TYPES:
+        raise VolleyballStateError(
+            f"Invalid event_type '{event_type}' (expected one of {VALID_EVENT_TYPES})."
         )
     game = get_game(game_id)
     if game is None:
@@ -250,12 +282,12 @@ def add_point(game_id: int, scoring_team: str) -> Dict[str, Any]:
 
     rows = sql_insert_returning(
         f"""
-            INSERT INTO volleyball.points (game_id, scoring_team)
-            VALUES (%s, %s)
+            INSERT INTO volleyball.points (game_id, scoring_team, event_type)
+            VALUES (%s, %s, %s)
             RETURNING
                 {_POINT_COLUMNS}
         """,
-        (game_id, scoring_team),
+        (game_id, scoring_team, event_type),
     )
     if not rows:
         raise VolleyballError("Failed to record point.")
@@ -331,6 +363,70 @@ def remove_last_point(game_id: int, scoring_team: str) -> bool:
     if err:
         raise VolleyballError(f"Failed to refresh started_at: {err}")
     return True
+
+
+def tag_last_point(game_id: int, event_type: str) -> Dict[str, Any]:
+    """
+    Tag the most recently recorded point of the game (whichever team scored
+    it) with a notable-play event_type (006-002). This annotates an existing
+    row — it never creates a point. Re-pressing an event button while the
+    same point is still last overwrites its tag (overwrite allowed; there is
+    deliberately no undo UI). Only valid while the game is 'active'.
+
+    Raises:
+        VolleyballNotFoundError: game does not exist, or has no points to
+            tag (AC-11: no-points maps to HTTP 404).
+        VolleyballStateError: game is not 'active', or bad event_type.
+    """
+    if event_type not in VALID_EVENT_TYPES:
+        raise VolleyballStateError(
+            f"Invalid event_type '{event_type}' (expected one of {VALID_EVENT_TYPES})."
+        )
+    game = get_game(game_id)
+    if game is None:
+        raise VolleyballNotFoundError(f"Volleyball game {game_id} not found.")
+    if game["status"] != "active":
+        raise VolleyballStateError(
+            f"Cannot tag a point on game {game_id} in status "
+            f"'{game['status']}' (expected 'active')."
+        )
+
+    last = one_sql_result(
+        """
+            SELECT point_id
+            FROM volleyball.points
+            WHERE game_id = %s
+            ORDER BY recorded_at DESC, point_id DESC
+            LIMIT 1
+        """,
+        (game_id,),
+    )
+    if last is None:
+        # Contract (AC-11): no point to tag is a 404-class absence (the
+        # resource this action targets does not exist), not a 409 conflict.
+        raise VolleyballNotFoundError(
+            f"No points recorded in game {game_id} — nothing to tag."
+        )
+
+    err = qec(
+        "UPDATE volleyball.points SET event_type = %s WHERE point_id = %s",
+        (event_type, last),
+    )
+    if err:
+        raise VolleyballError(f"Failed to tag point: {err}")
+
+    rows = sql_to_dict(
+        f"""
+            SELECT
+                {_POINT_COLUMNS}
+            FROM volleyball.points
+            WHERE point_id = %s
+        """,
+        (last,),
+    )
+    if not rows:
+        raise VolleyballError("Tagged point disappeared after update.")
+    return rows[0]
 
 
 def end_game(game_id: int) -> Dict[str, Any]:

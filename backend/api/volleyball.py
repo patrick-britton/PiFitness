@@ -8,9 +8,10 @@ FastAPI endpoints for the Beach Volleyball scorekeeping feature
 Endpoints (contract from .features/designs_active/006-001_design.md):
     GET    /api/sports/volleyball                      -> game history (completed_at desc, w/ scores)
     GET    /api/sports/volleyball/active               -> active game + points + derived score, or game: null
-    POST   /api/sports/volleyball                      -> create game (opponent name only); 409 if one is active
+    POST   /api/sports/volleyball                      -> create game (opponent name + SR partner); 409 if one is active
     POST   /api/sports/volleyball/{id}/points          -> add a point for a team
     DELETE /api/sports/volleyball/{id}/points/{team}   -> remove that team's most recent point
+    POST   /api/sports/volleyball/{id}/points/latest/event -> tag the most recent point (either team) with an event_type (006-002)
     POST   /api/sports/volleyball/{id}/end             -> end game (completed_at = MAX(recorded_at))
     DELETE /api/sports/volleyball/{id}                 -> abandon game (cascade deletes its points)
 """
@@ -26,6 +27,7 @@ from backend_functions.queries import (
     create_game,
     add_point,
     remove_last_point,
+    tag_last_point,
     end_game,
     abandon_game,
     VolleyballActiveGameExistsError,
@@ -36,6 +38,7 @@ from backend_functions.queries import (
 from backend.schemas.volleyball_schemas import (
     VolleyballCreateGameRequest,
     VolleyballAddPointRequest,
+    VolleyballTagEventRequest,
 )
 
 router = APIRouter(prefix="/api/sports/volleyball", tags=["volleyball"])
@@ -102,7 +105,11 @@ async def active():
 async def create(req: VolleyballCreateGameRequest):
     """Create a new game (opponent name only). 409 when one is already active."""
     try:
-        game = create_game(team_b_name=req.team_b_name)
+        game = create_game(
+            team_b_name=req.team_b_name,
+            partner_number=req.partner_number,
+            partner_name=req.partner_name,
+        )
         return _serialize_game(game)
     except VolleyballActiveGameExistsError as e:
         blocking = _serialize_game(e.blocking_game)
@@ -117,7 +124,11 @@ async def create(req: VolleyballCreateGameRequest):
 async def add(game_id: int, req: VolleyballAddPointRequest):
     """Record one point for a team on the active game."""
     try:
-        point = add_point(game_id, scoring_team=req.scoring_team)
+        point = add_point(
+            game_id,
+            scoring_team=req.scoring_team,
+            event_type=req.event_type,
+        )
         return _serialize_point(point)
     except VolleyballNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -127,6 +138,27 @@ async def add(game_id: int, req: VolleyballAddPointRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to add point: {str(e)}")
+
+
+@router.post("/{game_id}/points/latest/event")
+async def tag_event(game_id: int, req: VolleyballTagEventRequest):
+    """
+    Tag the most recently recorded point of the game (whichever team scored
+    it) with a notable-play event_type (006-002). Annotates an existing row —
+    never creates a point. 404 when the game (or a point to tag) does not
+    exist; 409 when the game is not 'active'.
+    """
+    try:
+        point = tag_last_point(game_id, req.event_type)
+        return _serialize_point(point)
+    except VolleyballNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except VolleyballStateError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except VolleyballError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to tag point: {str(e)}")
 
 
 @router.delete("/{game_id}/points/{scoring_team}")

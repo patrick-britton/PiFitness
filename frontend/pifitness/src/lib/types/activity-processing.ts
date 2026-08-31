@@ -108,12 +108,30 @@ export interface ProcessStepEvent {
 }
 
 /**
+ * End-of-run summary embedded in the terminal event on success (AC-9).
+ * Null values mean the corresponding steps were skipped / not applicable.
+ */
+export interface ProcessSummaryData {
+  /** Playlist was shuffled (null when playlist steps were skipped) */
+  playlist_shuffled?: boolean | null;
+  /** Number of segments matched for the processed activity (null when segment steps were skipped) */
+  segments_matched?: number | null;
+  /** Whether any matched segment is a course (null when segment steps were skipped) */
+  course_found?: boolean | null;
+  /** Name of the matched course, when course_found is true */
+  course_name?: string | null;
+  /** Activity the summary refers to (the fake activity id in Manual Processing) */
+  activity_id?: number | null;
+}
+
+/**
  * Terminal event marking the end of the NDJSON stream.
  */
 export interface ProcessCompleteEvent {
   complete: true;
   success: boolean;
   error?: string;
+  summary?: ProcessSummaryData;
 }
 
 /**
