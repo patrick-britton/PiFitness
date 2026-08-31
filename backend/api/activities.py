@@ -29,6 +29,7 @@ from backend.schemas.activity_schemas import (
     ProcessActivityResponse,
     ProcessStepResult,
     ProcessStepResultData,
+    ProcessSummaryData,
 )
 
 router = APIRouter(prefix="/api/activities", tags=["activities"])
@@ -108,6 +109,8 @@ def _process_generator(req: ProcessActivityRequest):
         is_manual = playlist_name == "Manual Processing"
         is_no_playlist = playlist_name == "No Playlist"
         has_error = False
+        post_row: Optional[int] = None
+        auto_shuffle_completed = False
 
         # -----------------------------------------------------------------------
         # Step 1: Sync Activities
@@ -218,6 +221,16 @@ def _process_generator(req: ProcessActivityRequest):
                     yield json.dumps(_step_to_dict(result)) + "\n"
                     if result.status == "error":
                         has_error = True
+                    else:
+                        auto_shuffle_completed = result.status == "complete"
+
+        # -----------------------------------------------------------------------
+        # End-of-run summary (AC-9): computed BEFORE cleanup because Manual
+        # Processing deletes the fake activity in the cleanup step.
+        # -----------------------------------------------------------------------
+        summary_payload = None
+        if not has_error:
+            summary_payload = _build_process_summary(auto_shuffle_completed, post_row)
 
         # -----------------------------------------------------------------------
         # Step 7: Cleanup (Manual Processing only)
@@ -230,7 +243,10 @@ def _process_generator(req: ProcessActivityRequest):
                 yield json.dumps(_step_to_dict(_skip_step("cleanup"))) + "\n"
 
         # Terminal event
-        yield json.dumps({"complete": True, "success": not has_error}) + "\n"
+        terminal = {"complete": True, "success": not has_error}
+        if summary_payload is not None:
+            terminal["summary"] = summary_payload.model_dump(mode="json")
+        yield json.dumps(terminal) + "\n"
 
     except Exception as e:
         yield json.dumps({"complete": True, "success": False, "error": f"Internal server error: {str(e)}"}) + "\n"
@@ -251,6 +267,8 @@ async def process_activity(req: ProcessActivityRequest):
       7. cleanup          — delete fake activity (Manual Processing only)
 
     Returns NDJSON stream with one event per step, plus a terminal event.
+    On success the terminal event includes a `summary` (playlist shuffled /
+    segments matched / course found) — see _build_process_summary (AC-9).
     """
     return StreamingResponse(
         _process_generator(req),
@@ -369,6 +387,51 @@ def _cleanup_fake_activity() -> Optional[ProcessStepResultData]:
     if err:
         raise ValueError(f"Error deleting fake activity: {err}")
     return None
+
+
+def _build_process_summary(
+    auto_shuffle_completed: bool,
+    activity_id: Optional[int],
+) -> ProcessSummaryData:
+    """Build the end-of-run summary (AC-9, T09).
+
+    Read-only DB reads; any failure degrades the affected fields to null so the
+    summary can never convert a successful run into an error. Must be called
+    BEFORE the cleanup step (Manual Processing deletes the fake activity).
+    """
+    segments_matched: Optional[int] = None
+    course_found: Optional[bool] = None
+    course_name: Optional[str] = None
+    if activity_id is not None:
+        try:
+            seg_count = one_sql_result(
+                "SELECT count(*) FROM activities.segments_details WHERE activity_id = %s",
+                (activity_id,),
+            )
+            segments_matched = int(seg_count) if seg_count is not None else 0
+            course_rows = sql_to_dict(
+                """SELECT s.segment_name
+                   FROM activities.segments_details sd
+                   JOIN activities.segments s ON s.segment_id = sd.segment_id
+                   WHERE sd.activity_id = %s AND s.is_course
+                   ORDER BY sd.start_time_utc
+                   LIMIT 1""",
+                (activity_id,),
+            )
+            course_found = bool(course_rows)
+            course_name = course_rows[0]["segment_name"] if course_rows else None
+        except Exception as e:
+            print(f"[activities] End-of-run summary DB read failed: {e}")
+            segments_matched = None
+            course_found = None
+            course_name = None
+    return ProcessSummaryData(
+        playlist_shuffled=True if auto_shuffle_completed else None,
+        segments_matched=segments_matched,
+        course_found=course_found,
+        course_name=course_name,
+        activity_id=activity_id,
+    )
 
 
 # ---------------------------------------------------------------------------

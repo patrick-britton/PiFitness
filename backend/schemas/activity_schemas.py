@@ -46,6 +46,30 @@ class ProcessStepResultData(BaseModel):
     playlist_id: Optional[str] = Field(None, description="The Spotify playlist ID")
 
 
+class ProcessSummaryData(BaseModel):
+    """End-of-run summary embedded in the terminal NDJSON event (AC-9, T09)"""
+    playlist_shuffled: Optional[bool] = Field(
+        None,
+        description="Whether the playlist was shuffled (null when playlist steps were skipped)",
+    )
+    segments_matched: Optional[int] = Field(
+        None,
+        description="Number of segment matches recorded for the processed activity (null when segment steps were skipped)",
+    )
+    course_found: Optional[bool] = Field(
+        None,
+        description="Whether any matched segment is a course (null when segment steps were skipped)",
+    )
+    course_name: Optional[str] = Field(
+        None,
+        description="Name of the matched course, when course_found is true",
+    )
+    activity_id: Optional[int] = Field(
+        None,
+        description="Activity the summary refers to (the fake activity id in Manual Processing)",
+    )
+
+
 class ProcessStepResult(BaseModel):
     """Result of a single processing step"""
     step_id: str = Field(..., description="Step identifier")

@@ -9,6 +9,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore } from '../../stores/uiStore';
 import Header from './Header';
@@ -23,6 +24,10 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { initialize: initializeViewport, setViewport, layoutMode, layoutVariant } = useViewportStore();
   const { initialize: initializeUI, syncActiveModuleFromPath, syncActiveSubPageFromPath } = useUIStore();
+  // Kiosk routes (006-002): the unlisted /beachchanger viewer renders without
+  // the app chrome — no header, sidebar, or nav. DebugPanel intentionally
+  // stays (dev-only toggle). Every other route is unchanged.
+  const isKiosk = usePathname() === '/beachchanger';
 
   // Initialize stores on mount
   useEffect(() => {
@@ -62,34 +67,34 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <Header />
+      {/* Header (hidden on kiosk routes) */}
+      {!isKiosk && <Header />}
 
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar for desktop - always visible */}
-        {isDesktop && (
+        {!isKiosk && isDesktop && (
           <div className="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700">
             <Sidebar />
           </div>
         )}
 
         {/* Left sidebar nav for landscape - icon-only, no text */}
-        {isLandscape && (
+        {!isKiosk && isLandscape && (
           <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <NavBar showLabels={false} vertical />
           </div>
         )}
 
         {/* Main content - add bottom padding on portrait so it clears the pinned nav */}
-        <main className={`flex-1 overflow-auto ${isPortrait ? 'pb-20' : ''}`}>
+        <main className={`flex-1 overflow-auto ${isPortrait && !isKiosk ? 'pb-20' : ''}`}>
           {children}
         </main>
       </div>
 
       {/* Bottom navigation for portrait - pinned so the OS browser chrome cannot
           push it off-screen, with safe-area padding for the gesture bar */}
-      {isPortrait && (
+      {!isKiosk && isPortrait && (
         <div className="fixed bottom-0 inset-x-0 z-40 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 pb-[env(safe-area-inset-bottom)]">
           <NavBar showLabels={true} />
         </div>

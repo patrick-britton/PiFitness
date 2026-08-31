@@ -24,6 +24,7 @@ import {
   VolleyballHistoryResponse,
   VolleyballCreateGameRequest,
   VolleyballAddPointRequest,
+  VolleyballTagEventRequest,
   VolleyballScoringTeam,
 } from './types/volleyball';
 import {
@@ -382,6 +383,11 @@ export const API = {
       fetchAPI<{ success: boolean }>(
         `/api/sports/volleyball/${id}/points/${scoringTeam}`,
         { method: "DELETE" }
+      ),
+    tagLastEvent: (id: number, req: VolleyballTagEventRequest) =>
+      fetchAPI<VolleyballPoint>(
+        `/api/sports/volleyball/${id}/points/latest/event`,
+        { method: "POST", body: JSON.stringify(req) }
       ),
     endGame: (id: number) =>
       fetchAPI<VolleyballGame>(`/api/sports/volleyball/${id}/end`, { method: "POST" }),
