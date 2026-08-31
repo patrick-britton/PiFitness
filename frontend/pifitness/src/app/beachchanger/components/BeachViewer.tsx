@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { useViewportStore } from '../../../stores/viewportStore';
 import { useVolleyballViewerActive } from '../../../hooks/useVolleyball';
 import VolleyballScoreChart from '../../activities/beach/components/VolleyballScoreChart';
+import VolleyballGameHistory from '../../activities/beach/components/VolleyballGameHistory';
 
 export default function BeachViewer() {
   const { layoutVariant } = useViewportStore();
@@ -77,13 +78,15 @@ export default function BeachViewer() {
 
   if (!game) {
     return (
-      <div className="p-4">
+      <div className="space-y-4 p-4">
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 text-center">
           <p className="font-semibold text-gray-900 dark:text-white">Welcome to Beachchanger</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             The live scoreboard appears here once a game starts.
           </p>
         </div>
+        {/* Completed game log beneath the welcome message */}
+        <VolleyballGameHistory />
       </div>
     );
   }
@@ -145,6 +148,9 @@ export default function BeachViewer() {
 
       {/* Event-marked running-score chart (presentational, shared) */}
       <VolleyballScoreChart detail={game} />
+
+      {/* Completed game log beneath the in-progress chart */}
+      <VolleyballGameHistory />
     </div>
   );
 }
