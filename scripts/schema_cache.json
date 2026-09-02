@@ -1177,6 +1177,1659 @@
       "type": "text"
     }
   ],
+  "activities.vw_activity_elevation_deltas": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "elapsed_duration_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "elevation_delta",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "activities.vw_activity_ids_to_sync": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "max_points",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "activities.vw_activity_path_updates": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_path",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    }
+  ],
+  "activities.vw_activity_segments_aggregated": [
+    {
+      "name": "id_val",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "meta_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "path_coords",
+      "nullable": true,
+      "type": "json"
+    },
+    {
+      "name": "map_timestamps",
+      "nullable": true,
+      "type": "json"
+    },
+    {
+      "name": "x_time",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "x_distance",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_time",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_time_delta",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_hr",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_hr_delta",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_elevation",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_cadence",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_balance",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_performance",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_vert_ratio",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_osc",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_temp",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_stride",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_gct",
+      "nullable": true,
+      "type": "ARRAY"
+    },
+    {
+      "name": "y_speed",
+      "nullable": true,
+      "type": "ARRAY"
+    }
+  ],
+  "activities.vw_activity_sleep": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "awake_hours_prior",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "sleep_score",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "avg_sleep_hours",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "one_day_sleep_hours",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "activities.vw_activity_summary": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_start_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "distance_mi",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "activity_pace",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "segment_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "is_course",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "activity_time_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "segment_distance_mi",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "all_time_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "best_time_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "prior_time_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "best_delta_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "prior_delta_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "segment_pace",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "activities.vw_activity_summary_segment_creation": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_type_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "start_time_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "distance_mi",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "distance_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "child_courses",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "child_segments",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "matched_courses",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "matched_segments",
+      "nullable": true,
+      "type": "bigint"
+    }
+  ],
+  "activities.vw_activity_training_status": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "vo2_max_value",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "altitude_acclimation_m",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "heat_acclimation_pct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_load_acute",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_load_pct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_readiness",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_load_mid",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_load_max",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_load_min",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "resting_hr_asleep",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "resting_hr_awake",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "sleep_duration_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "sleep_score",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "light_sleep_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "deep_sleep_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "awake_sleep_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "rem_sleep_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "awake_s_before_activity",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "start_time_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "sleep_end_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "sleep_end_date",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "activity_start_date",
+      "nullable": true,
+      "type": "date"
+    }
+  ],
+  "activities.vw_activity_weights": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "weight_lb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "muscle_lb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "fat_lb",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "activities.vw_course_review": [
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "segment_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "activity_reference_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "reference_start_point",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "reference_end_point",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "effort_label",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "activity_type_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "activity_path",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    },
+    {
+      "name": "distance_mi",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "elevation_gain",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "elevation_loss",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "matched_activities",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "last_event_utc",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "course_idx",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "max_course_idx",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "new_count",
+      "nullable": true,
+      "type": "bigint"
+    }
+  ],
+  "activities.vw_elevation_smooth": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "latitude",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "longitude",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "lat5",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "long5",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "elevation_raw",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "elevation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "geog",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    }
+  ],
+  "activities.vw_matched_segment_path_updates": [
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_path",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    }
+  ],
+  "activities.vw_overlapped_segments": [
+    {
+      "name": "match_rank",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "match_confidence",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "segment_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "effort_label",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "activity_path",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    },
+    {
+      "name": "matched_activities",
+      "nullable": true,
+      "type": "ARRAY"
+    }
+  ],
+  "activities.vw_possible_segment_matches": [
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "segment_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_date",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "match_confidence",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "match_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "is_course",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "activity_path",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    },
+    {
+      "name": "effort_label",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "activities.vw_pr_hunter": [
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "segment_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "vs_date",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "attempt_label",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "total_attempts",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "predicted_time_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "vs_pace",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "estimated_pace",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "prestige_score",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "weight_delta",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "vo2_delta",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "acute_load_delta",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "load_max_delta",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "activities.vw_run_timing": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "run_age",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "music_start",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "music_end",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "music_duration_ms",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "activities.vw_segment_comps": [
+    {
+      "name": "id_val",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "meta_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "elevation_m_smooth",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "distance_m",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "elapsed_ms",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "elapsed_ms_delta",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "longitude",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "latitude",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "heartrate_bpm",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "heartrate_bpm_delta",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "cadence_spm",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "ground_contact_balance_left",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "performance_condition",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "vert_ratio",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "vert_oscillation_cm",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "air_temp_c",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "stride_length_cm",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "ground_contact_time_ms",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "speed_mmps",
+      "nullable": true,
+      "type": "bigint"
+    }
+  ],
+  "activities.vw_segment_create_auto_approve": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "best_start_dist",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "best_end_dist",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "dist_deviation",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "polygon_deviation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "hausdorff_deviation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "freschet_deviation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "confidence",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "approval_phase",
+      "nullable": true,
+      "type": "integer"
+    }
+  ],
+  "activities.vw_segment_create_from_details": [
+    {
+      "name": "activity_reference_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "reference_start_point",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "reference_end_point",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "is_course",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "segment_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "segment_path",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    },
+    {
+      "name": "distance_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "elevation_gain",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "elevation_loss",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "start_point",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    },
+    {
+      "name": "end_point",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    },
+    {
+      "name": "activity_type_id",
+      "nullable": true,
+      "type": "smallint"
+    }
+  ],
+  "activities.vw_segment_leaderboard": [
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "is_course",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "segment_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_start_point",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "activity_end_point",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "distance_mi",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "start_time_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "all_time_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "last_365_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "current_cycle_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "recency_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "elapsed_duration_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "pace_str",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "weight_lb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "muscle_pct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "fat_pct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "vo2_max_value",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "altitude_acclimation_m",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "heat_acclimation_pct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_load_acute",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_load_pct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_readiness",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_load_mid",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_load_max",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "training_load_min",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "resting_hr_asleep",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "resting_hr_awake",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "sleep_duration_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "sleep_hours",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "sleep_score",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "light_sleep_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "deep_sleep_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "awake_sleep_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "rem_sleep_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "awake_hours",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "max_hr",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_hr",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_cadence",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_temp",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_vert_osc",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_vert_ratio",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_gct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_perf",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_balance",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_stride_length",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "activities.vw_segment_matching_downselect_confidence": [
+    {
+      "name": "confirmed",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "best_start_dist",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "best_end_dist",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "dist_deviation",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "polygon_deviation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "freschet_deviation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "hausdorff_deviation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "confidence_score",
+      "nullable": true,
+      "type": "integer"
+    }
+  ],
+  "activities.vw_segment_matching_downselect_scores": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "best_start_dist",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "best_end_dist",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "dist_deviation",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "ruggedness",
+      "nullable": true,
+      "type": "double precision"
+    }
+  ],
+  "activities.vw_segment_path_updates": [
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "activity_reference_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_type_id",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "reference_start_point",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "reference_end_point",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "segment_path",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    },
+    {
+      "name": "distance_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "ascent_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "descent_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "start_point",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    },
+    {
+      "name": "end_point",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    }
+  ],
+  "activities.vw_segment_racing": [
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "segment_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "distance_mi",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "effort_count",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "last_effort",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "is_course",
+      "nullable": true,
+      "type": "boolean"
+    }
+  ],
+  "activities.vw_segments_details_ranked": [
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_start_point",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "activity_end_point",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "recency_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "all_time_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "last_365_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "current_cycle_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "start_time_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "distance_mi",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "elapsed_duration_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "max_hr",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_hr",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_cadence",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_temp",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_vert_osc",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_vert_ratio",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_gct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_perf",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_balance",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_stride_length",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "segment_path",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    }
+  ],
+  "activities.vw_segments_effort_stats": [
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "segment_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "is_course",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "activity_type_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "distance_mi",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "elevation_gain",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "last_effort",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "matched_activity_count",
+      "nullable": true,
+      "type": "bigint"
+    }
+  ],
+  "activities.vw_temp_segment_matches_downselect": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "effort_date",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "best_start_dist",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "best_end_dist",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "ruggedness",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "dist_deviation",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "polygon_deviation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "hausdorff_deviation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "freschet_deviation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "confidence",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "activities.vw_unmatched_activitites": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    }
+  ],
+  "activities.vw_watch_music_heard": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_order",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "track_name_clean",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "artist_display_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "duration_ms",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "music_start",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "start_cumulative_ms",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "end_cumulative_ms",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "pct_listened",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "total_listen_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "played_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
   "api_services.api_service_list": [
     {
       "name": "api_service_name",
@@ -1599,6 +3252,219 @@
       "type": "numeric"
     }
   ],
+  "health.vw_activity_weights": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "weight_total_g",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "weight_bone_g",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "weight_muscle_g",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "weight_fat_g",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "fat_pct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "water_pct",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "health.vw_body_comp_interpolation_precalc": [
+    {
+      "name": "ts_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "next_ts_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "weight_total_g",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "delta_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "weight_delta_per_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "weight_bone_g",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "bone_delta_per_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "weight_muscle_g",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "muscle_delta_per_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "fat_pct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "fat_delta_per_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "water_pct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "water_delta_per_s",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "health.vw_heart_rates": [
+    {
+      "name": "hr_date",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "resting_hr_asleep",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "max_hr",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "resting_hr_awake",
+      "nullable": true,
+      "type": "double precision"
+    }
+  ],
+  "health.vw_weight_viz": [
+    {
+      "name": "date_val",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "total_lb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "bone_lb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "muscle_lb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "fat_lb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "water_lb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "bmi",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "tgt_lb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "lb_from_target",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "year",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "day_of_year",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "relative_day",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "relative_year",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "relative_30",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "relative_90",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "dm30",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "dm90",
+      "nullable": true,
+      "type": "double precision"
+    }
+  ],
   "health.weight_target": [
     {
       "name": "ts_utc",
@@ -1823,6 +3689,175 @@
       "type": "integer"
     }
   ],
+  "logging.vw_all_event_history": [
+    {
+      "name": "event_time_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "event_type",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "description",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "error_text",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "is_error",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "not_skip_row",
+      "nullable": true,
+      "type": "boolean"
+    }
+  ],
+  "logging.vw_db_biggest_table_chart": [
+    {
+      "name": "date_utc",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "db_table",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "total_size_mb",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "logging.vw_db_size": [
+    {
+      "name": "table_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "total_size_mb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "table_size_mb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "index_size_mb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "other_size_mb",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "logging.vw_db_size_chart": [
+    {
+      "name": "date_utc",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "table_size_mb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "index_size_mb",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "other_size_mb",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "logging.vw_event_analysis": [
+    {
+      "name": "task_age",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "event_category",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "event_description",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "error_text",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "execution_time_ms",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "event_time_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "is_error",
+      "nullable": true,
+      "type": "boolean"
+    }
+  ],
+  "logging.vw_last_login": [
+    {
+      "name": "api_service_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "seconds_since_last_event",
+      "nullable": true,
+      "type": "integer"
+    }
+  ],
+  "logging.vw_task_analysis": [
+    {
+      "name": "task_age",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "task_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "is_failure",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "error_text",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
   "music.all_albums": [
     {
       "name": "album_id",
@@ -2035,6 +4070,33 @@
       "name": "playlist_id",
       "nullable": true,
       "type": "text"
+    }
+  ],
+  "music.missing_relationships": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "needs_auto",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "needs_manual",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "needs_recs",
+      "nullable": true,
+      "type": "boolean"
     }
   ],
   "music.playlist_config": [
@@ -2488,6 +4550,793 @@
       "name": "elo_track_predicted",
       "nullable": true,
       "type": "numeric"
+    }
+  ],
+  "music.vw_all_tracks": [
+    {
+      "name": "track_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_name_clean",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_name_search",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "duration_ms",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "artist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "artist_display_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "album_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "release_date",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "available_in_us",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "total_markets",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "popularity",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "updated_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "album_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "best_track_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "is_best_track_id",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "best_isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "is_best_isrc",
+      "nullable": true,
+      "type": "boolean"
+    }
+  ],
+  "music.vw_best_track_id": [
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "best_track_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc_preference",
+      "nullable": true,
+      "type": "bigint"
+    }
+  ],
+  "music.vw_isrc_dupe_review": [
+    {
+      "name": "isrc1",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "pref1",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "track_name1",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "artist_name1",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "album_name1",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "duration_1",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "isrc2",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "pref2",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "track_name2",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "artist_name2",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "album_name2",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "duration_2",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "match_score",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "track_score",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "artist_score",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "album_score",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "duration_score",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "preferred_isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "preferred_logic",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "music.vw_listening_history": [
+    {
+      "name": "played_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "music.vw_playlist_config": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_description",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_count",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "auto_shuffle",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "manual_shuffle",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "seeds_only",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "make_recs",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "ratings_weight",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "recency_weight",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "randomness_weight",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "minutes_to_sync",
+      "nullable": true,
+      "type": "integer"
+    }
+  ],
+  "music.vw_playlist_detail_sync_logic": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "next_valid_sync",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "last_played_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "rval",
+      "nullable": true,
+      "type": "bigint"
+    }
+  ],
+  "music.vw_playlist_families": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "child_playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_type",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "music.vw_playlist_isrc_stats": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "target_playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_artist",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "album_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "duration_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "recency_pct",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "ratings_pct",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "random_pct",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "recency_weight",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "ratings_weight",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "randomness_weight",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "elo_rating",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "combined_recency_score",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "days_ago_played",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "days_ago_playlist_played",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "recency_pressure",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "ratings_pressure",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "randomness_pressure",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "total_weight",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "minutes_to_sync",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "default_new_order",
+      "nullable": true,
+      "type": "bigint"
+    }
+  ],
+  "music.vw_playlist_isrcs": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_order",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "updated_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "music.vw_playlist_last_heard": [
+    {
+      "name": "last_played_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "music.vw_playlist_shuffle_eligibility": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "last_played_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "last_auto_shuffled_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "music.vw_playlist_with_mismatched_isrc": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "music.vw_rating_eligible": [
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "last_played_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "last_rated_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "needs_rating",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "played_in_last_24",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "never_rated",
+      "nullable": true,
+      "type": "boolean"
+    }
+  ],
+  "music.vw_rating_eligible_playlists": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_name",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "music.vw_rating_update": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "elo_rating",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "rating_count",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "rating_wins",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "rating_losses",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "last_rated_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "music.vw_ratings": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "elo_rating",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "rating_count",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "rating_wins",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "rating_losses",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "last_rated_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "music.vw_ratings_history": [
+    {
+      "name": "rating_time_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc_vs",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "elo_old",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "elo_new",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "rating_result",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "row_num",
+      "nullable": true,
+      "type": "bigint"
+    }
+  ],
+  "music.vw_ratings_update": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "elo_current",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "rating_count",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "wins",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "losses",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "last_rated_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "music.vw_recent_plays": [
+    {
+      "name": "last_played_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "playcount_last_30",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "playcount_total",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "track_artist",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "rating",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "max_playcount_last_30",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "max_playcount_total",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "max_elo",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "min_elo",
+      "nullable": true,
+      "type": "integer"
+    }
+  ],
+  "music.vw_track_id_finder": [
+    {
+      "name": "track_isrc",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "music.vw_track_id_to_isrc": [
+    {
+      "name": "track_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
     }
   ],
   "staging.activity_metric_descriptors": [
@@ -3473,6 +6322,562 @@
       "type": "numeric"
     }
   ],
+  "staging.vw_activity_by_distance": [
+    {
+      "name": "meter",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "elapsed_duration_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "elev_raw",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "staging.vw_activity_flatten": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_type_id",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "activity_detail_index",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "ts_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "moving_duration_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "elapsed_duration_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "duration_s",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "distance_mm",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "latitude",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "longitude",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "heartrate_bpm",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "cadence_spm",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "air_temp_c",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "elevation_m",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "speed_mmps",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "vertical_speed_mps",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "vert_oscillation_cm",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "stride_length_cm",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "vert_ratio",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "ground_contact_time_ms",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "ground_contact_balance_left",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "performance_condition",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "loc_point",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    },
+    {
+      "name": "elevation_smooth_m",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "staging.vw_album_inserts": [
+    {
+      "name": "album_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "album_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "album_name_clean",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "album_name_search",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "updated_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "staging.vw_artist_inserts": [
+    {
+      "name": "artist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "artist_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "artist_name_search",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "updated_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "staging.vw_elevation_backward": [
+    {
+      "name": "meter",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "curr_elev",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "new_elev",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "staging.vw_elevation_bumps": [
+    {
+      "name": "meter",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "curr_elev",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "new_elev",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "staging.vw_elevation_forward": [
+    {
+      "name": "meter",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "curr_elev",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "new_elev",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "staging.vw_elevation_median": [
+    {
+      "name": "meter",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "curr_elev",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "new_elev",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "staging.vw_elevation_medians": [
+    {
+      "name": "meter",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "curr_elev",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "staging.vw_elevation_neighbors": [
+    {
+      "name": "meter",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "curr_elev",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "prior_elev",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "next_elev",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "inc_delta",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "out_delta",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "valid_point",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "extreme_point",
+      "nullable": true,
+      "type": "boolean"
+    }
+  ],
+  "staging.vw_elevation_weighted_avg": [
+    {
+      "name": "meter",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "curr_elev",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "new_elev",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "staging.vw_large_pull": [
+    {
+      "name": "meter",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "curr_elev",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "new_elev",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "staging.vw_listening_history_inserts": [
+    {
+      "name": "played_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "staging.vw_now_playing_inserts": [
+    {
+      "name": "played_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "staging.vw_playlist_inserts": [
+    {
+      "name": "playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_order",
+      "nullable": true,
+      "type": "bigint"
+    }
+  ],
+  "staging.vw_small_pull": [
+    {
+      "name": "meter",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "curr_elev",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "new_elev",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
+  "staging.vw_track_inserts": [
+    {
+      "name": "track_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_name_clean",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_name_search",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "artist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "artist_display_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "album_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "release_date",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "available_in_us",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "total_markets",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "popularity",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "duration_ms",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "updated_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "staging.vw_track_inserts_from_listen_history": [
+    {
+      "name": "track_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_name_clean",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_name_search",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "track_isrc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "artist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "artist_display_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "album_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "release_date",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "available_in_us",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "total_markets",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "popularity",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "duration_ms",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "updated_at_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
   "tasks.acceptable_failures": [
     {
       "name": "acceptable_failures",
@@ -3786,6 +7191,469 @@
     },
     {
       "name": "error_message",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "tasks.vw_task_execution": [
+    {
+      "name": "task_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "task_description",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "task_frequency",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "task_interval",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "task_priority",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "api_function",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "api_service_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "api_loop_type",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "api_post_processing",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "api_parameters",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "api_service_function",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "python_function",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "last_calendar_field",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "total_attempts",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "consecutive_successes",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "consecutive_failures",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "last_execution_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "last_success_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "updated_through_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "data_requires_catchup",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "next_execution_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "do_execute",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "execution_logic",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "tasks.vw_task_info": [
+    {
+      "name": "task_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "task_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "task_frequency",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "task_interval",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "task_start_hour",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "task_stop_hour",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "next_planned_execution_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "should_execute",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "consecutive_failures",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "api_service_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "api_function_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "loop_strategy",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "iter_path_keys",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "iter_query_keys",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "static_path_params",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "static_query_params",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "friendly_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "run_extract",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "python_login_function",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "python_extraction_function",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "flatten_sproc",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "value_recency",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "python_execution_function",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "run_python",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "api_under_rate_limits",
+      "nullable": true,
+      "type": "boolean"
+    }
+  ],
+  "tasks.vw_task_performance": [
+    {
+      "name": "task_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "event_date",
+      "nullable": true,
+      "type": "date"
+    },
+    {
+      "name": "login_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "extract_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "load_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "flatten_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "parse_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "interpolation_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "forecasting_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "python_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "admin_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "total_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "is_failure",
+      "nullable": true,
+      "type": "boolean"
+    }
+  ],
+  "tasks.vw_task_summary_chart": [
+    {
+      "name": "task_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "task_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "task_frequency",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "consecutive_failures",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "time_ago_execution",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "time_ago_next",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "time_ago_value",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "execution_minutes_ago",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "value_recency_minutes_ago",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "next_planned_execution_minutes",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "value_recency",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "last_executed_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "last_failed_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "next_planned_execution_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "last_failure_message",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "is_active_failure",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "execution_count",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "success_count",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "success_percentage",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "max_executions",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "login_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "extract_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "flatten_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "parse_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "interpolation_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "forecasting_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "python_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "admin_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "total_ms",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "increasing_steps",
       "nullable": true,
       "type": "text"
     }

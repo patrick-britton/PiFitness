@@ -90,15 +90,70 @@ def get_playlist_isrc_stats(playlist_id: str) -> Sequence[Dict[str, Any]]:
 
 def get_recent_plays(limit: int = 20) -> Sequence[Dict[str, Any]]:
     """
-    Get recent play history.
+    Get recent play history with per-set scale anchors (feature 008-001, FR-7).
+
+    Reads the canonical sources behind music.vw_recent_plays directly so each
+    row can also carry `isrc` (the view does not project it) and so the scale
+    anchors are computed over the LIMITED result set, not the whole view.
+    No schema change (AC-11): read-only, no DDL.
+
+    Each row dict carries the contract columns
+    (isrc, lastPlayedAtUtc, trackName, artistName, playlistName, rating,
+    playcountLast30, playcountTotal) plus the per-set anchors (minRating,
+    maxRating, maxPlaycountLast30, maxPlaycountTotal) repeated on every row;
+    the API layer (T05) splits them into {plays, scale}. `rating` is the
+    ELO (1500 baseline); the UI renders the rating bar on the fixed
+    1300–1700 range rather than these per-set anchors.
 
     Args:
-        limit (int): Maximum number of tracks to return
+        limit (int): Maximum number of tracks to return (newest first)
 
     Returns:
-        Sequence[Dict[str, Any]]: Recent play history data
+        Sequence[Dict[str, Any]]: Recent play rows with scale anchors, or []
     """
-    sql = """SELECT * FROM (SELECT * FROM music.vw_recent_plays) LIMIT %s"""
+    sql = """WITH ranked_plays AS (
+                 SELECT ps.isrc,
+                        ps.last_played_at_utc,
+                        ps.playcount_last_30,
+                        ps.playcount_total
+                 FROM (
+                     SELECT lh.isrc,
+                            MAX(lh.played_at_utc) AS last_played_at_utc,
+                            COUNT(DISTINCT CASE
+                                WHEN lh.played_at_utc > (CURRENT_TIMESTAMP - '30 days'::interval)
+                                THEN lh.played_at_utc END) AS playcount_last_30,
+                            COUNT(DISTINCT lh.played_at_utc) AS playcount_total
+                     FROM music.vw_listening_history lh
+                     GROUP BY lh.isrc
+                 ) ps
+                 ORDER BY ps.last_played_at_utc DESC, ps.isrc
+                 LIMIT %s
+             )
+             SELECT rp.isrc,
+                    rp.last_played_at_utc AS "lastPlayedAtUtc",
+                    COALESCE(allt.track_name_clean, '') AS "trackName",
+                    COALESCE(allt.artist_display_name, '') AS "artistName",
+                    pc.playlist_name AS "playlistName",
+                    COALESCE(r.elo_rating, 1500) AS rating,
+                    rp.playcount_last_30 AS "playcountLast30",
+                    rp.playcount_total AS "playcountTotal",
+                    MIN(COALESCE(r.elo_rating, 1500)) OVER () AS "minRating",
+                    MAX(COALESCE(r.elo_rating, 1500)) OVER () AS "maxRating",
+                    MAX(rp.playcount_last_30) OVER () AS "maxPlaycountLast30",
+                    MAX(rp.playcount_total) OVER () AS "maxPlaycountTotal"
+             FROM ranked_plays rp
+             JOIN music.vw_listening_history lh
+               ON lh.isrc = rp.isrc AND lh.played_at_utc = rp.last_played_at_utc
+             JOIN music.vw_best_track_id bt ON bt.isrc = rp.isrc
+             JOIN music.all_tracks allt ON allt.track_id = bt.best_track_id
+             LEFT JOIN music.playlist_relationships pr
+               ON pr.child_playlist_id = lh.playlist_id
+             LEFT JOIN music.vw_ratings r
+               ON r.isrc = lh.isrc
+              AND r.playlist_id = COALESCE(pr.parent_playlist_id, lh.playlist_id)
+             LEFT JOIN music.playlist_config pc
+               ON pc.playlist_id = COALESCE(pr.parent_playlist_id, lh.playlist_id)
+             ORDER BY rp.last_played_at_utc DESC, rp.isrc"""
     result = sql_to_dict(sql, (limit,))
     return result if result else []
 
