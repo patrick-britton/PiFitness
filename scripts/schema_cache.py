@@ -32,12 +32,13 @@ def build_cache():
     cache = {}
 
     for schema in TARGET_SCHEMAS:
-        # Get all tables in this schema
+        # Get all tables and views in this schema (views included so
+        # validate_sql.py can check queries that reference views)
         cursor.execute("""
             SELECT table_name
             FROM information_schema.tables
             WHERE table_schema = %s
-              AND table_type = 'BASE TABLE'
+              AND table_type IN ('BASE TABLE', 'VIEW')
         """, (schema,))
         tables = cursor.fetchall()
 

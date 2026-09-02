@@ -37,6 +37,14 @@ import {
   ExerciseUpdateRequest,
   ExerciseAttemptCreateRequest,
 } from './types/exercises';
+import {
+  NowPlayingResponse,
+  MusicActionResponse,
+  MusicAddTargetsResponse,
+  RecentPlaysResponse,
+  ServiceStatus,
+  MusicRatingsEligibleCountResponse,
+} from './types/music';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -298,15 +306,42 @@ export const API = {
     getWeightTargets: () => fetchAPI<any[]>("/api/health/weight-targets"),
   },
 
-  /**
+    /**
    * Music API endpoints
    */
   music: {
     getPlaylists: () => fetchAPI<any[]>("/api/music/playlists"),
     getPlaylistTracks: (playlistId: string) => fetchAPI<any[]>(`/api/music/playlists/${playlistId}/tracks`),
     getRatings: () => fetchAPI<any[]>("/api/music/ratings"),
-    getRatingsEligibleCount: () => fetchAPI<number>("/api/music/ratings/eligible-count"),
-    getRecentPlays: () => fetchAPI<any[]>("/api/music/recent-plays"),
+    getRatingsEligibleCount: () => fetchAPI<MusicRatingsEligibleCountResponse>("/api/music/ratings/eligible-count"),
+    getRecentPlays: (limit?: number) =>
+      fetchAPI<RecentPlaysResponse>(
+        `/api/music/recent-plays${limit !== undefined ? `?limit=${limit}` : ""}`
+      ),
+    getServiceStatus: () => fetchAPI<ServiceStatus>("/api/music/service-status"),
+    getNowPlaying: () => fetchAPI<NowPlayingResponse>("/api/music/now-playing"),
+    skipTrack: () =>
+      fetchAPI<MusicActionResponse>("/api/music/now-playing/skip", { method: "POST" }),
+    promoteTrack: () =>
+      fetchAPI<MusicActionResponse>("/api/music/now-playing/promote", { method: "POST" }),
+    softRejectTrack: () =>
+      fetchAPI<MusicActionResponse>("/api/music/now-playing/soft-reject", { method: "POST" }),
+    hardRejectTrack: () =>
+      fetchAPI<MusicActionResponse>("/api/music/now-playing/hard-reject", { method: "POST" }),
+    removeTrack: () =>
+      fetchAPI<MusicActionResponse>("/api/music/now-playing/remove", { method: "POST" }),
+    rankUpTrack: () =>
+      fetchAPI<MusicActionResponse>("/api/music/now-playing/rank-up", { method: "POST" }),
+    rankDownTrack: () =>
+      fetchAPI<MusicActionResponse>("/api/music/now-playing/rank-down", { method: "POST" }),
+    addToPlaylist: (playlistId: string) =>
+      fetchAPI<MusicActionResponse>("/api/music/now-playing/add-to-playlist", {
+        method: "POST",
+        body: JSON.stringify({ playlist_id: playlistId }),
+      }),
+    getAddTargets: () => fetchAPI<MusicAddTargetsResponse>("/api/music/now-playing/add-targets"),
+    getAlbumArt: (albumId: string) =>
+      fetchAPI<Blob>(`/api/music/album-art/${albumId}`),
     shuffle: (config: any) => fetchAPI<any>("/api/music/shuffle", {
       method: "POST",
       body: JSON.stringify(config),
@@ -315,7 +350,6 @@ export const API = {
       method: "POST",
       body: JSON.stringify(ratingData),
     }),
-    getNowPlaying: () => fetchAPI<any>("/api/music/now-playing"),
   },
 
   /**

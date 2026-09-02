@@ -4,22 +4,33 @@ Music API Endpoints
 
 FastAPI endpoints for music data (playlists, ratings, shuffle, playback).
 
-Note: Some endpoints (now-playing, shuffle) require further extraction
-from frontend_functions/ into backend functions. Those are marked as
+Note: The shuffle endpoint still requires further extraction
+from frontend_functions/ into backend functions. It is marked as
 PENDING and will be added when the backend extraction is complete.
+Now-playing is served by backend_functions.music_functions.resolve_now_playing
+(feature 008-001).
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
+from pathlib import Path
 from typing import Optional
 
+from backend_functions.database_functions import sql_to_dict, sql_to_list, one_sql_result, qec
+from backend_functions.music_functions import resolve_now_playing, save_matchup_results, album_image_retrieval
+from backend_functions.service_logins import get_spotify_client, check_rate_limit_cached, sql_rate_limited
 from backend_functions.queries import (
+    add_isrc_to_local_playlist,
+    add_into_current_ratings,
+    add_soft_rejection_exclusion,
     get_playlist_config,
     get_playlist_isrc_stats,
-    get_recent_plays,
-    get_rating_eligible_playlists,
-    get_rating_eligible_count,
-    record_recommendation_decision,
     get_playlists_not_containing_isrc,
+    get_recent_plays,
+    get_rating_eligible_count,
+    get_rating_eligible_playlists,
+    record_recommendation_decision,
+    remove_recommendation,
 )
 
 router = APIRouter(prefix="/api/music", tags=["music"])
@@ -147,19 +158,51 @@ async def record_rating(
 
 
 @router.get("/recent-plays")
-async def list_recent_plays(limit: Optional[int] = 20):
+async def list_recent_plays(
+    limit: int = Query(default=20, ge=10, le=100, multiple_of=10),
+):
     """
-    Get recent play history.
+    Get recent play history with per-set scale anchors (FR-7).
 
     Args:
-        limit: Maximum number of recent plays to return
+        limit: Row count (10-100, step 10, default 20)
 
     Returns:
-        List of recent play records
+        {plays, scale} per RecentPlaysResponse contract
     """
     try:
-        plays = get_recent_plays(limit=limit or 20)
-        return {"data": plays, "count": len(plays)}
+        rows = get_recent_plays(limit=limit)
+        if not rows:
+            return {
+                "plays": [],
+                "scale": {
+                    "minRating": 1500,
+                    "maxRating": 1500,
+                    "maxPlaycountLast30": 0,
+                    "maxPlaycountTotal": 0,
+                },
+            }
+
+        plays = []
+        for r in rows:
+            plays.append({
+                "isrc": r["isrc"],
+                "lastPlayedAtUtc": r["lastPlayedAtUtc"],
+                "trackName": r["trackName"],
+                "artistName": r["artistName"],
+                "playlistName": r.get("playlistName"),
+                "rating": r["rating"],
+                "playcountLast30": r["playcountLast30"],
+                "playcountTotal": r["playcountTotal"],
+            })
+
+        scale = {
+            "minRating": rows[0]["minRating"],
+            "maxRating": rows[0]["maxRating"],
+            "maxPlaycountLast30": rows[0]["maxPlaycountLast30"],
+            "maxPlaycountTotal": rows[0]["maxPlaycountTotal"],
+        }
+        return {"plays": plays, "scale": scale}
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -167,24 +210,437 @@ async def list_recent_plays(limit: Optional[int] = 20):
         )
 
 
+@router.get("/service-status")
+async def service_status():
+    """
+    Report Spotify service status (FR-9/AC-12).
+
+    Returns:
+        {spotify: {rateLimited, rateLimitClearedUtc}}
+    """
+    try:
+        rate_limited = bool(sql_rate_limited())
+        cleared_utc = None
+        if rate_limited:
+            cleared_utc = one_sql_result(
+                """SELECT rate_limit_cleared_utc::text
+                   FROM api_services.api_service_list
+                   WHERE api_service_name = 'Spotify'"""
+            )
+        return {
+            "spotify": {
+                "rateLimited": rate_limited,
+                "rateLimitClearedUtc": cleared_utc,
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch service status: {str(e)}",
+        )
+
+
 # ---------------------------------------------------------------------------
-# Now Playing — PENDING: requires backend extraction from frontend_functions
+# Now Playing
 # ---------------------------------------------------------------------------
 
 
 @router.get("/now-playing")
 async def get_now_playing():
     """
-    Get current Spotify playback state.
+    Get current Spotify playback state (008-001 contract).
 
-    PENDING: This endpoint currently returns a stub. The get_current_playback()
-    function needs to be extracted from frontend_functions/music_module.py into
-    backend_functions/music_functions.py before this can return real data.
+    Persists the raw poll to staging (FR-1/AC-9), then resolves track,
+    playlist-family context, and rating. A rate-limited service loads no
+    content (AC-12); anything unresolvable returns the idle response (AC-8).
 
     Returns:
-        Stub response indicating feature is pending
+        { playing, rateLimited, track: NowPlayingTrack | null, refreshedAt }
     """
-    return {"data": None, "status": "pending", "message": "Now playing endpoint requires further backend extraction"}
+    try:
+        return resolve_now_playing()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch now playing: {str(e)}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Now Playing actions
+# ---------------------------------------------------------------------------
+
+
+def _get_spotify_client():
+    """Return the spotify client or None (rate-limited / unauthenticated)."""
+    rate_limited = bool(check_rate_limit_cached())
+    if rate_limited:
+        return None
+    client = get_spotify_client(None)
+    sp = client.get("client") if client else None
+    return sp
+
+
+@router.post("/now-playing/skip")
+async def now_playing_skip():
+    """
+    Advance Spotify playback to the next track (FR-6).
+
+    The view re-fetches on the next GET /now-playing poll.
+    """
+    sp = _get_spotify_client()
+    if sp is None:
+        raise HTTPException(status_code=503, detail="Spotify not available")
+    try:
+        sp.next_track()
+        return {"ok": True, "message": "Skipped to next track"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to skip: {str(e)}")
+
+
+@router.post("/now-playing/promote")
+async def now_playing_promote():
+    """
+    Promote the current recommendation to its parent playlist (FR-6/AC-5).
+
+    Adds the track locally and on Spotify, records the promotion decision,
+    removes it from the recommendation set, and seeds a rating.
+    """
+    state = resolve_now_playing()
+    if not state.get("playing") or not state.get("track"):
+        return {"ok": False, "message": "No track is playing"}
+
+    track = state["track"]
+    ctx = track.get("context", {})
+    if ctx.get("relationshipType") != "recommendation":
+        return {"ok": False, "message": "Promote only applies to recommendations"}
+
+    isrc = track["isrc"]
+    parent_id = ctx.get("parentPlaylistId")
+    if not parent_id:
+        return {"ok": False, "message": "No parent playlist found"}
+
+    track_id = track["trackId"]
+    track_name = track["trackName"]
+    current_elo = track.get("rating", {}).get("value", 1500)
+
+    try:
+        add_isrc_to_local_playlist(parent_id, isrc)
+    except Exception:
+        pass
+
+    sp = _get_spotify_client()
+    if sp:
+        try:
+            sp.playlist_add_items(parent_id, [track_id])
+        except Exception:
+            pass
+
+    record_recommendation_decision(parent_id, isrc, was_promoted=True)
+    remove_recommendation(parent_id, isrc)
+
+    try:
+        add_into_current_ratings(parent_id, isrc, current_elo)
+    except Exception:
+        pass
+
+    return {"ok": True, "message": f"{track_name} added to playlist"}
+
+
+@router.post("/now-playing/soft-reject")
+async def now_playing_soft_reject():
+    """
+    Soft-reject the current recommendation (FR-6/AC-5).
+
+    Writes a recommendation exclusion carrying the predicted rating and
+    removes the track from the recommendation set.
+    """
+    state = resolve_now_playing()
+    if not state.get("playing") or not state.get("track"):
+        return {"ok": False, "message": "No track is playing"}
+
+    track = state["track"]
+    ctx = track.get("context", {})
+    if ctx.get("relationshipType") != "recommendation":
+        return {"ok": False, "message": "Soft Reject only applies to recommendations"}
+
+    isrc = track["isrc"]
+    parent_id = ctx.get("parentPlaylistId")
+    if not parent_id:
+        return {"ok": False, "message": "No parent playlist found"}
+
+    predicted_elo = track.get("rating", {}).get("value", 1500)
+
+    add_soft_rejection_exclusion(parent_id, isrc, predicted_elo)
+    remove_recommendation(parent_id, isrc)
+
+    return {"ok": True, "message": f"{track['trackName']} excluded from future recommendations"}
+
+
+@router.post("/now-playing/hard-reject")
+async def now_playing_hard_reject():
+    """
+    Hard-reject the current recommendation (FR-6/AC-5).
+
+    Records the rejection decision, removes the track from the recommendation
+    set, and advances to the next track.
+    """
+    state = resolve_now_playing()
+    if not state.get("playing") or not state.get("track"):
+        return {"ok": False, "message": "No track is playing"}
+
+    track = state["track"]
+    ctx = track.get("context", {})
+    if ctx.get("relationshipType") != "recommendation":
+        return {"ok": False, "message": "Hard Reject only applies to recommendations"}
+
+    isrc = track["isrc"]
+    parent_id = ctx.get("parentPlaylistId")
+    if not parent_id:
+        return {"ok": False, "message": "No parent playlist found"}
+
+    track_name = track["trackName"]
+
+    record_recommendation_decision(parent_id, isrc, was_promoted=False)
+    remove_recommendation(parent_id, isrc)
+
+    sp = _get_spotify_client()
+    if sp:
+        try:
+            sp.next_track()
+        except Exception:
+            pass
+
+    return {"ok": True, "message": f"{track_name} rejected from recommendations"}
+
+
+@router.post("/now-playing/remove")
+async def now_playing_remove():
+    """
+    Remove the current track from its playlist family (FR-6/AC-7, OQ-4).
+
+    Implements the resolved OQ-4 guard contract:
+    - Family miss -> "the playlist cannot be found"
+    - Per-playlist track miss -> "<track name> not found on <playlist name>" (soft, continue)
+    - Full success -> confirm removal
+    """
+    state = resolve_now_playing()
+    if not state.get("playing") or not state.get("track"):
+        return {"ok": False, "message": "No track is playing"}
+
+    track = state["track"]
+    ctx = track.get("context", {})
+    if ctx.get("relationshipType") != "regular":
+        return {"ok": False, "message": "Remove only applies to playlist tracks"}
+
+    isrc = track["isrc"]
+    playlist_id = ctx.get("playlistId")
+    if not playlist_id:
+        return {"ok": False, "message": "No playlist context"}
+
+    track_name = track["trackName"]
+
+    # Look up the family (OQ-4 guard)
+    family_rows = sql_to_dict(
+        """SELECT DISTINCT child_playlist_id
+           FROM music.vw_playlist_families
+           WHERE playlist_id = %s""",
+        (playlist_id,),
+    )
+    if not family_rows:
+        return {"ok": False, "message": "the playlist cannot be found"}
+
+    # Get playlist names for error messages
+    family_ids = [r["child_playlist_id"] for r in family_rows]
+    names = sql_to_dict(
+        """SELECT playlist_id, playlist_name
+           FROM music.playlist_config
+           WHERE playlist_id = ANY(%s)""",
+        (family_ids,),
+    )
+    name_map = {r["playlist_id"]: r["playlist_name"] for r in names}
+
+    messages = []
+    removed_any = False
+
+    for fid in family_ids:
+        exists = one_sql_result(
+            "SELECT 1 FROM music.playlist_isrcs WHERE playlist_id = %s AND isrc = %s",
+            (fid, isrc),
+        )
+        if not exists:
+            pname = name_map.get(fid, fid)
+            messages.append(f"{track_name} not found on {pname}")
+            continue
+
+        qec(
+            "DELETE FROM music.playlist_isrcs WHERE playlist_id = %s AND isrc = %s",
+            (fid, isrc),
+        )
+        qec(
+            """INSERT INTO music.playlist_recommendation_exclusions (playlist_id, isrc)
+               VALUES (%s, %s)
+               ON CONFLICT (playlist_id, isrc) DO NOTHING""",
+            (fid, isrc),
+        )
+        removed_any = True
+
+    # Spotify removal for the user-controlled playlist
+    track_list = sql_to_list(
+        "SELECT DISTINCT track_id FROM music.all_tracks WHERE track_isrc = %s",
+        (isrc,),
+    )
+    if track_list:
+        sp = _get_spotify_client()
+        if sp:
+            try:
+                sp.playlist_remove_all_occurrences_of_items(playlist_id, track_list)
+            except Exception:
+                pass
+
+    if not removed_any:
+        return {"ok": True, "message": "; ".join(messages) if messages else "No changes made"}
+
+    confirmation = f"{track_name} removed from playlist"
+    if messages:
+        confirmation += " (" + "; ".join(messages) + ")"
+    return {"ok": True, "message": confirmation}
+
+
+@router.post("/now-playing/rank-up")
+async def now_playing_rank_up():
+    """
+    Bump up the current track's rating against a straw man (FR-6/AC-7).
+
+    Records the matchup in ratings_history and merges the new rating.
+    """
+    state = resolve_now_playing()
+    if not state.get("playing") or not state.get("track"):
+        return {"ok": False, "message": "No track is playing"}
+
+    track = state["track"]
+    ctx = track.get("context", {})
+    if ctx.get("relationshipType") != "regular":
+        return {"ok": False, "message": "Rank Up only applies to playlist tracks"}
+
+    isrc = track["isrc"]
+    playlist_id = ctx.get("playlistId")
+    if not playlist_id:
+        return {"ok": False, "message": "No playlist context"}
+
+    current_elo = track.get("rating", {}).get("value", 1500)
+    track_name = track["trackName"]
+
+    save_matchup_results(
+        hd={"isrc": isrc, "playlistId": playlist_id, "currentELO": current_elo},
+        ad=None,
+        mr=2,
+    )
+
+    return {"ok": True, "message": f"{track_name} ranked up"}
+
+
+@router.post("/now-playing/rank-down")
+async def now_playing_rank_down():
+    """
+    Bump down the current track's rating against a straw man (FR-6/AC-7).
+
+    Records the matchup in ratings_history and merges the new rating.
+    """
+    state = resolve_now_playing()
+    if not state.get("playing") or not state.get("track"):
+        return {"ok": False, "message": "No track is playing"}
+
+    track = state["track"]
+    ctx = track.get("context", {})
+    if ctx.get("relationshipType") != "regular":
+        return {"ok": False, "message": "Rank Down only applies to playlist tracks"}
+
+    isrc = track["isrc"]
+    playlist_id = ctx.get("playlistId")
+    if not playlist_id:
+        return {"ok": False, "message": "No playlist context"}
+
+    current_elo = track.get("rating", {}).get("value", 1500)
+    track_name = track["trackName"]
+
+    save_matchup_results(
+        hd={"isrc": isrc, "playlistId": playlist_id, "currentELO": current_elo},
+        ad=None,
+        mr=-2,
+    )
+
+    return {"ok": True, "message": f"{track_name} ranked down"}
+
+
+@router.post("/now-playing/add-to-playlist")
+async def now_playing_add_to_playlist(playlist_id: str):
+    """
+    Add the current track to the specified playlist (FR-6/AC-6).
+
+    Adds locally and on Spotify.
+    """
+    state = resolve_now_playing()
+    if not state.get("playing") or not state.get("track"):
+        return {"ok": False, "message": "No track is playing"}
+
+    track = state["track"]
+    isrc = track["isrc"]
+    track_id = track["trackId"]
+    track_name = track["trackName"]
+
+    try:
+        add_isrc_to_local_playlist(playlist_id, isrc)
+    except Exception:
+        pass
+
+    sp = _get_spotify_client()
+    if sp:
+        try:
+            sp.playlist_add_items(playlist_id, [track_id])
+        except Exception:
+            pass
+
+    return {"ok": True, "message": f"{track_name} added to playlist"}
+
+
+@router.get("/now-playing/add-targets")
+async def now_playing_add_targets():
+    """
+    List playlists eligible to add the current track to (FR-6/AC-6).
+
+    Returns playlists that are configured (auto-shuffle, recommendations, or
+    manual-shuffle) and don't already contain the track.
+    """
+    state = resolve_now_playing()
+    if not state.get("playing") or not state.get("track"):
+        return {"playlists": [], "eligible": False}
+
+    isrc = state["track"]["isrc"]
+    playlists = get_playlists_not_containing_isrc(isrc)
+
+    return {
+        "playlists": [
+            {"playlist_id": p["playlist_id"], "playlist_name": p["playlist_name"]}
+            for p in playlists
+        ],
+        "eligible": len(playlists) > 0,
+    }
+
+
+@router.get("/album-art/{album_id}")
+async def get_album_art(album_id: str):
+    """
+    Serve album art from the local cache, downloading on first need (FR-1/OQ-1).
+
+    Resolves the JPEG path via the ported ``album_image_retrieval`` helper.
+    The response is a ``FileResponse``; if no image can be obtained a 404 is
+    returned.
+    """
+    filepath = album_image_retrieval(album_id)
+    if filepath is None:
+        raise HTTPException(status_code=404, detail=f"Album art not found for {album_id}")
+    return FileResponse(filepath, media_type="image/jpeg")
 
 
 # ---------------------------------------------------------------------------

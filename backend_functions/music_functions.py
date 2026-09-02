@@ -1,9 +1,11 @@
+import os
 import pandas as pd
 
 from backend_functions.database_functions import get_conn, sql_to_list, elapsed_ms, qec, sql_to_dict, one_sql_result
 from backend_functions.logging_functions import log_app_event, start_timer
-from backend_functions.service_logins import get_spotify_client
+from backend_functions.service_logins import get_spotify_client, check_rate_limit_cached
 from backend_functions.task_execution import json_loading, task_log
+from datetime import datetime, timedelta, timezone
 import time
 
 
@@ -426,6 +428,206 @@ def get_now_playing(client=None):
     }
 
 
+def resolve_now_playing():
+    """
+    Resolve the Now Playing contract for GET /api/music/now-playing (008-001).
+
+    Order of operations (design T03):
+      1. Rate-limit gate - a rate-limited service loads no content (AC-12).
+      2. Fetch current playback from Spotify.
+      3. Persist the raw poll to staging and flatten it (FR-1/AC-9); a poll
+         that cannot be recorded resolves to the idle response (FR-2).
+      4. Resolve ISRC -> best track -> album display data; any miss resolves
+         to the idle response (contract display fields are non-null, AC-8).
+      5. Resolve playlist context, family relationship, and rating source
+         (ratings | predicted | 1500 baseline).
+
+    Returns:
+        dict matching the NowPlayingResponse contract in
+        frontend/pifitness/src/lib/types/music.ts.
+    """
+
+    def idle_response(rate_limited_flag=False):
+        return {
+            "playing": False,
+            "rateLimited": bool(rate_limited_flag),
+            "track": None,
+            "refreshedAt": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # 1. Rate-limit gate
+    rate_limited = bool(check_rate_limit_cached())
+    if rate_limited:
+        return idle_response(rate_limited)
+
+    # 2. Spotify playback
+    client = get_spotify_client(None)
+    sp = client.get("client") if client else None
+    if sp is None:
+        return idle_response(check_rate_limit_cached())
+    try:
+        playback = sp.current_user_playing_track()
+    except Exception as e:
+        log_app_event(cat='Now Playing', desc=f"Playback fetch failed: {e}")
+        return idle_response(check_rate_limit_cached())
+
+    if not playback or playback.get("item") is None:
+        return idle_response(False)
+
+    track = playback["item"]
+
+    # 3. Staging persist + flatten (runs regardless of what happens next)
+    try:
+        json_loading(playback, 'now_playing')
+    except Exception as e:
+        task_log(task_name='Now Playing Poll', fail_type='staging_load', fail_text=str(e))
+        return idle_response(False)
+    try:
+        qec("call staging.flatten_now_playing();")
+    except Exception as e:
+        task_log(task_name='Now Playing Poll', fail_type='flatten', fail_text=str(e))
+
+    # 4. Resolution
+    track_id = track.get("id")
+    duration_ms = track.get("duration_ms")
+    progress_ms = playback.get("progress_ms")
+
+    isrc = None
+    if track_id:
+        isrc = one_sql_result(
+            "SELECT isrc FROM music.vw_track_id_to_isrc WHERE track_id = %s",
+            (track_id,)
+        )
+    if not isrc:
+        return idle_response(False)
+
+    rows = sql_to_dict(
+        """SELECT DISTINCT
+                    b.track_isrc as isrc,
+                    b.track_id,
+                    b.track_name_clean as track_name,
+                    b.artist_display_name as artist_name,
+                    alb.album_name_clean as album_name,
+                    b.album_id
+                FROM music.vw_best_track_id bt
+                    INNER JOIN music.all_tracks b on b.track_id = bt.best_track_id
+                    INNER JOIN music.all_albums alb on alb.album_id = b.album_id
+                WHERE b.track_isrc = %s""",
+        (isrc,)
+    )
+    if not rows:
+        return idle_response(False)
+    track_dict = rows[0]
+    best_track_id = track_dict.get("track_id")
+    track_name = track_dict.get("track_name")
+    artist_name = track_dict.get("artist_name")
+    album_name = track_dict.get("album_name")
+    album_id = track_dict.get("album_id")
+    if not (best_track_id and track_name and artist_name and album_name and album_id):
+        return idle_response(False)
+
+    # 5. Context, family, rating
+    context = playback.get("context")
+    playlist_id = None
+    playlist_name = None
+    if context and context.get("type") == "playlist":
+        playlist_uri = context.get("uri")  # e.g. spotify:playlist:12345
+        if playlist_uri and playlist_uri.startswith("spotify:playlist:"):
+            playlist_id = playlist_uri.split(":")[-1]
+            try:
+                playlist_data = sp.playlist(playlist_id, fields="name")
+                playlist_name = playlist_data.get("name")
+            except Exception:
+                playlist_name = None
+                playlist_id = None
+
+    relationship_type = None
+    parent_id = None
+    parent_name = None
+    if playlist_id:
+        family = sql_to_dict(
+            """SELECT child_playlist_id, parent_playlist_id, child_playlist_type
+               FROM music.playlist_relationships
+               WHERE child_playlist_id = %s""",
+            (playlist_id,)
+        )
+        if family:
+            parent_id = family[0].get("parent_playlist_id")
+            ctype = family[0].get("child_playlist_type")
+            relationship_type = 'recommendation' if ctype == 'recommendation' else 'regular'
+            # Fetch parent playlist name for the context line label (FR-6 design notes)
+            if parent_id:
+                parent_name = one_sql_result(
+                    """SELECT playlist_name
+                       FROM music.playlist_config
+                       WHERE playlist_id = %s""",
+                    (parent_id,)
+                )
+        else:
+            # Playlist context with no local family mapping: treat as regular
+            # so the UI's remove-guard (OQ-4 "cannot be found") is reachable.
+            relationship_type = 'regular'
+
+    rating_value = 1500
+    rating_source = 'baseline'
+    if relationship_type:
+        fetch_id = parent_id if parent_id else playlist_id
+        if relationship_type == 'recommendation':
+            predicted = one_sql_result(
+                """SELECT elo_track_predicted FROM music.track_recommendations
+                   WHERE isrc = %s AND playlist_id = %s""",
+                (isrc, fetch_id)
+            )
+            if predicted is not None:
+                rating_value = predicted
+                rating_source = 'predicted'
+        else:
+            rated = one_sql_result(
+                """SELECT elo_rating FROM music.ratings
+                   WHERE isrc = %s AND playlist_id = %s""",
+                (isrc, fetch_id)
+            )
+            if rated is not None:
+                rating_value = rated
+                rating_source = 'ratings'
+
+    completion = None
+    if duration_ms is not None and progress_ms is not None:
+        remaining_s = max((duration_ms - progress_ms) / 1000.0, 0.0)
+        completion = {
+            "doneInS": round(remaining_s, 1),
+            "completeAtTS": (
+                datetime.now(timezone.utc) + timedelta(seconds=remaining_s)
+            ).isoformat(),
+        }
+
+    return {
+        "playing": True,
+        "rateLimited": False,
+            "track": {
+            "trackId": track_id,
+            "bestTrackId": best_track_id,
+            "isrc": isrc,
+            "trackName": track_name,
+            "artistName": artist_name,
+            "albumName": album_name,
+            "albumId": album_id,
+            "albumArtUrl": f"/api/music/album-art/{album_id}",
+            "context": {
+                "isPlaylist": playlist_id is not None,
+                "playlistId": playlist_id,
+                "playlistName": playlist_name,
+                "relationshipType": relationship_type,
+                "parentPlaylistId": parent_id,
+                "parentPlaylistName": parent_name,
+            },
+            "rating": {"value": rating_value, "source": rating_source},
+            "completion": completion,
+        },
+        "refreshedAt": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 def add_isrc_to_local(id, isrc):
     # Add to parent playlist locally
     ins_sql = f"""INSERT INTO music.playlist_isrcs (playlist_id, isrc) VALUES (%s, %s)"""
@@ -685,3 +887,50 @@ def nightly_track_id_maintenance():
 
     qec('CALL music.isrc_duplicate_finder();')
     return
+
+
+def album_image_retrieval(album_id):
+    """
+    Resolve an album id to a local JPEG path, downloading on first need.
+
+        Ported from frontend_functions/music_module.py (OQ-1 Option A).
+    Single writer to the disk cache; reuses existing Spotify auth path.
+    Returns the filepath string, or None if the image cannot be obtained.
+    """
+    import requests
+
+    from backend_functions.file_handlers import album_art_path
+
+    filename = f"{album_id}.jpg"
+    filepath = os.path.join(str(album_art_path()), filename)
+
+    # Return immediately if file already exists
+    if os.path.exists(filepath):
+        return filepath
+
+    # Fetch album info from Spotify
+    client = get_spotify_client(None)
+    if not client:
+        return None
+    sp = client.get("client")
+    if sp is None:
+        return None
+
+    try:
+        album = sp.album(album_id)
+        images = album.get("images", [])
+        if not images:
+            return None
+        image_url = images[0]["url"]
+    except Exception:
+        return None
+
+    # Download and save
+    try:
+        resp = requests.get(image_url)
+        resp.raise_for_status()
+        with open(filepath, "wb") as f:
+            f.write(resp.content)
+        return filepath
+    except Exception:
+        return None

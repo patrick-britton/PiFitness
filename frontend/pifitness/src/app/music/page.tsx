@@ -6,10 +6,13 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore, MODULE_SUB_PAGES } from '../../stores/uiStore';
+import { API } from '../../lib/api-client';
 import * as Icons from '@mui/icons-material';
+import NowPlayingView from './components/NowPlayingView';
 
 const TABS = MODULE_SUB_PAGES.music;
 
@@ -17,11 +20,37 @@ type TabId = (typeof TABS)[number]['id'];
 
 export default function MusicPage() {
   const { activeSubPage, setActiveSubPage } = useUIStore();
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { layoutVariant } = useViewportStore();
   const isDesktop = layoutVariant === 'desktop';
   const isPortrait = layoutVariant === 'portrait';
   const isLandscape = layoutVariant === 'landscape';
+
+  // OQ-2 / FR-10 — entry-time-only landing. Each time the module is opened
+  // from navigation (activeSubPage is null; NavBar/Sidebar clear it), route to
+  // Ratings when any track awaits rating, else Now Playing. Never active-switch
+  // a tab the user has selected mid-session (a non-null activeSubPage is left
+  // untouched), and a direct sub-page URL (path !== '/music') is preserved.
+  useEffect(() => {
+    if (pathname !== '/music') return;
+    if (activeSubPage !== null) return;
+
+    let cancelled = false;
+    API.music
+      .getRatingsEligibleCount()
+      .then((res) => {
+        if (cancelled) return;
+        const pending = res?.count ?? 0;
+        setActiveSubPage(pending > 0 ? 'ratings' : 'now-playing');
+      })
+      .catch(() => {
+        if (!cancelled) setActiveSubPage('now-playing'); // AC-1 default
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname, activeSubPage, setActiveSubPage]);
 
   const activeTab = activeSubPage || TABS[0].id;
 
@@ -135,14 +164,20 @@ export default function MusicPage() {
       {/* Active Tab Content */}
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="p-8 text-center">
-            <p className="text-gray-500 dark:text-gray-400 text-lg">
-              wow such empty
-            </p>
-            <p className="text-gray-400 dark:text-gray-500 mt-2">
-              future home of {activeTabConfig.label}
-            </p>
-          </div>
+          {/* Mounted feature views (008-001) */}
+          {activeTab === 'now-playing' && <NowPlayingView />}
+
+          {/* Placeholder for sub-pages not yet built (Ratings → 008-004, etc.) */}
+          {activeTab !== 'now-playing' && (
+            <div className="p-8 text-center">
+              <p className="text-gray-500 dark:text-gray-400 text-lg">
+                wow such empty
+              </p>
+              <p className="text-gray-400 dark:text-gray-500 mt-2">
+                future home of {activeTabConfig.label}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
