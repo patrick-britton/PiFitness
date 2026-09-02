@@ -857,32 +857,6 @@ def get_matchup_dictionary(i):
     return matchup_dict[0]
 
 
-def elo_update(home_elo, away_elo, result, k=100):
-    # Takes in the starting ratings & match result, spits out the new ratings
-
-    # Expected scores based on ELO difference
-    expected_home = 1 / (1 + 10 ** ((away_elo - home_elo) / 400))
-    expected_away = 1 - expected_home
-
-    # Scale result to [0,1], where 0 = home lost, 1 = home won
-    # matchResult = 0 gives 0.5 (draw)
-    if result < 0:
-        actual_home = (abs(result) + 5) / 10
-        actual_away = 1 - actual_home
-    else:
-        actual_away = (abs(result) + 5) / 10
-        actual_home = 1-actual_away
-
-    # Scale adjustment by margin of victory
-    margin_multiplier = 1 + (abs(result) / 5)  # between 1x and 2x impact
-
-    # Update ratings
-    hne = round(home_elo + k * margin_multiplier * (actual_home - expected_home),0)
-    ane = round(away_elo + k * margin_multiplier * (actual_away - expected_away),0)
-
-    return hne, ane
-
-
 def nightly_track_id_maintenance():
 
     qec('CALL music.isrc_duplicate_finder();')

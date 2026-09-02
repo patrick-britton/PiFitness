@@ -12,7 +12,7 @@ Now-playing is served by backend_functions.music_functions.resolve_now_playing
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pathlib import Path
 from typing import Optional
 
@@ -31,6 +31,8 @@ from backend_functions.queries import (
     get_rating_eligible_playlists,
     record_recommendation_decision,
     remove_recommendation,
+    get_matchup,
+    score_matchup,
 )
 
 router = APIRouter(prefix="/api/music", tags=["music"])
@@ -150,6 +152,77 @@ async def record_rating(
             status_code=500,
             detail=f"Failed to record rating: {str(e)}",
         )
+
+
+# ---------------------------------------------------------------------------
+# Ratings — Matchup (008-004)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ratings/matchup")
+async def get_matchup_endpoint(
+    playlist_id: Optional[str] = Query(default=None, description="Optional playlist to scope the matchup"),
+):
+    """
+    Get a head-to-head matchup for rating (FR-3/FR-5).
+
+    Returns the primary track plus the challenger (closest score in the same
+    playlist). When the playlist has only one rateable track, challenger is
+    null. Returns 204 when no rateable tracks exist.
+    """
+    try:
+        matchup = get_matchup(playlist_id=playlist_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get matchup: {str(e)}",
+        )
+
+    if matchup is None:
+        return {"ok": True, "primary": None, "challenger": None}
+
+    return {"ok": True, **matchup}
+
+
+@router.post("/ratings/matchup/score")
+async def score_matchup_endpoint(
+    playlist_id: str,
+    isrc: str,
+    isrc_vs: str,
+    margin: int = Query(ge=-5, le=5, description="Rating margin -5..-1 or +1..+5 (no zero)"),
+):
+    """
+    Score a matchup and return the next one (FR-6/FR-7).
+
+    Validates that margin is non-zero, recomputes both scores, writes history,
+    updates standings, and returns the next matchup.
+    """
+    if margin == 0:
+        raise HTTPException(
+            status_code=422,
+            detail="Margin cannot be zero — no draws allowed",
+        )
+
+    try:
+        result = score_matchup(
+            playlist_id=playlist_id,
+            isrc=isrc,
+            isrc_vs=isrc_vs,
+            margin=margin,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to score matchup: {str(e)}",
+        )
+
+    # Load next matchup (same playlist scope as the one just scored)
+    try:
+        next_matchup = get_matchup(playlist_id=playlist_id)
+    except Exception:
+        next_matchup = None
+
+    return {"ok": True, "next": next_matchup, "scores": result}
 
 
 # ---------------------------------------------------------------------------

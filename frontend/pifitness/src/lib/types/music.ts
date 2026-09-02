@@ -31,6 +31,9 @@
  *   GET  /service-status              -> { spotify: { rateLimited, rateLimitClearedUtc } }
  *   GET  /ratings/eligible-count     -> { count }   (pre-existing; FR-10
  *                                         landing)
+ *   GET  /ratings/matchup?playlist_id= -> { ok, primary, challenger }
+ *   POST /ratings/matchup/score        -> { ok, next, scores }
+ *                                         query { playlist_id, isrc, isrc_vs, margin }
  */
 
 /**
@@ -233,4 +236,57 @@ export interface ServiceStatus {
 /** Response for GET /api/music/ratings/eligible-count (FR-10 landing). */
 export interface MusicRatingsEligibleCountResponse {
   count: number;
+}
+
+/** Response for GET /api/music/ratings (eligible-playlists chooser, FR-2).
+ *  `data` maps playlist_name (count-in-label, e.g. "Car (5)") -> playlist_id. */
+export interface MusicRatingsEligiblePlaylistsResponse {
+  data: Record<string, string>;
+  count: number;
+}
+
+// ---------------------------------------------------------------------------
+// Track Ratings — Matchup (008-004)
+// ---------------------------------------------------------------------------
+
+/** One side of a rating matchup. */
+export interface MatchupTrack {
+  isrc: string;
+  playlistId: string;
+  playlistName: string;
+  trackName: string;
+  artistName: string;
+  albumId: string;
+  albumArtUrl: string | null;
+  score: number;
+}
+
+/** Response for GET /api/music/ratings/matchup. `primary` is null when no
+ *  rateable tracks exist. `challenger` is null when the playlist has only
+ *  one track total (no challenger exists). */
+export interface MatchupResponse {
+  primary: MatchupTrack | null;
+  challenger: MatchupTrack | null;
+}
+
+/** Request query for POST /api/music/ratings/matchup/score. */
+export interface ScoreRequest {
+  playlist_id: string;
+  isrc: string;
+  isrc_vs: string;
+  /** -5..-1 or +1..+5 (no zero/draw). Positive = primary wins. */
+  margin: number;
+}
+
+/** Response for POST /api/music/ratings/matchup/score. */
+export interface ScoreResponse {
+  ok: boolean;
+  next: MatchupResponse | null;
+  scores: {
+    ok: boolean;
+    isrc: string;
+    isrcVs: string;
+    homeNewElo: number;
+    awayNewElo: number;
+  };
 }

@@ -18,6 +18,7 @@ import {
   ServiceStatus,
   MusicAddTargetsResponse,
   MusicAddToPlaylistRequest,
+  ScoreRequest,
 } from "@/lib/types/music";
 
 // ---------------------------------------------------------------------------
@@ -157,5 +158,25 @@ export function useAddToPlaylist() {
   return useMutation({
     mutationFn: (playlistId: string) => API.music.addToPlaylist(playlistId),
     onSuccess: () => invalidateNowPlaying(queryClient),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Ratings matchup scoring (008-004)
+// ---------------------------------------------------------------------------
+
+/** Score a matchup (FR-6). On success, invalidates the matchup, eligible-count,
+ *  AND eligible-playlists so the view loads the next matchup, the landing count
+ *  reflects the change, and the playlist dropdown updates with the new per-playlist
+ *  rateable counts (e.g., a playlist that's been fully rated disappears). */
+export function useScoreMatchup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: ScoreRequest) => API.music.scoreMatchup(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['music', 'ratings', 'matchup'] });
+      queryClient.invalidateQueries({ queryKey: ['music', 'ratings', 'eligible-count'] });
+      queryClient.invalidateQueries({ queryKey: ['music', 'ratings', 'eligible-playlists'] });
+    },
   });
 }

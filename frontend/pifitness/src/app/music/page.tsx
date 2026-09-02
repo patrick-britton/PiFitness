@@ -13,6 +13,7 @@ import { useUIStore, MODULE_SUB_PAGES } from '../../stores/uiStore';
 import { API } from '../../lib/api-client';
 import * as Icons from '@mui/icons-material';
 import NowPlayingView from './components/NowPlayingView';
+import RatingsView from './components/RatingsView';
 
 const TABS = MODULE_SUB_PAGES.music;
 
@@ -164,11 +165,12 @@ export default function MusicPage() {
       {/* Active Tab Content */}
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Mounted feature views (008-001) */}
+          {/* Mounted feature views */}
           {activeTab === 'now-playing' && <NowPlayingView />}
+          {activeTab === 'ratings' && <RatingsView />}
 
-          {/* Placeholder for sub-pages not yet built (Ratings → 008-004, etc.) */}
-          {activeTab !== 'now-playing' && (
+          {/* Placeholder for sub-pages not yet built */}
+          {activeTab !== 'now-playing' && activeTab !== 'ratings' && (
             <div className="p-8 text-center">
               <p className="text-gray-500 dark:text-gray-400 text-lg">
                 wow such empty
