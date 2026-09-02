@@ -9,6 +9,7 @@ These functions return plain Python data structures with no Streamlit dependenci
 from typing import List, Dict, Any, Optional, Sequence, Union
 from datetime import datetime
 from backend_functions.database_functions import qec, sql_to_dict, sql_to_list, sql_to_lookup_dict, one_sql_result
+from backend_functions.music_functions import elo_update
 from backend.schemas.music_schemas import Track, Playlist, TrackRecommendation
 
 def get_rating_eligible_count() -> int:
@@ -441,12 +442,221 @@ def add_soft_rejection_exclusion(
     params = (playlist_id, isrc, current_elo)
     return qec(soft_sql, params)
 
-# Additional music query functions can be added here as needed
-# For example:
-# def get_playlist_tracks(playlist_id: str) -> List[Track]:
-#     """Get all tracks for a specific playlist"""
-#     pass
-#
+
+def get_matchup(playlist_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Build a rating matchup: one rateable track plus a challenger from the same
+    playlist with the closest current ELO score.
+
+    The PRIMARY track is selected from music.vw_rating_eligible (tracks not
+    recently played that need rating). The CHALLENGER is selected from
+    music.playlist_isrcs (ALL tracks in the playlist, including recently-played
+    ones) — ordered by closest ELO score to the primary. This matches the legacy
+    get_matchup_dictionary behavior.
+
+    Args:
+        playlist_id: Optional playlist to scope the matchup. None = any rateable track.
+
+    Returns:
+        Dict with 'primary' and 'challenger' MatchupTrack dicts, or None when no
+        rateable tracks exist. 'challenger' is None when the playlist has only
+        one track total (no other track to challenge against).
+    """
+    matchup_sql = """
+        WITH primary_track AS (
+            SELECT isrc, playlist_id
+            FROM music.vw_rating_eligible
+            WHERE (%s IS NULL OR playlist_id = %s)
+            LIMIT 1
+        ),
+        all_playlist_tracks AS (
+            -- ALL tracks in the same playlist as the primary (excluding primary itself)
+            -- Challenger can be any track, not just rateable ones
+            SELECT isrc, playlist_id
+            FROM music.playlist_isrcs
+            WHERE playlist_id = (SELECT playlist_id FROM primary_track)
+              AND isrc != (SELECT isrc FROM primary_track)
+        ),
+        rated AS (
+            -- ELO ratings for primary + all playlist tracks
+            SELECT isrc, playlist_id, COALESCE(elo_rating, 1500) AS elo
+            FROM music.ratings
+            WHERE playlist_id = (SELECT playlist_id FROM primary_track)
+              AND isrc IN (SELECT isrc FROM primary_track
+                           UNION SELECT isrc FROM all_playlist_tracks)
+        ),
+        matchup AS (
+            SELECT
+                pt.playlist_id,
+                pt.isrc,
+                COALESCE(pr.elo, 1500) AS isrc_elo,
+                apt.isrc AS isrc_vs,
+                COALESCE(vr.elo, 1500) AS isrc_vs_elo,
+                ROW_NUMBER() OVER (
+                    ORDER BY abs(COALESCE(pr.elo, 1500) - COALESCE(vr.elo, 1500))
+                ) AS row_num
+            FROM primary_track pt
+            LEFT JOIN rated pr ON pr.isrc = pt.isrc AND pr.playlist_id = pt.playlist_id
+            LEFT JOIN all_playlist_tracks apt ON apt.playlist_id = pt.playlist_id
+            LEFT JOIN rated vr ON vr.isrc = apt.isrc AND vr.playlist_id = apt.playlist_id
+            WHERE apt.isrc IS NOT NULL
+        )
+        SELECT
+            m.playlist_id,
+            pc.playlist_name,
+            m.isrc,
+            m.isrc_elo,
+            at1.track_name_clean AS isrc_track,
+            at1.artist_display_name AS isrc_artist,
+            at1.album_id AS isrc_album_id,
+            m.isrc_vs,
+            m.isrc_vs_elo,
+            at2.track_name_clean AS isrc_vs_track,
+            at2.artist_display_name AS isrc_vs_artist,
+            at2.album_id AS isrc_vs_album_id
+        FROM matchup m
+        INNER JOIN music.playlist_config pc ON pc.playlist_id = m.playlist_id
+        INNER JOIN music.vw_best_track_id bt1 ON bt1.isrc = m.isrc
+        INNER JOIN music.all_tracks at1 ON at1.track_isrc = bt1.isrc
+        LEFT JOIN music.vw_best_track_id bt2 ON bt2.isrc = m.isrc_vs
+        LEFT JOIN music.all_tracks at2 ON at2.track_isrc = bt2.isrc
+        WHERE m.row_num = 1
+    """
+
+    rows = sql_to_dict(matchup_sql, (playlist_id, playlist_id))
+
+    # No rateable tracks at all
+    if not rows:
+        # Determine if it's "no tracks at all" vs "no challenger"
+        primary_sql = """
+            SELECT isrc, playlist_id
+            FROM music.vw_rating_eligible
+            WHERE (%s IS NULL OR playlist_id = %s)
+            LIMIT 1
+        """
+        primary_rows = sql_to_dict(primary_sql, (playlist_id, playlist_id))
+        if not primary_rows:
+            return None
+        # Primary exists but no challenger — fetch primary display values only
+        primary = primary_rows[0]
+        isrc = primary["isrc"]
+        pid = primary["playlist_id"]
+        display_sql = """
+            SELECT
+                pc.playlist_name,
+                at.track_name_clean AS track_name,
+                at.artist_display_name AS artist_name,
+                at.album_id,
+                COALESCE(r.elo_rating, 1500) AS score
+            FROM music.playlist_config pc
+            INNER JOIN music.vw_best_track_id bt ON bt.isrc = %s
+            INNER JOIN music.all_tracks at ON at.track_isrc = bt.isrc
+            LEFT JOIN music.ratings r ON r.isrc = %s AND r.playlist_id = %s
+            WHERE pc.playlist_id = %s
+            LIMIT 1
+        """
+        drows = sql_to_dict(display_sql, (isrc, isrc, pid, pid))
+        if not drows:
+            return None
+        d = drows[0]
+        return {
+            "primary": {
+                "isrc": isrc,
+                "playlistId": pid,
+                "playlistName": d["playlist_name"],
+                "trackName": d["track_name"],
+                "artistName": d["artist_name"],
+                "albumId": d["album_id"],
+                "albumArtUrl": f"/api/music/album-art/{d['album_id']}" if d["album_id"] else None,
+                "score": d["score"],
+            },
+            "challenger": None,
+        }
+
+    row = rows[0]
+    return {
+        "primary": {
+            "isrc": row["isrc"],
+            "playlistId": row["playlist_id"],
+            "playlistName": row["playlist_name"],
+            "trackName": row["isrc_track"],
+            "artistName": row["isrc_artist"],
+            "albumId": row["isrc_album_id"],
+            "albumArtUrl": f"/api/music/album-art/{row['isrc_album_id']}" if row["isrc_album_id"] else None,
+            "score": row["isrc_elo"],
+        },
+        "challenger": {
+            "isrc": row["isrc_vs"],
+            "playlistId": row["playlist_id"],
+            "playlistName": row["playlist_name"],
+            "trackName": row["isrc_vs_track"],
+            "artistName": row["isrc_vs_artist"],
+            "albumId": row["isrc_vs_album_id"],
+            "albumArtUrl": f"/api/music/album-art/{row['isrc_vs_album_id']}" if row["isrc_vs_album_id"] else None,
+            "score": row["isrc_vs_elo"],
+        },
+    }
+
+
+def score_matchup(
+    playlist_id: str,
+    isrc: str,
+    isrc_vs: str,
+    margin: int,
+) -> Dict[str, Any]:
+    """
+    Score a matchup between two tracks.
+
+    Recomputes both scores via elo_update (K=100, margin multiplier 1+|margin|/5),
+    writes two mirrored history rows (one per side, opposite result signs), and
+    upserts both standings via the recency-guarded vw_rating_update.
+
+    Args:
+        playlist_id: The playlist both tracks belong to.
+        isrc: The home track ISRC.
+        isrc_vs: The challenger (away) track ISRC.
+        margin: Rating margin in [-5..-1, +1..+5] (no zero/draw).
+               Positive = home wins, negative = away wins.
+
+    Returns:
+        Dict with ok status and the new scores for both tracks.
+    """
+    # Fetch current ELOs (default 1500 baseline when unrated)
+    elo_sql = """SELECT isrc, COALESCE(elo_rating, 1500) AS elo
+                 FROM music.ratings
+                 WHERE playlist_id = %s AND isrc IN (%s, %s)"""
+    elo_rows = sql_to_dict(elo_sql, (playlist_id, isrc, isrc_vs))
+    elo_map = {r["isrc"]: r["elo"] for r in elo_rows} if elo_rows else {}
+
+    home_elo = elo_map.get(isrc, 1500)
+    away_elo = elo_map.get(isrc_vs, 1500)
+
+    # Recompute scores via existing ELO formula.
+    # Positive margin = home wins, negative = away wins.
+    home_new_elo, away_new_elo = elo_update(
+        home_elo=home_elo,
+        away_elo=away_elo,
+        result=margin,
+    )
+
+    # Write two mirrored history rows with correct signs:
+    # winner (positive margin = home) gets +margin, loser gets -margin.
+    hist_sql = """INSERT INTO music.ratings_history (
+                    playlist_id, isrc, isrc_vs, elo_old, elo_new, rating_result
+                  ) VALUES (%s, %s, %s, %s, %s, %s)"""
+    qec(hist_sql, (playlist_id, isrc, isrc_vs, home_elo, home_new_elo, margin))
+    qec(hist_sql, (playlist_id, isrc_vs, isrc, away_elo, away_new_elo, -margin))
+
+    # Upsert both standings (recency-guarded via vw_rating_update)
+    update_ratings_from_view()
+
+    return {
+        "ok": True,
+        "isrc": isrc,
+        "isrcVs": isrc_vs,
+        "homeNewElo": home_new_elo,
+        "awayNewElo": away_new_elo,
+    }
 # def get_track_recommendations(playlist_id: str) -> List[TrackRecommendation]:
 #     """Get track recommendations for a playlist"""
 #     pass

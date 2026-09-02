@@ -12,11 +12,18 @@
  *
  * Uses MUI Snackbar+Alert for confirmation toasts (MUI already a dependency).
  * Album art is served from the app's /api/music/album-art/{albumId} endpoint (OQ-1).
+ *
+ * Refresh strategy (efficient, no polling):
+ *   - When a track is playing with a known completion time, schedule exactly one
+ *     refetch ~1s after the song ends (timeout derived from `completion.completeAtTS`).
+ *   - Action mutations invalidate the query (via the hooks) -> immediate refetch.
+ *   - A manual refresh icon button is always available so the user can refetch when
+ *     nothing is playing (and therefore no song-end timer is scheduled).
  */
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useViewportStore } from '@/stores/viewportStore';
 import {
   useNowPlaying,
@@ -320,7 +327,7 @@ function AddToPlaylistControl({ onAction }: { onAction: (label: string) => void 
 // ---------------------------------------------------------------------------
 
 export default function NowPlayingView() {
-  const { data: npData, isLoading, isError, error } = useNowPlaying();
+  const { data: npData, isLoading, isError, error, refetch } = useNowPlaying();
 
   const skipTrack = useSkipTrack();
   const promoteTrack = usePromoteTrack();
@@ -343,6 +350,24 @@ export default function NowPlayingView() {
   };
 
     const handleCloseToast = () => setToastOpen(false);
+
+  /**
+   * Efficient auto-refresh: schedule exactly one refetch ~1s after the current
+   * track completes, derived from `completion.completeAtTS`. The timer is torn
+   * down whenever the snapshot/refetch identity changes, so only one timer exists
+   * at a time. No periodic polling. When nothing is playing (no completion time),
+   * no timer is scheduled — the manual refresh button covers that case.
+   */
+  useEffect(() => {
+    const completion = npData?.playing ? npData?.track?.completion : null;
+    if (!completion?.completeAtTS) return;
+    const remainingMs = Date.parse(completion.completeAtTS) - Date.now();
+    if (!isFinite(remainingMs) || remainingMs < 0) return;
+    const timer = setTimeout(() => {
+      refetch();
+    }, remainingMs + 1000); // 1s buffer after the song ends
+    return () => clearTimeout(timer);
+  }, [npData, refetch]);
 
   /**
    * Dispatch an action mutation and show a confirmation toast.
@@ -470,6 +495,18 @@ export default function NowPlayingView() {
   return (
     <div className="p-4 sm:p-6">
       <div className="max-w-3xl mx-auto">
+        {/* Manual refresh — always available. Needed when no song is playing
+            (auto song-end refetch has no timer) and as a fallback otherwise. */}
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={() => refetch()}
+            title="Refresh Now Playing"
+            aria-label="Refresh Now Playing"
+            className="inline-flex items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800 p-2 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            <Icons.Refresh className="w-5 h-5" />
+          </button>
+        </div>
         {!playing || !track ? (
           <div className="text-center py-12">
             <Icons.MusicNote className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />

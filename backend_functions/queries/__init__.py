@@ -34,7 +34,9 @@ from .music_queries import (
     update_playlist_config_weights,
     record_rating_history,
     update_ratings_from_view,
-    add_soft_rejection_exclusion
+    add_soft_rejection_exclusion,
+    get_matchup,
+    score_matchup,
 )
 from .admin_queries import (
     get_api_service_list,
@@ -162,6 +164,8 @@ __all__ = [
     'record_rating_history',
     'update_ratings_from_view',
     'add_soft_rejection_exclusion',
+    'get_matchup',
+    'score_matchup',
     # Admin
     'get_api_service_list',
     'get_distinct_api_service_names',

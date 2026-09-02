@@ -44,6 +44,10 @@ import {
   RecentPlaysResponse,
   ServiceStatus,
   MusicRatingsEligibleCountResponse,
+  MatchupResponse,
+  ScoreRequest,
+  ScoreResponse,
+  MusicRatingsEligiblePlaylistsResponse,
 } from './types/music';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -312,7 +316,7 @@ export const API = {
   music: {
     getPlaylists: () => fetchAPI<any[]>("/api/music/playlists"),
     getPlaylistTracks: (playlistId: string) => fetchAPI<any[]>(`/api/music/playlists/${playlistId}/tracks`),
-    getRatings: () => fetchAPI<any[]>("/api/music/ratings"),
+    getRatings: () => fetchAPI<MusicRatingsEligiblePlaylistsResponse>("/api/music/ratings"),
     getRatingsEligibleCount: () => fetchAPI<MusicRatingsEligibleCountResponse>("/api/music/ratings/eligible-count"),
     getRecentPlays: (limit?: number) =>
       fetchAPI<RecentPlaysResponse>(
@@ -350,6 +354,19 @@ export const API = {
       method: "POST",
       body: JSON.stringify(ratingData),
     }),
+    getMatchup: (playlistId?: string) =>
+      fetchAPI<MatchupResponse>(
+        `/api/music/ratings/matchup${playlistId ? `?playlist_id=${encodeURIComponent(playlistId)}` : ""}`
+      ),
+    scoreMatchup: (request: ScoreRequest) =>
+      fetchAPI<ScoreResponse>(`/api/music/ratings/matchup/score?${new URLSearchParams({
+        playlist_id: request.playlist_id,
+        isrc: request.isrc,
+        isrc_vs: request.isrc_vs,
+        margin: String(request.margin),
+      }).toString()}`, {
+        method: "POST",
+      }),
   },
 
   /**
