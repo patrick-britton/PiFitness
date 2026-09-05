@@ -17,13 +17,20 @@ from pathlib import Path
 from typing import Optional
 
 from backend_functions.database_functions import sql_to_dict, sql_to_list, one_sql_result, qec
-from backend_functions.music_functions import resolve_now_playing, save_matchup_results, album_image_retrieval
+from backend_functions.music_functions import (
+    resolve_now_playing,
+    save_matchup_results,
+    album_image_retrieval,
+    playlist_upload,
+    playlist_to_db,
+)
 from backend_functions.service_logins import get_spotify_client, check_rate_limit_cached, sql_rate_limited
 from backend_functions.queries import (
     add_isrc_to_local_playlist,
     add_into_current_ratings,
     add_soft_rejection_exclusion,
     get_playlist_config,
+    get_playlist_config_view,
     get_playlist_isrc_stats,
     get_playlists_not_containing_isrc,
     get_recent_plays,
@@ -33,7 +40,10 @@ from backend_functions.queries import (
     remove_recommendation,
     get_matchup,
     score_matchup,
+    compute_shuffle_order,
 )
+import time as _time
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/music", tags=["music"])
 
@@ -535,6 +545,9 @@ async def now_playing_remove():
 
     messages = []
     removed_any = False
+    # Collect family playlists where the track was found locally so we can
+    # also remove from each on Spotify (FR-6: "locally and on Spotify").
+    spotify_playlist_ids = []
 
     for fid in family_ids:
         exists = one_sql_result(
@@ -557,8 +570,10 @@ async def now_playing_remove():
             (fid, isrc),
         )
         removed_any = True
+        spotify_playlist_ids.append(fid)
 
-    # Spotify removal for the user-controlled playlist
+    # Spotify removal for every family playlist where the track was found locally
+    # (FR-6/AC-7: "every playlist in the current family locally and on Spotify").
     track_list = sql_to_list(
         "SELECT DISTINCT track_id FROM music.all_tracks WHERE track_isrc = %s",
         (isrc,),
@@ -566,10 +581,11 @@ async def now_playing_remove():
     if track_list:
         sp = _get_spotify_client()
         if sp:
-            try:
-                sp.playlist_remove_all_occurrences_of_items(playlist_id, track_list)
-            except Exception:
-                pass
+            for sid in spotify_playlist_ids:
+                try:
+                    sp.playlist_remove_all_occurrences_of_items(sid, track_list)
+                except Exception:
+                    pass
 
     if not removed_any:
         return {"ok": True, "message": "; ".join(messages) if messages else "No changes made"}
@@ -717,8 +733,283 @@ async def get_album_art(album_id: str):
 
 
 # ---------------------------------------------------------------------------
-# Smart Shuffle — PENDING: requires backend extraction from frontend_functions
+# Playlist Shuffle (008-003) — manual, one-shot weighted shuffle
 # ---------------------------------------------------------------------------
+
+
+class ShuffleConfigBody(BaseModel):
+    """Weights/minutes for a preview or config reconcile (FR-3/FR-6, OQ-1)."""
+    ratingsWeight: int = Field(ge=0, le=50, description="Ratings weight 0-50")
+    recencyWeight: int = Field(ge=0, le=50, description="Recency weight 0-50")
+    randomWeight: int = Field(ge=0, le=50, description="Randomness weight 0-50")
+    minutesToSync: int = Field(ge=30, le=9999, description="Minutes 30-9999 (9999 = no limit)")
+
+
+class ShuffleFlagsBody(BaseModel):
+    """Boolean playlist-config flags for a checkbox reconcile (008-003)."""
+    autoShuffle: bool = False
+    manualShuffle: bool = False
+    makeRecs: bool = False
+    seedsOnly: bool = False
+
+
+class ShuffleSendRequest(BaseModel):
+    """Send-to-Spotify request body (FR-5/FR-6, OQ-1)."""
+    playlistId: str = Field(..., description="Source playlist id")
+    ratingsWeight: int = Field(ge=0, le=50)
+    recencyWeight: int = Field(ge=0, le=50)
+    randomWeight: int = Field(ge=0, le=50)
+    minutesToSync: int = Field(ge=30, le=9999)
+
+
+@router.get("/shuffle/playlists")
+async def shuffle_playlists():
+    """
+    Selection grid of parent (child-excluded) playlists for Playlist Shuffle (FR-1).
+
+    Reads `music.vw_playlist_config`. Each row carries the fields needed by the
+    selection grid plus the saved tuning defaults. Returns `{data, count}`.
+    """
+    try:
+        playlists = get_playlist_config_view()
+        return {"data": playlists, "count": len(playlists)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch shuffle playlists: {str(e)}",
+        )
+
+
+@router.get("/shuffle")
+async def shuffle_data(playlist_id: str):
+    """
+    Playlist shuffle data for a selected playlist (FR-1/FR-2).
+
+    Returns the source playlist's saved config (weights/minutes), the resolved
+    target (shuffle-child) playlist id, and the raw per-track stats rows needed
+    to compute the preview. When the playlist has no stats rows, `rows` is empty
+    and `targetPlaylistId` is null (OQ-3).
+    """
+    try:
+        stats = get_playlist_isrc_stats(playlist_id)
+        config_rows = get_playlist_config(playlist_id)
+        target_playlist_id = stats[0].get("target_playlist_id") if stats else None
+
+        cfg = config_rows[0] if config_rows else {}
+        config = {
+            "ratingsWeight": cfg.get("ratings_weight", 0),
+            "recencyWeight": cfg.get("recency_weight", 0),
+            "randomWeight": cfg.get("randomness_weight", 0),
+            "minutesToSync": cfg.get("minutes_to_sync", 9999),
+            "autoShuffle": bool(cfg.get("auto_shuffle", False)),
+            "manualShuffle": bool(cfg.get("manual_shuffle", False)),
+            "makeRecs": bool(cfg.get("make_recs", False)),
+            "seedsOnly": bool(cfg.get("seeds_only", False)),
+        }
+        return {
+            "playlistId": playlist_id,
+            "targetPlaylistId": target_playlist_id,
+            "config": config,
+            "rows": stats,
+            "count": len(stats),
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch shuffle data: {str(e)}",
+        )
+
+
+@router.post("/shuffle/preview")
+async def shuffle_preview(
+    body: ShuffleConfigBody,
+    playlist_id: str,
+):
+    """
+    Compute the weighted shuffle order for the live preview (FR-3/FR-4).
+
+    Delegates to ``compute_shuffle_order``, the single source of truth shared
+    with ``/shuffle/send``. When the playlist has no rows, returns an empty
+    ``rows`` list (the frontend shows 'No Songs found on this playlist', OQ-3).
+    """
+    try:
+        result = compute_shuffle_order(
+            playlist_id,
+            body.ratingsWeight,
+            body.recencyWeight,
+            body.randomWeight,
+            body.minutesToSync,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to compute shuffle preview: {str(e)}",
+        )
+
+    rows = [
+        {
+            "newPosition": r.get("new_position"),
+            "trackArtist": r.get("track_artist"),
+            "recency_pct": r.get("recency_pct"),
+            "ratings_pct": r.get("ratings_pct"),
+            "random_pct": r.get("random_pct"),
+            "duration_s": r.get("duration_s"),
+            "durationBarMax": result.get("max_duration_s", 0),
+            "isrc": r.get("isrc"),
+            "trackId": r.get("track_id"),
+            "targetPlaylistId": result.get("target_playlist_id"),
+        }
+        for r in result.get("rows", [])
+    ]
+    return {"rows": rows, "count": len(rows)}
+
+
+@router.post("/shuffle/config")
+async def shuffle_config(
+    body: ShuffleConfigBody,
+    playlist_id: str,
+):
+    """
+    Reconcile tuning inputs to the source playlist config immediately (OQ-4 / AC-8).
+
+    Writes the three weights and minutes to ``music.playlist_config`` on each
+    input change so the saved config stays in sync even if the user never sends.
+    Returns ``{ok, message}``.
+    """
+    try:
+        qec(
+            "UPDATE music.playlist_config SET "
+            "ratings_weight = %s, recency_weight = %s, randomness_weight = %s, "
+            "minutes_to_sync = %s WHERE playlist_id = %s",
+            (
+                body.ratingsWeight,
+                body.recencyWeight,
+                body.randomWeight,
+                body.minutesToSync,
+                playlist_id,
+            ),
+        )
+        return {"ok": True, "message": "Playlist config updated"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to reconcile playlist config: {str(e)}",
+        )
+
+
+@router.post("/shuffle/flags")
+async def shuffle_flags(
+    body: ShuffleFlagsBody,
+    playlist_id: str,
+):
+    """
+    Reconcile boolean playlist flags to the source config immediately.
+
+    Writes auto_shuffle, manual_shuffle, make_recs, and seeds_only to
+    ``music.playlist_config`` on each checkbox change so the saved config stays
+    in sync. Returns ``{ok, message}``.
+    """
+    try:
+        qec(
+            "UPDATE music.playlist_config SET "
+            "auto_shuffle = %s, manual_shuffle = %s, make_recs = %s, seeds_only = %s "
+            "WHERE playlist_id = %s",
+            (
+                body.autoShuffle,
+                body.manualShuffle,
+                body.makeRecs,
+                body.seedsOnly,
+                playlist_id,
+            ),
+        )
+        return {"ok": True, "message": "Playlist flags updated"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to reconcile playlist flags: {str(e)}",
+        )
+
+
+@router.post("/shuffle/send")
+async def shuffle_send(body: ShuffleSendRequest):
+    """
+    Push the shuffled order to the target Spotify playlist (FR-5/FR-6/FR-7).
+
+    Recomputes the order via ``compute_shuffle_order``, uploads it to the
+    shuffle-child target via ``playlist_upload`` (atomic replace first 100 +
+    batched appends), waits, re-runs the playlist-detail re-sync via
+    ``playlist_to_db``, and persists the weights/minutes/last-auto-shuffled
+    timestamp to config for BOTH the source and target playlist ids.
+    Returns ``{ok: False}`` when there are no rows (OQ-3) or no client.
+    """
+    try:
+        result = compute_shuffle_order(
+            body.playlistId,
+            body.ratingsWeight,
+            body.recencyWeight,
+            body.randomWeight,
+            body.minutesToSync,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to compute shuffle order: {str(e)}",
+        )
+
+    rows = result.get("rows", [])
+    target_playlist_id = result.get("target_playlist_id")
+    if not rows:
+        return {"ok": False, "message": "No Songs found on this playlist"}
+    if not target_playlist_id:
+        return {"ok": False, "message": "No target playlist for this source"}
+
+    track_list = [r["track_id"] for r in rows]
+
+    sp = _get_spotify_client()
+    if sp is None:
+        return {"ok": False, "message": "Spotify client unavailable or rate-limited"}
+
+    client = {"client": sp}
+    try:
+        playlist_upload(client=client, list_id=target_playlist_id, track_list=track_list)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Spotify playlist upload failed: {str(e)}",
+        )
+
+    _time.sleep(2)
+
+    try:
+        playlist_to_db(client=client, list_id=target_playlist_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Playlist detail sync failed: {str(e)}",
+        )
+
+    try:
+        qec(
+            "UPDATE music.playlist_config SET "
+            "ratings_weight = %s, recency_weight = %s, randomness_weight = %s, "
+            "minutes_to_sync = %s, last_auto_shuffled_utc = CURRENT_TIMESTAMP "
+            "WHERE playlist_id IN (%s, %s)",
+            (
+                body.ratingsWeight,
+                body.recencyWeight,
+                body.randomWeight,
+                body.minutesToSync,
+                body.playlistId,
+                target_playlist_id,
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to persist shuffle config: {str(e)}",
+        )
+
+    return {"ok": True, "message": f"Playlist shuffled ({len(track_list)} tracks)"}
 
 
 @router.post("/shuffle")

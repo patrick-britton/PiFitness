@@ -290,3 +290,114 @@ export interface ScoreResponse {
     awayNewElo: number;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Playlist Shuffle (008-003)
+// ---------------------------------------------------------------------------
+
+/** One row of the selection grid (GET /api/music/shuffle/playlists). */
+export interface ShufflePlaylistRow {
+  playlist_id: string;
+  playlist_name: string;
+  track_count: number | null;
+  ratings_weight: number | null;
+  recency_weight: number | null;
+  randomness_weight: number | null;
+  minutes_to_sync: number | null;
+  playlist_type: string | null;
+}
+
+/** Playlist type filter options (derived from music.vw_playlist_config.playlist_type). */
+export type PlaylistTypeOption = 'Parents' | 'Seeds' | 'Other';
+
+/** Response for GET /api/music/shuffle/playlists. */
+export interface ShufflePlaylistsResponse {
+  data: ShufflePlaylistRow[];
+  count: number;
+}
+
+/** Saved tuning config for a selected playlist (GET /api/music/shuffle). */
+export interface ShuffleConfig {
+  ratingsWeight: number;
+  recencyWeight: number;
+  randomWeight: number;
+  minutesToSync: number;
+  autoShuffle: boolean;
+  manualShuffle: boolean;
+  makeRecs: boolean;
+  seedsOnly: boolean;
+}
+
+/** Raw per-track stats row for a selected playlist (GET /api/music/shuffle). */
+export interface ShuffleTrackRow {
+  playlist_id: string;
+  target_playlist_id: string;
+  isrc: string;
+  track_id: string;
+  track_artist: string;
+  duration_s: number;
+  recency_pct: number;
+  ratings_pct: number;
+  random_pct: number;
+}
+
+/** Response for GET /api/music/shuffle?playlist_id= (FR-1/FR-2). */
+export interface ShuffleData {
+  playlistId: string;
+  targetPlaylistId: string | null;
+  config: ShuffleConfig;
+  rows: ShuffleTrackRow[];
+  count: number;
+}
+
+/** Body for POST /api/music/shuffle/preview and /shuffle/config. */
+export interface ShuffleConfigBody {
+  ratingsWeight: number;
+  recencyWeight: number;
+  randomWeight: number;
+  minutesToSync: number;
+}
+
+/** Body for POST /api/music/shuffle/flags (boolean checkbox reconcile). */
+export interface ShuffleFlagsBody {
+  autoShuffle: boolean;
+  manualShuffle: boolean;
+  makeRecs: boolean;
+  seedsOnly: boolean;
+}
+
+/** One ordered preview row (POST /api/music/shuffle/preview). Fields
+ *  `isrc`, `trackId`, `targetPlaylistId` are carried but hidden in the UI. */
+export interface ShufflePreviewRow {
+  newPosition: number;
+  trackArtist: string | null;
+  recency_pct: number | null;
+  ratings_pct: number | null;
+  random_pct: number | null;
+  duration_s: number | null;
+  durationBarMax: number;
+  isrc: string | null;
+  trackId: string | null;
+  targetPlaylistId: string | null;
+}
+
+/** Response for POST /api/music/shuffle/preview. */
+export interface ShufflePreviewResponse {
+  rows: ShufflePreviewRow[];
+  count: number;
+}
+
+/** Request body for POST /api/music/shuffle/send (FR-5/FR-6). */
+export interface ShuffleSendRequest {
+  playlistId: string;
+  ratingsWeight: number;
+  recencyWeight: number;
+  randomWeight: number;
+  minutesToSync: number;
+}
+
+/** Response for POST /api/music/shuffle/send. */
+export interface ShuffleSendResponse {
+  ok: boolean;
+  message: string;
+}

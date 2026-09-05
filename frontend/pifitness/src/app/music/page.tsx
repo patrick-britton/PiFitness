@@ -1,7 +1,7 @@
 /**
  * Music Module Page
  * Inline tab navigation matching admin module pattern.
- * Sub-pages: Now Playing, Ratings, Playlist Shuffle, ISRC Review, Playlist Configuration, Playlist Sync
+ * Sub-pages: Now Playing, Ratings, Playlist Config, ISRC Review, Playlist Sync
  */
 
 'use client';
@@ -14,6 +14,7 @@ import { API } from '../../lib/api-client';
 import * as Icons from '@mui/icons-material';
 import NowPlayingView from './components/NowPlayingView';
 import RatingsView from './components/RatingsView';
+import PlaylistShuffleView from './components/PlaylistShuffleView';
 
 const TABS = MODULE_SUB_PAGES.music;
 
@@ -168,9 +169,10 @@ export default function MusicPage() {
           {/* Mounted feature views */}
           {activeTab === 'now-playing' && <NowPlayingView />}
           {activeTab === 'ratings' && <RatingsView />}
+          {activeTab === 'playlist-shuffle' && <PlaylistShuffleView />}
 
           {/* Placeholder for sub-pages not yet built */}
-          {activeTab !== 'now-playing' && activeTab !== 'ratings' && (
+          {activeTab !== 'now-playing' && activeTab !== 'ratings' && activeTab !== 'playlist-shuffle' && (
             <div className="p-8 text-center">
               <p className="text-gray-500 dark:text-gray-400 text-lg">
                 wow such empty

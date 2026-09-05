@@ -2,7 +2,7 @@ import sys
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -87,6 +87,53 @@ def test_now_playing_remove_family_miss():
         data = response.json()
         assert data["ok"] is False
         assert data["message"] == "the playlist cannot be found"
+
+
+def test_now_playing_remove_full_flow():
+    """Remove succeeds when family is found and track exists in playlist (FR-6/AC-7).
+
+    This test covers the success path that was previously untested — it exercises
+    the sql_to_list call with params that caused the 500 TypeError bug. It also
+    verifies that Spotify removal targets every family playlist where the track is
+    present locally (child AND parent), not just the currently-playing child.
+    """
+    mock_state = {
+        "playing": True,
+        "track": {
+            "isrc": "TEST123",
+            "trackName": "Test Track",
+            "context": {"relationshipType": "regular", "playlistId": "pl123"},
+        },
+    }
+    # Child playlist pl123 (currently playing) + parent playlist plParent
+    family_rows = [{"child_playlist_id": "pl123"}, {"child_playlist_id": "plParent"}]
+    name_rows = [
+        {"playlist_id": "pl123", "playlist_name": "Child Playlist"},
+        {"playlist_id": "plParent", "playlist_name": "Parent Playlist"},
+    ]
+    mock_spotify = MagicMock()
+    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
+         patch('backend.api.music.sql_to_dict', side_effect=[family_rows, name_rows]), \
+         patch('backend.api.music.one_sql_result', return_value=1), \
+         patch('backend.api.music.qec'), \
+         patch('backend.api.music.sql_to_list', return_value=["tid1"]) as mock_sql_to_list, \
+         patch('backend.api.music._get_spotify_client', return_value=mock_spotify):
+        response = client.post("/api/music/now-playing/remove")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ok"] is True
+        assert "Test Track removed from playlist" in data["message"]
+        # Regression guard: sql_to_list must be called with the ISRC params tuple
+        mock_sql_to_list.assert_called_once()
+        args, kwargs = mock_sql_to_list.call_args
+        assert args[1] == ("TEST123",)
+        # Spotify removal must be called for every family playlist where the track
+        # was found locally — the child (currently playing) AND the parent.
+        mock_spotify.playlist_remove_all_occurrences_of_items.assert_has_calls(
+            [call("pl123", ["tid1"]), call("plParent", ["tid1"])],
+            any_order=True,
+        )
+        assert mock_spotify.playlist_remove_all_occurrences_of_items.call_count == 2
 
 
 def test_now_playing_rank_up_wrong_context():
@@ -395,3 +442,95 @@ def test_album_image_retrieval_no_client():
          patch('backend_functions.music_functions.get_spotify_client', return_value=None):
         result = album_image_retrieval("nonexistent")
         assert result is None
+
+
+def test_shuffle_flags_updates_playlist_config():
+    """POST /api/music/shuffle/flags reconciles boolean flags to the source playlist."""
+    with patch('backend.api.music.qec') as mock_qec:
+        response = client.post(
+            "/api/music/shuffle/flags?playlist_id=pl123",
+            json={
+                "autoShuffle": True,
+                "manualShuffle": False,
+                "makeRecs": True,
+                "seedsOnly": False,
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ok"] is True
+        assert "flags updated" in data["message"]
+        # Ensure the UPDATE was executed
+        args, kwargs = mock_qec.call_args
+        assert "UPDATE music.playlist_config SET" in args[0]
+        assert "auto_shuffle = %s" in args[0]
+        assert "manual_shuffle = %s" in args[0]
+        assert "make_recs = %s" in args[0]
+        assert "seeds_only = %s" in args[0]
+        assert "WHERE playlist_id = %s" in args[0]
+        # Parameter order: auto, manual, recs, seeds, playlist_id
+        assert args[1] == (True, False, True, False, "pl123")
+
+
+def test_shuffle_flags_defaults_to_false():
+    """POST /api/music/shuffle/flags accepts missing flags as False."""
+    with patch('backend.api.music.qec') as mock_qec:
+        response = client.post(
+            "/api/music/shuffle/flags?playlist_id=pl123",
+            json={},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ok"] is True
+        args, kwargs = mock_qec.call_args
+        assert args[1] == (False, False, False, False, "pl123")
+
+
+# ---------------------------------------------------------------------------
+# database_functions tests
+# ---------------------------------------------------------------------------
+
+
+def test_sql_to_list_accepts_params():
+    """sql_to_list must accept an optional params argument and pass it to cursor.execute.
+
+    Regression test for 008-001 Remove bug: now_playing_remove called
+    sql_to_list with a params tuple, but the function only accepted query_str,
+    causing a TypeError -> 500 Internal Server Error.
+    """
+    from backend_functions.database_functions import sql_to_list
+
+    mock_cursor = MagicMock()
+    mock_cursor.fetchall.return_value = [("track1",), ("track2",)]
+    mock_conn = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+
+    with patch('backend_functions.database_functions.get_conn', return_value=mock_conn):
+        result = sql_to_list(
+            "SELECT DISTINCT track_id FROM music.all_tracks WHERE track_isrc = %s",
+            ("TEST123",),
+        )
+
+    assert result == ["track1", "track2"]
+    mock_cursor.execute.assert_called_once_with(
+        "SELECT DISTINCT track_id FROM music.all_tracks WHERE track_isrc = %s",
+        ("TEST123",),
+    )
+
+
+def test_sql_to_list_no_params_still_works():
+    """sql_to_list must still work when called without params (backward compat)."""
+    from backend_functions.database_functions import sql_to_list
+
+    mock_cursor = MagicMock()
+    mock_cursor.fetchall.return_value = [("a",), ("b",)]
+    mock_conn = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+
+    with patch('backend_functions.database_functions.get_conn', return_value=mock_conn):
+        result = sql_to_list("SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5")
+
+    assert result == ["a", "b"]
+    mock_cursor.execute.assert_called_once_with(
+        "SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5"
+    )

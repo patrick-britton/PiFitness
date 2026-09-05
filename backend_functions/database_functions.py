@@ -172,10 +172,13 @@ def sql_to_lookup_dict(query_str, params=None):
 
 
 
-def sql_to_list(query_str):
+def sql_to_list(query_str, params=None):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute(query_str)
+    if params is None:
+        cur.execute(query_str)
+    else:
+        cur.execute(query_str, params)
     values = [row[0] for row in cur.fetchall()] # list of dicts if using RealDictCursor
     cur.close()
     conn.close()

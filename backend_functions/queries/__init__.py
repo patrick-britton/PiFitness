@@ -37,6 +37,8 @@ from .music_queries import (
     add_soft_rejection_exclusion,
     get_matchup,
     score_matchup,
+    get_playlist_config_view,
+    compute_shuffle_order,
 )
 from .admin_queries import (
     get_api_service_list,
@@ -166,6 +168,8 @@ __all__ = [
     'add_soft_rejection_exclusion',
     'get_matchup',
     'score_matchup',
+    'get_playlist_config_view',
+    'compute_shuffle_order',
     # Admin
     'get_api_service_list',
     'get_distinct_api_service_names',

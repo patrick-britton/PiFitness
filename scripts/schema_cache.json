@@ -1734,6 +1734,18 @@
       "type": "USER-DEFINED"
     }
   ],
+  "activities.vw_last_activity_id_by_type": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_type",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
   "activities.vw_matched_segment_path_updates": [
     {
       "name": "segment_id",
@@ -4840,6 +4852,16 @@
       "name": "minutes_to_sync",
       "nullable": true,
       "type": "integer"
+    },
+    {
+      "name": "playlist_type",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "last_played_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
     }
   ],
   "music.vw_playlist_detail_sync_logic": [

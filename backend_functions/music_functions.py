@@ -60,6 +60,18 @@ def playlist_to_db(client=None, list_id=None):
 
     extract_ms = elapsed_ms(t0)
 
+    # Normalize paging hrefs: Spotify now returns the playlist_items paging
+    # href as ".../playlists/{id}/items?offset=..&limit=..", but
+    # staging.flatten_playlist_details() derives playlist_id from href by
+    # splitting on "/tracks". Without this normalization the SPROC writes
+    # music.playlist_isrcs rows under a malformed id
+    # ("{id}/items?offset=..&limit=..&additional_types=track") and the real
+    # playlist's stored order is never refreshed (Bug T10-7).
+    for page in all_items:
+        href = page.get('href') or ''
+        if '/items?' in href:
+            page['href'] = href.replace('/items?', '/tracks?', 1)
+
     # Stop if no results
     if not all_items:
         task_log(task_name=task_name,
