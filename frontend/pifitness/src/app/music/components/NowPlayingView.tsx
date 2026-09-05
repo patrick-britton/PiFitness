@@ -162,9 +162,11 @@ function TrackCard({ track }: { track: NowPlayingTrack }) {
 function ContextControls({
   track,
   onAction,
+  actionInProgress,
 }: {
   track: NowPlayingTrack;
   onAction: (label: string) => void;
+  actionInProgress: string | null;
 }) {
   const mode = getContextMode(track);
 
@@ -173,6 +175,8 @@ function ContextControls({
   const handlePromote = () => onAction('promote');
   const handleSoftReject = () => onAction('soft-reject');
   const handleHardReject = () => onAction('hard-reject');
+
+  const isRemoveLoading = actionInProgress === 'remove';
 
   return (
     <div className="flex flex-col sm:flex-row flex-wrap items-center gap-2 mt-4">
@@ -217,10 +221,20 @@ function ContextControls({
         <>
           <button
             onClick={handleRemoveClick}
-            className="inline-flex items-center justify-center rounded-md bg-red-100 dark:bg-red-900/30 px-4 py-2 text-sm font-medium text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+            disabled={isRemoveLoading}
+            className="inline-flex items-center justify-center rounded-md bg-red-100 dark:bg-red-900/30 px-4 py-2 text-sm font-medium text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-50"
           >
-            <Icons.RemoveCircle className="mr-1" />
-            Remove
+            {isRemoveLoading ? (
+              <>
+                <CircularProgress size={16} className="mr-1" />
+                Removing…
+              </>
+            ) : (
+              <>
+                <Icons.RemoveCircle className="mr-1" />
+                Remove
+              </>
+            )}
           </button>
           <button
             onClick={handleRank('rank-up')}
@@ -237,7 +251,7 @@ function ContextControls({
             Rank Down
           </button>
         </>
-            )}
+      )}
     </div>
   );
 }
@@ -342,6 +356,8 @@ export default function NowPlayingView() {
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastSeverity, setToastSeverity] = useState<'success' | 'error'>('success');
+  // Track which action is in progress so buttons can show a spinner (FR-9/AC-7)
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
   const showToast = (message: string, severity: 'success' | 'error' = 'success') => {
     setToastMessage(message);
@@ -349,7 +365,7 @@ export default function NowPlayingView() {
     setToastOpen(true);
   };
 
-    const handleCloseToast = () => setToastOpen(false);
+  const handleCloseToast = () => setToastOpen(false);
 
   /**
    * Efficient auto-refresh: schedule exactly one refetch ~1s after the current
@@ -385,6 +401,7 @@ export default function NowPlayingView() {
       'rank-down': 'Track ranked down.',
     };
 
+    setActionInProgress(label);
     try {
       let result: { ok?: boolean; message?: string } | void;
 
@@ -425,8 +442,10 @@ export default function NowPlayingView() {
             result?.ok ? showToast('Track added to playlist.') : showToast(result?.message ?? 'Add to playlist failed.', 'error');
           }
       }
-        } catch (e: any) {
+    } catch (e: any) {
       showToast(e?.message ?? 'Action failed. Please try again.', 'error');
+    } finally {
+      setActionInProgress(null);
     }
   };
 
@@ -526,7 +545,7 @@ export default function NowPlayingView() {
 
             {/* Controls */}
             <div className="pt-4">
-              <ContextControls track={track} onAction={handleAction} />
+              <ContextControls track={track} onAction={handleAction} actionInProgress={actionInProgress} />
               {showAddToPlaylist && <AddToPlaylistControl onAction={handleAction} />}
             </div>
           </>

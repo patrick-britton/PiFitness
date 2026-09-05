@@ -8,6 +8,7 @@ from backend_functions.database_functions import sql_to_dict, qec, sql_to_list, 
 from backend_functions.helper_functions import get_sync_dates, random_sleep, safe_parse
 from backend_functions.logging_functions import log_app_event
 from backend_functions.music_functions import get_playlist_list
+from backend_functions.service_logins import get_spotify_client
 
 
 def extract_json_limit_50(client=None, td=None):
@@ -49,6 +50,9 @@ def extract_json_playlist_details(client=None, td=None, list_id=None):
     # Uploads JSON to DB, which is then processed via stored procedure.
 
     # Monitor performance, start the timer
+
+    if not client:
+        client = get_spotify_client
 
     task_name = 'Playlist Detail Sync'
 

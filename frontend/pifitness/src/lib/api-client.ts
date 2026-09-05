@@ -5,6 +5,7 @@
 
 import {
   ProcessActivityRequest,
+  ProcessStepStartEvent,
   ProcessStepEvent,
   ProcessCompleteEvent,
 } from './types/activity-processing';
@@ -48,6 +49,13 @@ import {
   ScoreRequest,
   ScoreResponse,
   MusicRatingsEligiblePlaylistsResponse,
+  ShufflePlaylistsResponse,
+  ShuffleData,
+  ShuffleConfigBody,
+  ShuffleFlagsBody,
+  ShufflePreviewResponse,
+  ShuffleSendRequest,
+  ShuffleSendResponse,
 } from './types/music';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -103,7 +111,7 @@ export interface ApiStatusResponse {
  */
 export async function readNdjsonStream(
   response: Response,
-  onStep: (event: ProcessStepEvent) => void
+  onStep: (event: ProcessStepStartEvent | ProcessStepEvent) => void
 ): Promise<ProcessCompleteEvent> {
   const reader = response.body?.getReader();
   if (!reader) {
@@ -136,8 +144,8 @@ export async function readNdjsonStream(
           return event as ProcessCompleteEvent;
         }
 
-        // Otherwise it's a step event
-        onStep(event as ProcessStepEvent);
+                // Otherwise it's a step start (running) or completion event
+        onStep(event as ProcessStepStartEvent | ProcessStepEvent);
       }
     }
 
@@ -367,6 +375,32 @@ export const API = {
       }).toString()}`, {
         method: "POST",
       }),
+    getShufflePlaylists: () =>
+      fetchAPI<ShufflePlaylistsResponse>("/api/music/shuffle/playlists"),
+    getShuffleData: (playlistId: string) =>
+      fetchAPI<ShuffleData>(
+        `/api/music/shuffle?playlist_id=${encodeURIComponent(playlistId)}`
+      ),
+    getShufflePreview: (playlistId: string, body: ShuffleConfigBody) =>
+      fetchAPI<ShufflePreviewResponse>(
+        `/api/music/shuffle/preview?playlist_id=${encodeURIComponent(playlistId)}`,
+        { method: "POST", body: JSON.stringify(body) }
+      ),
+    reconcileShuffleConfig: (playlistId: string, body: ShuffleConfigBody) =>
+      fetchAPI<{ ok: boolean; message: string }>(
+        `/api/music/shuffle/config?playlist_id=${encodeURIComponent(playlistId)}`,
+        { method: "POST", body: JSON.stringify(body) }
+      ),
+    reconcileShuffleFlags: (playlistId: string, body: ShuffleFlagsBody) =>
+      fetchAPI<{ ok: boolean; message: string }>(
+        `/api/music/shuffle/flags?playlist_id=${encodeURIComponent(playlistId)}`,
+        { method: "POST", body: JSON.stringify(body) }
+      ),
+    sendShuffle: (request: ShuffleSendRequest) =>
+      fetchAPI<ShuffleSendResponse>("/api/music/shuffle/send", {
+        method: "POST",
+        body: JSON.stringify(request),
+      }),
   },
 
   /**
@@ -486,7 +520,7 @@ export const API = {
      */
     processActivity: async (
       request: ProcessActivityRequest,
-      onStep: (event: ProcessStepEvent) => void
+      onStep: (event: ProcessStepStartEvent | ProcessStepEvent) => void
     ): Promise<ProcessCompleteEvent> => {
       const url = `${API_BASE}/api/activities/process`;
       const response = await fetch(url, {

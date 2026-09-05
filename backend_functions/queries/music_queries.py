@@ -657,6 +657,110 @@ def score_matchup(
         "homeNewElo": home_new_elo,
         "awayNewElo": away_new_elo,
     }
+def get_playlist_config_view() -> Sequence[Dict[str, Any]]:
+    """
+    Get the playlist selection grid for Playlist Shuffle (feature 008-003, FR-1).
+
+    Reads `music.vw_playlist_config` (parent-only: child/shuffle-target playlists
+    are excluded). Each row carries the six fields needed by the selection grid and
+    the saved tuning defaults: playlist_id, playlist_name, track_count,
+    ratings_weight, recency_weight, randomness_weight, minutes_to_sync.
+
+    Returns:
+        Sequence[Dict[str, Any]]: Ordered list of parent playlist rows, or [].
+    """
+    sql = """SELECT
+                playlist_id,
+                playlist_name,
+                track_count,
+                ratings_weight,
+                recency_weight,
+                randomness_weight,
+                minutes_to_sync,
+                playlist_type
+             FROM music.vw_playlist_config"""
+    result = sql_to_dict(sql)
+    return result if result else []
+
+
+def compute_shuffle_order(
+    playlist_id: str,
+    ratings_weight: float,
+    recency_weight: float,
+    random_weight: float,
+    minutes_to_sync: int,
+) -> Dict[str, Any]:
+    """
+    Compute the weighted shuffle order for a playlist (feature 008-003, FR-3/FR-4).
+
+    Fetches the playlist's per-track stats via `get_playlist_isrc_stats`, scores
+    each row as ``play_score = ratings_pct*ratings_weight + recency_pct*recency_weight
+    + random_pct*(random_weight/10)`` (FR-3), sorts descending (stable, so equal scores
+    keep their input order), re-indexes 0..n-1, and when ``minutes_to_sync != 9999``
+    keeps rows only while the cumulative playback duration (duration_s summed in the
+    new order, divided by 60) is at or below the minute cap (FR-4).
+
+    No Pandas: operates on the plain dict rows returned by `get_playlist_isrc_stats`.
+    Callable with no Spotify/network requirement.
+
+    Args:
+        playlist_id: The source playlist.
+        ratings_weight / recency_weight / random_weight: tuning weights (0-50).
+        minutes_to_sync: minute cap; 9999 means no duration limit.
+
+    Returns:
+        Dict with:
+          - rows: shuffled, re-indexed row dicts, each carrying the original stats
+            fields plus `play_score` and `new_position` (0-based).
+          - target_playlist_id: the shuffle-child playlist id (from any stats row),
+            or None when the playlist has no stats rows.
+          - max_duration_s: max duration_s across the fetched stats (pre-cap) for
+            stable duration-bar scaling, or 0.
+    """
+    stats = get_playlist_isrc_stats(playlist_id)
+    if not stats:
+        return {
+            "rows": [],
+            "target_playlist_id": None,
+            "max_duration_s": 0,
+        }
+
+    target_playlist_id = stats[0].get("target_playlist_id")
+
+    def _score(row: Dict[str, Any]) -> float:
+        return (
+            (row.get("ratings_pct") or 0.0) * float(ratings_weight)
+            + (row.get("recency_pct") or 0.0) * float(recency_weight)
+            + (row.get("random_pct") or 0.0) * (float(random_weight) / 10.0)
+        )
+
+    max_duration_s = max(int(row.get("duration_s") or 0) for row in stats)
+
+    # Stable sort by score descending: ties preserve input order.
+    scored = [dict(row) for row in stats]
+    for row in scored:
+        row["play_score"] = _score(row)
+    scored.sort(key=lambda r: r["play_score"], reverse=True)
+
+    if minutes_to_sync != 9999:
+        cumulative_minutes = 0.0
+        kept = []
+        for row in scored:
+            cumulative_minutes += int(row.get("duration_s") or 0) / 60.0
+            if cumulative_minutes <= minutes_to_sync:
+                kept.append(row)
+        scored = kept
+
+    for idx, row in enumerate(scored):
+        row["new_position"] = idx
+
+    return {
+        "rows": scored,
+        "target_playlist_id": target_playlist_id,
+        "max_duration_s": max_duration_s,
+    }
+
+
 # def get_track_recommendations(playlist_id: str) -> List[TrackRecommendation]:
 #     """Get track recommendations for a playlist"""
 #     pass

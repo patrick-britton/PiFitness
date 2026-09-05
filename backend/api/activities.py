@@ -8,6 +8,7 @@ Includes the Activity Processing & Playlist Shuffle pipeline.
 
 import json
 import time
+import threading
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from starlette.responses import JSONResponse
@@ -21,7 +22,11 @@ from backend_functions.queries import (
     get_segment_matches,
 )
 from backend_functions.database_functions import sql_to_dict, get_conn, qec, one_sql_result, sql_to_list
-from backend_functions.music_functions import auto_shuffle_playlists
+from backend_functions.music_functions import (
+    get_spotify_client,
+    playlist_upload,
+    playlist_to_db,
+)
 from backend_functions.ultimate_task_executioner_v2 import ultimate_task_executioner
 
 from backend.schemas.activity_schemas import (
@@ -29,6 +34,7 @@ from backend.schemas.activity_schemas import (
     ProcessActivityResponse,
     ProcessStepResult,
     ProcessStepResultData,
+    ProcessStepStartEvent,
     ProcessSummaryData,
 )
 
@@ -74,6 +80,61 @@ def _skip_step(step_id: str) -> ProcessStepResult:
     )
 
 
+def _start_event(step_id: str) -> dict:
+    """Return a JSON-safe dict for a step start (running) event."""
+    return ProcessStepStartEvent(step_id=step_id).model_dump(mode="json")
+
+
+# ---------------------------------------------------------------------------
+# In-process concurrency guard (FR-1, OQ-4): one processing run at a time.
+# A second concurrent run is rejected immediately.
+# ---------------------------------------------------------------------------
+_process_lock = threading.Lock()
+
+
+def _run_step_data(step_id: str, fn, *args, **kwargs) -> ProcessStepResult:
+    """Execute a step function that returns ProcessStepResultData; measure elapsed time."""
+    t0 = time.perf_counter()
+    try:
+        data = fn(*args, **kwargs)
+        elapsed = int((time.perf_counter() - t0) * 1000)
+        return ProcessStepResult(
+            step_id=step_id,
+            status="complete",
+            elapsed_ms=elapsed,
+            error=None,
+            result=data,
+        )
+    except Exception as e:
+        elapsed = int((time.perf_counter() - t0) * 1000)
+        return ProcessStepResult(
+            step_id=step_id,
+            status="error",
+            elapsed_ms=elapsed,
+            error=str(e),
+            result=None,
+        )
+
+
+def _resolve_activity_id(activity_type: str) -> Optional[int]:
+    """Resolve the target activity via activities.vw_last_activity_id_by_type (T03/T04).
+
+    activity_type is 'Walk' (last_walk mode) or 'Run' (last_run mode). The view
+    bakes in most-recent selection (max activity_id) and distance constraints.
+    """
+    sql = (
+        "SELECT activity_id FROM activities.vw_last_activity_id_by_type "
+        f"WHERE activity_type = '{activity_type}'"
+    )
+    row = one_sql_result(sql)
+    if not row:
+        raise ValueError(
+            f"No activity found by activities.vw_last_activity_id_by_type "
+            f"for activity_type='{activity_type}'"
+        )
+    return int(row)
+
+
 def _step_to_dict(step: ProcessStepResult) -> dict:
     """Convert a ProcessStepResult to a JSON-safe dict for NDJSON streaming."""
     d = {
@@ -85,10 +146,13 @@ def _step_to_dict(step: ProcessStepResult) -> dict:
         d["error"] = step.error
     if step.result:
         try:
-            d["result"] = dict(step.result)
+            # exclude_none: ProcessStepResultData carries several optional
+            # fields; emitting them as null made the UI render stubs like
+            # "songs heard." on steps that never produced them (Bug T10-8).
+            d["result"] = step.result.model_dump(mode="json", exclude_none=True)
         except Exception:
             try:
-                d["result"] = step.result.model_dump(mode="json")
+                d["result"] = dict(step.result)
             except Exception:
                 d["result"] = {}
     return d
@@ -101,146 +165,248 @@ def _step_to_dict(step: ProcessStepResult) -> dict:
 
 def _process_generator(req: ProcessActivityRequest):
     """
-    Generator that yields one NDJSON line per step completion.
-    Final line is a terminal event with `complete: true`.
+    Generator that yields one NDJSON line per step (start + terminal) and a
+    final terminal event with `complete: true`.
+
+    Fixed order (AC-5): sync_activities → sync_details → resolve_activity →
+    [FR-8.1–8.7 shuffle sequence, only last_run + not no_music] → activity
+    post-processing (on the resolved activity_id) → summary.
+    Halts on first error (FR-9); every executed step emits a start (running)
+    event and exactly one terminal complete/error event (Bug #2 / FR-12).
     """
+    # FR-1 / OQ-4: reject a concurrent second run.
+    if not _process_lock.acquire(blocking=False):
+        yield json.dumps({
+            "complete": True,
+            "success": False,
+            "error": "A processing run is already in progress.",
+        }) + "\n"
+        return
     try:
-        playlist_name: str | None = req.playlist_name
-        is_manual = playlist_name == "Manual Processing"
-        is_no_playlist = playlist_name == "No Playlist"
+        run_t0 = time.perf_counter()
+        is_last_run = req.mode == "last_run"
+        do_shuffle = is_last_run and req.music != "no_music"
+        playlist_name = "Running" if req.music == "running" else "Jogging"
         has_error = False
         post_row: Optional[int] = None
-        auto_shuffle_completed = False
+        shuffle_completed = False
 
-        # -----------------------------------------------------------------------
-        # Step 1: Sync Activities
-        # -----------------------------------------------------------------------
+        # -------------------------------------------------------------------
+        # Step 1: Sync Activities (always first — Bug #1 invariant, OQ-3)
+        # -------------------------------------------------------------------
+        yield json.dumps(_start_event("sync_activities")) + "\n"
         result = _run_step("sync_activities", ultimate_task_executioner, force_task_id=4)
         yield json.dumps(_step_to_dict(result)) + "\n"
         if result.status == "error":
             has_error = True
 
-        # -----------------------------------------------------------------------
+        # -------------------------------------------------------------------
         # Step 2: Sync Activity Details
-        # -----------------------------------------------------------------------
+        # -------------------------------------------------------------------
         if not has_error:
+            yield json.dumps(_start_event("sync_details")) + "\n"
             result = _run_step("sync_details", ultimate_task_executioner, force_task_id=19)
             yield json.dumps(_step_to_dict(result)) + "\n"
             if result.status == "error":
                 has_error = True
 
-            # -----------------------------------------------------------------------
-            # Step 3: Activity Post-processing substeps (elevation/smoothing + segment matching)
-            # -----------------------------------------------------------------------
-            if not has_error:
-                from backend_functions.activity_smoothing import activity_post_processing_steps
-
-                post_sql = """SELECT activity_id FROM activities.activities
-                              WHERE activity_type_name in ('running', 'trail_running')
-                              ORDER BY activity_id DESC LIMIT 1"""
-                post_row = one_sql_result(post_sql)
-
-                if not post_row:
-                    # No running/trail activity: skip all known substeps
-                    skipped_substeps = [
-                        "insert_heartrate",
-                        "assign_elevation_reference_time",
-                        "smooth_elevation_spikes_by_time",
-                        "smooth_elevation_python_time",
-                        "update_elevation_reference_by_time",
-                        "resample_activity_to_distance",
-                        "smooth_elevation_spikes_by_distance",
-                        "smooth_elevation_python_distance",
-                        "smooth_elevation_python_reference",
-                        "update_elevation_reference_by_distance",
-                        "build_activity_path",
-                        "segment_match_segments",
-                        "segment_pair_generation",
-                        "segment_polygon_match",
-                        "segment_mass_confirm_1",
-                        "segment_hausdorff_match",
-                        "segment_mass_confirm_2",
-                        "segment_frechet_match",
-                        "segment_mass_confirm_3",
-                        "segment_update_details",
-                    ]
-                    for sid in skipped_substeps:
-                        yield json.dumps(_step_to_dict(_skip_step(sid))) + "\n"
-                else:
-                    for step_id, elapsed_ms, error in activity_post_processing_steps(post_row):
-                        if error:
-                            has_error = True
-                            step = ProcessStepResult(
-                                step_id=step_id,
-                                status="error",
-                                elapsed_ms=elapsed_ms,
-                                error=error,
-                                result=None,
-                            )
-                        else:
-                            step = ProcessStepResult(
-                                step_id=step_id,
-                                status="complete",
-                                elapsed_ms=elapsed_ms,
-                                error=None,
-                                result=None,
-                            )
-                        yield json.dumps(_step_to_dict(step)) + "\n"
-                        if has_error:
-                            break
-
-        # -----------------------------------------------------------------------
-        # Step 4: Look Up Playlist (skip if No Playlist)
-        # -----------------------------------------------------------------------
+        # -------------------------------------------------------------------
+        # Step 3: Resolve Activity (FR-5/FR-6 — view-based, OQ-1/OQ-2)
+        # -------------------------------------------------------------------
         if not has_error:
-            if is_no_playlist:
-                yield json.dumps(_step_to_dict(_skip_step("lookup_playlist"))) + "\n"
-                yield json.dumps(_step_to_dict(_skip_step("insert_history"))) + "\n"
-                yield json.dumps(_step_to_dict(_skip_step("auto_shuffle"))) + "\n"
+            yield json.dumps(_start_event("resolve_activity")) + "\n"
+            t0 = time.perf_counter()
+            try:
+                post_row = _resolve_activity_id("Run" if is_last_run else "Walk")
+                result = ProcessStepResult(
+                    step_id="resolve_activity",
+                    status="complete",
+                    elapsed_ms=int((time.perf_counter() - t0) * 1000),
+                    error=None,
+                    result=None,
+                )
+            except Exception as e:
+                post_row = None
+                result = ProcessStepResult(
+                    step_id="resolve_activity",
+                    status="error",
+                    elapsed_ms=int((time.perf_counter() - t0) * 1000),
+                    error=str(e),
+                    result=None,
+                )
+            yield json.dumps(_step_to_dict(result)) + "\n"
+            if result.status == "error":
+                has_error = True
+
+        # -----------------------------------------------------------------------
+        # Step 4: FR-8 playlist shuffle sequence (only last_run + not no_music)
+        # Sub-steps in FR-8 order; each emits start + terminal events (Bug #2).
+        # Runs BEFORE post-processing per AC-5.
+        # -----------------------------------------------------------------------
+        playlist_id: Optional[str] = None
+        track_ids: list = []
+        if not has_error:
+            if not do_shuffle:
+                for sid in (
+                    "lookup_playlist",
+                    "insert_history",
+                    "query_isrc_stats",
+                    "send_to_spotify",
+                    "verify_spotify",
+                    "report_shuffle",
+                ):
+                    yield json.dumps(_step_to_dict(_skip_step(sid))) + "\n"
             else:
-                pn = "Running" if is_manual else (playlist_name or "Running")
-                lookup_result = _lookup_playlist(pn)
+                # FR-8.1: query heard songs for the target playlist (playlist_name
+                # scoped; the view derives its own time window — OQ-3).
+                yield json.dumps(_start_event("lookup_playlist")) + "\n"
+                t0 = time.perf_counter()
+                try:
+                    lookup_result = _lookup_playlist(playlist_name)
+                except Exception as e:  # defensive: guarantee a terminal event (Bug #2)
+                    lookup_result = ProcessStepResult(
+                        step_id="lookup_playlist",
+                        status="error",
+                        elapsed_ms=int((time.perf_counter() - t0) * 1000),
+                        error=str(e),
+                        result=None,
+                    )
                 yield json.dumps(_step_to_dict(lookup_result)) + "\n"
                 if lookup_result.status == "error":
                     has_error = True
+                elif lookup_result.result:
+                    playlist_id = lookup_result.result.playlist_id
 
-                # ---------------------------------------------------------------
-                # Step 5: Insert Listening History
-                # ---------------------------------------------------------------
+                # FR-8.2: insert listening history from the heard songs.
                 if not has_error:
-                    result = _run_step("insert_history", _insert_listening_history, pn)
+                    yield json.dumps(_start_event("insert_history")) + "\n"
+                    result = _run_step("insert_history", _insert_listening_history, playlist_name)
                     yield json.dumps(_step_to_dict(result)) + "\n"
                     if result.status == "error":
                         has_error = True
 
-                # ---------------------------------------------------------------
-                # Step 6: Auto Shuffle
-                # ---------------------------------------------------------------
+                # FR-8.4: read the target playlist order (default_new_order asc).
                 if not has_error:
-                    result = _run_step("auto_shuffle", _do_auto_shuffle, pn)
+                    yield json.dumps(_start_event("query_isrc_stats")) + "\n"
+                    t0 = time.perf_counter()
+                    try:
+                        track_ids = _query_isrc_stats(playlist_id)
+                        result = ProcessStepResult(
+                            step_id="query_isrc_stats",
+                            status="complete",
+                            elapsed_ms=int((time.perf_counter() - t0) * 1000),
+                            error=None,
+                            result=None,
+                        )
+                    except Exception as e:
+                        result = ProcessStepResult(
+                            step_id="query_isrc_stats",
+                            status="error",
+                            elapsed_ms=int((time.perf_counter() - t0) * 1000),
+                            error=str(e),
+                            result=None,
+                        )
+                    yield json.dumps(_step_to_dict(result)) + "\n"
+                    if result.status == "error":
+                        has_error = True
+
+                # FR-8.5: send the compiled order to Spotify (halt on failure —
+                # never report success unverified, FR-10).
+                if not has_error:
+                    yield json.dumps(_start_event("send_to_spotify")) + "\n"
+                    result = _run_step("send_to_spotify", _send_to_spotify, playlist_id, track_ids)
+                    yield json.dumps(_step_to_dict(result)) + "\n"
+                    if result.status == "error":
+                        has_error = True
+
+                # FR-8.6 (Bug #1 fix): re-pull from Spotify and refresh the
+                # stored order so future vw_watch_music_heard runs are correct.
+                if not has_error:
+                    yield json.dumps(_start_event("verify_spotify")) + "\n"
+                    result = _run_step("verify_spotify", _verify_spotify, playlist_id)
+                    yield json.dumps(_step_to_dict(result)) + "\n"
+                    if result.status == "error":
+                        has_error = True
+
+                # FR-8.7: report the shuffled song count.
+                if not has_error:
+                    yield json.dumps(_start_event("report_shuffle")) + "\n"
+                    result = _run_step_data("report_shuffle", _report_shuffle, playlist_id)
                     yield json.dumps(_step_to_dict(result)) + "\n"
                     if result.status == "error":
                         has_error = True
                     else:
-                        auto_shuffle_completed = result.status == "complete"
+                        shuffle_completed = True
 
         # -----------------------------------------------------------------------
-        # End-of-run summary (AC-9): computed BEFORE cleanup because Manual
-        # Processing deletes the fake activity in the cleanup step.
+        # Step 5: Activity Post-processing substeps (elevation/smoothing +
+        # segment matching) on the resolved activity_id. Runs after the shuffle
+        # sequence per AC-5; each executed substep emits start + terminal.
+        # -----------------------------------------------------------------------
+        if not has_error:
+            from backend_functions.activity_smoothing import activity_post_processing_steps
+
+            if not post_row:
+                # No resolvable activity: skip all known substeps
+                skipped_substeps = [
+                    "insert_heartrate",
+                    "assign_elevation_reference_time",
+                    "smooth_elevation_spikes_by_time",
+                    "smooth_elevation_python_time",
+                    "update_elevation_reference_by_time",
+                    "resample_activity_to_distance",
+                    "smooth_elevation_spikes_by_distance",
+                    "smooth_elevation_python_distance",
+                    "smooth_elevation_python_reference",
+                    "update_elevation_reference_by_distance",
+                    "build_activity_path",
+                    "segment_match_segments",
+                    "segment_pair_generation",
+                    "segment_polygon_match",
+                    "segment_mass_confirm_1",
+                    "segment_hausdorff_match",
+                    "segment_mass_confirm_2",
+                    "segment_frechet_match",
+                    "segment_mass_confirm_3",
+                    "segment_update_details",
+                ]
+                for sid in skipped_substeps:
+                    yield json.dumps(_step_to_dict(_skip_step(sid))) + "\n"
+            else:
+                try:
+                    substeps = activity_post_processing_steps(post_row)
+                except Exception as e:  # defensive: guarantee a terminal event (Bug #2)
+                    substeps = [("post_processing", 0, str(e))]
+                for step_id, elapsed_ms, error in substeps:
+                    yield json.dumps(_start_event(step_id)) + "\n"
+                    if error:
+                        has_error = True
+                        step = ProcessStepResult(
+                            step_id=step_id,
+                            status="error",
+                            elapsed_ms=elapsed_ms,
+                            error=error,
+                            result=None,
+                        )
+                    else:
+                        step = ProcessStepResult(
+                            step_id=step_id,
+                            status="complete",
+                            elapsed_ms=elapsed_ms,
+                            error=None,
+                            result=None,
+                        )
+                    yield json.dumps(_step_to_dict(step)) + "\n"
+                    if has_error:
+                        break
+
+        # -----------------------------------------------------------------------
+        # End-of-run summary (AC-11/FR-14)
         # -----------------------------------------------------------------------
         summary_payload = None
         if not has_error:
-            summary_payload = _build_process_summary(auto_shuffle_completed, post_row)
-
-        # -----------------------------------------------------------------------
-        # Step 7: Cleanup (Manual Processing only)
-        # -----------------------------------------------------------------------
-        if not has_error:
-            if is_manual:
-                result = _run_step("cleanup", _cleanup_fake_activity)
-                yield json.dumps(_step_to_dict(result)) + "\n"
-            else:
-                yield json.dumps(_step_to_dict(_skip_step("cleanup"))) + "\n"
+            total_elapsed_ms = int((time.perf_counter() - run_t0) * 1000)
+            summary_payload = _build_process_summary(shuffle_completed, post_row, total_elapsed_ms)
 
         # Terminal event
         terminal = {"complete": True, "success": not has_error}
@@ -250,25 +416,24 @@ def _process_generator(req: ProcessActivityRequest):
 
     except Exception as e:
         yield json.dumps({"complete": True, "success": False, "error": f"Internal server error: {str(e)}"}) + "\n"
+    finally:
+        # FR-1/OQ-4: always release the guard so future runs are not locked out.
+        _process_lock.release()
 
 
 @router.post("/process")
 async def process_activity(req: ProcessActivityRequest):
     """
-    Run the activity processing pipeline.
+    Run the activity processing pipeline (NDJSON stream).
 
-    Steps (sequential, halts on first error):
-      1. sync_activities  — ultimate_task_executioner(task_id=4)
-      2. sync_details     — ultimate_task_executioner(task_id=19)
-      3. match_segments   — ultimate_task_executioner(task_id=21)
-      4. lookup_playlist  — query vw_watch_music_heard
-      5. insert_history   — truncate temp_listening_history, insert, reconcile
-      6. auto_shuffle     — auto_shuffle_playlists()
-      7. cleanup          — delete fake activity (Manual Processing only)
+    Fixed order (AC-5), halting on first error (FR-9):
+      sync_activities → sync_details → resolve_activity →
+      [FR-8.1–8.7 shuffle sequence, only last_run + not no_music] →
+      activity post-processing substeps (on the resolved activity_id) →
+      summary + terminal event.
 
-    Returns NDJSON stream with one event per step, plus a terminal event.
-    On success the terminal event includes a `summary` (playlist shuffled /
-    segments matched / course found) — see _build_process_summary (AC-9).
+    Every executed step emits a start (running) event and exactly one terminal
+    complete/error event (Bug #2 / FR-12). One run at a time (FR-1).
     """
     return StreamingResponse(
         _process_generator(req),
@@ -295,7 +460,22 @@ def _lookup_playlist(playlist_name: str) -> ProcessStepResult:
             raise ValueError(f"No songs found for playlist '{playlist_name}'")
         first_song = str(df["track_name_clean"].iloc[0])
         last_song = str(df["track_name_clean"].iloc[song_count - 1])
-        playlist_id = str(df["playlist_id"].iloc[0])
+        # vw_watch_music_heard returns the PARENT playlist_id (Bug T10-5). The
+        # playlist we actually shuffle is the target child, derived from
+        # music.vw_playlist_isrc_stats for that parent — the same source the
+        # canonical auto_shuffle_playlists uses (FR-8.4).
+        parent_playlist_id = str(df["playlist_id"].iloc[0])
+        target_ids = sql_to_list(
+            "SELECT DISTINCT target_playlist_id FROM music.vw_playlist_isrc_stats "
+            "WHERE playlist_id = %s ORDER BY target_playlist_id",
+            (parent_playlist_id,),
+        )
+        if not target_ids:
+            raise ValueError(
+                f"No target_playlist_id found in music.vw_playlist_isrc_stats "
+                f"for playlist '{parent_playlist_id}'"
+            )
+        playlist_id = str(target_ids[0])
         elapsed = int((time.perf_counter() - t0) * 1000)
         return ProcessStepResult(
             step_id="lookup_playlist",
@@ -360,46 +540,87 @@ def _insert_listening_history(playlist_name: str) -> Optional[ProcessStepResultD
     return None
 
 
-def _do_auto_shuffle(playlist_name: str) -> Optional[ProcessStepResultData]:
-    """Get the playlist ID and call auto_shuffle_playlists."""
-    import pandas as pd
-    conn = get_conn(alchemy=True)
-    sql = f"SELECT DISTINCT playlist_id FROM activities.vw_watch_music_heard WHERE playlist_name = '{playlist_name}'"
-    df = pd.read_sql(sql, con=conn)
-    conn.dispose()
-    if df.empty:
-        raise ValueError(f"No playlist_id found for '{playlist_name}'")
-    target_id = str(df["playlist_id"].iloc[0])
-    auto_shuffle_playlists(target_id, limit_minutes=True)
+def _query_isrc_stats(playlist_id: str) -> list:
+    """FR-8.4: track send order from music.vw_playlist_isrc_stats (default_new_order asc).
+
+    Filter on the view's `playlist_id` column using the resolved target_playlist_id
+    (Bug T10-5 fix). `playlist_id` here is the target (child) playlist passed in from
+    _lookup_playlist.
+    """
+    sql = (
+        "SELECT track_id FROM music.vw_playlist_isrc_stats "
+        "WHERE playlist_id = %s ORDER BY default_new_order ASC"
+    )
+    track_ids = sql_to_list(sql, (playlist_id,))
+    if not track_ids:
+        raise ValueError(f"No tracks returned by music.vw_playlist_isrc_stats for playlist '{playlist_id}'")
+    return track_ids
+
+
+def _send_to_spotify(playlist_id: str, track_ids: list) -> None:
+    """FR-8.5: atomically replace the target playlist with the compiled track list."""
+    client = get_spotify_client()
+    playlist_upload(client, list_id=playlist_id, track_list=track_ids)
+
+
+def _verify_spotify(playlist_id: str) -> None:
+    """FR-8.6 (Bug #1 fix): after a successful send, re-pull the target playlist
+    from Spotify and refresh the stored track order in music.playlist_isrcs.
+
+    FR-10: this step actively verifies its effect. playlist_to_db can silently
+    no-op (early return) when no usable Spotify client is available, so we
+    (1) require a working client up front and (2) confirm music.playlist_isrcs
+    was actually refreshed before reporting success.
+    """
+    client = get_spotify_client()
+    if client is None or client.get("client") is None:
+        raise RuntimeError(
+            "verify_spotify: could not obtain a usable Spotify client "
+            "(rate-limited or token unavailable) — cannot re-pull playlist details."
+        )
+
+    playlist_to_db(client, list_id=playlist_id)
+
+    # FR-10: confirm the re-pull actually refreshed the stored order in the DB.
+    fresh = one_sql_result(
+        "SELECT max(updated_at_utc) >= (CURRENT_TIMESTAMP - interval '5 minutes') "
+        "FROM music.playlist_isrcs WHERE playlist_id = %s",
+        (playlist_id,),
+    )
+    if not fresh:
+        raise RuntimeError(
+            f"verify_spotify: music.playlist_isrcs not refreshed for playlist "
+            f"'{playlist_id}' (updated_at_utc not recent) — the stored order was "
+            f"not updated to reflect the Spotify send."
+        )
+
+
+def _report_shuffle(playlist_id: str) -> ProcessStepResultData:
+    """FR-8.7: report the number of tracks sent to Spotify (target playlist)."""
+    count = one_sql_result(
+        "SELECT count(*) FROM music.playlist_isrcs WHERE playlist_id = %s",
+        (playlist_id,),
+    )
+    if count is None:
+        raise ValueError(f"Could not count tracks for playlist '{playlist_id}'")
     return ProcessStepResultData(
-        song_count=None,
-        first_song=None,
-        last_song=None,
-        playlist_shuffled=True,
-        playlist_id=str(target_id),
+        songs_sent=int(count),
+        playlist_id=str(playlist_id),
     )
 
 
-def _cleanup_fake_activity() -> Optional[ProcessStepResultData]:
-    """Delete the fake activity used for Manual Processing."""
-    del_sql = "DELETE FROM activities.activities WHERE activity_id = 9223372036854775800"
-    err = qec(del_sql)
-    if err:
-        raise ValueError(f"Error deleting fake activity: {err}")
-    return None
-
-
 def _build_process_summary(
-    auto_shuffle_completed: bool,
+    shuffle_completed: bool,
     activity_id: Optional[int],
+    total_elapsed_ms: Optional[int] = None,
 ) -> ProcessSummaryData:
-    """Build the end-of-run summary (AC-9, T09).
+    """Build the end-of-run summary (AC-11, FR-14).
 
     Read-only DB reads; any failure degrades the affected fields to null so the
-    summary can never convert a successful run into an error. Must be called
-    BEFORE the cleanup step (Manual Processing deletes the fake activity).
+    summary can never convert a successful run into an error.
     """
     segments_matched: Optional[int] = None
+    courses_matched: Optional[int] = None
     course_found: Optional[bool] = None
     course_name: Optional[str] = None
     if activity_id is not None:
@@ -414,20 +635,23 @@ def _build_process_summary(
                    FROM activities.segments_details sd
                    JOIN activities.segments s ON s.segment_id = sd.segment_id
                    WHERE sd.activity_id = %s AND s.is_course
-                   ORDER BY sd.start_time_utc
-                   LIMIT 1""",
+                   ORDER BY sd.start_time_utc""",
                 (activity_id,),
             )
+            courses_matched = len(course_rows)
             course_found = bool(course_rows)
             course_name = course_rows[0]["segment_name"] if course_rows else None
         except Exception as e:
             print(f"[activities] End-of-run summary DB read failed: {e}")
             segments_matched = None
+            courses_matched = None
             course_found = None
             course_name = None
     return ProcessSummaryData(
-        playlist_shuffled=True if auto_shuffle_completed else None,
+        total_elapsed_ms=total_elapsed_ms,
+        playlist_shuffled=True if shuffle_completed else None,
         segments_matched=segments_matched,
+        courses_matched=courses_matched,
         course_found=course_found,
         course_name=course_name,
         activity_id=activity_id,

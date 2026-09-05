@@ -1,0 +1,6 @@
+from backend_functions.service_logins import get_spotify_client
+from backend_functions.json_extractors import extract_json_playlist_details
+
+
+id_val = '7LPPIzdYgJZgj2QTSXCCNy'
+extract_json_playlist_details(list_id=id_val)

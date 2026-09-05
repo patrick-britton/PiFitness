@@ -296,21 +296,28 @@ def activity_post_processing_steps(activity_id: int):
         if error:
             return  # Halt pipeline on first error
 
-    # Segment matching (running/trail_running only)
-    is_running = False
+    # Segment matching (running, trail_running, treadmill_running, walking, hiking only)
+    # The DB layer enforces same-activity-type matching (segment_matching_match_segments:
+    # "Rule 1: Match the activity_type_id of the target segment"), so widening this
+    # gate to include walks/hikes is safe (OQ-6 / Bug T10-2 fix). Per the feature
+    # owner: walk = 'walking'(9)/'hiking'(3); run = 'running'(1)/'trail_running'(4)/
+    # 'treadmill_running'(18).
+    do_segment_matching = False
     try:
         activity_type_row = one_sql_result(
             "SELECT activity_type_name FROM activities.activities WHERE activity_id = %s", (int_a,)
         )
-        if activity_type_row and activity_type_row in ('running', 'trail_running'):
-            is_running = True
+        if activity_type_row and activity_type_row in (
+            'running', 'trail_running', 'treadmill_running', 'walking', 'hiking',
+        ):
+            do_segment_matching = True
     except Exception as e:
         log_app_event(cat='Task Executioner',
                       desc=f'Activity Post Processing: failed to get activity type for {int_a}',
                       err=str(e),
                       data_event=None)
 
-    if is_running:
+    if do_segment_matching:
         segment_steps = [
             ('segment_match_segments', call_segment_match_segments),
             ('segment_pair_generation', call_segment_pair_generation),

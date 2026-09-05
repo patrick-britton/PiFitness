@@ -9,14 +9,13 @@
 
 /**
  * Request body for POST /api/activities/process
+ * 'last_walk' processes the most recent Walk; 'last_run' the most recent Run.
  */
 export interface ProcessActivityRequest {
-  /** Playlist name selection. 'Manual Processing' shows datetime inputs. */
-  playlist_name?: 'Running' | 'Jogging' | 'No Playlist' | 'Manual Processing';
-  /** ISO 8601 datetime — required when playlist_name is 'Manual Processing' */
-  manual_start_utc?: string;
-  /** ISO 8601 datetime — required when playlist_name is 'Manual Processing' */
-  manual_end_utc?: string;
+  /** Selection mode. */
+  mode: 'last_walk' | 'last_run';
+  /** Music option. Required (one of the three) when mode === 'last_run'; omitted for 'last_walk'. */
+  music?: 'running' | 'jogging' | 'no_music';
 }
 
 /**
@@ -39,8 +38,10 @@ export interface ProcessStepResult {
   step_id: ProcessStepId;
   /** Step status */
   status: 'complete' | 'error' | 'skipped' | 'running' | 'pending';
-  /** Elapsed time in milliseconds */
+    /** Elapsed time in milliseconds */
   elapsed_ms: number;
+  /** ISO 8601 timestamp when the step started (from start event; used for live timer) */
+  started_at?: string;
   /** Error message if status is 'error' */
   error?: string;
   /** Optional result data from the step */
@@ -52,6 +53,7 @@ export interface ProcessStepResult {
  */
 export type ProcessStepId =
   | 'sync_activities'
+  | 'resolve_activity'
   | 'sync_details'
   | 'match_segments'
   | 'insert_heartrate'
@@ -76,8 +78,10 @@ export type ProcessStepId =
   | 'segment_update_details'
   | 'lookup_playlist'
   | 'insert_history'
-  | 'auto_shuffle'
-  | 'cleanup';
+  | 'query_isrc_stats'
+  | 'send_to_spotify'
+  | 'verify_spotify'
+  | 'report_shuffle';
 
 /**
  * Step result data (populated on completion of relevant steps)
@@ -85,14 +89,27 @@ export type ProcessStepId =
 export interface ProcessStepResultData {
   /** Number of songs heard (from lookup_playlist) */
   song_count?: number;
+  /** Number of songs sent to Spotify (from report_shuffle) */
+  songs_sent?: number;
   /** First song heard (from lookup_playlist) */
   first_song?: string;
   /** Last song heard (from lookup_playlist) */
   last_song?: string;
-  /** Whether the playlist was successfully shuffled (from auto_shuffle) */
+  /** Whether the playlist was successfully shuffled (from report_shuffle) */
   playlist_shuffled?: boolean;
   /** The Spotify playlist ID (from lookup_playlist) */
   playlist_id?: string;
+}
+
+/**
+ * Streaming event emitted when a step begins executing.
+ * Each step emits one of these (status 'running') before its terminal event.
+ */
+export interface ProcessStepStartEvent {
+  step_id: ProcessStepId;
+  status: 'running';
+  /** ISO 8601 timestamp when the step started */
+  started_at: string;
 }
 
 /**
@@ -108,19 +125,23 @@ export interface ProcessStepEvent {
 }
 
 /**
- * End-of-run summary embedded in the terminal event on success (AC-9).
+ * End-of-run summary embedded in the terminal event on success.
  * Null values mean the corresponding steps were skipped / not applicable.
  */
 export interface ProcessSummaryData {
+  /** Total execution time of the whole run in milliseconds (FR-14) */
+  total_elapsed_ms?: number;
   /** Playlist was shuffled (null when playlist steps were skipped) */
   playlist_shuffled?: boolean | null;
   /** Number of segments matched for the processed activity (null when segment steps were skipped) */
   segments_matched?: number | null;
+  /** Count of matched courses (null when segment steps were skipped) (FR-14) */
+  courses_matched?: number | null;
   /** Whether any matched segment is a course (null when segment steps were skipped) */
   course_found?: boolean | null;
   /** Name of the matched course, when course_found is true */
   course_name?: string | null;
-  /** Activity the summary refers to (the fake activity id in Manual Processing) */
+  /** Activity the summary refers to (the resolved activity id) */
   activity_id?: number | null;
 }
 
@@ -137,7 +158,7 @@ export interface ProcessCompleteEvent {
 /**
  * Union type for all NDJSON stream events.
  */
-export type NdjsonEvent = ProcessStepEvent | ProcessCompleteEvent;
+export type NdjsonEvent = ProcessStepStartEvent | ProcessStepEvent | ProcessCompleteEvent;
 
 /**
  * Human-readable labels for each step, used by the StepChecklist component
@@ -166,10 +187,13 @@ export const STEP_LABELS: Record<ProcessStepId, string> = {
   segment_frechet_match: 'Frechet Matching',
   segment_mass_confirm_3: 'Mass Confirmation (pass 3)',
   segment_update_details: 'Updating Segment Details',
+  resolve_activity: 'Resolving Activity',
   lookup_playlist: 'Looking Up Playlist',
   insert_history: 'Inserting Listening History',
-  auto_shuffle: 'Reshuffling Playlist',
-  cleanup: 'Cleanup',
+  query_isrc_stats: 'Reading Playlist Order',
+  send_to_spotify: 'Sending to Spotify',
+  verify_spotify: 'Verifying on Spotify',
+  report_shuffle: 'Sending New Order to Spotify',
 };
 
 /**
@@ -177,8 +201,16 @@ export const STEP_LABELS: Record<ProcessStepId, string> = {
  */
 export const STEP_ORDER: readonly ProcessStepId[] = [
   'sync_activities',
+  'resolve_activity',
+  // Playlist-shuffle sequence (only for last_run + non-no_music), per AC-5
+  'lookup_playlist',
+  'insert_history',
+  'query_isrc_stats',
+  'send_to_spotify',
+  'verify_spotify',
+  'report_shuffle',
+  // Activity post-processing on the resolved activity
   'sync_details',
-  'match_segments',
   'insert_heartrate',
   'assign_elevation_reference_time',
   'smooth_elevation_spikes_by_time',
@@ -199,8 +231,4 @@ export const STEP_ORDER: readonly ProcessStepId[] = [
   'segment_frechet_match',
   'segment_mass_confirm_3',
   'segment_update_details',
-  'lookup_playlist',
-  'insert_history',
-  'auto_shuffle',
-  'cleanup',
 ];

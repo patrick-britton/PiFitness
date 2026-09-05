@@ -208,9 +208,8 @@ export const MODULE_SUB_PAGES: Record<NavigationModule, SubNavigationConfig[]> =
   music: [
     { id: 'now-playing', label: 'Now Playing', iconName: 'PlayCircle', path: '/now-playing' },
     { id: 'ratings', label: 'Ratings', iconName: 'Star', path: '/ratings' },
-    { id: 'playlist-shuffle', label: 'Playlist Shuffle', iconName: 'Shuffle', path: '/playlist-shuffle' },
+    { id: 'playlist-shuffle', label: 'Playlist Config', iconName: 'Tune', path: '/playlist-shuffle' },
     { id: 'isrc-review', label: 'ISRC Review', iconName: 'Search', path: '/isrc-review' },
-    { id: 'playlist-config', label: 'Playlist Configuration', iconName: 'Tune', path: '/playlist-config' },
     { id: 'playlist-sync', label: 'Playlist Sync', iconName: 'Sync', path: '/playlist-sync' },
   ],
   activities: [
