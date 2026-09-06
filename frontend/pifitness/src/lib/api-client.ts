@@ -10,6 +10,10 @@ import {
   ProcessCompleteEvent,
 } from './types/activity-processing';
 import {
+  ActivityReport,
+  ActivityReportType,
+} from './types/activity-report';
+import {
   TriTipEvent,
   TriTipReading,
   TriTipEventDetail,
@@ -513,6 +517,11 @@ export const API = {
     getActivity: (activityId: string) => fetchAPI<any>(`/api/activities/${activityId}`),
     getSegments: () => fetchAPI<any[]>("/api/segments"),
     getSegmentMatches: (segmentId: string) => fetchAPI<any[]>(`/api/segments/${segmentId}/matches`),
+    /**
+     * Fetch the Recent Activity Report for the most recent Run or Walk activity (009-001).
+     */
+    getReport: (activityType: ActivityReportType) =>
+      fetchAPI<ActivityReport>(`/api/activities/report?activity_type=${activityType}`),
     /**
      * Process an activity via NDJSON streaming.
      * Calls onStep for each step-completion event.

@@ -12,6 +12,7 @@ import { useUIStore, MODULE_SUB_PAGES } from '../../stores/uiStore';
 import * as Icons from '@mui/icons-material';
 import ActivityProcessingPage from '../activities/activity-processing/page';
 import BeachPage from '../activities/beach/page';
+import RecentActivityPage from '../activities/recent-activity/page';
 
 const TABS = MODULE_SUB_PAGES.activities;
 
@@ -139,6 +140,8 @@ export default function ActivitiesPage() {
         <div className="max-w-7xl mx-auto">
           {activeTab === 'activity-processing' ? (
             <ActivityProcessingPage />
+          ) : activeTab === 'recent-activity' ? (
+            <RecentActivityPage />
           ) : activeTab === 'beach' ? (
             <BeachPage />
           ) : (

@@ -104,3 +104,61 @@ class ProcessActivityResponse(BaseModel):
     success: bool = Field(..., description="True if all steps completed successfully")
     steps: List[ProcessStepResult] = Field(..., description="Ordered array of step results")
     error: Optional[str] = Field(None, description="Overall error message if a step failed fatally")
+
+
+# ---------------------------------------------------------------------------
+# Activity Report Schemas (009-001)
+# Mirrors the frontend cross-surface contract in
+# frontend/pifitness/src/lib/types/activity-report.ts.
+# GET /api/activities/report?activity_type=Run|Walk
+# ---------------------------------------------------------------------------
+
+
+class ActivityReportHeader(BaseModel):
+    """Metrics displayed in the report's summary header for a single activity."""
+    start_utc: str = Field(..., description="UTC start timestamp (ISO 8601); the UI renders local time")
+    distance_mi: float = Field(..., description="Activity distance in miles")
+    total_time_s: float = Field(
+        ..., description="Total duration in seconds (per OQ-4: activity_time_s from vw_activity_summary)"
+    )
+    total_time_text: str = Field(..., description="Formatted total time as h:mm:ss.ms")
+    pace_text: str = Field(..., description="Formatted pace as m:ss.ms/mi")
+    hr_median: Optional[float] = Field(None, description="Median heart rate, when available")
+    hr_p75: Optional[float] = Field(None, description="75th-percentile heart rate, when available")
+    hr_max: Optional[float] = Field(None, description="Maximum heart rate, when available")
+    show_efficiency_placeholder: bool = Field(
+        ..., description="True for Run/Trail activities -> show the running-efficiency placeholder"
+    )
+
+
+class ActivityReportSegment(BaseModel):
+    """A course or crossed segment with its comparison against prior/best efforts."""
+    segment_id: int = Field(..., description="Segment identifier")
+    name: str = Field(..., description="Segment (or course) name")
+    is_course: bool = Field(..., description="True when this row is the course (is_course = true)")
+    all_time_rank: Optional[int] = Field(None, description="Overall rank (fastest = 1), when defined")
+    total_attempts: int = Field(..., description="Total attempts on this segment/course (the 'B' in 'A/B')")
+    prior_delta_s: Optional[float] = Field(
+        None, description="Seconds faster (negative) or slower (positive) than the prior attempt"
+    )
+    best_delta_s: Optional[float] = Field(
+        None, description="Seconds faster (negative) or slower (positive) than the best-ever attempt"
+    )
+
+
+class ActivityReport(BaseModel):
+    """Full report for a single activity."""
+    activity_id: int = Field(..., description="The resolved activity id (footer caption)")
+    activity_type: Literal['Run', 'Walk'] = Field(
+        ..., description="Which activity-type selection produced this report"
+    )
+    header: ActivityReportHeader = Field(..., description="Summary header metrics")
+    course: Optional[ActivityReportSegment] = Field(
+        None, description="The matched course row, when the activity is a course effort; else null"
+    )
+    segments: List[ActivityReportSegment] = Field(
+        ..., description="Crossed non-course segments (excludes the course row itself)"
+    )
+    has_segments: bool = Field(
+        ..., description="True when the report has any course or segment rows (drives FR-5 nav)"
+    )
