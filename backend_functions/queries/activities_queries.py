@@ -8,7 +8,7 @@ These functions return plain Python data structures with no Streamlit dependenci
 
 from typing import List, Dict, Any, Optional, Union, Sequence
 from datetime import date
-from backend_functions.database_functions import qec, sql_to_dict
+from backend_functions.database_functions import qec, sql_to_dict, one_sql_result
 from backend_functions.db_schema import get_columns
 
 
@@ -201,6 +201,116 @@ def get_activity_stats(activity_id: int) -> Optional[Dict[str, Any]]:
     return result[0] if result else None
 
 
+def resolve_latest_activity_id(activity_type: str) -> Optional[int]:
+    """
+    Resolve the most recent activity_id for a run/walk activity type (009-001, FR-2).
+
+    Uses the same activities.vw_last_activity_id_by_type view as Activity Processing.
+    The view bakes in most-recent selection (max activity_id) and distance constraints.
+
+    Args:
+        activity_type: 'Run' or 'Walk' (the view's activity_type key)
+
+    Returns:
+        Optional[int]: The resolved activity_id, or None if the view has no row.
+    """
+    sql = """
+        SELECT activity_id
+        FROM activities.vw_last_activity_id_by_type
+        WHERE activity_type = %s
+    """
+    row = one_sql_result(sql, (activity_type,))
+    return int(row) if row is not None else None
+
+
+def get_activity_report_header(activity_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve the report summary header values for an activity (009-001, FR-4).
+
+    Returns start time, distance, and total activity time (activity_time_s). The
+    activity row of vw_activity_summary supplies the single per-activity total
+    (OQ-4); start time + distance come from activities. HR median/75th/max are
+    computed separately via get_activity_percentile_hr.
+
+    Args:
+        activity_id: The activity ID
+
+    Returns:
+        Optional[Dict[str, Any]]: Header values or None if the activity has no rows.
+    """
+    sql = """
+        SELECT
+            a.start_time_utc AS start_utc,
+            m2mi(a.distance_m) AS distance_mi,
+            SAS.activity_time_s AS total_time_s
+        FROM activities.activities a
+        JOIN (
+            SELECT DISTINCT ON (activity_id) activity_id, activity_time_s
+            FROM activities.vw_activity_summary
+            WHERE activity_id = %s
+        ) SAS ON SAS.activity_id = a.activity_id
+    """
+    result = sql_to_dict(sql, (activity_id,))
+    return result[0] if result else None
+
+
+def get_activity_percentile_hr(activity_id: int, frac: float) -> Optional[float]:
+    """
+    Compute a heart-rate percentile over an activity's telemetry (009-001, FR-4).
+
+    Args:
+        activity_id: The activity ID
+        frac: The percentile fraction (0.5 for median, 0.75 for 75th).
+
+    Returns:
+        Optional[float]: The percentile HR value, or None if no HR data.
+    """
+    sql = """
+        SELECT percentile_cont(%s) WITHIN GROUP (ORDER BY heartrate_bpm)
+        FROM activities.activity_details
+        WHERE activity_id = %s AND heartrate_bpm IS NOT NULL
+    """
+    row = one_sql_result(sql, (frac, activity_id))
+    return float(row) if row is not None else None
+
+
+def get_activity_report_efforts(activity_id: int) -> List[Dict[str, Any]]:
+    """
+    Retrieve course + crossed-segment comparison rows for the report (009-001, FR-3/FR-4).
+
+    Returns the activity's segment rows from vw_activity_summary (name, is_course,
+    all_time_rank, best_delta_s, prior_delta_s) plus a per-segment total_attempts
+    denominator (count(*) over vw_segment_leaderboard for the segment) per OQ-3.
+    Course detail is sourced from the leaderboard view via is_course = true (OQ-4).
+
+    Args:
+        activity_id: The activity ID
+
+    Returns:
+        List[Dict[str, Any]]: Effort rows ordered courses first, then start time.
+    """
+    sql = """
+        SELECT
+            s.segment_id,
+            s.segment_name AS name,
+            s.is_course,
+            s.all_time_rank,
+            s.best_delta_s,
+            s.prior_delta_s,
+            lb.total_attempts
+        FROM activities.vw_activity_summary s
+        LEFT JOIN (
+            SELECT segment_id, count(*) AS total_attempts
+            FROM activities.vw_segment_leaderboard
+            GROUP BY segment_id
+        ) lb ON lb.segment_id = s.segment_id
+        WHERE s.activity_id = %s
+        ORDER BY s.is_course DESC, s.activity_start_utc
+    """
+    result = sql_to_dict(sql, (activity_id,))
+    return result if result else []
+
+
 __all__ = [
     'get_activities_list',
     'get_activity_by_id',
@@ -208,4 +318,8 @@ __all__ = [
     'get_segment_matches',
     'get_recent_activities',
     'get_activity_stats',
+    'resolve_latest_activity_id',
+    'get_activity_report_header',
+    'get_activity_percentile_hr',
+    'get_activity_report_efforts',
 ]

@@ -20,6 +20,10 @@ from backend_functions.queries import (
     get_activity_by_id,
     get_activity_telemetry,
     get_segment_matches,
+    resolve_latest_activity_id,
+    get_activity_report_header,
+    get_activity_percentile_hr,
+    get_activity_report_efforts,
 )
 from backend_functions.database_functions import sql_to_dict, get_conn, qec, one_sql_result, sql_to_list
 from backend_functions.music_functions import (
@@ -36,6 +40,9 @@ from backend.schemas.activity_schemas import (
     ProcessStepResultData,
     ProcessStepStartEvent,
     ProcessSummaryData,
+    ActivityReport,
+    ActivityReportHeader,
+    ActivityReportSegment,
 )
 
 router = APIRouter(prefix="/api/activities", tags=["activities"])
@@ -460,14 +467,10 @@ def _lookup_playlist(playlist_name: str) -> ProcessStepResult:
             raise ValueError(f"No songs found for playlist '{playlist_name}'")
         first_song = str(df["track_name_clean"].iloc[0])
         last_song = str(df["track_name_clean"].iloc[song_count - 1])
-        # vw_watch_music_heard returns the PARENT playlist_id (Bug T10-5). The
-        # playlist we actually shuffle is the target child, derived from
-        # music.vw_playlist_isrc_stats for that parent — the same source the
-        # canonical auto_shuffle_playlists uses (FR-8.4).
         parent_playlist_id = str(df["playlist_id"].iloc[0])
         target_ids = sql_to_list(
-            "SELECT DISTINCT target_playlist_id FROM music.vw_playlist_isrc_stats "
-            "WHERE playlist_id = %s ORDER BY target_playlist_id",
+            "SELECT DISTINCT target_playlist_id FROM music.vw_playlist_shuffle_targets "
+            "WHERE parent_playlist_id = %s ",
             (parent_playlist_id,),
         )
         if not target_ids:
@@ -503,35 +506,13 @@ def _lookup_playlist(playlist_name: str) -> ProcessStepResult:
 
 def _insert_listening_history(playlist_name: str) -> Optional[ProcessStepResultData]:
     """Truncate temp_listening_history, insert from vw_watch_music_heard, reconcile."""
-    import pandas as pd
     conn = get_conn(alchemy=True)
-    sql = f"SELECT played_at_utc, isrc, playlist_id FROM activities.vw_watch_music_heard WHERE playlist_name = '{playlist_name}'"
-    df = pd.read_sql(sql, con=conn)
-    if df.empty:
-        conn.dispose()
-        raise ValueError(f"No listening history data for playlist '{playlist_name}'")
-
-    # Truncate temp table
-    err = qec("TRUNCATE music.temp_listening_history")
-    if err:
-        conn.dispose()
-        raise ValueError(f"Error truncating temp_listening_history: {err}")
-
-    # Insert into temp table
-    df.to_sql(
-        schema="music",
-        name="temp_listening_history",
-        con=conn,
-        if_exists="replace",
-        index=False,
-    )
-    conn.dispose()
-
+    insert_sql = f"SELECT played_at_utc, isrc, playlist_id FROM activities.vw_watch_music_heard WHERE playlist_name = '{playlist_name}'"
+  
     # Reconcile into listening_history
-    reconcile_sql = """INSERT INTO music.listening_history (
+    reconcile_sql = f"""INSERT INTO music.listening_history (
         played_at_utc, isrc, playlist_id)
-        SELECT played_at_utc::TIMESTAMPTZ, isrc, playlist_id
-        FROM music.temp_listening_history
+        {insert_sql}
         ON CONFLICT(played_at_utc, isrc) DO NOTHING;"""
     err = qec(reconcile_sql)
     if err:
@@ -549,7 +530,8 @@ def _query_isrc_stats(playlist_id: str) -> list:
     """
     sql = (
         "SELECT track_id FROM music.vw_playlist_isrc_stats "
-        "WHERE playlist_id = %s ORDER BY default_new_order ASC"
+        "WHERE target_playlist_id = %s AND cumulative_playlist_minutes <= minutes_to_sync"
+        "ORDER BY default_new_order ASC"
     )
     track_ids = sql_to_list(sql, (playlist_id,))
     if not track_ids:
@@ -656,6 +638,143 @@ def _build_process_summary(
         course_name=course_name,
         activity_id=activity_id,
     )
+
+
+# ---------------------------------------------------------------------------
+# Activity Report endpoint (009-001)
+# ---------------------------------------------------------------------------
+
+VALID_REPORT_TYPES = ('Run', 'Walk')
+
+
+def _format_total_time(total_time_s: float) -> str:
+    """Format seconds (e.g. 3723.456) as h:mm:ss.ms (e.g. 1:02:03.456)."""
+    if total_time_s is None:
+        return "--:--:--.---"
+    total_ms = int(round(float(total_time_s) * 1000))
+    hours, rem = divmod(total_ms, 3600_000)
+    minutes, rem = divmod(rem, 60_000)
+    seconds, ms = divmod(rem, 1000)
+    return f"{hours}:{minutes:02d}:{seconds:02d}.{ms:03d}"
+
+
+def _format_pace(distance_mi: float, total_time_s: float) -> str:
+    """Format pace as m:ss.ms/mi from miles and seconds (e.g. 8:30.25/mi)."""
+    if not distance_mi or not total_time_s or float(distance_mi) <= 0:
+        return "--:--.--/mi"
+    secs_per_mi = float(total_time_s) / float(distance_mi)
+    minutes = int(secs_per_mi // 60)
+    remainder = secs_per_mi - (minutes * 60)
+    return f"{minutes}:{remainder:05.2f}/mi"
+
+
+def _is_run_type(activity_type: str) -> bool:
+    """True for the Run report type (running/trail); False for Walk (walk/hike)."""
+    return (activity_type or '').lower() == 'run'
+
+
+@router.get("/report")
+async def get_activity_report(activity_type: str = 'Run'):
+    """
+    Get the Recent Activity Report for the most recent Run or Walk activity (009-001).
+
+    Resolves the target activity via activities.vw_last_activity_id_by_type (the
+    same view Activity Processing uses), then composes the summary header, the
+    course (if any), and crossed segments with comparisons. Read-only; no writes.
+
+    Args:
+        activity_type: 'Run' or 'Walk'. Defaults to 'Run'.
+
+    Returns:
+        ActivityReport matching the cross-surface contract.
+    """
+    if activity_type not in VALID_REPORT_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"activity_type must be one of {VALID_REPORT_TYPES}",
+        )
+
+    try:
+        activity_id = resolve_latest_activity_id(activity_type)
+        if activity_id is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No activity found for activity_type='{activity_type}'",
+            )
+
+        header_row = get_activity_report_header(activity_id)
+        if header_row is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No report data found for activity_id={activity_id}",
+            )
+
+        hr_median = get_activity_percentile_hr(activity_id, 0.5)
+        hr_p75 = get_activity_percentile_hr(activity_id, 0.75)
+        hr_max = get_activity_percentile_hr(activity_id, 1.0)
+
+        effort_rows = get_activity_report_efforts(activity_id)
+        course_row = next((r for r in effort_rows if r.get('is_course')), None)
+
+        # show_efficiency_placeholder: true for Run (running/trail); false for Walk.
+        # Resolved via the activity_type selected (the report only serves Run/Walk).
+        show_eff = _is_run_type(activity_type)
+
+        header = ActivityReportHeader(
+            start_utc=str(header_row['start_utc']),
+            distance_mi=float(header_row['distance_mi'] or 0),
+            total_time_s=float(header_row['total_time_s'] or 0),
+            total_time_text=_format_total_time(header_row['total_time_s']),
+            pace_text=_format_pace(header_row['distance_mi'], header_row['total_time_s']),
+            hr_median=float(hr_median) if hr_median is not None else None,
+            hr_p75=float(hr_p75) if hr_p75 is not None else None,
+            hr_max=float(hr_max) if hr_max is not None else None,
+            show_efficiency_placeholder=show_eff,
+        )
+
+        course = None
+        segments = []
+        if course_row:
+            course = ActivityReportSegment(
+                segment_id=int(course_row['segment_id']),
+                name=str(course_row['name']),
+                is_course=True,
+                all_time_rank=int(course_row['all_time_rank']) if course_row.get('all_time_rank') is not None else None,
+                total_attempts=int(course_row['total_attempts'] or 0),
+                prior_delta_s=float(course_row['prior_delta_s']) if course_row.get('prior_delta_s') is not None else None,
+                best_delta_s=float(course_row['best_delta_s']) if course_row.get('best_delta_s') is not None else None,
+            )
+
+        for r in effort_rows:
+            if r.get('is_course'):
+                continue
+            segments.append(ActivityReportSegment(
+                segment_id=int(r['segment_id']),
+                name=str(r['name']),
+                is_course=False,
+                all_time_rank=int(r['all_time_rank']) if r.get('all_time_rank') is not None else None,
+                total_attempts=int(r['total_attempts'] or 0),
+                prior_delta_s=float(r['prior_delta_s']) if r.get('prior_delta_s') is not None else None,
+                best_delta_s=float(r['best_delta_s']) if r.get('best_delta_s') is not None else None,
+            ))
+
+        report = ActivityReport(
+            activity_id=activity_id,
+            activity_type=activity_type,
+            header=header,
+            course=course,
+            segments=segments,
+            has_segments=bool(course_row or segments),
+        )
+        return report.model_dump(mode="json")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch activity report: {str(e)}",
+        )
 
 
 # ---------------------------------------------------------------------------
