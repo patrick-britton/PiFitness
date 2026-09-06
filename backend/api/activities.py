@@ -530,7 +530,7 @@ def _query_isrc_stats(playlist_id: str) -> list:
     """
     sql = (
         "SELECT track_id FROM music.vw_playlist_isrc_stats "
-        "WHERE target_playlist_id = %s AND cumulative_playlist_minutes <= minutes_to_sync"
+        "WHERE target_playlist_id = %s AND cumulative_playlist_minutes <= minutes_to_sync "
         "ORDER BY default_new_order ASC"
     )
     track_ids = sql_to_list(sql, (playlist_id,))
