@@ -89,8 +89,12 @@ from .activities_queries import (
     get_activity_stats,
     resolve_latest_activity_id,
     get_activity_report_header,
+    get_activity_report_header_view,
+    get_activity_report_header_view_by_type,
     get_activity_percentile_hr,
     get_activity_report_efforts,
+    get_activity_report_charts,
+    get_activity_course_path,
 )
 from .tri_tip_queries import (
     get_tri_tip_event,
@@ -221,8 +225,12 @@ __all__ = [
     'get_activity_stats',
     'resolve_latest_activity_id',
     'get_activity_report_header',
+    'get_activity_report_header_view',
+    'get_activity_report_header_view_by_type',
     'get_activity_percentile_hr',
     'get_activity_report_efforts',
+    'get_activity_report_charts',
+    'get_activity_course_path',
     # Tri-tip Timer
     'get_tri_tip_event',
     'list_tri_tip_events',

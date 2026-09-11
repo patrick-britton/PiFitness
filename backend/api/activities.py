@@ -20,10 +20,10 @@ from backend_functions.queries import (
     get_activity_by_id,
     get_activity_telemetry,
     get_segment_matches,
-    resolve_latest_activity_id,
-    get_activity_report_header,
-    get_activity_percentile_hr,
+    get_activity_report_header_view_by_type,
     get_activity_report_efforts,
+    get_activity_report_charts,
+    get_activity_course_path,
 )
 from backend_functions.database_functions import sql_to_dict, get_conn, qec, one_sql_result, sql_to_list
 from backend_functions.music_functions import (
@@ -43,6 +43,10 @@ from backend.schemas.activity_schemas import (
     ActivityReport,
     ActivityReportHeader,
     ActivityReportSegment,
+    ActivityReportCharts,
+    ActivityElevationPoint,
+    ActivityHeartratePoint,
+    ActivityPacePoint,
 )
 
 router = APIRouter(prefix="/api/activities", tags=["activities"])
@@ -457,17 +461,18 @@ def _lookup_playlist(playlist_name: str) -> ProcessStepResult:
     """Query vw_watch_music_heard for the given playlist name."""
     t0 = time.perf_counter()
     try:
-        conn = get_conn(alchemy=True)
-        import pandas as pd
-        sql = f"SELECT * FROM activities.vw_watch_music_heard WHERE playlist_name = '{playlist_name}'"
-        df = pd.read_sql(sql, con=conn)
-        conn.dispose()
-        song_count = len(df)
+        rows = sql_to_dict(
+            "SELECT * FROM activities.vw_watch_music_heard "
+            "WHERE playlist_name = %s "
+            "ORDER BY track_order",
+            (playlist_name,),
+        )
+        song_count = len(rows)
         if song_count == 0:
             raise ValueError(f"No songs found for playlist '{playlist_name}'")
-        first_song = str(df["track_name_clean"].iloc[0])
-        last_song = str(df["track_name_clean"].iloc[song_count - 1])
-        parent_playlist_id = str(df["playlist_id"].iloc[0])
+        first_song = str(rows[0]["track_name_clean"])
+        last_song = str(rows[song_count - 1]["track_name_clean"])
+        parent_playlist_id = str(rows[0]["playlist_id"])
         target_ids = sql_to_list(
             "SELECT DISTINCT target_playlist_id FROM music.vw_playlist_shuffle_targets "
             "WHERE parent_playlist_id = %s ",
@@ -673,14 +678,52 @@ def _is_run_type(activity_type: str) -> bool:
     return (activity_type or '').lower() == 'run'
 
 
+def _safe_float(value) -> Optional[float]:
+    """Coerce to float; None/blank/NaN-safe (009-007 AC-1 Walk 500 fix)."""
+    if value is None:
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    if result != result:  # NaN guard
+        return None
+    return result
+
+
+def _safe_int(value) -> Optional[int]:
+    """Coerce to int; None-safe (009-007 AC-1 Walk 500 fix)."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_float_default(value, default: float = 0.0) -> float:
+    """Coerce to float with a numeric default for required (non-null) fields."""
+    result = _safe_float(value)
+    return default if result is None else result
+
+
+def _safe_int_default(value, default: int = 0) -> int:
+    """Coerce to int with a numeric default for required (non-null) fields."""
+    result = _safe_int(value)
+    return default if result is None else result
+
+
 @router.get("/report")
 async def get_activity_report(activity_type: str = 'Run'):
     """
-    Get the Recent Activity Report for the most recent Run or Walk activity (009-001).
+    Get the Recent Activity Report for the most recent Run or Walk activity (009-007 B2).
 
-    Resolves the target activity via activities.vw_last_activity_id_by_type (the
-    same view Activity Processing uses), then composes the summary header, the
-    course (if any), and crossed segments with comparisons. Read-only; no writes.
+    The toggle maps to activities.vw_activity_header_stats.activity_type_basic
+    ('run' | 'walk'): the single returned row IS the target (one row per type,
+    always with a non-null path by construction). Its activity_id drives the
+    per-minute chart series, course path, and efforts queries. Header display
+    strings + HR median/max come straight from the view; numerics/elevation
+    join from activities.activities. Read-only; no writes, no fallback.
 
     Args:
         activity_type: 'Run' or 'Walk'. Defaults to 'Run'.
@@ -695,40 +738,63 @@ async def get_activity_report(activity_type: str = 'Run'):
         )
 
     try:
-        activity_id = resolve_latest_activity_id(activity_type)
-        if activity_id is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No activity found for activity_type='{activity_type}'",
-            )
-
-        header_row = get_activity_report_header(activity_id)
+        type_key = 'run' if activity_type == 'Run' else 'walk'
+        header_row = get_activity_report_header_view_by_type(type_key)
         if header_row is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"No report data found for activity_id={activity_id}",
+                detail=f"No report data found for activity_type='{activity_type}'",
             )
+        activity_id = int(header_row['activity_id'])
 
-        hr_median = get_activity_percentile_hr(activity_id, 0.5)
-        hr_p75 = get_activity_percentile_hr(activity_id, 0.75)
-        hr_max = get_activity_percentile_hr(activity_id, 1.0)
+        hr_median = _safe_float(header_row.get('hr_median'))
+        hr_max = _safe_float(header_row.get('hr_maximum'))
+        view_displays = {
+            'distance_display': str(header_row.get('distance_display') or ''),
+            'duration_display': str(header_row.get('duration_display') or ''),
+            'pace_display': str(header_row.get('pace_display') or ''),
+        }
 
-        effort_rows = get_activity_report_efforts(activity_id)
+        chart_rows = get_activity_report_charts(activity_id) or []
+        course_path = get_activity_course_path(activity_id) or []
+
+        effort_rows = get_activity_report_efforts(activity_id) or []
+        effort_rows = [r for r in effort_rows if r.get('segment_id') is not None]
         course_row = next((r for r in effort_rows if r.get('is_course')), None)
 
         # show_efficiency_placeholder: true for Run (running/trail); false for Walk.
         # Resolved via the activity_type selected (the report only serves Run/Walk).
         show_eff = _is_run_type(activity_type)
 
+        # Numeric distance/time: prefer activities columns; fall back to parsing
+        # the view's display strings only if the numeric columns are missing.
+        distance_mi = _safe_float(header_row.get('distance_mi'))
+        if distance_mi is None:
+            try:
+                distance_mi = _safe_float(str(header_row.get('distance_display') or '').split()[0])
+            except (TypeError, ValueError, IndexError, AttributeError):
+                distance_mi = None
+        distance_mi = distance_mi if distance_mi is not None else 0.0
+
+        total_time_raw = header_row.get('duration_elapsed_s')
+        if total_time_raw is None:
+            total_time_raw = header_row.get('duration_s')
+        if total_time_raw is None:
+            total_time_raw = header_row.get('total_time_s')
+        total_time_s = _safe_float_default(total_time_raw, 0.0)
+
         header = ActivityReportHeader(
-            start_utc=str(header_row['start_utc']),
-            distance_mi=float(header_row['distance_mi'] or 0),
-            total_time_s=float(header_row['total_time_s'] or 0),
-            total_time_text=_format_total_time(header_row['total_time_s']),
-            pace_text=_format_pace(header_row['distance_mi'], header_row['total_time_s']),
-            hr_median=float(hr_median) if hr_median is not None else None,
-            hr_p75=float(hr_p75) if hr_p75 is not None else None,
-            hr_max=float(hr_max) if hr_max is not None else None,
+            start_utc=str(header_row['start_utc']) if header_row.get('start_utc') is not None else '',
+            distance_mi=distance_mi,
+            distance_display=view_displays['distance_display'],
+            elevation_m_gain=_safe_float(header_row.get('elevation_m_gain')),
+            total_time_s=total_time_s,
+            total_time_text=_format_total_time(total_time_raw),
+            total_time_display=view_displays['duration_display'],
+            pace_text=_format_pace(distance_mi, total_time_raw),
+            pace_display=view_displays['pace_display'],
+            hr_median=hr_median,
+            hr_max=hr_max,
             show_efficiency_placeholder=show_eff,
         )
 
@@ -736,27 +802,61 @@ async def get_activity_report(activity_type: str = 'Run'):
         segments = []
         if course_row:
             course = ActivityReportSegment(
-                segment_id=int(course_row['segment_id']),
-                name=str(course_row['name']),
+                segment_id=_safe_int_default(course_row.get('segment_id'), 0),
+                name=str(course_row.get('name') or ''),
                 is_course=True,
-                all_time_rank=int(course_row['all_time_rank']) if course_row.get('all_time_rank') is not None else None,
-                total_attempts=int(course_row['total_attempts'] or 0),
-                prior_delta_s=float(course_row['prior_delta_s']) if course_row.get('prior_delta_s') is not None else None,
-                best_delta_s=float(course_row['best_delta_s']) if course_row.get('best_delta_s') is not None else None,
+                all_time_rank=_safe_int(course_row.get('all_time_rank')),
+                total_attempts=_safe_int_default(course_row.get('total_attempts'), 0),
+                prior_delta_s=_safe_float(course_row.get('prior_delta_s')),
+                best_delta_s=_safe_float(course_row.get('best_delta_s')),
             )
 
         for r in effort_rows:
             if r.get('is_course'):
                 continue
+            if r.get('segment_id') is None:
+                continue
             segments.append(ActivityReportSegment(
-                segment_id=int(r['segment_id']),
-                name=str(r['name']),
+                segment_id=_safe_int_default(r.get('segment_id'), 0),
+                name=str(r.get('name') or ''),
                 is_course=False,
-                all_time_rank=int(r['all_time_rank']) if r.get('all_time_rank') is not None else None,
-                total_attempts=int(r['total_attempts'] or 0),
-                prior_delta_s=float(r['prior_delta_s']) if r.get('prior_delta_s') is not None else None,
-                best_delta_s=float(r['best_delta_s']) if r.get('best_delta_s') is not None else None,
+                all_time_rank=_safe_int(r.get('all_time_rank')),
+                total_attempts=_safe_int_default(r.get('total_attempts'), 0),
+                prior_delta_s=_safe_float(r.get('prior_delta_s')),
+                best_delta_s=_safe_float(r.get('best_delta_s')),
             ))
+
+        charts = ActivityReportCharts(
+            elevation=[
+                ActivityElevationPoint(
+                    minute=_safe_int_default(r.get('minute'), 0),
+                    elevation_m=_safe_float_default(r.get('elevation_m'), 0.0),
+                )
+                for r in chart_rows
+            ],
+            heartrate=[
+                ActivityHeartratePoint(
+                    minute=_safe_int_default(r.get('minute'), 0),
+                    heartrate_bpm=_safe_float(r.get('heartrate_bpm')),
+                )
+                for r in chart_rows
+            ],
+            pace=[
+                ActivityPacePoint(
+                    minute=_safe_int_default(r.get('minute'), 0),
+                    pace_sec_per_mi=_safe_float(r.get('pace_sec_per_mi')),
+                    pace_text=r.get('pace_text'),
+                )
+                for r in chart_rows
+            ],
+        )
+
+        safe_path: list = []
+        for pt in course_path:
+            try:
+                safe_path.append([float(pt[0]), float(pt[1])])
+            except (TypeError, ValueError, IndexError):
+                continue
 
         report = ActivityReport(
             activity_id=activity_id,
@@ -765,6 +865,8 @@ async def get_activity_report(activity_type: str = 'Run'):
             course=course,
             segments=segments,
             has_segments=bool(course_row or segments),
+            charts=charts,
+            course_path=safe_path,
         )
         return report.model_dump(mode="json")
 

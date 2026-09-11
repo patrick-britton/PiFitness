@@ -118,13 +118,16 @@ class ActivityReportHeader(BaseModel):
     """Metrics displayed in the report's summary header for a single activity."""
     start_utc: str = Field(..., description="UTC start timestamp (ISO 8601); the UI renders local time")
     distance_mi: float = Field(..., description="Activity distance in miles")
+    distance_display: str = Field(..., description="Formatted distance from vw_activity_header_stats (e.g. '4.6 mi')")
+    elevation_m_gain: Optional[float] = Field(None, description="Total elevation gain (m) from activities.activities")
     total_time_s: float = Field(
         ..., description="Total duration in seconds (per OQ-4: activity_time_s from vw_activity_summary)"
     )
     total_time_text: str = Field(..., description="Formatted total time as h:mm:ss.ms")
+    total_time_display: str = Field(..., description="Duration display from vw_activity_header_stats (e.g. '46:45.7')")
     pace_text: str = Field(..., description="Formatted pace as m:ss.ms/mi")
+    pace_display: str = Field(..., description="Pace display from vw_activity_header_stats (e.g. '10:09.9/mi')")
     hr_median: Optional[float] = Field(None, description="Median heart rate, when available")
-    hr_p75: Optional[float] = Field(None, description="75th-percentile heart rate, when available")
     hr_max: Optional[float] = Field(None, description="Maximum heart rate, when available")
     show_efficiency_placeholder: bool = Field(
         ..., description="True for Run/Trail activities -> show the running-efficiency placeholder"
@@ -146,6 +149,32 @@ class ActivityReportSegment(BaseModel):
     )
 
 
+class ActivityElevationPoint(BaseModel):
+    """A single per-minute elevation sample."""
+    minute: int = Field(..., description="Elapsed minute (0-based) within the activity")
+    elevation_m: float = Field(..., description="Average elevation for the minute (m)")
+
+
+class ActivityHeartratePoint(BaseModel):
+    """A single per-minute heart-rate sample."""
+    minute: int = Field(..., description="Elapsed minute (0-based) within the activity")
+    heartrate_bpm: Optional[float] = Field(None, description="Average heart rate for the minute (bpm)")
+
+
+class ActivityPacePoint(BaseModel):
+    """A single per-minute pace sample (numeric + formatted text)."""
+    minute: int = Field(..., description="Elapsed minute (0-based) within the activity")
+    pace_sec_per_mi: Optional[float] = Field(None, description="Numeric pace in seconds per mile (one decimal)")
+    pace_text: Optional[str] = Field(None, description="Formatted pace as m:ss.ms")
+
+
+class ActivityReportCharts(BaseModel):
+    """Per-minute chart series served with the report."""
+    elevation: List[ActivityElevationPoint] = Field(..., description="Per-minute elevation series")
+    heartrate: List[ActivityHeartratePoint] = Field(..., description="Per-minute heart-rate series")
+    pace: List[ActivityPacePoint] = Field(..., description="Per-minute pace series")
+
+
 class ActivityReport(BaseModel):
     """Full report for a single activity."""
     activity_id: int = Field(..., description="The resolved activity id (footer caption)")
@@ -162,3 +191,5 @@ class ActivityReport(BaseModel):
     has_segments: bool = Field(
         ..., description="True when the report has any course or segment rows (drives FR-5 nav)"
     )
+    charts: ActivityReportCharts = Field(..., description="Per-minute chart series (elevation/heartrate/pace)")
+    course_path: List[List[float]] = Field(..., description="Simplified course path as [lon, lat] pairs")
