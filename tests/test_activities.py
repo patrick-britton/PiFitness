@@ -90,10 +90,23 @@ def test_activity_report_contract_shape():
     import backend.api.activities as api_activities
 
     header = {
+        "activity_id": 1234,
         "start_utc": "2026-09-01T12:00:00+00:00",
         "distance_mi": 5.0,
+        "distance_display": "5.0 mi",
+        "duration_display": "45:00.0",
+        "pace_display": "9:00.0/mi",
+        "hr_median": 150.0,
+        "hr_maximum": 182.0,
         "total_time_s": 2700.0,
+        "elevation_m_gain": 120.5,
     }
+    chart_rows = [
+        {"minute": 0, "elevation_m": 120, "heartrate_bpm": 155.0,
+         "speed_mps": 3.0, "pace_sec_per_mi": 570.5, "pace_text": "9:30.5"},
+        {"minute": 1, "elevation_m": 132, "heartrate_bpm": 168.0,
+         "speed_mps": 3.1, "pace_sec_per_mi": 555.0, "pace_text": "9:15.0"},
+    ]
     efforts = [
         {
             "segment_id": 11,
@@ -116,9 +129,9 @@ def test_activity_report_contract_shape():
     ]
 
     import unittest.mock as mock
-    with mock.patch.object(api_activities, "resolve_latest_activity_id", return_value=1234), \
-         mock.patch.object(api_activities, "get_activity_report_header", return_value=header), \
-         mock.patch.object(api_activities, "get_activity_percentile_hr", side_effect=[150.0, 165.0, 182.0]), \
+    with mock.patch.object(api_activities, "get_activity_report_header_view_by_type", return_value=header), \
+         mock.patch.object(api_activities, "get_activity_report_charts", return_value=chart_rows), \
+         mock.patch.object(api_activities, "get_activity_course_path", return_value=[[-122.42, 37.77], [-122.43, 37.78]]), \
          mock.patch.object(api_activities, "get_activity_report_efforts", return_value=efforts):
         response = client.get("/api/activities/report?activity_type=Run")
         assert response.status_code == 200
@@ -129,8 +142,9 @@ def test_activity_report_contract_shape():
         assert data["header"]["total_time_text"] == "0:45:00.000"
         assert data["header"]["pace_text"] == "9:00.00/mi"
         assert data["header"]["hr_median"] == 150.0
-        assert data["header"]["hr_p75"] == 165.0
+        assert "hr_p75" not in data["header"]
         assert data["header"]["hr_max"] == 182.0
+        assert data["header"]["elevation_m_gain"] == 120.5
         assert data["header"]["show_efficiency_placeholder"] is True
         # Course mapped from the is_course row; segments exclude the course row.
         assert data["course"]["name"] == "My Course"
@@ -140,6 +154,12 @@ def test_activity_report_contract_shape():
         assert data["segments"][0]["name"] == "Hill Sprint"
         assert data["segments"][0]["is_course"] is False
         assert data["segments"][0]["prior_delta_s"] == 3.0
+        # New 009-006 chart series + course path fields ride on the same report.
+        assert data["course_path"] == [[-122.42, 37.77], [-122.43, 37.78]]
+        assert data["charts"]["elevation"][0] == {"minute": 0, "elevation_m": 120.0}
+        assert data["charts"]["heartrate"][1]["heartrate_bpm"] == 168.0
+        assert data["charts"]["pace"][0]["pace_sec_per_mi"] == 570.5
+        assert data["charts"]["pace"][0]["pace_text"] == "9:30.5"
 
 
 def test_activity_report_invalid_type():
@@ -154,13 +174,20 @@ def test_activity_report_walk_no_placeholder():
     import unittest.mock as mock
 
     header = {
+        "activity_id": 999,
         "start_utc": "2026-09-01T10:00:00+00:00",
         "distance_mi": 2.0,
+        "distance_display": "2.0 mi",
+        "duration_display": "30:00.0",
+        "pace_display": "15:00.0/mi",
+        "hr_median": 120.0,
+        "hr_maximum": 160.0,
         "total_time_s": 1800.0,
+        "elevation_m_gain": None,
     }
-    with mock.patch.object(api_activities, "resolve_latest_activity_id", return_value=999), \
-         mock.patch.object(api_activities, "get_activity_report_header", return_value=header), \
-         mock.patch.object(api_activities, "get_activity_percentile_hr", side_effect=[120.0, 140.0, 160.0]), \
+    with mock.patch.object(api_activities, "get_activity_report_header_view_by_type", return_value=header), \
+         mock.patch.object(api_activities, "get_activity_report_charts", return_value=[]), \
+         mock.patch.object(api_activities, "get_activity_course_path", return_value=[]), \
          mock.patch.object(api_activities, "get_activity_report_efforts", return_value=[]):
         response = client.get("/api/activities/report?activity_type=Walk")
         assert response.status_code == 200
@@ -170,3 +197,5 @@ def test_activity_report_walk_no_placeholder():
         assert data["course"] is None
         assert data["segments"] == []
         assert data["has_segments"] is False
+        assert data["charts"]["elevation"] == []
+        assert data["course_path"] == []

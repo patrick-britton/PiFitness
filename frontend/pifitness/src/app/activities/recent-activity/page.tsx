@@ -9,6 +9,12 @@ import {
   ActivityReportType,
   ActivityReportSegment,
 } from '@/lib/types/activity-report';
+import {
+  CoursePathChart,
+  ElevationChart,
+  HeartrateChart,
+  PaceChart,
+} from './components/ActivityReportCharts';
 
 /**
  * Recent Activity Report page (009-001).
@@ -27,35 +33,25 @@ function formatDelta(delta: number | null): string {
   return `${sign}${delta}s ${label}`;
 }
 
-/** Render an ISO-8601 UTC timestamp as a local-time string. */
-function formatStart(iso: string): string {
+/** Render an ISO-8601 UTC timestamp as `d-mmm h:mm am/pm` (local time). */
+function formatStartShort(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleString();
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  let hours = d.getHours();
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getDate()} ${months[d.getMonth()]} ${hours}:${mins} ${ampm}`;
 }
 
 /** Format "A/B" rank; emits "—" when rank is missing. */
 function formatRank(rank: number | null, total: number): string {
   if (rank == null) return '—';
   return `${rank}/${total}`;
-}
-
-function Stat({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-3">
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-        {value}
-      </p>
-    </div>
-  );
 }
 
 function SegmentRow({
@@ -124,12 +120,6 @@ export default function RecentActivityPage() {
   useEffect(() => {
     fetchReport(activityType);
   }, [activityType, fetchReport]);
-
-  const resetToSelection = useCallback(() => {
-    setReport(null);
-    setSelectedSegmentId(null);
-    setError(null);
-  }, []);
 
   const handleSegmentSelect = useCallback((seg: ActivityReportSegment) => {
     setSelectedSegmentId((prev) =>
@@ -206,59 +196,48 @@ export default function RecentActivityPage() {
       {/* Report */}
       {report && !loading && (
         <div className="space-y-4">
-          {/* Controls row: reset */}
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={resetToSelection}
-              className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              Reset
-            </button>
-          </div>
-          {/* Summary header */}
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-              {activityType} Summary
-            </h2>
-            <div
-              className={`mt-3 grid gap-3 ${
-                isLandscape
-                  ? 'grid-cols-3'
-                  : layoutVariant === 'desktop'
-                  ? 'grid-cols-3 sm:grid-cols-4'
-                  : 'grid-cols-2'
-              }`}
-            >
-              <Stat label="Start" value={formatStart(report.header.start_utc)} />
-              <Stat
-                label="Distance"
-                value={`${report.header.distance_mi.toFixed(2)} mi`}
-              />
-              <Stat label="Time" value={report.header.total_time_text} />
-              <Stat label="Pace" value={report.header.pace_text} />
-              <Stat
-                label="Median HR"
-                value={
-                  report.header.hr_median != null
-                    ? `${report.header.hr_median}`
-                    : '—'
-                }
-              />
-              <Stat
-                label="75th % HR"
-                value={
-                  report.header.hr_p75 != null ? `${report.header.hr_p75}` : '—'
-                }
-              />
-              <Stat
-                label="Max HR"
-                value={
-                  report.header.hr_max != null ? `${report.header.hr_max}` : '—'
-                }
-              />
+          {/* Start line (009-006): italic, low emphasis — above the header band */}
+          <p className="text-sm italic text-gray-500 dark:text-gray-400">
+            {formatStartShort(report.header.start_utc)}
+          </p>
+          {/* Header band (009-007): 3-column flex row — (1) stats text, (2) elevation,
+              (3) activity shape. Equal width via flex-1, equal fixed height (h-28),
+              no wrap at desktop width. CoursePathChart is the column-3 placeholder
+              until T05 swaps in the MapLibre shape visual. */}
+          <div className="w-full flex flex-nowrap items-stretch gap-4">
+            {/* (1) distance / time / pace text stats — view display strings
+                (1-decimal), fixed height, vertically centered */}
+            <div className="min-w-0 flex-1 h-28 flex flex-col justify-center text-xl font-semibold text-gray-900 dark:text-white space-y-0.5">
+              <p>{report.header.distance_display}</p>
+              <p>{report.header.total_time_display}</p>
+              <p>{report.header.pace_display}</p>
+            </div>
+            {/* (2) elevation chart — equal width, fixed height */}
+            <div className="min-w-0 flex-1 h-28" aria-label="Elevation profile container">
+              {report.charts.elevation.length > 0 && (
+                <ElevationChart points={report.charts.elevation} />
+              )}
+            </div>
+            {/* (3) activity shape visual — equal width, fixed height */}
+            <div className="min-w-0 flex-1 h-28" aria-label="Activity shape container">
+              {report.course_path.length > 1 && (
+                <CoursePathChart path={report.course_path} />
+              )}
             </div>
           </div>
+
+          {/* Heart-rate + pace line charts (009-006) — below the summary/elevation row.
+              Always 2-column so neither chart wraps internally. */}
+          {(report.charts.heartrate.length > 0 || report.charts.pace.length > 0) && (
+            <div className="grid gap-4 grid-cols-2">
+              {report.charts.heartrate.length > 0 && (
+                <HeartrateChart points={report.charts.heartrate} />
+              )}
+              {report.charts.pace.length > 0 && (
+                <PaceChart points={report.charts.pace} />
+              )}
+            </div>
+          )}
 
           {/* Running-efficiency placeholder — Run/Trail only */}
           {report.header.show_efficiency_placeholder && (

@@ -1194,6 +1194,53 @@
       "type": "numeric"
     }
   ],
+  "activities.vw_activity_header_stats": [
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "activity_type_basic",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "distance_mi",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "duration_display",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "pace_display",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "start_time_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "activity_path",
+      "nullable": true,
+      "type": "USER-DEFINED"
+    },
+    {
+      "name": "hr_median",
+      "nullable": true,
+      "type": "smallint"
+    },
+    {
+      "name": "hr_maximum",
+      "nullable": true,
+      "type": "smallint"
+    }
+  ],
   "activities.vw_activity_ids_to_sync": [
     {
       "name": "activity_id",
@@ -4980,19 +5027,9 @@
       "type": "integer"
     },
     {
-      "name": "combined_recency_score",
+      "name": "play_count_on_playlist",
       "nullable": true,
-      "type": "double precision"
-    },
-    {
-      "name": "days_ago_played",
-      "nullable": true,
-      "type": "double precision"
-    },
-    {
-      "name": "days_ago_playlist_played",
-      "nullable": true,
-      "type": "double precision"
+      "type": "bigint"
     },
     {
       "name": "recency_pressure",
@@ -5023,6 +5060,11 @@
       "name": "default_new_order",
       "nullable": true,
       "type": "bigint"
+    },
+    {
+      "name": "cumulative_playlist_minutes",
+      "nullable": true,
+      "type": "numeric"
     }
   ],
   "music.vw_playlist_isrcs": [
@@ -5079,6 +5121,23 @@
       "name": "last_auto_shuffled_utc",
       "nullable": true,
       "type": "timestamp with time zone"
+    }
+  ],
+  "music.vw_playlist_shuffle_targets": [
+    {
+      "name": "parent_playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "target_playlist_id",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "target_playlist_type",
+      "nullable": true,
+      "type": "text"
     }
   ],
   "music.vw_playlist_with_mismatched_isrc": [
