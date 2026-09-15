@@ -95,6 +95,12 @@ from .activities_queries import (
     get_activity_report_efforts,
     get_activity_report_charts,
     get_activity_course_path,
+    # 009-002 Leaderboards
+    get_leaderboard_segments,
+    get_segment_leaderboard,
+    get_segment_visuals_telemetry,
+    stage_leaderboard_visuals,
+    get_segment_name,
 )
 from .tri_tip_queries import (
     get_tri_tip_event,
@@ -231,6 +237,12 @@ __all__ = [
     'get_activity_report_efforts',
     'get_activity_report_charts',
     'get_activity_course_path',
+    # 009-002 Leaderboards
+    'get_leaderboard_segments',
+    'get_segment_leaderboard',
+    'get_segment_visuals_telemetry',
+    'stage_leaderboard_visuals',
+    'get_segment_name',
     # Tri-tip Timer
     'get_tri_tip_event',
     'list_tri_tip_events',

@@ -14,6 +14,15 @@ import {
   ActivityReportType,
 } from './types/activity-report';
 import {
+  Leaderboard,
+  LeaderboardEffortSelection,
+  LeaderboardVisualsRequest,
+  MapConfig,
+  SegmentListQuery,
+  SegmentListRow,
+  SegmentVisuals,
+} from './types/leaderboards';
+import {
   TriTipEvent,
   TriTipReading,
   TriTipEventDetail,
@@ -523,6 +532,33 @@ export const API = {
     getReport: (activityType: ActivityReportType) =>
       fetchAPI<ActivityReport>(`/api/activities/report?activity_type=${activityType}`),
     /**
+     * Fetch the filterable segment/course list for the Leaderboards page (009-002).
+     */
+    getLeaderboardSegments: (query: SegmentListQuery) => {
+      const params = new URLSearchParams();
+      if (query.name) params.set("name", query.name);
+      if (query.kind) params.set("kind", query.kind);
+      if (query.min_distance > 0) params.set("min_distance", String(query.min_distance));
+      if (query.activity_type) params.set("activity_type", query.activity_type);
+      const qs = params.toString();
+      return fetchAPI<SegmentListRow[]>(
+        `/api/activities/leaderboard/segments${qs ? `?${qs}` : ""}`
+      );
+    },
+    /**
+     * Fetch the full effort leaderboard for one segment/course (009-002).
+     */
+    getLeaderboard: (segmentId: number) =>
+      fetchAPI<Leaderboard>(`/api/activities/leaderboard/${segmentId}`),
+    /**
+     * Stage the selected efforts and fetch the generated replay + telemetry visuals (009-002).
+     */
+    postLeaderboardVisuals: (request: LeaderboardVisualsRequest) =>
+      fetchAPI<SegmentVisuals>("/api/activities/leaderboard/visuals", {
+        method: "POST",
+        body: JSON.stringify(request),
+      }),
+    /**
      * Process an activity via NDJSON streaming.
      * Calls onStep for each step-completion event.
      * Returns a promise that resolves with the terminal event on stream completion.
@@ -545,5 +581,17 @@ export const API = {
 
       return readNdjsonStream(response, onStep);
     },
+  },
+
+  /**
+   * App-wide configuration endpoints (009-002 T08).
+   */
+  config: {
+    /**
+     * Client-safe map configuration — exposes the Mapbox token so the
+     * Leaderboards visuals replay can build Mapbox-style tile URLs and gate
+     * the style dropdown on token presence (AC-13).
+     */
+    getMapConfig: () => fetchAPI<MapConfig>("/api/config/map"),
   },
 };

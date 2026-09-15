@@ -13,6 +13,7 @@ from backend_functions.database_functions import sql_to_dict, qec, con_cur, get_
 from backend_functions.helper_functions import get_sync_dates, get_last_date
 from backend_functions.logging_functions import start_timer, log_app_event, elapsed_ms
 from backend_functions.service_logins import sql_rate_limited
+from backend_functions.json_extractors import validate_playlist_payload
 
 def ultimate_task_executioner(force_task_name=None, force_task_id=None):
     """
@@ -302,9 +303,21 @@ def extract_load_flatten(cd, td):
                       err=error_msg,
                       task_id=td.get('task_id'),
                       data_event='No data from API'
-                      )
+                                            )
         reconcile_task_dates(td, task_fail=True, e=error_msg)
         return True, cd
+
+    # 000-001 AC-8: fail-loud payload validation for playlist sync tasks.
+    # Aborts before any staging load/SPROC (no deletes) when the payload is
+    # empty, incomplete (paging not exhausted), or yields a non-22-char id.
+    api_fn = td.get('api_function_name', '')
+    if api_fn in ('playlist_items', 'current_user_playlists'):
+        if not validate_playlist_payload(json_data, td):
+            reconcile_task_dates(
+                td, task_fail=True,
+                e=f"Playlist payload validation failed (api_function_name={api_fn})"
+            )
+            return True, cd
 
     print(f"Loading data for Task #{td.get('task_id')}: {td.get('task_name')}")
     t0 = start_timer()

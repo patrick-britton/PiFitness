@@ -9,7 +9,8 @@ These functions return plain Python data structures with no Streamlit dependenci
 import json
 from typing import List, Dict, Any, Optional, Union, Sequence
 from datetime import date
-from backend_functions.database_functions import qec, sql_to_dict, one_sql_result
+from psycopg2.extras import execute_values
+from backend_functions.database_functions import qec, sql_to_dict, get_conn, one_sql_result
 from backend_functions.db_schema import get_columns
 
 
@@ -475,6 +476,255 @@ def get_activity_report_efforts(activity_id: int) -> List[Dict[str, Any]]:
     return result if result else []
 
 
+# Legacy activity-type filter semantics (FR-2): Run matches '%run%' but excludes
+# trail-run types; every other type matches by its type-name pattern.
+_ACTIVITY_TYPE_PATTERNS = {
+    'Run': "activity_type_name ILIKE %s AND activity_type_name NOT ILIKE %s",
+    'Trail Run': "activity_type_name ILIKE %s",
+    'Hike': "activity_type_name ILIKE %s",
+    'Walk': "activity_type_name ILIKE %s",
+    'Bike': "activity_type_name ILIKE %s",
+    'Ski': "activity_type_name ILIKE %s",
+}
+
+_ACTIVITY_TYPE_PARAMS = {
+    'Run': ('%run%', '%trail%'),
+    'Trail Run': ('%trail%run%',),
+    'Hike': ('%hik%',),
+    'Walk': ('%walk%',),
+    'Bike': ('%bik%',),
+    'Ski': ('%ski%',),
+}
+
+
+def get_leaderboard_segments(
+    name: Optional[str] = None,
+    kind: Optional[str] = None,
+    min_distance: float = 0.0,
+    activity_type: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Retrieve the filterable segment/course list for the Leaderboards page (009-002, FR-1/FR-2).
+
+    Reads `activities.vw_segments_effort_stats` (per-segment; OQ-1) and applies:
+    - name: case-insensitive substring on segment_name (FR-2)
+    - kind: 'course' -> is_course, 'segment' -> NOT is_course, None -> both (FR-2)
+    - min_distance: distance_mi >= min_distance (FR-2)
+    - activity_type: legacy type-name patterns; Run excludes trail types (FR-2)
+
+    All filters are server-side (AC-1); SQL is parameterized (no string interpolation).
+
+    Args:
+        name: Substring filter; None/empty = any.
+        kind: 'course' | 'segment' | None.
+        min_distance: Minimum distance in miles; 0 = any.
+        activity_type: One of _ACTIVITY_TYPE_PATTERNS keys; None = any.
+
+    Returns:
+        List[Dict[str, Any]]: Segment rows ordered courses first, then last effort.
+    """
+    sql = """
+        SELECT
+            segment_id,
+            segment_name,
+            is_course,
+            activity_type_name,
+            distance_mi,
+            elevation_gain,
+            last_effort,
+            matched_activity_count
+        FROM activities.vw_segments_effort_stats
+        WHERE (%s::text IS NULL OR segment_name ILIKE %s)
+          AND (%s::text IS NULL OR (
+                CASE WHEN %s::text = 'course' THEN is_course
+                     WHEN %s::text = 'segment' THEN NOT is_course
+                     ELSE TRUE END))
+          AND distance_mi >= %s
+    """
+    params: List[Any] = [name, f"%{name}%" if name else None, kind, kind, kind, min_distance]
+
+    if (activity_type or '') in _ACTIVITY_TYPE_PATTERNS:
+        sql += f" AND ({_ACTIVITY_TYPE_PATTERNS[activity_type]})"
+        params.extend(_ACTIVITY_TYPE_PARAMS[activity_type])
+
+    sql += " ORDER BY is_course DESC, last_effort DESC NULLS LAST"
+
+    result = sql_to_dict(sql, tuple(params))
+    return result if result else []
+
+
+def get_segment_leaderboard(segment_id: int) -> List[Dict[str, Any]]:
+    """
+    Retrieve the ranked effort leaderboard for one segment/course (009-002, FR-4..FR-8).
+
+    Serves the live `activities.vw_segment_leaderboard` view directly (OQ-2: the legacy
+    leaderboard_update is a no-write on-demand SELECT, so no refresh call is made).
+    Computes server-side:
+    - gap_s: seconds behind the segment's fastest effort (FR-8)
+    - rank:  row_number by all_time_rank (client re-filters by range via the
+             four rank columns; FR-6/AC-5)
+
+    One query, projected columns only (no SELECT *), parameterized.
+
+    Args:
+        segment_id: The target segment/course id.
+
+    Returns:
+        List[Dict[str, Any]]: Effort rows ordered by all-time rank (NULLs last).
+    """
+    sql = """
+        WITH lb AS (
+            SELECT
+                segment_id,
+                is_course,
+                segment_name,
+                activity_id,
+                activity_start_point,
+                activity_end_point,
+                distance_mi,
+                start_time_utc,
+                all_time_rank,
+                last_365_rank,
+                current_cycle_rank,
+                recency_rank,
+                elapsed_duration_s,
+                pace_str,
+                weight_lb,
+                muscle_pct,
+                fat_pct,
+                vo2_max_value,
+                altitude_acclimation_m,
+                heat_acclimation_pct,
+                training_load_acute,
+                training_load_pct,
+                resting_hr_asleep,
+                resting_hr_awake,
+                sleep_hours,
+                sleep_score,
+                awake_hours,
+                max_hr,
+                avg_hr,
+                avg_cadence,
+                avg_temp,
+                avg_vert_osc,
+                avg_vert_ratio,
+                avg_gct,
+                avg_perf,
+                avg_balance,
+                avg_stride_length
+            FROM activities.vw_segment_leaderboard
+            WHERE segment_id = %s
+        ), fastest AS (
+            SELECT min(elapsed_duration_s) AS best_s
+            FROM lb
+        )
+        SELECT
+            lb.*,
+            round((lb.elapsed_duration_s - f.best_s), 1) AS gap_s,
+            row_number() OVER (ORDER BY lb.all_time_rank NULLS LAST) AS rank
+        FROM lb
+        CROSS JOIN fastest f
+        ORDER BY lb.all_time_rank NULLS LAST
+    """
+    result = sql_to_dict(sql, (segment_id,))
+    return result if result else []
+
+
+def get_segment_visuals_telemetry() -> List[Dict[str, Any]]:
+    """
+    Retrieve the generated comparison telemetry for the staged efforts (009-002, FR-10).
+
+    Reads `activities.vw_activity_segments_aggregated`, built off `vw_segment_comps`
+    joining the `temp_activity_segment_metas` staging table (staged by the T05 visuals
+    endpoint before this helper runs). Projects only the columns the SegmentVisuals
+    contract consumes; the view downsamples to one sample per canonical elapsed second.
+
+    Returns:
+        List[Dict[str, Any]]: One row per compared effort (meta_rank, id_val,
+        path_coords, and per-series arrays ordered by elapsed time).
+    """
+    sql = """
+        SELECT
+            id_val,
+            meta_rank,
+            path_coords,
+            x_time,
+            x_distance,
+            y_time,
+            y_hr,
+            y_elevation,
+            y_cadence,
+            y_speed,
+            y_vert_ratio,
+            y_osc,
+            y_temp,
+            y_stride,
+            y_gct
+        FROM activities.vw_activity_segments_aggregated
+        ORDER BY meta_rank, id_val
+    """
+    result = sql_to_dict(sql)
+    return result if result else []
+
+
+def stage_leaderboard_visuals(segment_id: int, efforts: List[Dict[str, Any]]) -> None:
+    """
+    Transactionally TRUNCATE + set-based multi-row INSERT of the selected efforts
+    into activities.temp_activity_segment_metas (009-002, T05).
+
+    A single parameterized execute_values statement replaces the legacy per-row
+    f-string loop (viz_factory/leaderboards.py::load_segment_selection_data), so the
+    staging table always contains exactly the N selected efforts and repeated calls
+    replace (never append). Wrapped in one transaction so a failure mid-insert
+    rolls back both the TRUNCATE and the INSERT.
+
+    Args:
+        segment_id: The segment the compared efforts belong to (passed through for
+            contract symmetry; the staging table is keyed by activity_id + points).
+        efforts: Selected efforts, each {activity_id, start_point, end_point}.
+    """
+    rows = [
+        (int(e["activity_id"]), int(e["start_point"]), int(e["end_point"]))
+        for e in efforts
+    ]
+
+    conn = get_conn()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        cur.execute("TRUNCATE TABLE activities.temp_activity_segment_metas;")
+        execute_values(
+            cur,
+            "INSERT INTO activities.temp_activity_segment_metas "
+            "(activity_id, start_point, end_point) VALUES %s",
+            rows,
+            template="(%s, %s, %s)",
+        )
+        conn.commit()
+        cur.close()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def get_segment_name(segment_id: int) -> str:
+    """
+    Resolve the segment_name for a segment_id (009-002, T05).
+
+    Used by the visuals endpoint to populate the SegmentVisuals.segment_name
+    contract field from the request's segment_id. Falls back to "" when unknown.
+    """
+    result = sql_to_dict(
+        "SELECT segment_name FROM activities.segments WHERE segment_id = %s LIMIT 1",
+        (segment_id,),
+    )
+    if not result:
+        return ""
+    return str(result[0].get("segment_name") or "")
+
+
 __all__ = [
     'get_activities_list',
     'get_activity_by_id',
@@ -490,4 +740,10 @@ __all__ = [
     'get_activity_report_efforts',
     'get_activity_report_charts',
     'get_activity_course_path',
+    # 009-002 Leaderboards
+    'get_leaderboard_segments',
+    'get_segment_leaderboard',
+    'get_segment_visuals_telemetry',
+    'stage_leaderboard_visuals',
+    'get_segment_name',
 ]
