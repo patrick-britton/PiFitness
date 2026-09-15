@@ -13,6 +13,7 @@ import * as Icons from '@mui/icons-material';
 import ActivityProcessingPage from '../activities/activity-processing/page';
 import BeachPage from '../activities/beach/page';
 import RecentActivityPage from '../activities/recent-activity/page';
+import LeaderboardsPage from '../activities/leaderboards/page';
 
 const TABS = MODULE_SUB_PAGES.activities;
 
@@ -144,6 +145,8 @@ export default function ActivitiesPage() {
             <RecentActivityPage />
           ) : activeTab === 'beach' ? (
             <BeachPage />
+          ) : activeTab === 'leaderboards' ? (
+            <LeaderboardsPage />
           ) : (
             <div className="p-8 text-center">
               <p className="text-gray-500 dark:text-gray-400 text-lg">wow such empty</p>

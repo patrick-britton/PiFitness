@@ -1,7 +1,6 @@
 import os
-import pandas as pd
 
-from backend_functions.database_functions import get_conn, sql_to_list, elapsed_ms, qec, sql_to_dict, one_sql_result
+from backend_functions.database_functions import sql_to_list, elapsed_ms, qec, sql_to_dict, one_sql_result
 from backend_functions.logging_functions import log_app_event, start_timer
 from backend_functions.service_logins import get_spotify_client, check_rate_limit_cached
 from backend_functions.task_execution import json_loading, task_log
@@ -79,7 +78,23 @@ def playlist_to_db(client=None, list_id=None):
                  l_time=None,
                  t_time=None,
                  fail_type='No playlist items',
-                 fail_text=f"{len(playlists)} playlist(s) attempted: {e}")
+                                   fail_text=f"{len(playlists)} playlist(s) attempted: {e}")
+        return client
+
+            # 000-001 AC-8: fail-loud payload validation before staging load.
+    # Lazy import to avoid circular dependency (json_extractors imports
+    # get_playlist_list from this module at module load time).
+    from backend_functions.json_extractors import validate_playlist_payload
+    # Aborts (with log) when the payload is empty, incomplete, or yields a
+    # non-22-char playlist id — preventing malformed rows from entering staging.
+    td_stub = {'task_id': None, 'task_name': task_name, 'api_function_name': 'playlist_items'}
+    if not validate_playlist_payload(all_items, td_stub):
+        task_log(task_name=task_name,
+                 e_time=extract_ms,
+                 l_time=None,
+                 t_time=None,
+                 fail_type='Playlist payload validation failed',
+                 fail_text='Aborting before staging load — see log_app_event ValidatePayload entry')
         return client
 
     # Load blob to postgres
@@ -170,12 +185,12 @@ def playlist_upload(client=None, list_id=None, track_list=None):
     return client
 
 def ensure_playlist_relationships(client):
-    del_sql = """DELETE FROM music.playlist_relationships pr
-                WHERE pr.child_playlist_id in
-                 (SELECT DISTINCT playlist_id FROM music.playlist_config WHERE not is_active)"""
-    qec(del_sql)
-
-    sql = """SELECT * from music.missing_relationships"""
+    # 000-001 AC-5/AC-8: non-destructive — NO blanket DELETE of relationships.
+    # Row removal for retired children is the SPROC's responsibility (T05 S2
+    # correctness gate) and the repair script's (T12), never a side effect of
+    # a partial/empty input here.
+    sql = """SELECT playlist_id, playlist_name, needs_auto, needs_manual, needs_recs
+             FROM music.missing_relationships"""
     d = sql_to_dict(sql)
     if not d:
         return
@@ -193,39 +208,23 @@ def ensure_playlist_relationships(client):
             desc = f"Auto-shuffled copy of {name}."
             playlist_type = 'auto' if auto else 'manual'
             client, new_id = gen_playlist(client, name, desc)
-            ins_sql = f"""INSERT INTO music.playlist_relationships (
+            ins_sql = """INSERT INTO music.playlist_relationships (
             parent_playlist_id,
             child_playlist_id,
             child_playlist_type)
-            VALUES
-            ('{id}', '{new_id}', '{playlist_type}');"""
-            try:
-                qec(ins_sql)
-                print('success')
-                print(ins_sql)
-            except Exception as e:
-                print('ERROR')
-                print(ins_sql)
-                print(e)
+            VALUES (%s, %s, %s);"""
+            qec(ins_sql, p=(id, new_id, playlist_type))
         if rec:
             name = f"{name} (r)"
             desc = f"Auto-Recommendations for {name}."
             playlist_type = 'recommendation'
             client, new_id = gen_playlist(client, name, desc)
-            ins_sql = f"""INSERT INTO music.playlist_relationships (
+            ins_sql = """INSERT INTO music.playlist_relationships (
                         parent_playlist_id,
                         child_playlist_id,
                         child_playlist_type)
-                        VALUES
-                        ('{id}', '{new_id}', '{playlist_type}');"""
-            try:
-                qec(ins_sql)
-                print('success')
-                print(ins_sql)
-            except Exception as e:
-                print('ERROR')
-                print(ins_sql)
-                print(e)
+                        VALUES (%s, %s, %s);"""
+            qec(ins_sql, p=(id, new_id, playlist_type))
 
     return client
 
@@ -266,8 +265,12 @@ def auto_shuffle_playlists(list_id=None, limit_minutes=False):
     # The target_playlist_id returned is the child autoshuffle version of that playlist.
     for l in playlists:
         print(f'Pulling new order for list: {l}')
+        # 000-001 T11: parameterized (%s) instead of f-string interpolation,
+        # and the limit_minutes branch now has its filter applied — the
+        # pre-T11 string was missing the f-prefix so playlist_id was compared
+        # to the literal '{l}' and that path never returned rows.
         if limit_minutes:
-            sql = f"""SELECT target_playlist_id,
+            sql = """SELECT target_playlist_id,
                                track_id,
                                default_new_order
                         FROM
@@ -278,22 +281,25 @@ def auto_shuffle_playlists(list_id=None, limit_minutes=False):
                                                 OVER (PARTITION BY target_playlist_id ORDER BY default_new_order) as cumulative_duration_s,
                                                 minutes_to_sync
                                 FROM music.vw_playlist_isrc_stats
-                                WHERE playlist_id = '{l}') subquery
+                                WHERE playlist_id = %s) subquery
                         WHERE cumulative_duration_s/60 < minutes_to_sync
                         ORDER BY default_new_order asc;"""
         else:
-            sql = f"""SELECT DISTINCT target_playlist_id, track_id,
-                default_new_order 
-                FROM music.vw_playlist_isrc_stats WHERE playlist_id = '{l}'
+            sql = """SELECT DISTINCT target_playlist_id, track_id,
+                default_new_order
+                FROM music.vw_playlist_isrc_stats WHERE playlist_id = %s
                 ORDER BY default_new_order asc;"""
-        df = pd.read_sql(sql, get_conn(alchemy=True))
-        if df.empty:
+        # 000-001 T11: dataframe library removed — sql_to_dict returns a list
+        # of dicts in result order, which preserves default_new_order for the
+        # track list.
+        rows = sql_to_dict(sql, params=[l])
+        if not rows:
             print(f'No songs found for list: {l}')
             continue
 
-        id = df['target_playlist_id'].iloc[0]
+        id = rows[0].get("target_playlist_id")
         print(f"Target Playlist ID: {id} -- sourced from {l}")
-        track_list = df['track_id'].to_list()
+        track_list = [r.get("track_id") for r in rows]
         if not track_list:
             print(f'No tracks found for list {id}')
         else:
@@ -412,7 +418,7 @@ def get_now_playing(client=None):
             fetch_id = parent_id if parent_id else playlist_id
             if playlist_type == 'recommendation':
                 sql = f"""SELECT elo_track_predicted as elo_rating FROM music.track_recommendations
-                        WHERE isrc='{isrc}' and playlist_id='{fetch_id}'"""
+                        WHERE isrc='{isrc}' and playlist_id='{fetch_id}';"""
             else:
                 sql = f"""SELECT elo_rating from music.ratings
                         WHERE isrc='{isrc}' and playlist_id='{fetch_id}';"""

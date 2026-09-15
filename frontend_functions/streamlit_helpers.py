@@ -7,6 +7,9 @@ import psycopg2.extensions
 import pandas as pd
 import numpy as np
 
+# 000-001 OQ-7 one-time waiver: the legacy Streamlit playlist-config trigger is
+# hard-disabled (see sync_df_from_data_editor below). This import is retained
+# only so the module still loads; nothing may call ensure_playlist_relationships.
 from backend_functions.music_functions import ensure_playlist_relationships
 
 # Register numpy types with psycopg2
@@ -247,28 +250,35 @@ def ss_debug(ss_var_list=None):
 
 
 def sync_df_from_data_editor(df=None, key_val=None, pk_col=None):
-    if not key_val or df.empty or not pk_col:
-        st.toast('No values')
-        return
-
-    state_dict = ss.get(key_val)
-    if not state_dict:
-        st.toast('No state dict')
-        return
-
-    edited_rows = state_dict.get("edited_rows", {})
-    if not edited_rows:
-        st.toast('No edited rows')
-        return
-
-    for row_idx, changes in edited_rows.items():
-        for col_name, new_value in changes.items():
-            pk_value = df.loc[row_idx, pk_col]
-            upd_sql = f"""UPDATE music.playlist_config SET {col_name} = {new_value} WHERE {pk_col} = '{pk_value}';"""
-            qec(upd_sql)
-
-    ensure_playlist_relationships(None)
-    return
+    # 000-001 OQ-7 one-time waiver (hard-disable): the legacy implicit trigger
+    # `playlist_config_table` -> here -> `ensure_playlist_relationships(None)`
+    # created/deleted child playlists as a Streamlit data-editor side effect.
+    # The body below is intentionally inert: any reach must fail loudly.
+    # The original UPDATE loop + ensure_playlist_relationships(None) call are
+    # preserved commented-out for forensics. Do NOT re-enable.
+    raise RuntimeError("disabled legacy path — see 000-001 OQ-7")
+    # if not key_val or df.empty or not pk_col:
+    #     st.toast('No values')
+    #     return
+    #
+    # state_dict = ss.get(key_val)
+    # if not state_dict:
+    #     st.toast('No state dict')
+    #     return
+    #
+    # edited_rows = state_dict.get("edited_rows", {})
+    # if not edited_rows:
+    #     st.toast('No edited rows')
+    #     return
+    #
+    # for row_idx, changes in edited_rows.items():
+    #     for col_name, new_value in changes.items():
+    #         pk_value = df.loc[row_idx, pk_col]
+    #         upd_sql = f"""UPDATE music.playlist_config SET {col_name} = {new_value} WHERE {pk_col} = '{pk_value}';"""
+    #         qec(upd_sql)
+    #
+    # ensure_playlist_relationships(None)
+    # return
 
 
 def ss_pop(var_list):

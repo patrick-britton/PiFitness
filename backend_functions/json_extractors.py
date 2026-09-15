@@ -1,5 +1,6 @@
 import ast
 import hashlib
+import re
 import time
 from datetime import date, timedelta, datetime
 import pytz
@@ -52,7 +53,18 @@ def extract_json_playlist_details(client=None, td=None, list_id=None):
     # Monitor performance, start the timer
 
     if not client:
-        client = get_spotify_client
+        # get_spotify_client() returns a client *dict* ({'client': <spotipy>, ...})
+        # while this extractor needs the raw spotipy client. (Before 000-001 T08
+        # this assigned the function object itself, so the no-client path raised
+        # AttributeError: 'function' object has no attribute 'playlist_items'.)
+        client = (get_spotify_client() or {}).get('client')
+
+    if not client:
+        log_app_event(cat='Playlist Sync',
+                      desc='Aborting playlist detail extraction — no usable Spotify client',
+                      err='get_spotify_client() returned no client',
+                      data_event='ValidatePayload')
+        return []
 
     task_name = 'Playlist Detail Sync'
 
@@ -64,7 +76,11 @@ def extract_json_playlist_details(client=None, td=None, list_id=None):
 
     # Ensure we actually have playlists
     if not playlists:
-        return client
+        log_app_event(cat='Playlist Sync',
+                      desc='Aborting playlist detail extraction — no playlists to sync',
+                      err='get_playlist_list() returned no playlist ids',
+                      data_event='ValidatePayload')
+        return []
 
     log_app_event(cat='Playlist Sync',
                   desc=f"{len(playlists)} playlists found")
@@ -72,7 +88,7 @@ def extract_json_playlist_details(client=None, td=None, list_id=None):
     # Initialize Results
     all_items = []
 
-    # Iterate through list of playlists
+        # Iterate through list of playlists
     for l in playlists:
         if l != playlists[0]:
             time.sleep(2)  # Sleep for 10 seconds between playlists
@@ -84,7 +100,152 @@ def extract_json_playlist_details(client=None, td=None, list_id=None):
             all_items.append(results)
             results = client.next(results)
             time.sleep(1)
+
+    # 000-001 AC-8 (T08): normalize paging hrefs before the staging load.
+    # Spotify's playlist_items paging href uses "/items?offset=.." for page 2+,
+    # but staging.flatten_playlist_details derives playlist_id as
+    # split_part(split_part(href,'/playlists/',2),'/tracks',1) — so an
+    # un-normalized href persists "{id}/items?offset=..&limit=.." into
+    # music.playlist_isrcs.playlist_id (Bug 000-001-T01-1). This mirrors the
+    # rewrite in music_functions.playlist_to_db (004-004 Bug T10-7).
+    for page in all_items:
+        if isinstance(page, dict):
+            href = page.get('href') or ''
+            if '/items?' in href:
+                page['href'] = href.replace('/items?', '/tracks?', 1)
+
     return all_items
+
+
+PLAYLIST_ID_RE = re.compile(r'^[A-Za-z0-9]{22}$')
+
+
+def derive_playlist_id_from_href(href):
+    """Derive a playlist id the same way the live flatten SPROC does.
+
+    staging.flatten_playlist_details computes
+    ``split_part(split_part(href, '/playlists/', 2), '/tracks', 1)``; with an
+    un-normalized paging href (``.../playlists/{id}/items?offset=50&limit=50``)
+    that yields ``{id}/items?offset=50&limit=50`` and pollutes
+    ``music.playlist_isrcs.playlist_id`` (Bug 000-001-T01-1). This helper mirrors
+    the SPROC derivation and trims any query string, so a caller can tell whether
+    the payload would persist a bare 22-char id.
+
+    Returns the derived token, or None when the href carries no '/playlists/'.
+    """
+    if not href or '/playlists/' not in href:
+        return None
+    derived = href.split('/playlists/', 1)[1].split('/tracks', 1)[0]
+    return derived.split('?', 1)[0]
+
+
+def validate_playlist_payload(json_data, td):
+    """Fail-loud guard (AC-8) for playlist sync payloads.
+
+    Called between extraction and the staging load by the live task runner
+    (ultimate_task_executioner_v2.extract_load_flatten) and by
+    music_functions.playlist_to_db. Aborts (returns False + logs) when the
+    payload is empty, has a truncated page chain (paging not exhausted), or
+    yields a non-22-char playlist id — so no malformed row reaches staging and
+    no downstream delete can run.
+
+    Args:
+        json_data: list of page dicts from the extractor
+        td: task dictionary (for task_id/task_name logging context)
+
+    Returns:
+        True if the payload is valid and safe to load, False to abort.
+    """
+    task_id = td.get('task_id')
+    task_name = td.get('task_name')
+    api_function_name = td.get('api_function_name', '')
+
+    def _abort(desc, err):
+        log_app_event(
+            cat=f"Task #{task_id}: {task_name}",
+            desc=desc,
+            err=err,
+            task_id=task_id,
+            data_event='ValidatePayload'
+        )
+        return False
+
+    # --- Empty payload: abort with no deletes ---
+    if not json_data:
+        return _abort(
+            "Aborting playlist sync — empty payload",
+            f"api_function_name={api_function_name}; no data returned from API"
+        )
+
+    # --- Normalise to list ---
+    if isinstance(json_data, dict):
+        json_data = [json_data]
+
+    if not isinstance(json_data, (list, tuple)):
+        return _abort(
+            "Aborting playlist sync — unexpected payload type",
+            f"api_function_name={api_function_name}; type={type(json_data).__name__}"
+        )
+
+    # --- Validate page ids (detail payloads) and item ids (header payloads) ---
+    # Detail payloads ('playlist_items'): the page href is the only source of the
+    # playlist id the flatten SPROC persists, so it must resolve to a bare
+    # 22-char id. Header payloads ('current_user_playlists'): pages point at the
+    # user's playlist collection ('/users/{id}/playlists?offset=..'), so the
+    # playlist ids live on the items.
+    is_header_payload = api_function_name == 'current_user_playlists'
+
+    non_empty_pages = 0
+    derived_ids = []
+    for page in json_data:
+        items = page.get('items', []) if isinstance(page, dict) else []
+        if items:
+            non_empty_pages += 1
+
+        page_href = page.get('href', '') if isinstance(page, dict) else ''
+        derived = derive_playlist_id_from_href(page_href)
+
+        if not is_header_payload and (derived is None or not PLAYLIST_ID_RE.match(derived)):
+            return _abort(
+                "Aborting playlist sync — non-22-char playlist_id",
+                (f"api_function_name={api_function_name}; href={page_href[:120]}; "
+                 f"derived_id={str(derived)[:40]}")
+            )
+        derived_ids.append(derived)
+
+        if is_header_payload:
+            for item in items:
+                if isinstance(item, dict):
+                    item_id = item.get('id')
+                    if item_id and not PLAYLIST_ID_RE.match(str(item_id)):
+                        return _abort(
+                            "Aborting playlist sync — non-22-char playlist_id in items",
+                            f"api_function_name={api_function_name}; item_id={str(item_id)[:30]}"
+                        )
+
+    # --- Paging must be exhausted for every playlist chain ---
+    # A page that advertises a 'next' href is only fine when its successor page
+    # was already fetched (intermediate pages of a paged payload keep their
+    # pointer). A page whose successor is missing, or belongs to a different
+    # playlist, means extraction stopped early — abort (no load, no deletes).
+    for i, page in enumerate(json_data):
+        next_url = page.get('next') if isinstance(page, dict) else None
+        if next_url and (i + 1 >= len(json_data) or derived_ids[i + 1] != derived_ids[i]):
+            return _abort(
+                f"Aborting playlist sync — incomplete paging (page {i} has next={str(next_url)[:80]})",
+                f"api_function_name={api_function_name}; pages not exhausted"
+            )
+
+    # --- At least one page must carry items ---
+    if non_empty_pages == 0:
+        return _abort(
+            "Aborting playlist sync — all pages empty",
+            f"api_function_name={api_function_name}; {len(json_data)} page(s) with 0 items"
+        )
+
+    return True
+
+
 
 
 def extract_with_args(client=None, td=None, args=None):

@@ -26,7 +26,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.config import get_settings
-from backend.api import activities, health, admin, music, segments, auth, tri_tip, volleyball, exercises
+from backend.api import activities, health, admin, music, segments, auth, tri_tip, volleyball, exercises, config
 
 # ---------------------------------------------------------------------------
 # Application Initialization
@@ -116,6 +116,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include API routers
 app.include_router(activities.router)
+app.include_router(config.router)
 app.include_router(health.router)
 app.include_router(admin.router)
 app.include_router(music.router)

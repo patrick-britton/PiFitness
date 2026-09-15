@@ -530,7 +530,259 @@ def test_sql_to_list_no_params_still_works():
     with patch('backend_functions.database_functions.get_conn', return_value=mock_conn):
         result = sql_to_list("SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5")
 
-    assert result == ["a", "b"]
+        assert result == ["a", "b"]
     mock_cursor.execute.assert_called_once_with(
         "SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5"
     )
+
+
+# ---------------------------------------------------------------------------
+# Playlist sync fail-loud guards (000-001 T08, AC-8)
+# ---------------------------------------------------------------------------
+
+BARE_ID = '1Rfae5pyaheNsvr7ajdeBR'  # 22 chars, matches the PRD-documented id
+PAGE0_HREF = (f"https://api.spotify.com/v1/playlists/{BARE_ID}"
+              "/items?offset=0&limit=50&additional_types=track")
+PAGE1_HREF = (f"https://api.spotify.com/v1/playlists/{BARE_ID}"
+              "/items?offset=50&limit=50&additional_types=track")
+NORM0_HREF = PAGE0_HREF.replace('/items?', '/tracks?')
+NORM1_HREF = PAGE1_HREF.replace('/items?', '/tracks?')
+
+DETAIL_TD = {'task_id': 16, 'task_name': 'Playlist Detail Sync', 'api_function_name': 'playlist_items'}
+HEADER_TD = {'task_id': 17, 'task_name': 'Playlist Header Sync', 'api_function_name': 'current_user_playlists'}
+
+
+def test_validate_playlist_payload_empty_aborts():
+    """AC-8: empty payload aborts with False (no delete, no load)."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
+            patch('backend_functions.json_extractors.qec') as mock_qec:
+        result = validate_playlist_payload(None, HEADER_TD)
+    assert result is False
+    mock_log.assert_called_once()
+    mock_qec.assert_not_called()  # guard performs no DB work, so no deletes
+
+
+def test_validate_playlist_payload_incomplete_paging_aborts():
+    """AC-8: a page advertising 'next' with no successor page aborts."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    truncated_page = {
+        'href': NORM0_HREF,
+        'next': f"https://api.spotify.com/v1/playlists/{BARE_ID}/tracks?offset=50",
+        'items': [{'track': {'id': 't1'}}],
+    }
+    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
+            patch('backend_functions.json_extractors.qec') as mock_qec:
+        result = validate_playlist_payload([truncated_page], DETAIL_TD)
+    assert result is False
+    mock_log.assert_called_once()
+    assert 'incomplete paging' in mock_log.call_args[1].get('desc', '')
+    mock_qec.assert_not_called()
+
+
+def test_validate_playlist_payload_truncated_chain_before_next_playlist_aborts():
+    """AC-8: a playlist chain cut short (its 'next' page belongs to another id) aborts."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    other_id = '7LPPIzdYgJZgj2QTSXCCNy'
+    pages = [
+        {'href': NORM0_HREF, 'next': 'offset=50 page',
+         'items': [{'track': {'id': 't1'}}]},
+        {'href': f"https://api.spotify.com/v1/playlists/{other_id}/tracks?offset=0",
+         'items': [{'track': {'id': 't2'}}]},
+    ]
+    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+        result = validate_playlist_payload(pages, DETAIL_TD)
+    assert result is False
+    mock_log.assert_called_once()
+    assert 'incomplete paging' in mock_log.call_args[1].get('desc', '')
+
+
+def test_validate_playlist_payload_complete_paged_chain_passes():
+    """AC-8/T02 regression: intermediate pages legitimately keep their 'next'
+    pointer — a fully-fetched chain must pass (no false abort on page 0)."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    pages = [
+        {'href': NORM0_HREF, 'next': f".../playlists/{BARE_ID}/tracks?offset=50",
+         'items': [{'track': {'id': 't1'}}]},
+        {'href': NORM1_HREF, 'next': None, 'items': [{'track': {'id': 't2'}}]},
+    ]
+    assert validate_playlist_payload(pages, DETAIL_TD) is True
+
+
+def test_validate_playlist_payload_malformed_href_id_aborts():
+    """AC-8: a href whose derived id is not a bare 22-char id aborts with the
+    offender logged."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    bad_page = {
+        'href': 'https://api.spotify.com/v1/playlists/abc/playlist/items',
+        'items': [{'track': {'id': 't1'}}],
+    }
+    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+        result = validate_playlist_payload([bad_page], DETAIL_TD)
+    assert result is False
+    mock_log.assert_called_once()
+    assert 'non-22-char playlist_id' in mock_log.call_args[1].get('desc', '')
+
+
+def test_validate_playlist_payload_detail_missing_href_aborts():
+    """AC-8: a detail page whose href cannot yield an id aborts (the SPROC would
+    otherwise persist an empty/garbage playlist_id)."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+        result = validate_playlist_payload([{'items': [{'track': {'id': 't1'}}]}], DETAIL_TD)
+    assert result is False
+    mock_log.assert_called_once()
+    assert 'non-22-char playlist_id' in mock_log.call_args[1].get('desc', '')
+
+
+def test_validate_playlist_payload_detail_item_ids_are_not_playlist_ids():
+    """Detail payload items are playlist-track objects, not playlists — a
+    non-22-char item id (e.g. a local file) must not be mistaken for a polluted
+    playlist_id (only the page href carries the playlist id)."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    page = {
+        'href': NORM0_HREF,
+        'items': [{'id': 'spotify:local:artist:album:track:180', 'track': {'id': 't1'}}],
+    }
+    assert validate_playlist_payload([page], DETAIL_TD) is True
+
+
+def test_validate_playlist_payload_unnormalized_items_href_aborts():
+    """Bug 000-001-T01-1 regression: the raw page-2+ form
+    '/playlists/{id}/items?offset=50&limit=50&additional_types=track' would make
+    the SPROC persist '{id}/items?offset=50...' — fail loud instead (both live
+    paths normalize hrefs before this guard runs)."""
+    from backend_functions.json_extractors import (
+        derive_playlist_id_from_href,
+        validate_playlist_payload,
+    )
+    assert derive_playlist_id_from_href(PAGE1_HREF) == f"{BARE_ID}/items"
+    unnormalized_page = {'href': PAGE1_HREF, 'items': [{'track': {'id': 't2'}}]}
+    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
+            patch('backend_functions.json_extractors.qec') as mock_qec:
+        result = validate_playlist_payload([unnormalized_page], DETAIL_TD)
+    assert result is False
+    mock_log.assert_called_once()
+    assert 'non-22-char playlist_id' in mock_log.call_args[1].get('desc', '')
+    mock_qec.assert_not_called()
+
+
+def test_validate_playlist_payload_malformed_item_id_aborts():
+    """AC-8: header payloads carry the playlist id on the item — validate it."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    bad_page = {
+        'href': 'https://api.spotify.com/v1/users/someuser/playlists?offset=0&limit=50',
+        'items': [{'id': 'not_22_chars', 'name': 'Bad Playlist'}],
+    }
+    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
+            patch('backend_functions.json_extractors.qec') as mock_qec:
+        result = validate_playlist_payload([bad_page], HEADER_TD)
+    assert result is False
+    mock_log.assert_called_once()
+    assert 'in items' in mock_log.call_args[1].get('desc', '')
+    mock_qec.assert_not_called()
+
+
+def test_validate_playlist_payload_valid_detail_payload_passes():
+    """AC-8: normalized pages carrying bare 22-char ids pass."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    pages = [
+        {'href': NORM0_HREF, 'items': [{'track': {'id': 't1'}}]},
+        {'href': NORM1_HREF, 'items': [{'track': {'id': 't2'}}]},
+    ]
+    assert validate_playlist_payload(pages, DETAIL_TD) is True
+
+
+def test_validate_playlist_payload_valid_header_payload_passes():
+    """AC-8: header payload with a complete chain and 22-char item ids passes."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    pages = [
+        {'href': 'https://api.spotify.com/v1/users/someuser/playlists?offset=0&limit=50',
+         'next': 'https://api.spotify.com/v1/users/someuser/playlists?offset=50&limit=50',
+         'items': [{'id': BARE_ID, 'name': 'Good Playlist'}]},
+        {'href': 'https://api.spotify.com/v1/users/someuser/playlists?offset=50&limit=50',
+         'next': None,
+         'items': [{'id': '7LPPIzdYgJZgj2QTSXCCNy', 'name': 'Another'}]},
+    ]
+    assert validate_playlist_payload(pages, HEADER_TD) is True
+
+
+def test_validate_playlist_payload_all_pages_empty_aborts():
+    """AC-8: all pages with zero items aborts."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    empty_page = {'href': NORM0_HREF, 'items': []}
+    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+        result = validate_playlist_payload([empty_page], DETAIL_TD)
+    assert result is False
+    mock_log.assert_called_once()
+    assert 'all pages empty' in mock_log.call_args[1].get('desc', '')
+
+
+def test_validate_playlist_payload_unexpected_type_aborts():
+    """AC-8: a non-page payload (e.g. a client object) aborts instead of crashing."""
+    from backend_functions.json_extractors import validate_playlist_payload
+    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+        result = validate_playlist_payload(object(), DETAIL_TD)
+    assert result is False
+    mock_log.assert_called_once()
+    assert 'unexpected payload type' in mock_log.call_args[1].get('desc', '')
+
+
+class _FakeSpotifyClient:
+    """Minimal two-page playlist-items client (no network)."""
+
+    def __init__(self, pages):
+        self._pages = list(pages)
+
+    def playlist_items(self, playlist_id=None, additional_types=None):
+        assert playlist_id == BARE_ID
+        return dict(self._pages[0])
+
+    def next(self, results):
+        if results.get('next') == 'page1':
+            return dict(self._pages[1])
+        return None
+
+
+def test_playlist_details_extractor_normalizes_hrefs_and_passes_guard():
+    """Bug 000-001-T01-1: the task-wired extractor must hand bare ids to staging.
+
+    Fixture-driven (no network): every page of the playlist-items payload is
+    normalized to '/tracks?' so the SPROC derivation yields the bare 22-char id,
+    and the resulting payload then passes the AC-8 fail-loud guard.
+    """
+    from backend_functions.json_extractors import (
+        derive_playlist_id_from_href,
+        extract_json_playlist_details,
+        validate_playlist_payload,
+    )
+    pages = [
+        {'href': PAGE0_HREF, 'next': 'page1', 'items': [{'track': {'id': 't1'}}]},
+        {'href': PAGE1_HREF, 'next': None, 'items': [{'track': {'id': 't2'}}]},
+    ]
+    with patch('backend_functions.json_extractors.time.sleep'), \
+            patch('backend_functions.json_extractors.log_app_event'):
+        payload = extract_json_playlist_details(
+            client=_FakeSpotifyClient(pages), list_id=BARE_ID, td=DETAIL_TD
+        )
+
+    assert len(payload) == 2
+    for page in payload:
+        assert '/items?' not in page['href'], f"unnormalized href: {page['href']}"
+        assert '/tracks?' in page['href'], f"expected normalized href: {page['href']}"
+        assert derive_playlist_id_from_href(page['href']) == BARE_ID
+    assert validate_playlist_payload(payload, DETAIL_TD) is True
+
+
+def test_playlist_details_extractor_no_client_aborts_loudly():
+    """Bug 000-001-T08-2: the no-client path must fail loud instead of raising
+    AttributeError: 'function' object has no attribute 'playlist_items'."""
+    from backend_functions.json_extractors import extract_json_playlist_details
+    with patch('backend_functions.json_extractors.get_spotify_client', return_value={}), \
+            patch('backend_functions.json_extractors.log_app_event') as mock_log, \
+            patch('backend_functions.json_extractors.get_playlist_list') as mock_list:
+        result = extract_json_playlist_details(client=None, list_id=None, td=DETAIL_TD)
+    assert result == []
+    mock_log.assert_called_once()
+    assert 'no usable Spotify client' in mock_log.call_args[1].get('desc', '')
+    mock_list.assert_not_called()

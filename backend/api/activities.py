@@ -24,6 +24,11 @@ from backend_functions.queries import (
     get_activity_report_efforts,
     get_activity_report_charts,
     get_activity_course_path,
+    get_leaderboard_segments,
+    get_segment_leaderboard,
+    get_segment_visuals_telemetry,
+    stage_leaderboard_visuals,
+    get_segment_name,
 )
 from backend_functions.database_functions import sql_to_dict, get_conn, qec, one_sql_result, sql_to_list
 from backend_functions.music_functions import (
@@ -47,6 +52,14 @@ from backend.schemas.activity_schemas import (
     ActivityElevationPoint,
     ActivityHeartratePoint,
     ActivityPacePoint,
+)
+from backend.schemas.leaderboard_schemas import (
+    Leaderboard,
+    LeaderboardEffort,
+    LeaderboardVisualsRequest,
+    SegmentVisuals,
+    SegmentVisualEffort,
+    SegmentVisualSeriesPoint,
 )
 
 router = APIRouter(prefix="/api/activities", tags=["activities"])
@@ -876,6 +889,247 @@ async def get_activity_report(activity_type: str = 'Run'):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch activity report: {str(e)}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Leaderboards (009-002)
+# ---------------------------------------------------------------------------
+
+VALID_LEADERBOARD_KINDS = ('course', 'segment')
+VALID_LEADERBOARD_ACTIVITY_TYPES = ('Run', 'Trail Run', 'Hike', 'Walk', 'Bike', 'Ski')
+
+
+@router.get("/leaderboard/segments")
+async def get_leaderboard_segments_route(
+    name: Optional[str] = None,
+    kind: Optional[str] = None,
+    min_distance: float = 0.0,
+    activity_type: Optional[str] = None,
+):
+    """
+    Get the filterable segment/course list for the Leaderboards page (009-002, FR-1/FR-2).
+
+    Thin handler: validate -> call the T02 SQL helper (all filtering is
+    server-side in `activities.vw_segments_effort_stats`) -> return rows.
+    Returns a bare JSON array matching the SegmentListRow[] contract consumed
+    by `API.activities.getLeaderboardSegments`.
+
+    Args:
+        name: Case-insensitive substring on segment_name; empty/omitted = any.
+        kind: 'course' | 'segment' | omitted (both).
+        min_distance: Minimum distance in miles; 0 = any.
+        activity_type: One of VALID_LEADERBOARD_ACTIVITY_TYPES; omitted = any.
+
+    Returns:
+        List[SegmentListRow]
+    """
+    if kind is not None and kind not in VALID_LEADERBOARD_KINDS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"kind must be one of {list(VALID_LEADERBOARD_KINDS)} or omitted",
+        )
+    if activity_type is not None and activity_type not in VALID_LEADERBOARD_ACTIVITY_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"activity_type must be one of {list(VALID_LEADERBOARD_ACTIVITY_TYPES)} or omitted",
+        )
+    if min_distance < 0:
+        raise HTTPException(status_code=422, detail="min_distance must be >= 0")
+
+    try:
+        rows = get_leaderboard_segments(
+            name=name or None,
+            kind=kind,
+            min_distance=min_distance,
+            activity_type=activity_type,
+        )
+        return rows or []
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch leaderboard segments: {str(e)}",
+        )
+
+
+@router.get("/leaderboard/{segment_id}")
+async def get_leaderboard_route(segment_id: int):
+    """
+    Get the ranked effort leaderboard for one segment/course (009-002, FR-4..FR-8).
+
+    Serves the live `activities.vw_segment_leaderboard` view directly (OQ-2:
+    the legacy leaderboard_update is a no-write on-demand SELECT, so no refresh
+    call is made; "refresh" for the client is simply re-fetching this endpoint).
+    gap_s is computed server-side by the T02 helper; all four rank columns are
+    returned so range/type switching stays client-side (FR-6/FR-7).
+
+    Args:
+        segment_id: The target segment/course id.
+
+    Returns:
+        Leaderboard matching the cross-surface contract.
+    """
+    try:
+        rows = get_segment_leaderboard(segment_id)
+        if not rows:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No leaderboard data found for segment_id={segment_id}",
+            )
+
+        first = rows[0]
+        efforts = [
+            LeaderboardEffort(
+                activity_id=_safe_int_default(r.get('activity_id'), 0),
+                activity_start_point=_safe_int_default(r.get('activity_start_point'), 0),
+                activity_end_point=_safe_int_default(r.get('activity_end_point'), 0),
+                rank=_safe_int_default(r.get('rank'), 0),
+                all_time_rank=_safe_int(r.get('all_time_rank')),
+                last_365_rank=_safe_int(r.get('last_365_rank')),
+                current_cycle_rank=_safe_int(r.get('current_cycle_rank')),
+                recency_rank=_safe_int(r.get('recency_rank')),
+                start_time_utc=str(r.get('start_time_utc') or ''),
+                elapsed_duration_s=_safe_float_default(r.get('elapsed_duration_s'), 0.0),
+                gap_s=_safe_float_default(r.get('gap_s'), 0.0),
+                pace_str=r.get('pace_str'),
+                avg_hr=_safe_float(r.get('avg_hr')),
+                max_hr=_safe_float(r.get('max_hr')),
+                vo2_max_value=_safe_float(r.get('vo2_max_value')),
+                resting_hr_asleep=_safe_float(r.get('resting_hr_asleep')),
+                resting_hr_awake=_safe_float(r.get('resting_hr_awake')),
+                training_load_acute=_safe_float(r.get('training_load_acute')),
+                training_load_pct=_safe_float(r.get('training_load_pct')),
+                weight_lb=_safe_float(r.get('weight_lb')),
+                fat_pct=_safe_float(r.get('fat_pct')),
+                muscle_pct=_safe_float(r.get('muscle_pct')),
+                avg_cadence=_safe_float(r.get('avg_cadence')),
+                avg_vert_osc=_safe_float(r.get('avg_vert_osc')),
+                avg_vert_ratio=_safe_float(r.get('avg_vert_ratio')),
+                avg_gct=_safe_float(r.get('avg_gct')),
+                avg_stride_length=_safe_float(r.get('avg_stride_length')),
+                avg_temp=_safe_float(r.get('avg_temp')),
+                altitude_acclimation_m=_safe_float(r.get('altitude_acclimation_m')),
+                heat_acclimation_pct=_safe_float(r.get('heat_acclimation_pct')),
+                sleep_hours=_safe_float(r.get('sleep_hours')),
+                sleep_score=_safe_float(r.get('sleep_score')),
+                awake_hours=_safe_float(r.get('awake_hours')),
+                avg_perf=_safe_float(r.get('avg_perf')),
+                avg_balance=_safe_float(r.get('avg_balance')),
+            )
+            for r in rows
+        ]
+        leaderboard = Leaderboard(
+            segment_id=_safe_int_default(first.get('segment_id'), segment_id),
+            segment_name=str(first.get('segment_name') or ''),
+            is_course=bool(first.get('is_course')),
+            efforts=efforts,
+        )
+        return leaderboard.model_dump(mode="json")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch segment leaderboard: {str(e)}",
+        )
+
+
+def _map_visual_row(row: dict) -> SegmentVisualEffort:
+    """
+    Map one aggregated view row to the SegmentVisualEffort contract (009-002, T05).
+
+    The T02 telemetry helper returns parallel array columns (one sample per
+    canonical elapsed second). Zip them into the series point list — pure Python,
+    no pandas (mirrors the legacy viz_factory explode approach). psycopg2 returns
+    PG arrays as Python lists and the json path_coords column as a native list,
+    so no per-element coercion is required beyond None-safety.
+    """
+    x_time = row.get("x_time") or []
+    x_distance = row.get("x_distance") or []
+    n = len(x_time)
+
+    y_elevation = row.get("y_elevation") or []
+    y_hr = row.get("y_hr") or []
+    y_cadence = row.get("y_cadence") or []
+    y_speed = row.get("y_speed") or []
+    y_vert_ratio = row.get("y_vert_ratio") or []
+    y_osc = row.get("y_osc") or []
+    y_temp = row.get("y_temp") or []
+    y_stride = row.get("y_stride") or []
+    y_gct = row.get("y_gct") or []
+
+    series = [
+        SegmentVisualSeriesPoint(
+            elapsed_s=_safe_float_default(x_time[i], 0.0) if i < n else 0.0,
+            distance_m=_safe_float_default(x_distance[i], 0.0)
+            if i < len(x_distance)
+            else 0.0,
+            elevation_m=_safe_float(y_elevation[i]) if i < len(y_elevation) else None,
+            heartrate_bpm=_safe_float(y_hr[i]) if i < len(y_hr) else None,
+            cadence_spm=_safe_float(y_cadence[i]) if i < len(y_cadence) else None,
+            speed_mmps=_safe_float(y_speed[i]) if i < len(y_speed) else None,
+            vert_ratio=_safe_float(y_vert_ratio[i])
+            if i < len(y_vert_ratio)
+            else None,
+            vert_oscillation_cm=_safe_float(y_osc[i]) if i < len(y_osc) else None,
+            air_temp_c=_safe_float(y_temp[i]) if i < len(y_temp) else None,
+            stride_length_cm=_safe_float(y_stride[i]) if i < len(y_stride) else None,
+            ground_contact_time_ms=_safe_float(y_gct[i]) if i < len(y_gct) else None,
+        )
+        for i in range(n)
+    ]
+
+    path_coords = row.get("path_coords") or []
+
+    return SegmentVisualEffort(
+        id_val=str(row.get("id_val") or ""),
+        meta_rank=_safe_int_default(row.get("meta_rank"), 0),
+        path_coords=path_coords,
+        series=series,
+    )
+
+
+@router.post("/leaderboard/visuals")
+async def post_leaderboard_visuals(request: LeaderboardVisualsRequest):
+    """
+    Stage selected efforts and return generated replay + telemetry visuals (009-002, T05/FR-10).
+
+    Transactionally TRUNCATEs + bulk-inserts the selected (activity_id, start/end
+    point) rows into activities.temp_activity_segment_metas, then reads the
+    aggregated telemetry via the T02 helper and returns the SegmentVisuals
+    contract (per-effort path_coords + zipped telemetry series). No pandas, no
+    per-row loop inserts; range/type switching stays client-side so no re-fetch.
+    """
+    try:
+        stage_leaderboard_visuals(
+            request.segment_id,
+            [e.model_dump() for e in request.efforts],
+        )
+
+        raw_rows = get_segment_visuals_telemetry()
+        if not raw_rows:
+            raise HTTPException(
+                status_code=404,
+                detail="No visual data found for the staged efforts",
+            )
+
+        segment_name = get_segment_name(request.segment_id)
+
+        visuals = SegmentVisuals(
+            segment_id=request.segment_id,
+            segment_name=segment_name,
+            efforts=[_map_visual_row(r) for r in raw_rows],
+        )
+        return visuals.model_dump(mode="json")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate leaderboard visuals: {str(e)}",
         )
 
 

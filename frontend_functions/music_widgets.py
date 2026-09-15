@@ -7,6 +7,9 @@ from streamlit import session_state as ss
 
 from backend_functions.database_functions import get_conn, qec
 from backend_functions.helper_functions import convert_to_json_serializable
+# 000-001 OQ-7 one-time waiver: the `on_change=sync_df_from_data_editor`
+# wiring in playlist_config_table() below is commented out (hard-disable).
+# Import retained so the module loads; the trigger must never fire.
 from frontend_functions.streamlit_helpers import sync_df_from_data_editor
 
 
@@ -93,14 +96,19 @@ def playlist_config_table(is_selection=False, list_id=None):
                      on_select="rerun"
                       )
     else:
+        # 000-001 OQ-7 one-time waiver (hard-disable): the on_change wiring to
+        # sync_df_from_data_editor (which called ensure_playlist_relationships)
+        # is commented out. The table renders read-only; edits must go through
+        # the React UI / FastAPI layer. Do NOT re-enable.
         st.data_editor(data=ss.pc_df,
                    key=key_val,
-                   on_change=sync_df_from_data_editor,
+                   # on_change=sync_df_from_data_editor,
                    num_rows="fixed",
                    column_order=cols,
                    column_config=col_config,
                    hide_index=True,
-                   args=(ss.pc_df, key_val, 'playlist_id'))
+                   # args=(ss.pc_df, key_val, 'playlist_id'))
+                   )
     return
 
 def render_shuffle_df(rcw, rtw, rnw, mts):
