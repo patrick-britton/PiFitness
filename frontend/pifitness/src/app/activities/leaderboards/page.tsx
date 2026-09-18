@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useViewportStore } from '@/stores/viewportStore';
 import { API } from '@/lib/api-client';
+import { scale } from '@/lib/bar-geometry';
 import {
   SegmentListQuery,
   SegmentListRow,
@@ -35,20 +36,35 @@ const DEFAULT_QUERY: SegmentListQuery = {
 };
 
 const KIND_OPTIONS: { value: SegmentKindFilter; label: string }[] = [
-  { value: null, label: 'Both' },
   { value: 'course', label: 'Course' },
   { value: 'segment', label: 'Segment' },
+  { value: null, label: 'Both' },
 ];
 
-const ACTIVITY_TYPE_OPTIONS: { value: SegmentActivityTypeFilter; label: string }[] = [
-  { value: null, label: 'Any' },
-  { value: 'Run', label: 'Run' },
-  { value: 'Trail Run', label: 'Trail Run' },
-  { value: 'Hike', label: 'Hike' },
-  { value: 'Walk', label: 'Walk' },
-  { value: 'Bike', label: 'Bike' },
-  { value: 'Ski', label: 'Ski' },
-];
+/** Raw DB activity-type strings are snake_case (`trail_running`, `hiking`);
+ *  prettify for display per OQ-3 (`Trail Running`, `Hiking`). Display-only —
+ *  the canonical filter key is sent to the backend. */
+function prettyType(raw: string): string {
+  return raw
+    .split('_')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
+/** Map a raw `activity_type_name` to the canonical backend filter key whose
+ *  `_ACTIVITY_TYPE_PATTERNS` ILIKE semantics already match that raw form.
+ *  Returns null when no canonical key matches (surfaced explicitly, never guessed). */
+function canonicalTypeKey(raw: string): SegmentActivityTypeFilter {
+  const v = raw.toLowerCase();
+  if (v.includes('trail') && v.includes('run')) return 'Trail Run';
+  if (v.includes('run') && !v.includes('trail')) return 'Run';
+  if (v.includes('hik')) return 'Hike';
+  if (v.includes('walk')) return 'Walk';
+  if (v.includes('bik')) return 'Bike';
+  if (v.includes('ski')) return 'Ski';
+  return null;
+}
 
 /** Format an ISO-8601 date as `d-mmm-yyyy`; falls back to "-" when missing. */
 function formatDate(iso: string | null): string {
@@ -60,21 +76,104 @@ function formatDate(iso: string | null): string {
 }
 
 /**
- * Scale a value into [floor, 100]% across the data range [min, max].
- * Returns 100 when the range is flat/degenerate so a single-row result still
- * renders a full bar rather than an empty one.
+ * Segmented single-select toggle (009-009 FR-1, AC-1): a pill group used for
+ * Kind (no visible header by design) and Activity Type. Themed via Tailwind
+ * dark tokens; `aria-pressed` carries state for assistive tech.
  */
-function scale(value: number, min: number, max: number, floor = 8): number {
-  if (!Number.isFinite(value) || !Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 100;
-  const clamped = Math.min(Math.max(value, min), max);
-  return Math.round(floor + ((clamped - min) / (max - min)) * (100 - floor));
+function ToggleGroup({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string | null;
+  options: { value: string | null; label: string }[];
+  onChange: (v: string | null) => void;
+}) {
+  return (
+    <div
+      className="flex rounded-md bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 overflow-hidden"
+      role="group"
+      aria-label={label}
+    >
+      {options.map((opt) => {
+        const active = (opt.value ?? null) === (value ?? null);
+        return (
+          <button
+            key={opt.label}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(opt.value ?? null)}
+            className={`flex-1 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
+              active
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
-/** Columns of the segment list that can be sorted. */
+/**
+ * Min-distance stepper (009-009 FR-1): ± buttons step exactly 1 mile while
+ * preserving decimals (0.25 +1 → 1.25); direct decimal entry stays supported.
+ * Native number spinners are hidden — a native `step=1` input would round
+ * 0.25 up to 1 on increment.
+ */
+function MinDistanceStepper({
+  value,
+  inputCls,
+  onChange,
+}: {
+  value: number;
+  inputCls: string;
+  onChange: (v: number) => void;
+}) {
+  const step = (delta: number) => onChange(Math.max(0, Math.round((value + delta) * 100) / 100));
+  const btn =
+    'w-7 flex-1 text-[10px] leading-none font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500';
+  return (
+    <div className="flex">
+      <input
+        id="lb-min-dist"
+        type="number"
+        min={0}
+        step="any"
+        value={value}
+        onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+        className={`${inputCls} rounded-r-none border-r-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+      />
+      <div className="flex flex-col">
+        <button
+          type="button"
+          onClick={() => step(1)}
+          aria-label="Increase minimum distance by 1 mile"
+          className={`${btn} rounded-tr-md border border-gray-300 dark:border-gray-600`}
+        >
+          ▲
+        </button>
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          aria-label="Decrease minimum distance by 1 mile"
+          className={`${btn} rounded-br-md border border-t-0 border-gray-300 dark:border-gray-600`}
+        >
+          ▼
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Columns of the segment list that can be sorted (Type column dropped, 009-009 T03). */
 type SortKey =
   | 'segment_name'
   | 'last_effort'
-  | 'activity_type_name'
   | 'distance_mi'
   | 'matched_activity_count'
   | 'elevation_gain';
@@ -132,6 +231,8 @@ export default function LeaderboardsPage() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey | null; dir: SortDir }>({ key: null, dir: 'asc' });
+  /** Activity types present in the (unfiltered) data — drives the type toggle (009-009 FR-1). */
+  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
 
   const fetchSegments = useCallback(async (q: SegmentListQuery) => {
     setLoading(true);
@@ -139,6 +240,14 @@ export default function LeaderboardsPage() {
     try {
       const data = await API.activities.getLeaderboardSegments(q);
       setRows(data);
+      // Cache the type list from any unfiltered-by-type fetch so the toggle
+      // only offers types that actually have segments (Bike/Ski stay hidden
+      // until they exist) — no extra backend endpoint (009-009 key decision).
+      if (!q.activity_type) {
+        setAvailableTypes(
+          Array.from(new Set(data.map((r) => r.activity_type_name).filter((t): t is string => !!t))).sort()
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load segments');
       setRows([]);
@@ -147,25 +256,49 @@ export default function LeaderboardsPage() {
     }
   }, []);
 
+  // Auto-apply (009-009 FR-1, AC-2): every filter change immediately re-queries
+  // the list server-side — no Apply button. Text edits debounce (400ms) so the
+  // Pi absorbs typing; toggles and stepper clicks fire on the next tick.
+  const prevQueryRef = useRef<SegmentListQuery | null>(null);
   useEffect(() => {
-    fetchSegments(DEFAULT_QUERY);
-    setHasSearched(true);
-  }, [fetchSegments]);
-
-  const handleApply = useCallback(() => {
-    setSelectedId(null);
-    fetchSegments(query);
+    const prev = prevQueryRef.current;
+    prevQueryRef.current = query;
+    const nameOnlyChanged =
+      prev != null &&
+      (prev.name || '') !== (query.name || '') &&
+      prev.kind === query.kind &&
+      prev.min_distance === query.min_distance &&
+      prev.activity_type === query.activity_type;
+    const timer = setTimeout(
+      () => {
+        setSelectedId(null);
+        setHasSearched(true);
+        fetchSegments(query);
+      },
+      nameOnlyChanged ? 400 : 0
+    );
+    return () => clearTimeout(timer);
   }, [query, fetchSegments]);
 
   const handleReset = useCallback(() => {
     setQuery(DEFAULT_QUERY);
     setSelectedId(null);
     setShowLeaderboard(false);
-    fetchSegments(DEFAULT_QUERY);
-  }, [fetchSegments]);
+  }, []);
 
   const handleSelect = useCallback((segmentId: number) => {
-    setSelectedId((prev) => (prev === segmentId ? null : segmentId));
+    setSelectedId(segmentId);
+    // Auto-load (AC-5): selection immediately populates the leaderboard —
+    // no separate Generate click.
+    setShowLeaderboard(true);
+  }, []);
+
+  // "x" on the segment header (AC-5/AC-10): restores filters + list and drops
+  // the leaderboard, race view, and all activity selections (LeaderboardTable
+  // unmounts, so its internal state resets with it).
+  const clearSelectedSegment = useCallback(() => {
+    setSelectedId(null);
+    setShowLeaderboard(false);
   }, []);
 
   /** Toggle sort: same column flips direction, new column starts ascending. */
@@ -180,12 +313,12 @@ export default function LeaderboardsPage() {
     const attempts = rows.map((r) => r.matched_activity_count);
     const elevations = rows.map((r) => r.elevation_gain).filter((v): v is number => v != null);
     const numOrZero = (v: number) => (Number.isFinite(v) ? v : 0);
-    const minOf = (arr: number[]) => (arr.length ? Math.min(...arr) : 0);
     const maxOf = (arr: number[]) => (arr.length ? Math.max(...arr) : 0);
     return {
-      dist: { min: minOf(dists), max: maxOf(dists) },
-      attempts: { min: minOf(attempts), max: maxOf(attempts) },
-      elev: { min: minOf(elevations), max: maxOf(elevations), hasData: elevations.length > 0 },
+      // Zero-based bars (AC-3): only the set max is needed.
+      dist: { max: maxOf(dists) },
+      attempts: { max: maxOf(attempts) },
+      elev: { max: maxOf(elevations), hasData: elevations.length > 0 },
       numOrZero,
     };
   }, [rows]);
@@ -206,6 +339,9 @@ export default function LeaderboardsPage() {
   }, [rows, sort]);
 
   const selectedRow = rows.find((r) => r.segment_id === selectedId) || null;
+  // Focus mode (AC-5): a segment is selected and its leaderboard is shown —
+  // filters and the segment list hide; the segment header with "x" restores.
+  const focusMode = selectedRow != null && showLeaderboard;
 
   const inputCls =
     'w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -214,126 +350,153 @@ export default function LeaderboardsPage() {
   const secondaryBtn =
     'px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors';
 
+  // Type toggle options (009-009 FR-1, T13/OQ-3): DISTINCT raw
+  // `activity_type_name` values from the cached unfiltered fetch, prettified
+  // for display (`trail_running` → `Trail Running`) and mapped to the
+  // canonical backend key the endpoint validates. Unmapped raws surface with
+  // their pretty label and a null value (never guessed) — selecting them
+  // sends no filter rather than a wrong one.
+  const typeOptions: { value: SegmentActivityTypeFilter; label: string }[] = [
+    { value: null, label: 'Any' },
+    ...availableTypes.map((raw) => ({
+      value: canonicalTypeKey(raw),
+      label: prettyType(raw),
+    })),
+  ];
+
+  const searchBox = (
+    <div>
+      <label htmlFor="lb-name" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+        Search
+      </label>
+      <input
+        id="lb-name"
+        type="text"
+        placeholder="segment or course name"
+        value={query.name || ''}
+        onChange={(e) => setQuery((q) => ({ ...q, name: e.target.value }))}
+        className={inputCls}
+      />
+    </div>
+  );
+
+  const minDistBox = (
+    <div>
+      <label htmlFor="lb-min-dist" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+        Min Distance (mi)
+      </label>
+      <MinDistanceStepper
+        value={query.min_distance}
+        inputCls={inputCls}
+        onChange={(v) => setQuery((q) => ({ ...q, min_distance: v }))}
+      />
+    </div>
+  );
+
+  const kindBox = (
+    <div>
+      {/* No header by design (FR-1); invisible spacer keeps pill alignment with sibling labels. */}
+      <span aria-hidden="true" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 select-none">
+        &nbsp;
+      </span>
+      <ToggleGroup
+        label="Course or segment kind"
+        value={query.kind}
+        options={KIND_OPTIONS}
+        onChange={(v) => setQuery((q) => ({ ...q, kind: v as SegmentKindFilter }))}
+      />
+    </div>
+  );
+
   return (
     <div className="space-y-4">
+      {!focusMode && (
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4">
-        <div
-          className={
-            isDesktop ? 'grid grid-cols-4 gap-4' : isLandscape ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-3'
-          }
-        >
+        <div className="space-y-3">
+          {/* Activity Type — the first filter the user engages with; top-left (009-009 FR-1). */}
           <div>
-            <label htmlFor="lb-name" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-              Name
-            </label>
-            <input
-              id="lb-name"
-              type="text"
-              placeholder="Substring..."
-              value={query.name || ''}
-              onChange={(e) => setQuery((q) => ({ ...q, name: e.target.value }))}
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <label htmlFor="lb-kind" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-              Kind
-            </label>
-            <select
-              id="lb-kind"
-              value={query.kind ?? ''}
-              onChange={(e) => setQuery((q) => ({ ...q, kind: (e.target.value || null) as SegmentKindFilter }))}
-              className={inputCls}
-            >
-              {KIND_OPTIONS.map((opt) => (
-                <option key={String(opt.value)} value={opt.value ?? ''}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="lb-min-dist" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-              Min Distance (mi)
-            </label>
-            <input
-              id="lb-min-dist"
-              type="number"
-              min={0}
-              step={0.1}
-              value={query.min_distance}
-              onChange={(e) => setQuery((q) => ({ ...q, min_distance: Math.max(0, Number(e.target.value) || 0) }))}
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <label htmlFor="lb-act" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            <span id="lb-act-label" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
               Activity Type
-            </label>
-            <select
-              id="lb-act"
-              value={query.activity_type ?? ''}
-              onChange={(e) =>
-                setQuery((q) => ({ ...q, activity_type: (e.target.value || null) as SegmentActivityTypeFilter }))
-              }
-              className={inputCls}
-            >
-              {ACTIVITY_TYPE_OPTIONS.map((opt) => (
-                <option key={String(opt.value)} value={opt.value ?? ''}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            </span>
+            <ToggleGroup
+              label="Activity type"
+              value={query.activity_type}
+              options={typeOptions}
+              onChange={(v) => setQuery((q) => ({ ...q, activity_type: v as SegmentActivityTypeFilter }))}
+            />
           </div>
+
+          {isDesktop ? (
+            <div className="grid grid-cols-[2fr_1fr_1fr] gap-4">
+              {searchBox}
+              {minDistBox}
+              {kindBox}
+            </div>
+          ) : isLandscape ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                {searchBox}
+                {minDistBox}
+              </div>
+              {kindBox}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Portrait: Search and Min Distance share one line (≈2/3 vs ≈1/3 width). */}
+              <div className="flex items-end gap-3">
+                <div className="flex-[2] min-w-0">{searchBox}</div>
+                <div className="flex-1 min-w-0">{minDistBox}</div>
+              </div>
+              {kindBox}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3 mt-4">
-          <button type="button" onClick={handleApply} className={primaryBtn}>
-            Apply Filters
-          </button>
           <button type="button" onClick={handleReset} className={secondaryBtn}>
             Reset
           </button>
         </div>
       </div>
+      )}
 
-      {loading && (
+      {!focusMode && loading && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-6 text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400">Loading segments...</p>
         </div>
       )}
 
-      {error && !loading && (
+      {!focusMode && error && !loading && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
           <p className="text-sm font-medium text-red-800 dark:text-red-200">Error loading segments</p>
           <p className="mt-1 text-sm text-red-700 dark:text-red-300">{error}</p>
         </div>
       )}
 
-      {!loading && !error && hasSearched && rows.length === 0 && (
+      {!focusMode && !loading && !error && hasSearched && rows.length === 0 && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-6 text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400">No segments match the current filters.</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Adjust the filters above and apply again.</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Adjust the filters above.</p>
         </div>
       )}
 
-      {!loading && !error && rows.length > 0 && (
+      {!focusMode && !loading && !error && rows.length > 0 && (
         <div className="space-y-3">
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {rows.length} segment{rows.length === 1 ? '' : 's'} found
           </p>
 
-          {isDesktop && (
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md overflow-x-auto">
+          {/* One responsive sortable table for all layouts (009-009 T03/AC-4;
+              the mobile card display prevented header sorting and was removed). */}
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
                     <th className="px-4 py-2 w-8" aria-label="Select" />
                     <SortableTh label="Name" col="segment_name" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} className="px-4 py-2" />
                     <SortableTh label="Last Effort" col="last_effort" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} className="px-4 py-2" />
-                    <SortableTh label="Type" col="activity_type_name" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} className="px-4 py-2" />
                     <SortableTh label="Distance (mi)" col="distance_mi" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} className="px-4 py-2 w-32" />
                     <SortableTh label="Attempts" col="matched_activity_count" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} className="px-4 py-2 w-32" />
-                    <SortableTh label="Elevation (m)" col="elevation_gain" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} className="px-4 py-2 w-32" />
+                    <SortableTh label="Elevation Gain" col="elevation_gain" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} className="px-4 py-2 w-32" />
                   </tr>
                 </thead>
                 <tbody>
@@ -359,29 +522,26 @@ export default function LeaderboardsPage() {
                         </td>
                         <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">{row.segment_name}</td>
                         <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{formatDate(row.last_effort)}</td>
-                        <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
-                          {row.activity_type_name ?? '-'}
-                        </td>
                         <td className="px-4 py-2">
                           <ProgressBar
-                            pct={scale(row.distance_mi, extents.dist.min, extents.dist.max)}
-                            label={row.distance_mi.toFixed(2)}
-                            color="var(--chart-1)"
+                            pct={scale(row.distance_mi, extents.dist.max)}
+                            label={`${row.distance_mi.toFixed(1)} mi`}
+                            color="rgb(var(--chart-1))"
                           />
                         </td>
                         <td className="px-4 py-2">
                           <ProgressBar
-                            pct={scale(row.matched_activity_count, extents.attempts.min, extents.attempts.max)}
+                            pct={scale(row.matched_activity_count, extents.attempts.max)}
                             label={String(row.matched_activity_count)}
-                            color="var(--chart-2)"
+                            color="rgb(var(--chart-2))"
                           />
                         </td>
                         <td className="px-4 py-2">
                           {extents.elev.hasData ? (
                             <ProgressBar
-                              pct={scale(extents.numOrZero(row.elevation_gain ?? 0), extents.elev.min, extents.elev.max)}
-                              label={row.elevation_gain != null ? `${row.elevation_gain}m` : '-'}
-                              color="var(--chart-3)"
+                              pct={scale(extents.numOrZero(row.elevation_gain ?? 0), extents.elev.max)}
+                              label={row.elevation_gain != null ? `${Math.round(row.elevation_gain)}m` : '-'}
+                              color="rgb(var(--chart-3))"
                             />
                           ) : (
                             <span className="text-gray-400 dark:text-gray-500">-</span>
@@ -393,88 +553,24 @@ export default function LeaderboardsPage() {
                 </tbody>
               </table>
             </div>
-          )}
-
-          {!isDesktop && (
-            <div className="space-y-2">
-              {sortedRows.map((row) => {
-                const sel = selectedId === row.segment_id;
-                return (
-                  <button
-                    key={row.segment_id}
-                    type="button"
-                    onClick={() => handleSelect(row.segment_id)}
-                    className={`w-full text-left bg-white dark:bg-gray-800 border rounded-md p-3 transition-colors ${
-                      sel
-                        ? 'border-blue-500 dark:border-blue-400'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                    }`}
-                    aria-pressed={sel}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                        {row.segment_name}
-                      </p>
-                      <span className="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">
-                        {row.is_course ? 'Course' : 'Segment'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {formatDate(row.last_effort)} &middot; {row.activity_type_name ?? '-'}
-                    </p>
-                    <div className="mt-2 space-y-1.5">
-                      <ProgressBar
-                        pct={scale(row.distance_mi, extents.dist.min, extents.dist.max)}
-                        label={`${row.distance_mi.toFixed(2)} mi`}
-                        color="var(--chart-1)"
-                      />
-                      <ProgressBar
-                        pct={scale(row.matched_activity_count, extents.attempts.min, extents.attempts.max)}
-                        label={`${row.matched_activity_count} attempts`}
-                        color="var(--chart-2)"
-                      />
-                      {extents.elev.hasData && (
-                        <ProgressBar
-                          pct={scale(extents.numOrZero(row.elevation_gain ?? 0), extents.elev.min, extents.elev.max)}
-                          label={row.elevation_gain != null ? `${row.elevation_gain}m` : '-'}
-                          color="var(--chart-3)"
-                        />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
 
-      {selectedRow && !showLeaderboard && (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              Selected: <span className="font-medium">{selectedRow.segment_name}</span>
+      {/* Focus view (AC-5/AC-10): segment header with an "x" that restores the
+          filters + list; the leaderboard auto-loads and Generate Race hides it. */}
+      {selectedRow && (
+        <div>
+          <div className="flex items-center justify-between gap-3 mb-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-3">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+              {selectedRow.segment_name}
             </p>
             <button
               type="button"
-              onClick={() => setShowLeaderboard(true)}
-              className={primaryBtn}
+              onClick={clearSelectedSegment}
+              aria-label={`Clear ${selectedRow.segment_name} selection and restore the segment list`}
+              className="shrink-0 w-8 h-8 flex items-center justify-center text-lg font-medium rounded-md text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              Generate Leaderboard
-            </button>
-          </div>
-        </div>
-      )}
-
-      {selectedRow && showLeaderboard && (
-        <div>
-          <div className="flex items-center gap-3 mb-3">
-            <button
-              type="button"
-              onClick={() => setShowLeaderboard(false)}
-              className={secondaryBtn}
-            >
-              Back to List
+              ×
             </button>
           </div>
           <LeaderboardTable segmentId={selectedRow.segment_id} segmentName={selectedRow.segment_name} />

@@ -57,7 +57,13 @@ export interface SegmentListRow {
 /** Leaderboard range selector mapped to the corresponding rank column. */
 export type LeaderboardRange = 'All Time' | 'Last 365' | 'Current Cycle' | 'Most Recent';
 
-/** Rank columns of vw_segment_leaderboard keyed by range. */
+/** DB-computed recency bucket label returned by vw_segment_leaderboard (009-009 OQ-4). */
+export type LeaderboardCycleName = 'Current Cycle' | 'Last 365' | 'All Time';
+
+/** Rank columns of vw_segment_leaderboard keyed by range — ORDERING within the
+ *  active range's window. Membership comes from `cycle_name` (see
+ *  `lib/effort-buckets.ts`), never from these being non-null: every rank column
+ *  is populated for every row (live check 2026-09-16). */
 export const LEADERBOARD_RANGE_COLUMN: Record<LeaderboardRange, string> = {
   'All Time': 'all_time_rank',
   'Last 365': 'last_365_rank',
@@ -80,12 +86,15 @@ export interface LeaderboardEffort {
   rank: number;
   /** All-time rank (fastest = 1). */
   all_time_rank: number | null;
-  /** Last-365-day rank. */
+  /** Last-365-day rank — window-scoped ORDERING value (never null in practice). */
   last_365_rank: number | null;
-  /** Current training-cycle rank. */
+  /** Current training-cycle rank — window-scoped ORDERING value (never null in practice). */
   current_cycle_rank: number | null;
   /** Recency rank (1 = most recent). */
   recency_rank: number | null;
+  /** DB-computed recency bucket (OQ-4): the membership signal for the lollipop
+   *  buckets + Range window. 'Most Recent' is derived from `recency_rank === 1`. */
+  cycle_name: LeaderboardCycleName | null;
   /** Effort start timestamp (ISO 8601). */
   start_time_utc: string;
   /** Effort duration in seconds. */

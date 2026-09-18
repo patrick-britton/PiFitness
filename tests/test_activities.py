@@ -278,6 +278,9 @@ def test_leaderboard_contract_shape():
             "last_365_rank": 1,
             "current_cycle_rank": 1,
             "recency_rank": 3,
+            # 009-009 T17/OQ-4: the view's recency bucket is the authoritative
+            # membership signal (ranks are window-scoped ordering values only).
+            "cycle_name": "Current Cycle",
             "elapsed_duration_s": 120.0,
             "pace_str": "4:45/mi",
             "gap_s": 0.0,
@@ -319,6 +322,9 @@ def test_leaderboard_contract_shape():
             "last_365_rank": 2,
             "current_cycle_rank": 2,
             "recency_rank": 2,
+            # Non-null ranks with an 'All Time' bucket on purpose: membership
+            # must come from cycle_name, never from a rank IS NOT NULL check.
+            "cycle_name": "All Time",
             "elapsed_duration_s": 125.5,
             "pace_str": "4:58/mi",
             "gap_s": 5.5,
@@ -343,6 +349,7 @@ def test_leaderboard_contract_shape():
         assert e0["last_365_rank"] == 1
         assert e0["current_cycle_rank"] == 1
         assert e0["recency_rank"] == 3
+        assert e0["cycle_name"] == "Current Cycle"
         assert e0["gap_s"] == 0.0
         assert e0["start_time_utc"] == "2026-09-01T10:00:00+00:00"
         assert e0["elapsed_duration_s"] == 120.0
@@ -363,6 +370,10 @@ def test_leaderboard_contract_shape():
         assert e0["max_hr"] == 172.0
         assert data["efforts"][1]["gap_s"] == 5.5
         assert data["efforts"][1]["max_hr"] is None
+        # 009-009 T17/OQ-4: the bucket label travels through the payload even
+        # though every rank column on that row is non-null.
+        assert data["efforts"][1]["cycle_name"] == "All Time"
+        assert data["efforts"][1]["current_cycle_rank"] == 2
 
 
 def test_leaderboard_not_found():

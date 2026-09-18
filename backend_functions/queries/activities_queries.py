@@ -564,6 +564,13 @@ def get_segment_leaderboard(segment_id: int) -> List[Dict[str, Any]]:
     - rank:  row_number by all_time_rank (client re-filters by range via the
              four rank columns; FR-6/AC-5)
 
+    Also projects `cycle_name` — the view's pre-computed recency bucket
+    ('Current Cycle' | 'Last 365' | 'All Time', 009-009 OQ-4/T17). It is the ONLY
+    membership signal for the lollipop buckets and the Range window: the rank
+    columns stay window-scoped ORDERING values (live check 2026-09-16: both
+    remaining rank columns are non-NULL for every row, so null-checks cannot
+    express membership).
+
     One query, projected columns only (no SELECT *), parameterized.
 
     Args:
@@ -578,6 +585,7 @@ def get_segment_leaderboard(segment_id: int) -> List[Dict[str, Any]]:
                 segment_id,
                 is_course,
                 segment_name,
+                cycle_name,
                 activity_id,
                 activity_start_point,
                 activity_end_point,

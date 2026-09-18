@@ -57,9 +57,23 @@ class LeaderboardEffort(BaseModel):
         ..., description="Active rank in the default range (all_time_rank); re-filtered client-side"
     )
     all_time_rank: Optional[int] = Field(None, description="All-time rank (fastest = 1)")
-    last_365_rank: Optional[int] = Field(None, description="Last-365-day rank")
-    current_cycle_rank: Optional[int] = Field(None, description="Current training-cycle rank")
+    last_365_rank: Optional[int] = Field(
+        None,
+        description="Last-365-day rank — window-scoped ORDERING value (never NULL; not a membership flag)",
+    )
+    current_cycle_rank: Optional[int] = Field(
+        None,
+        description="Current training-cycle rank — window-scoped ORDERING value (never NULL; not a membership flag)",
+    )
     recency_rank: Optional[int] = Field(None, description="Recency rank (1 = most recent)")
+    cycle_name: Optional[str] = Field(
+        None,
+        description=(
+            "DB-computed recency bucket (009-009 OQ-4): 'Current Cycle' | 'Last 365' | "
+            "'All Time'; the authoritative membership signal. 'Most Recent' is derived "
+            "client-side from recency_rank"
+        ),
+    )
     start_time_utc: str = Field(..., description="Effort start timestamp (ISO 8601)")
     elapsed_duration_s: float = Field(..., description="Effort duration in seconds")
     gap_s: float = Field(

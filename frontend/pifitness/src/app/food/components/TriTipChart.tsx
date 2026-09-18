@@ -37,6 +37,7 @@ import type {
   TriTipReferenceEvent,
   TriTipEvent,
 } from '../../../lib/types/tri-tip';
+import { tokenRgb } from '@/lib/token-color';
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -51,14 +52,7 @@ function eventT0(event: TriTipEvent, readings: TriTipReading[]): string | null {
   return times[0] ?? null;
 }
 
-/** SSR-safe token read with light/dark fallbacks (pattern from DbSizeView). */
-function tokenRgb(name: string, isDark: boolean): string {
-  const fallback =
-    name === '--text' ? (isDark ? '241 245 249' : '15 23 42') : isDark ? '148 163 184' : '226 232 240';
-  if (typeof window === 'undefined') return `rgb(${fallback})`;
-  const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value ? `rgb(${value})` : `rgb(${fallback})`;
-}
+/** SSR-safe token read lives in `@/lib/token-color` (T18 single reader). */
 
 interface TriTipChartProps {
   event: TriTipEvent | null;

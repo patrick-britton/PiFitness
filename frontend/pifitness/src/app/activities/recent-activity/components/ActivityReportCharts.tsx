@@ -33,32 +33,11 @@ import {
   ActivityHeartratePoint,
   ActivityPacePoint,
 } from '@/lib/types/activity-report';
+import { tokenRgb } from '@/lib/token-color';
 
 ChartJS.register(LinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 type XY = { x: number; y: number };
-
-/** SSR-safe token read with distinct light/dark fallbacks (pattern from TriTipChart). */
-function tokenRgb(name: string, isDark: boolean): string {
-  const fallback =
-    name === '--text'
-      ? isDark ? '241 245 249' : '15 23 42'
-      : name === '--danger'
-        ? isDark ? '248 113 113' : '220 38 38'
-        : name === '--ok'
-          ? isDark ? '74 222 128' : '22 163 74'
-          : name === '--chart-1'
-            ? isDark ? '96 165 250' : '0 114 178'
-            : name === '--grid'
-              ? isDark ? '51 65 85' : '226 232 240'
-              : isDark ? '148 163 184' : '107 114 128'; // --muted
-  if (typeof window === 'undefined') return `rgb(${fallback})`;
-  const value = window
-    .getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
-  return value ? `rgb(${value})` : `rgb(${fallback})`;
-}
 
 /** Increment a version when the `dark` class on <html> toggles (theme change). */
 function useThemeVersion(): number {

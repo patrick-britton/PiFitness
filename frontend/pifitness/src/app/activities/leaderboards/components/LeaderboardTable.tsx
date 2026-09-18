@@ -11,7 +11,10 @@ import {
   SegmentVisuals,
   LEADERBOARD_RANGE_COLUMN,
 } from '@/lib/types/leaderboards';
+import { inRange } from '@/lib/effort-buckets';
 import LeaderboardVisuals from './LeaderboardVisuals';
+import EffortLollipop from './EffortLollipop';
+import { deltaOf, deltaGeometry } from '@/lib/bar-geometry';
 
 /**
  * LeaderboardTable (009-002, T07).
@@ -28,7 +31,67 @@ interface MetricColumn {
   colorVar: string;
 }
 
-const CHART_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-6)'];
+/** Chart-token colors for bar fills. The tokens hold bare RGB channels
+ *  (design-system.md), so every CSS use site wraps them — a bare
+ *  `var(--chart-N)` is not a valid color (Bug 009-009-T14-1). */
+const CHART_COLORS = [
+  'rgb(var(--chart-1))', 'rgb(var(--chart-2))', 'rgb(var(--chart-3))',
+  'rgb(var(--chart-4))', 'rgb(var(--chart-5))', 'rgb(var(--chart-6))',
+];
+
+/** Default-mode racer options (009-009 T05, FR-4). */
+type RaceMode = 'default' | 'custom';
+type RaceOption = 'prior' | 'cycle' | 'y365' | 'alltime';
+const RACE_OPTIONS: { key: RaceOption; label: string }[] = [
+  { key: 'prior', label: 'Prior Attempt' },
+  { key: 'cycle', label: 'Best of Cycle' },
+  { key: 'y365', label: 'Best of Last 365' },
+  { key: 'alltime', label: 'Best All Time' },
+];
+
+interface Racer {
+  effort: LeaderboardEffort;
+  label: string;
+}
+
+/**
+ * Resolve Default-mode racers (009-009 T05, FR-4/AC-7; T17 membership). The most
+ * recent effort always races. Each selected "best" option resolves to rank 1
+ * withIN its window — 'Best of Last 365' / 'Best of Cycle' are scoped by
+ * `cycle_name` (OQ-4; the rank columns are window-scoped ordering values, so
+ * rank 1 is the window's best) — demoting to rank 2 when rank 1 IS the most
+ * recent effort. Overlapping selections resolve to one activity labeled by the
+ * hierarchy Best All Time > Best of Last 365 > Best of Cycle > Prior Attempt
+ * (processed in that priority order; once an activity is chosen, later options
+ * skip it).
+ */
+export function resolveDefaultRacers(efforts: LeaderboardEffort[], opts: Set<RaceOption>): Racer[] {
+  const mostRecent = efforts.find((e) => e.recency_rank === 1) ?? null;
+  if (!mostRecent) return [];
+  const racers: Racer[] = [{ effort: mostRecent, label: 'Most Recent' }];
+  const chosen = new Set<number>([mostRecent.activity_id]);
+  const pick = (
+    scopeRank: keyof LeaderboardEffort,
+    label: string,
+    member?: (e: LeaderboardEffort) => boolean,
+  ): void => {
+    for (const rank of [1, 2]) {
+      const cand = efforts.find(
+        (e) => (member ? member(e) : true) && (e[scopeRank] as number | null) === rank
+      );
+      if (cand && !chosen.has(cand.activity_id)) {
+        chosen.add(cand.activity_id);
+        racers.push({ effort: cand, label });
+        return;
+      }
+    }
+  };
+  if (opts.has('alltime')) pick('all_time_rank', 'Best All Time');
+  if (opts.has('y365')) pick('last_365_rank', 'Best of Last 365', (e) => inRange(e, 'Last 365'));
+  if (opts.has('cycle')) pick('current_cycle_rank', 'Best of Cycle', (e) => inRange(e, 'Current Cycle'));
+  if (opts.has('prior')) pick('recency_rank', 'Prior Attempt');
+  return racers;
+}
 
 /** Type-specific metric sets mirroring legacy col_selector. */
 const METRIC_SETS: Record<LeaderboardType, MetricColumn[]> = {
@@ -68,38 +131,37 @@ const METRIC_SETS: Record<LeaderboardType, MetricColumn[]> = {
 const RANGE_OPTIONS: LeaderboardRange[] = ['All Time', 'Last 365', 'Current Cycle', 'Most Recent'];
 const TYPE_OPTIONS: LeaderboardType[] = ['Basic', 'Fitness', 'Advanced', 'Environment', 'Preparedness'];
 
-/**
- * Scale a value into [floor, 100]% across the true data range [min, max].
- * Returns 100 when the range is flat/degenerate so a single-effort set still
- * renders a full bar rather than an empty one.
- */
-function scale(value: number, min: number, max: number, floor = 8): number {
-  if (!Number.isFinite(value) || !Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 100;
-  const clamped = Math.min(Math.max(value, min), max);
-  return Math.round(floor + ((clamped - min) / (max - min)) * (100 - floor));
-}
-
-function formatGap(gapS: number): string {
-  if (gapS === 0) return '0s';
-  return `${gapS > 0 ? '+' : ''}${gapS.toFixed(1)}s`;
+/** Signed-seconds delta label, e.g. "+12s" / "-80s" / "0s" (AC-9). */
+function formatDeltaS(delta: number): string {
+  if (delta === 0) return '0s';
+  return `${delta > 0 ? '+' : ''}${Number(delta.toFixed(1))}s`;
 }
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  let hours = d.getHours();
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  hours = hours % 12;
-  if (hours === 0) hours = 12;
-  return `${d.getDate()} ${months[d.getMonth()]} ${hours}:${String(d.getMinutes()).padStart(2, '0')} ${ampm}`;
+  // d-mmm-yyyy — time of day is irrelevant (FR-4/AC-9).
+  return `${d.getDate()}-${months[d.getMonth()]}-${d.getFullYear()}`;
 }
+
 interface Props {
   segmentId: number;
   segmentName: string;
+  /**
+   * Embedded host mode (009-009 T01): the host renders its own segment header,
+   * so the component suppresses its built-in name/effort-count header. Future
+   * hosts (e.g. the recent-activity report) pass `embedded` for reuse.
+   */
+  embedded?: boolean;
+  /**
+   * Host hook invoked when the component clears its per-segment state because
+   * the host swapped to a different segmentId (never on initial mount).
+   */
+  onClear?: () => void;
 }
 
-export default function LeaderboardTable({ segmentId, segmentName }: Props) {
+export default function LeaderboardTable({ segmentId, segmentName, embedded = false, onClear }: Props) {
   const [data, setData] = useState<Leaderboard | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +171,8 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
   const [visuals, setVisuals] = useState<SegmentVisuals | null>(null);
   const [visualsLoading, setVisualsLoading] = useState(false);
   const [visualsError, setVisualsError] = useState<string | null>(null);
+  const [raceMode, setRaceMode] = useState<RaceMode>('default');
+  const [raceOptions, setRaceOptions] = useState<Set<RaceOption>>(new Set());
   const visualsKey = useRef(0);
 
   const fetchLeaderboard = useCallback(async () => {
@@ -129,31 +193,72 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
     fetchLeaderboard();
   }, [fetchLeaderboard]);
 
+  // Reuse contract (009-009 T01): swapping segments must never leak activity
+  // selections, visuals, or range/type state across segments — and the host is
+  // notified (never on initial mount).
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    setSelected(new Set());
+    setVisuals(null);
+    setVisualsError(null);
+    setRaceMode('default');
+    setRaceOptions(new Set());
+    if (mountedRef.current) onClear?.();
+    mountedRef.current = true;
+    // onClear intentionally excluded: host callbacks are stable per host mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segmentId]);
+
   // Active rank column for the selected range.
   const rankCol = LEADERBOARD_RANGE_COLUMN[range] as keyof LeaderboardEffort;
 
-  // Filter: drop efforts without a rank in the active range.
+  // Range window membership (009-009 T17/OQ-4): the cycle/365 windows keep only
+  // efforts inside them (`cycle_name`); 'Most Recent' and 'All Time' are the
+  // whole set, re-sorted below. The rank columns are ORDERING values only —
+  // every rank column is populated for every row, so they cannot express
+  // membership (Bug 009-009-T17-1).
   const visibleEfforts = useMemo(() => {
     if (!data) return [];
-    return data.efforts.filter((e) => {
-      const r = e[rankCol];
-      return r != null;
-    });
-  }, [data, rankCol]);
+    return data.efforts.filter((e) => inRange(e, range));
+  }, [data, range]);
 
-  // Extent (min/max) for each metric across the visible set.
-  const metricExtents = useMemo(() => {
-    const cols = METRIC_SETS[type];
-    const extents: Record<string, { min: number; max: number }> = {};
-    for (const col of cols) {
-      const vals = visibleEfforts.map((e) => col.getValue(e)).filter((v): v is number => v != null && Number.isFinite(v));
-      // Scale to the TRUE data range. Forcing 0 into the range flattened
-      // high-baseline metrics (durations, HR, cadence, weight) into identical
-      // full-width bars; the true range keeps relative differences visible.
-      extents[col.key] = vals.length ? { min: Math.min(...vals), max: Math.max(...vals) } : { min: 0, max: 0 };
+  // Rank-sorted view (AC-9): the active range's #1-ranked effort is always
+  // the first row, and the entire table re-sorts when the Range changes.
+  const sortedEfforts = useMemo(
+    () =>
+      [...visibleEfforts].sort(
+        (a, b) => ((a[rankCol] as number) ?? Infinity) - ((b[rankCol] as number) ?? Infinity)
+      ),
+    [visibleEfforts, rankCol]
+  );
+  // Baseline for the diverging bars: the active range's #1-ranked effort.
+  const baseline = sortedEfforts[0] ?? null;
+
+  // Max |delta| from the baseline per column — the symmetric scale for the
+  // diverging bars (0 axis centered; signed bars left/right of it).
+  const gapMaxAbs = useMemo(() => {
+    if (!baseline) return 0;
+    return Math.max(
+      0,
+      ...visibleEfforts.map((e) => Math.abs(baseline.elapsed_duration_s - e.elapsed_duration_s))
+    );
+  }, [visibleEfforts, baseline]);
+
+  const metricDeltas = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const col of METRIC_SETS[type]) {
+      const bv = baseline ? col.getValue(baseline) : null;
+      let maxAbs = 0;
+      if (bv != null) {
+        for (const e of visibleEfforts) {
+          const v = col.getValue(e);
+          if (v != null) maxAbs = Math.max(maxAbs, Math.abs(v - bv));
+        }
+      }
+      out[col.key] = maxAbs;
     }
-    return extents;
-  }, [visibleEfforts, type]);
+    return out;
+  }, [visibleEfforts, type, baseline]);
 
   const toggleSelect = useCallback((activityId: number) => {
     setSelected((prev) => {
@@ -178,15 +283,35 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
       }));
   }, [data, selected]);
 
-  /** Stage the selected efforts and generate the replay + telemetry visuals. */
+  // Default-mode racer resolution (009-009 T05): pure client-side over the
+  // leaderboard payload; no re-fetch per toggle.
+  const defaultRacers = useMemo<Racer[]>(
+    () => (data ? resolveDefaultRacers(data.efforts, raceOptions) : []),
+    [data, raceOptions]
+  );
+
+  // The effort set POSTed to the visuals endpoint: resolved racers in Default
+  // mode, the checked rows in Custom mode.
+  const raceEffortSelections = useMemo<LeaderboardEffortSelection[]>(() => {
+    if (raceMode === 'default') {
+      return defaultRacers.map((r) => ({
+        activity_id: r.effort.activity_id,
+        start_point: r.effort.activity_start_point,
+        end_point: r.effort.activity_end_point,
+      }));
+    }
+    return selectedEfforts;
+  }, [raceMode, defaultRacers, selectedEfforts]);
+
+  /** Stage the race efforts and generate the replay + telemetry visuals. */
   const generateVisuals = useCallback(async () => {
-    if (selected.size === 0) return;
+    if (raceEffortSelections.length === 0) return;
     setVisualsLoading(true);
     setVisualsError(null);
     try {
       const result = await API.activities.postLeaderboardVisuals({
         segment_id: segmentId,
-        efforts: selectedEfforts,
+        efforts: raceEffortSelections,
       });
       visualsKey.current += 1;
       setVisuals(result);
@@ -196,7 +321,7 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
     } finally {
       setVisualsLoading(false);
     }
-  }, [segmentId, selectedEfforts]);
+  }, [segmentId, raceEffortSelections]);
 
   const selectAll = useCallback(() => {
     setSelected(new Set(visibleEfforts.map((e) => e.activity_id)));
@@ -207,18 +332,22 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
   }, []);
 
   const metrics = METRIC_SETS[type];
+  // Per-row selection UI (Select All / checkboxes) is Custom mode only (T05).
+  const canSelect = raceMode === 'custom';
 
   return (
     <div className="space-y-4">
       {/* Controls: range + type + refresh */}
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{segmentName}</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {visibleEfforts.length} effort{visibleEfforts.length === 1 ? '' : 's'}
-            </p>
-          </div>
+          {!embedded && (
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">{segmentName}</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {visibleEfforts.length} effort{visibleEfforts.length === 1 ? '' : 's'}
+              </p>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <div>
               <label htmlFor="lb-range" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Range</label>
@@ -283,18 +412,110 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
         </div>
       )}
 
+      {/* Lollipop distribution (009-009 T04, AC-6): ALL efforts, recency-bucket
+          colored, independent of the active Range (OQ-2). */}
+      {!visuals && data && <EffortLollipop data={data} />}
+
+      {/* Default / Custom race selection (009-009 T05, AC-7/AC-8) */}
+      {!visuals && data && visibleEfforts.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-3">
+          <div className="flex items-center gap-2" role="group" aria-label="Race selection mode">
+            {(['default', 'custom'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={raceMode === m}
+                onClick={() => setRaceMode(m)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                  raceMode === m
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                {m === 'default' ? 'Default' : 'Custom'}
+              </button>
+            ))}
+          </div>
+
+          {raceMode === 'default' && (
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Default racers">
+                {RACE_OPTIONS.map((o) => {
+                  const on = raceOptions.has(o.key);
+                  return (
+                    <button
+                      key={o.key}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() =>
+                        setRaceOptions((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(o.key)) next.delete(o.key);
+                          else next.add(o.key);
+                          return next;
+                        })
+                      }
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                        on
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {raceOptions.size > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                    Racers: <span className="font-medium">{defaultRacers.map((r) => r.label).join(' · ')}</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={generateVisuals}
+                    disabled={visualsLoading}
+                    className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
+                  >
+                    {visualsLoading ? 'Generating…' : 'Generate Race'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {raceMode === 'custom' && selected.size > 0 && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-gray-600 dark:text-gray-300">
+                {selected.size} effort{selected.size === 1 ? '' : 's'} selected
+              </p>
+              <button
+                type="button"
+                onClick={generateVisuals}
+                disabled={visualsLoading}
+                className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
+              >
+                {visualsLoading ? 'Generating…' : 'Generate Race'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Desktop table */}
       {!visuals && data && visibleEfforts.length > 0 && (
         <div className="hidden lg:block bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md overflow-x-auto">
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-            <button type="button" onClick={selectAll} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">Select All</button>
-            <button type="button" onClick={clearSelection} className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:underline">Clear</button>
-            <span className="text-xs text-gray-500 dark:text-gray-400">{selected.size} selected</span>
-          </div>
+          {canSelect && (
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+              <button type="button" onClick={selectAll} className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">Select All</button>
+              <button type="button" onClick={clearSelection} className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:underline">Clear</button>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{selected.size} selected</span>
+            </div>
+          )}
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
-                <th className="px-3 py-2 w-8" aria-label="Select" />
+                {canSelect && <th className="px-3 py-2 w-8" aria-label="Select" />}
                 <th className="px-3 py-2">Rank</th>
                 <th className="px-3 py-2">Date</th>
                 <th className="px-3 py-2">Gap</th>
@@ -302,19 +523,24 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
               </tr>
             </thead>
             <tbody>
-              {visibleEfforts.map((effort) => {
+              {sortedEfforts.map((effort) => {
                 const isSel = selected.has(effort.activity_id);
+                const gapDelta = baseline ? baseline.elapsed_duration_s - effort.elapsed_duration_s : null;
                 return (
                   <tr key={effort.activity_id} className={`border-b border-gray-100 dark:border-gray-700 transition-colors ${isSel ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}>
-                    <td className="px-3 py-2"><input type="checkbox" checked={isSel} onChange={() => toggleSelect(effort.activity_id)} aria-label={`Select effort ${effort.activity_id}`} className="accent-blue-600" /></td>
+                    {canSelect && (
+                      <td className="px-3 py-2"><input type="checkbox" checked={isSel} onChange={() => toggleSelect(effort.activity_id)} aria-label={`Select effort ${effort.activity_id}`} className="accent-blue-600" /></td>
+                    )}
                     <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{(effort[rankCol] as number | null) ?? '—'}</td>
                     <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{formatDate(effort.start_time_utc)}</td>
-                    <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{formatGap(effort.gap_s)}</td>
+                    <td className="px-3 py-2 min-w-[110px]">
+                      <DeltaBar delta={gapDelta} maxAbs={gapMaxAbs} label={gapDelta != null ? formatDeltaS(gapDelta) : '—'} color="rgb(var(--chart-2))" />
+                    </td>
                     {metrics.map((m) => {
-                      const ext = metricExtents[m.key];
+                      const d = baseline ? deltaOf(m.getValue(effort), m.getValue(baseline)) : null;
                       return (
                         <td key={m.key} className="px-3 py-2 min-w-[120px]">
-                          <MetricBar pct={scale(m.getValue(effort) ?? 0, ext.min, ext.max)} label={m.format(effort)} color={m.colorVar} />
+                          <DeltaBar delta={d} maxAbs={metricDeltas[m.key] ?? 0} label={m.format(effort)} color={m.colorVar} />
                         </td>
                       );
                     })}
@@ -329,8 +555,9 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
       {/* Portrait / Landscape: mobile cards */}
       {!visuals && data && visibleEfforts.length > 0 && (
         <div className="lg:hidden space-y-2">
-          {visibleEfforts.map((effort) => {
+          {sortedEfforts.map((effort) => {
             const isSel = selected.has(effort.activity_id);
+            const gapDelta = baseline ? baseline.elapsed_duration_s - effort.elapsed_duration_s : null;
             return (
               <div
                 key={effort.activity_id}
@@ -339,15 +566,19 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <input type="checkbox" checked={isSel} onChange={() => toggleSelect(effort.activity_id)} aria-label={`Select effort ${effort.activity_id}`} className="accent-blue-600" />
+                  {canSelect && (
+                    <input type="checkbox" checked={isSel} onChange={() => toggleSelect(effort.activity_id)} aria-label={`Select effort ${effort.activity_id}`} className="accent-blue-600" />
+                  )}
                   <span className="text-sm font-medium text-gray-900 dark:text-white">Rank {(effort[rankCol] as number | null) ?? '—'}</span>
                   <span className="text-xs text-gray-500 dark:text-gray-400">{formatDate(effort.start_time_utc)}</span>
                 </div>
-                <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">Gap {formatGap(effort.gap_s)}</div>
+                <div className="mt-1">
+                  <DeltaBar delta={gapDelta} maxAbs={gapMaxAbs} label={gapDelta != null ? `Gap ${formatDeltaS(gapDelta)}` : 'Gap —'} color="rgb(var(--chart-2))" />
+                </div>
                 <div className="mt-2 space-y-1.5">
                   {metrics.map((m) => {
-                    const ext = metricExtents[m.key];
-                    return <MetricBar key={m.key} pct={scale(m.getValue(effort) ?? 0, ext.min, ext.max)} label={`${m.label}: ${m.format(effort)}`} color={m.colorVar} />;
+                    const d = baseline ? deltaOf(m.getValue(effort), m.getValue(baseline)) : null;
+                    return <DeltaBar key={m.key} delta={d} maxAbs={metricDeltas[m.key] ?? 0} label={`${m.label}: ${m.format(effort)}`} color={m.colorVar} />;
                   })}
                 </div>
               </div>
@@ -356,24 +587,6 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
         </div>
       )}
 
-      {/* Generate Visuals control */}
-      {!visuals && selected.size > 0 && (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              {selected.size} effort{selected.size === 1 ? '' : 's'} selected
-            </p>
-            <button
-              type="button"
-              onClick={generateVisuals}
-              disabled={visualsLoading}
-              className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-50"
-            >
-              {visualsLoading ? 'Generating…' : 'Generate Visuals'}
-            </button>
-          </div>
-        </div>
-      )}
       {visualsError && !visuals && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
           <p className="text-sm font-medium text-red-800 dark:text-red-200">Failed to generate visuals</p>
@@ -404,16 +617,37 @@ export default function LeaderboardTable({ segmentId, segmentName }: Props) {
 }
 
 /**
- * Progress-scaled bar themed via a chart-token CSS variable. The track spans
- * the full cell width with the value above it, so small relative differences
- * remain legible (a side-by-side label left the track too narrow to read).
+ * Diverging baseline bar (009-009 T06, AC-9): the active range's #1-ranked
+ * effort is the 0 axis (center of the track); deltas slower/larger than the
+ * baseline extend right, faster/lower extend left — per the description's
+ * example (Most Recent 200s/241.9 lb baseline; the faster 120s attempt shows
+ * −80s extending left of 0). The label above shows the row's own value; the
+ * bar shows the signed delta vs the baseline (no bar when unrecorded).
  */
-function MetricBar({ pct, label, color }: { pct: number; label: string; color: string }) {
+function DeltaBar({ delta, maxAbs, label, color }: { delta: number | null; maxAbs: number; label: string; color: string }) {
+  const { width, side } = deltaGeometry(delta, maxAbs);
   return (
     <div title={label}>
       <div className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">{label}</div>
-      <div className="mt-1 h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
-        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+      <div
+        className="relative mt-1 h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden"
+        role="progressbar"
+        aria-valuemin={-100}
+        aria-valuemax={100}
+        aria-valuenow={delta != null && maxAbs > 0 ? Math.round((delta / maxAbs) * 100) : 0}
+        aria-label={label}
+      >
+        <div className="absolute inset-y-0 left-1/2 w-px bg-gray-400 dark:bg-gray-500" aria-hidden="true" />
+        {width > 0 && (
+          <div
+            className="absolute inset-y-0 transition-all"
+            style={
+              side === 'right'
+                ? { left: '50%', width: `${width}%`, backgroundColor: color }
+                : { right: '50%', width: `${width}%`, backgroundColor: color }
+            }
+          />
+        )}
       </div>
     </div>
   );

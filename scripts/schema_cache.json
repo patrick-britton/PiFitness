@@ -2216,6 +2216,11 @@
       "type": "text"
     },
     {
+      "name": "cycle_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
       "name": "activity_id",
       "nullable": true,
       "type": "bigint"
@@ -2609,6 +2614,11 @@
       "name": "activity_id",
       "nullable": true,
       "type": "bigint"
+    },
+    {
+      "name": "cycle_name",
+      "nullable": true,
+      "type": "text"
     },
     {
       "name": "activity_start_point",
