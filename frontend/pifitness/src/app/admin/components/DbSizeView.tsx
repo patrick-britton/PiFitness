@@ -25,6 +25,7 @@ import {
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { API } from '@/lib/api-client';
+import { tokenRgb } from '@/lib/token-color';
 
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -155,46 +156,13 @@ export default function DbSizeView() {
     return window.document.documentElement.classList.contains('dark');
   };
 
-  const getTokenRgb = (tokenName: string): string => {
-    const isDark = getIsDark();
-    if (typeof window === 'undefined') {
-      const fallback = tokenName === '--text'
-        ? (isDark ? '241 245 249' : '15 23 42')
-        : (isDark ? '148 163 184' : '226 232 240');
-      return `rgb(${fallback})`;
-    }
-    const value = window.getComputedStyle(document.documentElement)
-      .getPropertyValue(tokenName)
-      .trim();
-    if (!value) {
-      const fallback = tokenName === '--text'
-        ? (isDark ? '241 245 249' : '15 23 42')
-        : (isDark ? '148 163 184' : '226 232 240');
-      return `rgb(${fallback})`;
-    }
-    return `rgb(${value})`;
-  };
-
-  const getTokenRgba = (tokenName: string, alpha: number): string => {
-    const isDark = getIsDark();
-    if (typeof window === 'undefined') {
-      const fallback = tokenName === '--text'
-        ? (isDark ? '241 245 249' : '15 23 42')
-        : (isDark ? '148 163 184' : '226 232 240');
-      return `rgba(${fallback}, ${alpha})`;
-    }
-    const value = window.getComputedStyle(document.documentElement)
-      .getPropertyValue(tokenName)
-      .trim();
-    if (!value) {
-      const fallback = tokenName === '--text'
-        ? (isDark ? '241 245 249' : '15 23 42')
-        : (isDark ? '148 163 184' : '226 232 240');
-      return `rgba(${fallback}, ${alpha})`;
-    }
-    return `rgba(${value}, ${alpha})`;
-  };
-
+  /**
+   * Chart gridlines use an explicit theme-aware gray rather than the `--grid`
+   * token: the dark `--grid` channel (`51 65 85`) is too close to the dark
+   * surface to read, so a brighter gray is intentional here (Bug 001-003-T01-1 —
+   * "gridlines must be visibly distinct in both themes"). Token reads themselves
+   * come from `@/lib/token-color`.
+   */
   const getGridColor = (): string => {
     if (getIsDark()) {
       // Dark mode: light gray slightly darker than white font
@@ -205,7 +173,7 @@ export default function DbSizeView() {
   };
 
   const options = useMemo(() => {
-    const textColor = getTokenRgb('--text');
+    const textColor = tokenRgb('--text', getIsDark());
     const gridColor = getGridColor();
     return {
       responsive: true,
@@ -237,7 +205,7 @@ export default function DbSizeView() {
   }, [themeVersion]);
 
   const breakdownOptions = useMemo(() => {
-    const textColor = getTokenRgb('--text');
+    const textColor = tokenRgb('--text', getIsDark());
     const gridColor = getGridColor();
 
     return {

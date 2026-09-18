@@ -963,7 +963,9 @@ async def get_leaderboard_route(segment_id: int):
     the legacy leaderboard_update is a no-write on-demand SELECT, so no refresh
     call is made; "refresh" for the client is simply re-fetching this endpoint).
     gap_s is computed server-side by the T02 helper; all four rank columns are
-    returned so range/type switching stays client-side (FR-6/FR-7).
+    returned so range/type switching stays client-side (FR-6/FR-7). `cycle_name`
+    (009-009 OQ-4/T17) carries the view's recency bucket, which is the client's
+    authoritative membership signal for the lollipop buckets and the Range window.
 
     Args:
         segment_id: The target segment/course id.
@@ -990,6 +992,7 @@ async def get_leaderboard_route(segment_id: int):
                 last_365_rank=_safe_int(r.get('last_365_rank')),
                 current_cycle_rank=_safe_int(r.get('current_cycle_rank')),
                 recency_rank=_safe_int(r.get('recency_rank')),
+                cycle_name=r.get('cycle_name'),
                 start_time_utc=str(r.get('start_time_utc') or ''),
                 elapsed_duration_s=_safe_float_default(r.get('elapsed_duration_s'), 0.0),
                 gap_s=_safe_float_default(r.get('gap_s'), 0.0),
