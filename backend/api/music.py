@@ -36,6 +36,10 @@ from backend_functions.queries import (
     get_recent_plays,
     get_rating_eligible_count,
     get_rating_eligible_playlists,
+    get_isrc_dupe_count,
+    get_isrc_dupe_match,
+    process_isrc_dupe_decision,
+    run_isrc_duplicate_finder,
     record_recommendation_decision,
     remove_recommendation,
     get_matchup,
@@ -233,6 +237,146 @@ async def score_matchup_endpoint(
         next_matchup = None
 
     return {"ok": True, "next": next_matchup, "scores": result}
+
+
+# ---------------------------------------------------------------------------
+# ISRC Dupe Review (008-005)
+# ---------------------------------------------------------------------------
+
+
+_ISRC_DUPE_MATCH_FIELDS = (
+    "isrc1", "isrc2",
+    "track_name1", "track_name2",
+    "artist_name1", "artist_name2",
+    "album_name1", "album_name2",
+    "duration_1", "duration_2",
+    "match_score", "track_score", "artist_score", "album_score",
+    "duration_score", "preferred_isrc",
+)
+
+
+def _shape_isrc_dupe_match(row: dict) -> dict:
+    """Map one vw_isrc_dupe_review row to the IsrcDupeMatch contract (camelCase)."""
+    return {
+        "isrc1": row.get("isrc1"),
+        "isrc2": row.get("isrc2"),
+        "trackName1": row.get("track_name1"),
+        "trackName2": row.get("track_name2"),
+        "artistName1": row.get("artist_name1"),
+        "artistName2": row.get("artist_name2"),
+        "albumName1": row.get("album_name1"),
+        "albumName2": row.get("album_name2"),
+        "duration1": row.get("duration_1"),
+        "duration2": row.get("duration_2"),
+        "matchScore": row.get("match_score"),
+        "trackScore": row.get("track_score"),
+        "artistScore": row.get("artist_score"),
+        "albumScore": row.get("album_score"),
+        "durationScore": row.get("duration_score"),
+        "preferredIsrc": row.get("preferred_isrc"),
+    }
+
+
+class IsrcDupeDecisionBody(BaseModel):
+    """Decision body for POST /isrc-dupes/decision (FR-3/FR-4)."""
+    isrc1: str = Field(..., min_length=1, description="First ISRC of the pair")
+    isrc2: str = Field(..., min_length=1, description="Second ISRC of the pair")
+    preferredIsrc: str = Field(..., min_length=1, description="Precomputed merge target")
+    accept: bool = Field(..., description="True for ACCEPT, False for REJECT")
+
+
+@router.get("/isrc-dupes/count")
+async def get_isrc_dupe_count_endpoint():
+    """
+    Pending duplicate-ISRC pair count (FR-1/FR-7).
+
+    Returns pairs = floor(COUNT(*) / 2) per OQ-1.
+    """
+    try:
+        count = get_isrc_dupe_count()
+        return {"count": count}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get ISRC dupe count: {str(e)}",
+        )
+
+
+@router.get("/isrc-dupes/match")
+async def get_isrc_dupe_match_endpoint():
+    """
+    One reviewable duplicate-ISRC pair (FR-2).
+
+    Returns {match: IsrcDupeMatch | None} — match is None when the
+    queue is empty.
+    """
+    try:
+        rows = get_isrc_dupe_match()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get ISRC dupe match: {str(e)}",
+        )
+
+    if not rows:
+        return {"match": None}
+
+    return {"match": _shape_isrc_dupe_match(rows[0])}
+
+
+@router.post("/isrc-dupes/decision")
+async def decide_isrc_dupe_endpoint(body: IsrcDupeDecisionBody):
+    """
+    Persist one review decision (FR-3/FR-4/FR-5).
+
+    ACCEPT maps both ISRCs to the preferred ISRC; REJECT marks both
+    as explicitly not-a-match; both remove the pair from the pool.
+    """
+    try:
+        process_isrc_dupe_decision(
+            body.isrc1, body.isrc2, body.preferredIsrc, body.accept,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to record ISRC dupe decision: {str(e)}",
+        )
+
+    return {
+        "ok": True,
+        "message": "Match accepted" if body.accept else "Match rejected",
+    }
+
+
+@router.post("/isrc-dupes/rescan")
+def rescan_isrc_dupes_endpoint():
+    """
+    Re-run the duplicate-search procedure and reload the queue (FR-6).
+
+    Long-running (~25 s); the frontend shows a progress indicator.
+
+    Deliberately a SYNC handler (not `async def`, unlike the rest of this
+    module): it calls the blocking ~25 s `CALL music.isrc_duplicate_finder()`
+    over psycopg2. FastAPI dispatches sync handlers to its threadpool, so the
+    re-scan cannot stall the event loop and freeze unrelated requests
+    (T09 / Bug 008-005-T08-1).
+    """
+    try:
+        run_isrc_duplicate_finder()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to rescan ISRC dupes: {str(e)}",
+        )
+
+    try:
+        count = get_isrc_dupe_count()
+    except Exception:
+        count = None
+
+    if count:
+        return {"ok": True, "message": f"{count} potential duplicate isrcs found"}
+    return {"ok": True, "message": "No duplicate isrcs found"}
 
 
 # ---------------------------------------------------------------------------

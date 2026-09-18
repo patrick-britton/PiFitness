@@ -21,6 +21,8 @@ from .music_queries import (
     get_rating_eligible_count,
     get_isrc_dupe_count,
     get_isrc_dupe_match,
+    process_isrc_dupe_decision,
+    run_isrc_duplicate_finder,
     get_playlist_config,
     get_playlist_isrc_stats,
     get_recent_plays,
@@ -165,6 +167,8 @@ __all__ = [
     # Music
     'get_rating_eligible_count',
     'get_isrc_dupe_count',
+    'process_isrc_dupe_decision',
+    'run_isrc_duplicate_finder',
     'get_isrc_dupe_match',
     'get_playlist_config',
     'get_playlist_isrc_stats',

@@ -69,6 +69,10 @@ import {
   ShufflePreviewResponse,
   ShuffleSendRequest,
   ShuffleSendResponse,
+  IsrcDupeCountResponse,
+  IsrcDupeMatchResponse,
+  IsrcDupeDecisionRequest,
+  IsrcDupeDecisionResponse,
 } from './types/music';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -413,6 +417,19 @@ export const API = {
       fetchAPI<ShuffleSendResponse>("/api/music/shuffle/send", {
         method: "POST",
         body: JSON.stringify(request),
+      }),
+    getIsrcDupeCount: () =>
+      fetchAPI<IsrcDupeCountResponse>("/api/music/isrc-dupes/count"),
+    getIsrcDupeMatch: () =>
+      fetchAPI<IsrcDupeMatchResponse>("/api/music/isrc-dupes/match"),
+    decideIsrcDupe: (request: IsrcDupeDecisionRequest) =>
+      fetchAPI<IsrcDupeDecisionResponse>("/api/music/isrc-dupes/decision", {
+        method: "POST",
+        body: JSON.stringify(request),
+      }),
+    rescanIsrcDupes: () =>
+      fetchAPI<IsrcDupeDecisionResponse>("/api/music/isrc-dupes/rescan", {
+        method: "POST",
       }),
   },
 

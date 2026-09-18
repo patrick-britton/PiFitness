@@ -6,9 +6,9 @@ Database query functions extracted from frontend_functions/music_module.py.
 These functions return plain Python data structures with no Streamlit dependencies.
 """
 
-from typing import List, Dict, Any, Optional, Sequence, Union
+from typing import List, Dict, Any, Optional, Sequence, Union, Callable
 from datetime import datetime
-from backend_functions.database_functions import qec, sql_to_dict, sql_to_list, sql_to_lookup_dict, one_sql_result
+from backend_functions.database_functions import qec, sql_to_dict, sql_to_list, sql_to_lookup_dict, one_sql_result, get_conn
 from backend_functions.music_functions import elo_update
 from backend.schemas.music_schemas import Track, Playlist, TrackRecommendation
 
@@ -24,13 +24,16 @@ def get_rating_eligible_count() -> int:
 
 def get_isrc_dupe_count() -> int:
     """
-    Get the count of potential duplicate ISRCs.
+    Get the count of potential duplicate ISRC pairs (008-005, OQ-1).
+
+    The review view holds ~2 rows per pair, so the pair count is
+    floor(COUNT(*) / 2), matching the legacy int(count/2) call sites.
 
     Returns:
         int: Number of potential duplicate ISRC pairs
     """
     sql = "SELECT COUNT(*) FROM music.vw_isrc_dupe_review"
-    return one_sql_result(sql) or 0
+    return (one_sql_result(sql) or 0) // 2
 
 def get_isrc_dupe_match() -> Sequence[Dict[str, Any]]:
     """
@@ -39,9 +42,133 @@ def get_isrc_dupe_match() -> Sequence[Dict[str, Any]]:
     Returns:
         Sequence[Dict[str, Any]]: List containing one ISRC duplicate match record
     """
-    sql = "SELECT * FROM music.vw_isrc_dupe_review LIMIT 1"
+    sql = """SELECT isrc1, isrc2,
+                track_name1, track_name2,
+                artist_name1, artist_name2,
+                album_name1, album_name2,
+                duration_1, duration_2,
+                match_score, track_score, artist_score, album_score,
+                duration_score, preferred_isrc
+            FROM music.vw_isrc_dupe_review LIMIT 1"""
     result = sql_to_dict(sql)
     return result if result else []
+
+def _run_in_transaction(work: Callable[[Any], None]) -> None:
+    """
+    Run ``work(cursor)`` on one connection inside a single transaction (008-005, T08).
+
+    Opens one connection, lets ``work`` issue all of its statements on one
+    cursor, commits once, and always closes the connection. Any failure rolls
+    back and re-raises. This is deliberately used instead of the shared ``qec``
+    helper for decision/rescan writes: ``qec`` prints and swallows exceptions
+    (returning an error list), which lets a caller report success for a write
+    that never committed.
+
+    Args:
+        work: Callable receiving a cursor; issues the statements to commit.
+
+    Raises:
+        Exception: Whatever the driver raised, after the transaction is rolled back.
+    """
+    conn = get_conn()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        try:
+            work(cur)
+            conn.commit()
+        finally:
+            cur.close()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def process_isrc_dupe_decision(isrc1: str, isrc2: str, preferred_isrc: str, accept: bool) -> None:
+    """
+    Persist one ISRC-dupe review decision (008-005, OQ-2/T08).
+
+    ACCEPT inserts both ISRCs into music.isrc_swaps mapped to the preferred
+    ISRC with valid_mapping = TRUE (arbiter: PK on original_isrc).
+    REJECT inserts both ISRCs into music.isrc_non_swaps (bare
+    ON CONFLICT DO NOTHING — the table has no unique constraint, so no
+    arbiter may be named). Both paths delete the decided pair from
+    music.isrc_possible_dupes in both orientations.
+
+    Both ISRCs (one multi-row statement) and the pool delete run on a single
+    connection in a single transaction, so a decision is all-or-nothing; any
+    failure rolls back, raises, and the endpoint surfaces a 500 (T08).
+
+    Args:
+        isrc1: First ISRC of the pair.
+        isrc2: Second ISRC of the pair.
+        preferred_isrc: The precomputed merge target from the review view.
+        accept: True for ACCEPT, False for REJECT.
+
+    Raises:
+        Exception: If any statement fails, after rollback (nothing is committed).
+    """
+    if accept:
+        insert_sql = """INSERT INTO music.isrc_swaps (
+                        original_isrc,
+                        mapped_isrc,
+                        mapping_time_utc,
+                        valid_mapping)
+                        VALUES
+                        (%s, %s, CURRENT_TIMESTAMP, TRUE)
+                        ON CONFLICT
+                        (original_isrc)
+                        DO UPDATE SET
+                        mapped_isrc = EXCLUDED.mapped_isrc,
+                        mapping_time_utc = CURRENT_TIMESTAMP,
+                        valid_mapping = TRUE;
+                        """
+    else:
+        insert_sql = """INSERT INTO music.isrc_non_swaps (
+                        original_isrc,
+                        mapped_isrc,
+                        mapping_time_utc)
+                        VALUES
+                        (%s, %s, CURRENT_TIMESTAMP)
+                        ON CONFLICT
+                        DO NOTHING;
+                        """
+
+    del_sql = """DELETE FROM music.isrc_possible_dupes
+                WHERE (isrc1 = %s and isrc2 = %s)
+                OR (isrc1 = %s and isrc2 = %s)"""
+
+    def _write_decision(cur) -> None:
+        # One statement covers both ISRCs; the pool delete shares the
+        # transaction so a decision can never be half-applied.
+        cur.executemany(
+            insert_sql,
+            [(isrc1, preferred_isrc), (isrc2, preferred_isrc)],
+        )
+        cur.execute(del_sql, (isrc1, isrc2, isrc2, isrc1))
+
+    _run_in_transaction(_write_decision)
+    return
+
+def run_isrc_duplicate_finder() -> None:
+    """
+    Re-run the duplicate-search stored procedure (008-005, FR-6/T08).
+
+    The procedure rebuilds the candidate-pair staging data (~25 s);
+    this wrapper only invokes it — heuristics live in the database. The CALL
+    commits once and re-raises on failure, so a failed re-scan can no longer
+    be reported to the UI as a success.
+
+    Raises:
+        Exception: If the CALL fails, after rollback.
+    """
+    def _call_finder(cur) -> None:
+        cur.execute("CALL music.isrc_duplicate_finder();")
+
+    _run_in_transaction(_call_finder)
+    return
 
 def get_playlist_config(playlist_id: str) -> Sequence[Dict[str, Any]]:
     """
