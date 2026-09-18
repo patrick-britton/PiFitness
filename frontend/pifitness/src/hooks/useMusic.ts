@@ -19,6 +19,7 @@ import {
   MusicAddTargetsResponse,
   MusicAddToPlaylistRequest,
   ScoreRequest,
+  IsrcDupeDecisionRequest,
 } from "@/lib/types/music";
 
 // ---------------------------------------------------------------------------
@@ -158,6 +159,61 @@ export function useAddToPlaylist() {
   return useMutation({
     mutationFn: (playlistId: string) => API.music.addToPlaylist(playlistId),
     onSuccess: () => invalidateNowPlaying(queryClient),
+  });
+}
+
+/**
+ * Pending duplicate-ISRC pair count (008-005, OQ-1: pairs, not rows).
+ * Shared by the review banner and the home banner (T06).
+ */
+export function useIsrcDupeCount() {
+  return useQuery({
+    queryKey: [...musicKeys.all, 'isrc-dupes', 'count'],
+    queryFn: () => API.music.getIsrcDupeCount(),
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * One reviewable duplicate-ISRC pair (008-005, FR-2).
+ * Null match means the queue is empty.
+ */
+export function useIsrcDupeMatch(enabled: boolean = true) {
+  return useQuery({
+    queryKey: [...musicKeys.all, 'isrc-dupes', 'match'],
+    queryFn: () => API.music.getIsrcDupeMatch(),
+    enabled,
+    staleTime: 0,
+  });
+}
+
+/**
+ * Record an ACCEPT/REJECT decision (008-005, FR-3/FR-4/FR-5).
+ * On success, invalidates count + match so the banner updates and the
+ * next pair loads (or the empty state appears).
+ */
+export function useDecideIsrcDupe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: IsrcDupeDecisionRequest) =>
+      API.music.decideIsrcDupe(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...musicKeys.all, 'isrc-dupes'] });
+    },
+  });
+}
+
+/**
+ * Re-run the duplicate-search procedure (008-005, FR-6, ~25 s).
+ * On settle, invalidates count + match so the queue reloads.
+ */
+export function useRescanIsrcDupes() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => API.music.rescanIsrcDupes(),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [...musicKeys.all, 'isrc-dupes'] });
+    },
   });
 }
 

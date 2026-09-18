@@ -15,6 +15,7 @@ import * as Icons from '@mui/icons-material';
 import NowPlayingView from './components/NowPlayingView';
 import RatingsView from './components/RatingsView';
 import PlaylistShuffleView from './components/PlaylistShuffleView';
+import IsrcReviewView from './components/IsrcReviewView';
 
 const TABS = MODULE_SUB_PAGES.music;
 
@@ -170,9 +171,10 @@ export default function MusicPage() {
           {activeTab === 'now-playing' && <NowPlayingView />}
           {activeTab === 'ratings' && <RatingsView />}
           {activeTab === 'playlist-shuffle' && <PlaylistShuffleView />}
+          {activeTab === 'isrc-review' && <IsrcReviewView />}
 
           {/* Placeholder for sub-pages not yet built */}
-          {activeTab !== 'now-playing' && activeTab !== 'ratings' && activeTab !== 'playlist-shuffle' && (
+          {activeTab !== 'now-playing' && activeTab !== 'ratings' && activeTab !== 'playlist-shuffle' && activeTab !== 'isrc-review' && (
             <div className="p-8 text-center">
               <p className="text-gray-500 dark:text-gray-400 text-lg">
                 wow such empty

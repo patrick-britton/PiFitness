@@ -401,3 +401,52 @@ export interface ShuffleSendResponse {
   ok: boolean;
   message: string;
 }
+
+// ---------------------------------------------------------------------------
+// ISRC Review (008-005)
+// ---------------------------------------------------------------------------
+
+/** One reviewable duplicate-ISRC pair (GET /api/music/isrc-dupes/match).
+ *  Field names mirror music.vw_isrc_dupe_review columns, camelCased per convention. */
+export interface IsrcDupeMatch {
+  isrc1: string;
+  isrc2: string;
+  trackName1: string | null;
+  trackName2: string | null;
+  artistName1: string | null;
+  artistName2: string | null;
+  albumName1: string | null;
+  albumName2: string | null;
+  duration1: number | null;
+  duration2: number | null;
+  matchScore: number | null;
+  trackScore: number | null;
+  artistScore: number | null;
+  albumScore: number | null;
+  durationScore: number | null;
+  preferredIsrc: string;
+}
+
+/** Response for GET /api/music/isrc-dupes/count. count = pairs = floor(COUNT(*) / 2). */
+export interface IsrcDupeCountResponse {
+  count: number;
+}
+
+/** Response for GET /api/music/isrc-dupes/match. match is null when the queue is empty. */
+export interface IsrcDupeMatchResponse {
+  match: IsrcDupeMatch | null;
+}
+
+/** Request body for POST /api/music/isrc-dupes/decision. */
+export interface IsrcDupeDecisionRequest {
+  isrc1: string;
+  isrc2: string;
+  preferredIsrc: string;
+  accept: boolean;
+}
+
+/** Response for POST /api/music/isrc-dupes/decision and POST /api/music/isrc-dupes/rescan. */
+export interface IsrcDupeDecisionResponse {
+  ok: boolean;
+  message: string;
+}
