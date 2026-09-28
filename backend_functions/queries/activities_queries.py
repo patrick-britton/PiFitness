@@ -553,6 +553,48 @@ def get_leaderboard_segments(
     return result if result else []
 
 
+def get_segment_reference_windows(
+    segment_ids: Sequence[int],
+) -> Dict[int, Dict[str, Any]]:
+    """
+    Resolve the reference-geometry pointers for a set of segments (009-003, T02b/OQ-3).
+
+    Match Activities and Course Review render a segment's own GPS path from its
+    reference activity plus reference window — the legacy Streamlit source
+    (`get_activity_df(activity_reference_id, reference_start_point,
+    reference_end_point)`) — because `GET /api/segments/{id}/route` is keyed by
+    activity_id and cannot serve a segment_id.
+
+    ONE parameterized read over the `activities.segments` primary key for the
+    ids the caller just returned, projecting three scalars only (never the
+    geometry columns), so the picker list gains them without pushing
+    `segment_path` blobs to the client or re-running the filtered list query.
+
+    Args:
+        segment_ids: Segment ids to resolve.
+
+    Returns:
+        Dict[int, Dict[str, Any]]: segment_id -> {
+            activity_reference_id, reference_start_point, reference_end_point }.
+        Unknown ids are simply absent (caller emits nulls).
+    """
+    ids = [int(s) for s in segment_ids]
+    if not ids:
+        return {}
+    rows = sql_to_dict(
+        """
+        SELECT segment_id,
+               activity_reference_id,
+               reference_start_point,
+               reference_end_point
+        FROM activities.segments
+        WHERE segment_id = ANY(%s)
+        """,
+        (ids,),
+    ) or []
+    return {int(r["segment_id"]): r for r in rows}
+
+
 def get_segment_leaderboard(segment_id: int) -> List[Dict[str, Any]]:
     """
     Retrieve the ranked effort leaderboard for one segment/course (009-002, FR-4..FR-8).
@@ -717,6 +759,540 @@ def stage_leaderboard_visuals(segment_id: int, efforts: List[Dict[str, Any]]) ->
         conn.close()
 
 
+def get_activity_route(
+    activity_id: int,
+    start_m: Optional[float] = None,
+    end_m: Optional[float] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve route geometry + elevation for Segment Management (009-003, T03/FR-2, FR-4).
+
+    Single activity-meta lookup plus ONE ordered GPS scan of
+    activities.activity_details (lat/lon non-null, ordered by ts_utc):
+    path_coords as [lon, lat] pairs, elevations aligned 1:1 with path points.
+    Optional start_m/end_m trims by distance_mm (trim-gate support, FR-4);
+    None = full range. Parameterized, no pandas, no in-memory rollups.
+
+    Args:
+        activity_id: The source activity.
+        start_m: Trim start in meters; None = 0.
+        end_m: Trim end in meters; None = full distance.
+
+    Returns:
+        Dict {path_coords, elevations, distance_m} or None when no activity row.
+    """
+    meta = sql_to_dict(
+        "SELECT activity_id, distance_m FROM activities.activities WHERE activity_id = %s",
+        (activity_id,),
+    )
+    if not meta:
+        return None
+    sql = """
+        SELECT longitude, latitude, elevation_m
+        FROM activities.activity_details
+        WHERE activity_id = %s
+          AND latitude IS NOT NULL AND longitude IS NOT NULL
+          AND (%s::numeric IS NULL OR distance_mm / 1000.0 >= %s)
+          AND (%s::numeric IS NULL OR distance_mm / 1000.0 <= %s)
+        ORDER BY ts_utc
+    """
+    rows = sql_to_dict(sql, (activity_id, start_m, start_m, end_m, end_m)) or []
+    path_coords = [[float(r["longitude"]), float(r["latitude"])] for r in rows]
+    elevations = [float(r["elevation_m"]) if r["elevation_m"] is not None else 0.0 for r in rows]
+    dist = meta[0].get("distance_m")
+    return {
+        "path_coords": path_coords,
+        "elevations": elevations,
+        "distance_m": float(dist) if dist is not None else 0.0,
+    }
+
+
+def get_match_candidates(segment_id: int) -> Dict[str, Any]:
+    """
+    Retrieve candidate efforts + existing match count for Match Activities mode
+    (009-003, T06/FR-9, FR-10).
+
+    Reads the live activities.vw_temp_segment_matches_downselect rows for the
+    segment and joins per-activity distance/elevation. ONE query for
+    candidates + ONE COUNT for confirmed existing matches (excluding the
+    reference activity — mirroring the legacy existing-matches count).
+    Scaled *_scaled fields use legacy safe_minmax semantics (value / col max).
+    """
+    cand_sql = """
+        SELECT
+            v.activity_id,
+            v.confidence,
+            v.best_start_dist,
+            v.best_end_dist,
+            v.dist_deviation,
+            v.polygon_deviation_m,
+            v.hausdorff_deviation_m,
+            v.freschet_deviation_m,
+            a.start_time_utc,
+            a.distance_m,
+            a.elevation_m_gain
+        FROM activities.vw_temp_segment_matches_downselect v
+        JOIN activities.activities a ON a.activity_id = v.activity_id
+        WHERE v.segment_id = %s
+        ORDER BY v.confidence DESC
+    """
+    rows = sql_to_dict(cand_sql, (segment_id,)) or []
+    exist_sql = """
+        SELECT COUNT(DISTINCT sm.activity_id) AS cnt
+        FROM activities.segment_matches sm
+        JOIN activities.segments s ON s.segment_id = sm.segment_id
+        WHERE sm.segment_id = %s
+          AND sm.match_confirmed
+          AND sm.activity_id != s.activity_reference_id
+    """
+    exist = sql_to_dict(exist_sql, (segment_id,))
+    existing_match_count = int(exist[0]["cnt"]) if exist else 0
+
+    def _col_max(key: str) -> float:
+        vals = [float(r[key]) for r in rows if r.get(key) is not None]
+        return max(vals) if vals else 0.0
+
+    max_conf = _col_max("confidence")
+    max_dist = _col_max("dist_deviation")
+    max_poly = _col_max("polygon_deviation_m")
+    max_haus = _col_max("hausdorff_deviation_m")
+    max_fresh = _col_max("freschet_deviation_m")
+
+    def _scale(val, mx):
+        if val is None or not mx:
+            return None if val is None else 0.0
+        return float(val) / float(mx)
+
+    data = []
+    for r in rows:
+        start = r.get("start_time_utc")
+        data.append({
+            "activity_id": int(r["activity_id"]),
+            # Matched effort window inside the candidate activity (T06b/OQ-3).
+            # The columns are already fetched above; the UI needs them to draw
+            # the candidate's own route instead of the whole activity.
+            "best_start_dist": int(r["best_start_dist"]) if r["best_start_dist"] is not None else 0,
+            "best_end_dist": int(r["best_end_dist"]) if r["best_end_dist"] is not None else 0,
+            "confidence": float(r["confidence"]) if r["confidence"] is not None else 0.0,
+            "deviation": {
+                "distance_deviation_m": float(r["dist_deviation"]) if r["dist_deviation"] is not None else 0.0,
+                "polygon_deviation": float(r["polygon_deviation_m"]) if r["polygon_deviation_m"] is not None else 0.0,
+                "hausdorff_deviation": float(r["hausdorff_deviation_m"]) if r["hausdorff_deviation_m"] is not None else None,
+                "frechet_deviation": float(r["freschet_deviation_m"]) if r["freschet_deviation_m"] is not None else None,
+            },
+            "start_time_utc": start.isoformat() if hasattr(start, "isoformat") else str(start or ""),
+            "distance_m": float(r["distance_m"]) if r["distance_m"] is not None else 0.0,
+            "elevation_gain": float(r["elevation_m_gain"]) if r["elevation_m_gain"] is not None else None,
+            "confidence_scaled": _scale(r.get("confidence"), max_conf) or 0.0,
+            "distance_deviation_scaled": _scale(r.get("dist_deviation"), max_dist) or 0.0,
+            "polygon_deviation_scaled": _scale(r.get("polygon_deviation_m"), max_poly) or 0.0,
+            "hausdorff_deviation_scaled": _scale(r.get("hausdorff_deviation_m"), max_haus),
+            "frechet_deviation_scaled": _scale(r.get("freschet_deviation_m"), max_fresh),
+        })
+    return {"data": data, "count": len(data), "existing_match_count": existing_match_count}
+
+
+def run_find_matches(segment_id: int) -> Dict[str, Any]:
+    """
+    Run the legacy find-matches pipeline for a segment (009-003, T06/FR-9).
+
+    Exact legacy sequence from segment_creation.py::render_segment_matches:
+    match_activities -> pair_generation -> matches_all_polygon ->
+    mass_confirmation(1). Synchronous blocking CALLs; frontend shows a spinner
+    per OQ-1. Parameterized; no pandas.
+    """
+    seg = sql_to_dict(
+        "SELECT segment_id FROM activities.segments WHERE segment_id = %s",
+        (segment_id,),
+    )
+    if not seg:
+        raise ValueError(f"segment_id={segment_id} not found")
+    steps = [
+        ("CALL activities.segment_matching_match_activities(%s)", [int(segment_id)]),
+        ("CALL activities.segment_matching_pair_generation(%s)", [int(segment_id)]),
+        ("CALL activities.segment_matches_all_polygon()", None),
+        ("CALL activities.segment_matching_mass_confirmation(1)", None),
+    ]
+    for proc, params in steps:
+        err = qec(proc, params)
+        if err:
+            raise ValueError(f"find-matches step failed [{proc}]: {err}")
+    result = get_match_candidates(int(segment_id))
+    return {"message": f"Find matches complete for segment {segment_id}", "candidates": result["data"]}
+
+
+def finalize_candidate_match(
+    segment_id: int, activity_id: int, approved: bool
+) -> Dict[str, Any]:
+    """
+    Confirm or reject one candidate effort (009-003, T06/FR-11).
+
+    Looks up best_start/end_dist + confidence from
+    vw_temp_segment_matches_downselect, CALLs
+    segment_matching_finalize_match(approved, ...), then CALLs
+    staging.update_segment_details(NULL) on approval (legacy confirm flow).
+    Returns the MatchOperationResponse shape.
+    """
+    seg = sql_to_dict(
+        "SELECT segment_id, segment_name FROM activities.segments WHERE segment_id = %s",
+        (segment_id,),
+    )
+    if not seg:
+        raise ValueError(f"segment_id={segment_id} not found")
+    cand = sql_to_dict(
+        """SELECT best_start_dist, best_end_dist, confidence
+           FROM activities.vw_temp_segment_matches_downselect
+           WHERE segment_id = %s AND activity_id = %s""",
+        (segment_id, activity_id),
+    )
+    if not cand:
+        raise ValueError(
+            f"activity_id={activity_id} is not a pending candidate for segment_id={segment_id}"
+        )
+    start = int(cand[0]["best_start_dist"])
+    end = int(cand[0]["best_end_dist"])
+    conf = float(cand[0]["confidence"]) if cand[0]["confidence"] is not None else 0.0
+    flag = "TRUE" if approved else "FALSE"
+    err = qec(
+        f"CALL activities.segment_matching_finalize_match({flag}, %s, %s, %s, %s, %s::NUMERIC)",
+        [int(activity_id), int(segment_id), start, end, conf],
+    )
+    if err:
+        raise ValueError(f"finalize match failed: {err}")
+    if approved:
+        # Scoped to the confirmed activity: the unscoped NULL variant scans
+        # the full segment_matches join and hit a corrupt heap page
+        # (live probe: invalid page in block 173078). Same procedure,
+        # bounded work, Pi-5 friendly.
+        err = qec("CALL staging.update_segment_details(%s);", [int(activity_id)])
+        if err:
+            raise ValueError(f"update_segment_details failed: {err}")
+    matched = sql_to_dict(
+        "SELECT COUNT(*) AS cnt FROM activities.segment_matches WHERE segment_id = %s AND match_confirmed",
+        (segment_id,),
+    )
+    verb = "confirmed" if approved else "rejected"
+    return {
+        "message": f"Match {verb} for activity {activity_id}",
+        "segment": {
+            "segment_id": int(segment_id),
+            "segment_name": str(seg[0].get("segment_name") or ""),
+            "matched_count": int(matched[0]["cnt"]) if matched else 0,
+        },
+    }
+
+
+def bulk_confirm_matches(segment_id: int, confirm_all: bool) -> Dict[str, Any]:
+    """
+    Mass-approve remaining candidates (009-003, T06/FR-11).
+
+    Legacy flow: segment_matching_mass_confirmation(4) +
+    staging.update_segment_details(NULL). Requires confirm_all=True.
+    """
+    if not confirm_all:
+        raise ValueError("confirm_all must be true to run bulk confirm")
+    seg = sql_to_dict(
+        "SELECT segment_id, segment_name FROM activities.segments WHERE segment_id = %s",
+        (segment_id,),
+    )
+    if not seg:
+        raise ValueError(f"segment_id={segment_id} not found")
+    err = qec("CALL activities.segment_matching_mass_confirmation(4)")
+    if err:
+        raise ValueError(f"mass confirmation failed: {err}")
+    err = qec("CALL staging.update_segment_details(NULL);")
+    if err:
+        raise ValueError(f"update_segment_details failed: {err}")
+    matched = sql_to_dict(
+        "SELECT COUNT(*) AS cnt FROM activities.segment_matches WHERE segment_id = %s AND match_confirmed",
+        (segment_id,),
+    )
+    return {
+        "message": f"Bulk confirm complete for segment {segment_id}",
+        "segment": {
+            "segment_id": int(segment_id),
+            "segment_name": str(seg[0].get("segment_name") or ""),
+            "matched_count": int(matched[0]["cnt"]) if matched else 0,
+        },
+    }
+
+
+def run_extra_scoring(segment_id: int, kind: str) -> Dict[str, Any]:
+    """
+    Run Hausdorff or Freschet scoring over the candidate set (009-003, T06/FR-12).
+
+    Legacy: segment_matches_all_hausdorff() / segment_matches_all_freschet().
+    Returns the refreshed candidate set (ScoringResponse shape).
+    """
+    seg = sql_to_dict(
+        "SELECT segment_id FROM activities.segments WHERE segment_id = %s",
+        (segment_id,),
+    )
+    if not seg:
+        raise ValueError(f"segment_id={segment_id} not found")
+    proc = {
+        "hausdorff": "CALL activities.segment_matches_all_hausdorff()",
+        "frechet": "CALL activities.segment_matches_all_freschet()",
+    }.get(kind)
+    if proc is None:
+        raise ValueError(f"unknown scoring kind: {kind}")
+    err = qec(proc)
+    if err:
+        raise ValueError(f"{kind} scoring failed: {err}")
+    result = get_match_candidates(int(segment_id))
+    return {"message": f"{kind} scoring complete for segment {segment_id}", "candidates": result["data"]}
+
+
+def create_segment(
+    segment_name: str,
+    activity_id: int,
+    start_m: int,
+    end_m: int,
+    is_course: bool,
+) -> int:
+    """
+    Create a course/segment from an activity range (009-003, T05/FR-5).
+
+    Mirrors the legacy frontend_functions/segment_creation.py::new_segment_creation
+    flow exactly: CALL activities.segment_matching_segment_creation, resolve the
+    new id via MAX(segment_id), then CALL
+    activities.segment_matching_finalize_match(TRUE, ...) to record the source
+    activity's own confirmed match (confidence 0). Parameterized; no pandas.
+
+    Args:
+        segment_name: New segment/course name (non-empty, <= 200 chars).
+        activity_id: Source activity.
+        start_m: Trim-gate start in meters.
+        end_m: Trim-gate end in meters.
+        is_course: True = course, False = segment.
+
+    Returns:
+        int: The new segment_id.
+
+    Raises:
+        ValueError: On validation failure or missing source/new row.
+    """
+    name = (segment_name or "").strip()
+    if not name:
+        raise ValueError("name must be non-empty")
+    if len(name) > 200:
+        raise ValueError("name must be <= 200 characters")
+    if start_m < 0 or end_m < 0:
+        raise ValueError("start_m and end_m must be >= 0")
+    if end_m < start_m:
+        raise ValueError("end_m must be >= start_m")
+    meta = sql_to_dict(
+        "SELECT activity_id, distance_m FROM activities.activities WHERE activity_id = %s",
+        (activity_id,),
+    )
+    if not meta:
+        raise ValueError(f"activity_id={activity_id} not found")
+    dist = meta[0].get("distance_m")
+    if dist is not None and end_m > float(dist):
+        raise ValueError(
+            f"end_m ({end_m}) exceeds activity distance ({float(dist):.1f} m)"
+        )
+    err = qec(
+        "CALL activities.segment_matching_segment_creation(%s, %s, %s, %s, %s)",
+        [name, int(activity_id), int(start_m), int(end_m), bool(is_course)],
+    )
+    if err:
+        raise ValueError(f"segment creation failed: {err}")
+    new_id = one_sql_result("SELECT MAX(segment_id) FROM activities.segments")
+    if new_id is None:
+        raise ValueError("segment creation produced no row")
+    err = qec(
+        "CALL activities.segment_matching_finalize_match(TRUE, %s, %s, %s, %s, 0::NUMERIC)",
+        [int(activity_id), int(new_id), int(start_m), int(end_m)],
+    )
+    if err:
+        raise ValueError(f"finalize match failed: {err}")
+    return int(new_id)
+
+
+def delete_segment(segment_id: int) -> Dict[str, Any]:
+    """
+    Delete a segment with its match rows and detail records (009-003, T07/FR-13).
+
+    Mirrors the legacy Streamlit delete flow (segment_matches -> segments ->
+    segments_details) but adds the child tables that reference the segment, in
+    ONE transaction:
+
+    - activities.segment_match_exclusions: FK segment_match_exclusions_segment_id_fkey
+      is ON DELETE NO ACTION (verified live), so a plain parent DELETE fails
+      whenever exclusion rows exist -> delete first.
+    - activities.distinct_segments: derived pair rows keyed by segment_id /
+      match_seg_id; removed so no orphan pairing rows survive.
+    - activities.segment_matches, activities.segments_details: match + effort
+      records for the segment (FR-13).
+    - activities.segments: the segment row itself.
+
+    Five parameterized single-row DELETEs on a single connection (Pi-5: no
+    scans, no per-row round-trips, no pandas). Rolls back as a unit.
+
+    Args:
+        segment_id: The segment/course to remove.
+
+    Returns:
+        Dict {message, segment_id, deleted_matches, deleted_details}.
+
+    Raises:
+        ValueError: When the segment does not exist or a statement fails.
+    """
+    seg = sql_to_dict(
+        "SELECT segment_id, segment_name FROM activities.segments WHERE segment_id = %s",
+        (segment_id,),
+    )
+    if not seg:
+        raise ValueError(f"segment_id={segment_id} not found")
+    name = seg[0].get("segment_name") or ""
+    deleted_matches = 0
+    deleted_details = 0
+    conn = get_conn()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM activities.segment_match_exclusions WHERE segment_id = %s",
+            (segment_id,),
+        )
+        cur.execute(
+            "DELETE FROM activities.distinct_segments WHERE segment_id = %s OR match_seg_id = %s",
+            (segment_id, segment_id),
+        )
+        cur.execute(
+            "DELETE FROM activities.segment_matches WHERE segment_id = %s",
+            (segment_id,),
+        )
+        deleted_matches = cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+        cur.execute(
+            "DELETE FROM activities.segments_details WHERE segment_id = %s",
+            (segment_id,),
+        )
+        deleted_details = cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+        cur.execute(
+            "DELETE FROM activities.segments WHERE segment_id = %s",
+            (segment_id,),
+        )
+        removed = cur.rowcount
+        if not removed:
+            raise ValueError(f"segment_id={segment_id} not found")
+        conn.commit()
+        cur.close()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return {
+        "message": (
+            f"Segment {segment_id} '{name}' deleted "
+            f"({deleted_matches} match rows, {deleted_details} detail rows removed)"
+        ),
+        "segment_id": int(segment_id),
+        "deleted_matches": deleted_matches,
+        "deleted_details": deleted_details,
+    }
+
+
+def reset_match_tables(confirm_reset: bool) -> Dict[str, Any]:
+    """
+    Destructive reset of matching data (009-003, T07/FR-14).
+
+    Legacy sequence (segment_creation.py reset button): TRUNCATE
+    segment_matches -> segment_match_exclusions -> distinct_segments ->
+    segments RESTART IDENTITY CASCADE, extended with segments_details.
+
+    Rationale for segments_details: the segments truncate restarts the
+    segment_id identity, so surviving effort rows would re-attach to newly
+    created segments that recycle those ids (phantom efforts / leaderboard
+    rows). Legacy left them behind; resetting them keeps the wipe consistent
+    with the per-segment delete in delete_segment (FR-13).
+
+    All five TRUNCATEs run in ONE transaction on a single connection, so a
+    failure leaves the matching data untouched. TRUNCATE does not scan rows
+    (Pi-5 friendly; also avoids the pre-existing corrupt heap page that an
+    unscoped segment_matches scan hits). No pandas.
+
+    Args:
+        confirm_reset: Deliberate-activation flag (OQ-2: confirmation dialog).
+
+    Returns:
+        Dict {message, truncated_count} where truncated_count is the number of
+        tables truncated.
+
+    Raises:
+        ValueError: When confirm_reset is not true or a statement fails.
+    """
+    if not confirm_reset:
+        raise ValueError("confirm_reset must be true")
+    statements = [
+        "TRUNCATE TABLE activities.segment_matches",
+        "TRUNCATE TABLE activities.segment_match_exclusions",
+        "TRUNCATE TABLE activities.distinct_segments",
+        "TRUNCATE TABLE activities.segments_details",
+        "TRUNCATE TABLE activities.segments RESTART IDENTITY CASCADE",
+    ]
+    conn = get_conn()
+    conn.autocommit = False
+    try:
+        cur = conn.cursor()
+        for stmt in statements:
+            cur.execute(stmt)
+        conn.commit()
+        cur.close()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return {
+        "message": (
+            "Match tables reset: segment_matches, segment_match_exclusions, "
+            "distinct_segments, segments_details truncated and segments reset"
+        ),
+        "truncated_count": len(statements),
+    }
+
+
+def rename_segment(segment_id: int, new_name: str) -> Dict[str, Any]:
+    """
+    Rename a course/segment (009-003, T07/FR-16).
+
+    Same single parameterized UPDATE as the legacy course-review rename
+    (viz_factory/run_list.py::update_course_name). One existence check + one
+    UPDATE; no scans, no pandas.
+
+    Args:
+        segment_id: The course/segment to rename.
+        new_name: New name (stripped, non-empty, <= 200 chars).
+
+    Returns:
+        Dict {segment_id, segment_name} per the RenameResponse contract.
+
+    Raises:
+        ValueError: On validation failure or unknown segment_id.
+    """
+    name = (new_name or "").strip()
+    if not name:
+        raise ValueError("new_name must be non-empty")
+    if len(name) > 200:
+        raise ValueError("new_name must be <= 200 characters")
+    seg = sql_to_dict(
+        "SELECT segment_id FROM activities.segments WHERE segment_id = %s",
+        (segment_id,),
+    )
+    if not seg:
+        raise ValueError(f"segment_id={segment_id} not found")
+    err = qec(
+        "UPDATE activities.segments SET segment_name = %s WHERE segment_id = %s",
+        [name, int(segment_id)],
+    )
+    if err:
+        raise ValueError(f"segment rename failed: {err}")
+    return {"segment_id": int(segment_id), "segment_name": name}
+
+
 def get_segment_name(segment_id: int) -> str:
     """
     Resolve the segment_name for a segment_id (009-002, T05).
@@ -731,6 +1307,146 @@ def get_segment_name(segment_id: int) -> str:
     if not result:
         return ""
     return str(result[0].get("segment_name") or "")
+
+
+def get_segment_activities(
+    activity_type: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> List[Dict[str, Any]]:
+    """
+    Retrieve the source-activity selection list for Segment Management (009-003, T02/FR-1).
+
+    One row per activity in activities.activities (newest first) with:
+    - child_segment_count: segments created FROM this activity
+      (activities.segments.activity_reference_id = activity_id)
+    - matched_count: segment efforts belonging to this activity
+      (activities.segments_details.activity_id = activity_id)
+
+    Counts are correlated subqueries (no JOIN fan-out), parameterized, with
+    LIMIT/OFFSET pagination for Pi-5 memory bounds. Activity-type filtering
+    reuses the legacy _ACTIVITY_TYPE_PATTERNS semantics (Run excludes trail).
+
+    Args:
+        activity_type: One of _ACTIVITY_TYPE_PATTERNS keys; None = any.
+        limit: Max rows (1..200).
+        offset: Pagination offset.
+
+    Returns:
+        List[Dict[str, Any]]: Activity summary rows.
+    """
+    sql = """
+        SELECT
+            a.activity_id,
+            a.activity_type_name,
+            a.start_timestamp_utc AS start_time_utc,
+            a.distance_m,
+            (SELECT COUNT(*) FROM activities.segments s
+              WHERE s.activity_reference_id = a.activity_id) AS child_segment_count,
+            (SELECT COUNT(*) FROM activities.segments_details sd
+              WHERE sd.activity_id = a.activity_id) AS matched_count
+        FROM activities.activities a
+        WHERE (%s::text IS NULL OR TRUE)
+    """
+    params: List[Any] = [activity_type]
+    # Replace the no-op predicate with the legacy type pattern when known;
+    # unknown strings fall back to a case-insensitive substring match.
+    if activity_type in _ACTIVITY_TYPE_PATTERNS:
+        sql = sql.replace(
+            "WHERE (%s::text IS NULL OR TRUE)",
+            f"WHERE ({_ACTIVITY_TYPE_PATTERNS[activity_type]})",
+        )
+        params = list(_ACTIVITY_TYPE_PARAMS[activity_type])
+    elif activity_type:
+        sql = sql.replace(
+            "WHERE (%s::text IS NULL OR TRUE)",
+            "WHERE (a.activity_type_name ILIKE %s)",
+        )
+        params = [f"%{activity_type}%"]
+    else:
+        sql = sql.replace(
+            "WHERE (%s::text IS NULL OR TRUE)",
+            "WHERE (TRUE)",
+        )
+        params = []
+
+    sql += " ORDER BY a.start_timestamp_utc DESC NULLS LAST LIMIT %s OFFSET %s"
+    params.extend([limit, offset])
+
+    result = sql_to_dict(sql, tuple(params))
+    return result if result else []
+
+
+def get_courses_page(
+    name: Optional[str] = None,
+    min_distance: Optional[float] = None,
+    max_distance: Optional[float] = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> Dict[str, Any]:
+    """
+    Retrieve the paginated course-review list for Segment Management (009-003, T02/FR-15).
+
+    Reads activities.vw_segments_effort_stats filtered to is_course rows and
+    projects the CourseInfo contract shape (segment_id -> course_id,
+    segment_name -> course_name, matched_activity_count -> attempt_count,
+    last_effort -> last_run, is_new = last_effort IS NULL).
+
+    Single round-trip: COUNT(*) OVER() carries the filtered total alongside
+    the page rows (Pi-5: avoids a second count query).
+
+    Args:
+        name: Case-insensitive substring on segment_name; None/empty = any.
+        min_distance: Minimum distance_mi; None = any.
+        max_distance: Maximum distance_mi; None = any.
+        page: 1-based page number.
+        page_size: Rows per page.
+
+    Returns:
+        Dict with data/total_count/page/page_size/total_pages.
+    """
+    offset = (page - 1) * page_size
+    sql = """
+        SELECT
+            segment_id AS course_id,
+            segment_name AS course_name,
+            distance_mi,
+            elevation_gain,
+            last_effort AS last_run,
+            matched_activity_count AS attempt_count,
+            (last_effort IS NULL) AS is_new,
+            COUNT(*) OVER() AS total_count
+        FROM activities.vw_segments_effort_stats
+        WHERE is_course = TRUE
+          AND (%s::text IS NULL OR segment_name ILIKE %s)
+          AND (%s::numeric IS NULL OR distance_mi >= %s)
+          AND (%s::numeric IS NULL OR distance_mi <= %s)
+        ORDER BY last_effort DESC NULLS LAST, course_name
+        LIMIT %s OFFSET %s
+    """
+    params: List[Any] = [
+        name, f"%{name}%" if name else None,
+        min_distance, min_distance,
+        max_distance, max_distance,
+        page_size, offset,
+    ]
+    rows = sql_to_dict(sql, tuple(params)) or []
+    total_count = int(rows[0]["total_count"]) if rows else 0
+    data = [
+        {k: r[k] for k in (
+            "course_id", "course_name", "distance_mi", "elevation_gain",
+            "last_run", "attempt_count", "is_new",
+        )}
+        for r in rows
+    ]
+    total_pages = (total_count + page_size - 1) // page_size if total_count else 0
+    return {
+        "data": data,
+        "total_count": total_count,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
 
 
 __all__ = [
@@ -754,4 +1470,23 @@ __all__ = [
     'get_segment_visuals_telemetry',
     'stage_leaderboard_visuals',
     'get_segment_name',
+    # 009-003 Segment Management (T02)
+    'get_segment_activities',
+    'get_courses_page',
+    # 009-003 Segment Management (T02b)
+    'get_segment_reference_windows',
+    # 009-003 Segment Management (T03)
+    'get_activity_route',
+    # 009-003 Segment Management (T06)
+    'get_match_candidates',
+    'run_find_matches',
+    'finalize_candidate_match',
+    'bulk_confirm_matches',
+    'run_extra_scoring',
+    # 009-003 Segment Management (T05)
+    'create_segment',
+    # 009-003 Segment Management (T07)
+    'delete_segment',
+    'reset_match_tables',
+    'rename_segment',
 ]

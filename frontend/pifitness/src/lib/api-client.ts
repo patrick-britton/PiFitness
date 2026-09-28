@@ -52,6 +52,30 @@ import {
   ExerciseAttemptCreateRequest,
 } from './types/exercises';
 import {
+  ActivitiesQuery,
+  ActivitiesResponse,
+  RouteQuery,
+  RouteResponse,
+  CreateSegmentRequest,
+  CreateSegmentResponse,
+  MapStylesResponse,
+  CandidatesResponse,
+  ConfirmMatchRequest,
+  RejectMatchRequest,
+  MatchOperationResponse,
+  BulkConfirmRequest,
+  HausdorffScoringRequest,
+  FrechetScoringRequest,
+  ScoringResponse,
+  DeleteSegmentResponse,
+  ResetMatchTablesRequest,
+  ResetResponse,
+  RenameSegmentRequest,
+  RenameResponse,
+  CoursesQuery,
+  CoursesResponse,
+} from './types/segment-management';
+import {
   NowPlayingResponse,
   MusicActionResponse,
   MusicAddTargetsResponse,
@@ -597,6 +621,118 @@ export const API = {
       }
 
       return readNdjsonStream(response, onStep);
+    },
+  },
+
+  /**
+   * Segment Management API endpoints (009-003).
+   */
+  segments: {
+    /**
+     * Source-activity selection list for Create Segment mode (FR-1).
+     * Server-side `activity_type` filter + limit/offset paging.
+     */
+    getActivities: (query?: ActivitiesQuery & { limit?: number; offset?: number }) => {
+      const params = new URLSearchParams();
+      if (query?.activity_type) params.set("activity_type", query.activity_type);
+      if (query?.limit != null) params.set("limit", String(query.limit));
+      if (query?.offset != null) params.set("offset", String(query.offset));
+      const qs = params.toString();
+      return fetchAPI<ActivitiesResponse>(`/api/segments/activities${qs ? `?${qs}` : ""}`);
+    },
+    /**
+     * Activity route + elevation, optionally trimmed by the start/end gates in
+     * meters (FR-2/FR-4). Omitted gates return the full activity range.
+     */
+    getRoute: (activityId: number, query?: Partial<RouteQuery>) => {
+      const params = new URLSearchParams();
+      if (query?.start_m != null) params.set("start_m", String(query.start_m));
+      if (query?.end_m != null) params.set("end_m", String(query.end_m));
+      const qs = params.toString();
+      return fetchAPI<RouteResponse>(`/api/segments/${activityId}/route${qs ? `?${qs}` : ""}`);
+    },
+    /** Create the trimmed range as a course or a segment (FR-5). */
+    createSegment: (req: CreateSegmentRequest) =>
+      fetchAPI<CreateSegmentResponse>("/api/segments/create", {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    /**
+     * Basemap catalogue + satellite availability for the map style selector
+     * (FR-3); token-gated styles appear only when the token is configured.
+     */
+    getMapStyles: () => fetchAPI<MapStylesResponse>("/api/segments/map-styles"),
+    /** Filterable segment/course list for Match Activities picker (FR-7). */
+    getSegmentsList: (query?: SegmentListQuery) => {
+      const params = new URLSearchParams();
+      if (query?.name != null) params.set("name", query.name);
+      if (query?.min_distance != null) params.set("min_distance", String(query.min_distance));
+      if (query?.kind != null) params.set("kind", query.kind);
+      if (query?.activity_type != null) params.set("activity_type", query.activity_type);
+      const qs = params.toString();
+      return fetchAPI<ApiListResponse<SegmentListRow>>(`/api/segments/list${qs ? `?${qs}` : ""}`);
+    },
+        /** Trigger the find-matches pipeline (FR-9, OQ-1). */
+    findMatches: (segmentId: number) =>
+      fetchAPI<ScoringResponse>(`/api/segments/${segmentId}/matches/find`, { method: "POST" }),
+    /** Existing matches + candidates for a segment (FR-9, FR-10). */
+    getCandidates: (segmentId: number) =>
+      fetchAPI<CandidatesResponse>(`/api/segments/${segmentId}/matches/candidates`),
+    /** Confirm one candidate effort (FR-11). */
+    confirmMatch: (segmentId: number, req: ConfirmMatchRequest) =>
+      fetchAPI<MatchOperationResponse>(`/api/segments/${segmentId}/matches/confirm`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    /** Reject one candidate effort (FR-11). */
+    rejectMatch: (segmentId: number, req: RejectMatchRequest) =>
+      fetchAPI<MatchOperationResponse>(`/api/segments/${segmentId}/matches/reject`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    /** Mass-approve remaining candidates (FR-11). */
+    bulkConfirm: (segmentId: number, req: BulkConfirmRequest) =>
+      fetchAPI<MatchOperationResponse>(`/api/segments/${segmentId}/matches/bulk-confirm`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    /** Run Hausdorff scoring on candidates (FR-12). */
+    hausdorffScoring: (segmentId: number, req: HausdorffScoringRequest) =>
+      fetchAPI<ScoringResponse>(`/api/segments/${segmentId}/scoring/hausdorff`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    /** Run Fréchet scoring on candidates (FR-12). */
+    frechetScoring: (segmentId: number, req: FrechetScoringRequest) =>
+      fetchAPI<ScoringResponse>(`/api/segments/${segmentId}/scoring/frechet`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    /** Delete a segment and its matches/details (FR-13). */
+    deleteSegment: (segmentId: number) =>
+      fetchAPI<DeleteSegmentResponse>(`/api/segments/${segmentId}`, { method: "DELETE" }),
+    /** Truncate match tables and reset segments identity (FR-14). */
+    resetMatchTables: (req: ResetMatchTablesRequest) =>
+      fetchAPI<ResetResponse>("/api/segments/reset", {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    /** Rename a course (FR-16). */
+    renameSegment: (segmentId: number, req: RenameSegmentRequest) =>
+      fetchAPI<RenameResponse>(`/api/segments/${segmentId}/name`, {
+        method: "PATCH",
+        body: JSON.stringify(req),
+      }),
+    /** Paginated course review list with name/length filters (FR-15). */
+    getCourses: (query?: CoursesQuery) => {
+      const params = new URLSearchParams();
+      if (query?.name != null) params.set("name", query.name);
+      if (query?.min_distance != null) params.set("min_distance", String(query.min_distance));
+      if (query?.max_distance != null) params.set("max_distance", String(query.max_distance));
+      if (query?.page != null) params.set("page", String(query.page));
+      if (query?.page_size != null) params.set("page_size", String(query.page_size));
+      const qs = params.toString();
+      return fetchAPI<CoursesResponse>(`/api/segments/courses${qs ? `?${qs}` : ""}`);
     },
   },
 

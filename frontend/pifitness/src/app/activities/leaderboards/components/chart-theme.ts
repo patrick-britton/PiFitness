@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
 /**
  * Shared chart-theme helpers for the Leaderboards components (009-009 T04):
  * token reads and theme-cycle tracking used by Chart.js configs (Chart.js
@@ -20,13 +18,9 @@ import { useEffect, useState } from 'react';
  */
 export { tokenRgb } from '@/lib/token-color';
 
-/** Increment a version when the `dark` class on <html> toggles (theme change). */
-export function useThemeVersion(): number {
-  const [version, setVersion] = useState(0);
-  useEffect(() => {
-    const observer = new MutationObserver(() => setVersion((v) => v + 1));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-  return version;
-}
+/**
+ * Theme-cycle tracking now lives in ONE place for the module:
+ * `@/lib/theme-version` (009-003 T08). Re-exported here so existing leaderboard
+ * imports stay valid, mirroring the `tokenRgb` re-export above.
+ */
+export { useThemeVersion } from '@/lib/theme-version';
