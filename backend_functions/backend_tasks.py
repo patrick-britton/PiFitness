@@ -24,6 +24,7 @@ def nightly_maintenance(days_to_keep=365):
     st = start_timer()  # Track elapsed seconds
 
     # Health snapshot before maintenance
+    log_app_event(cat="DB Maintenance", desc="Starting Health Pre-Check")
     try:
         overall, checks = run_health_checks()
         print(f"Health check before maintenance: {overall}")
@@ -120,6 +121,7 @@ def nightly_maintenance(days_to_keep=365):
     conn.close()
 
     # Health snapshot after maintenance
+    log_app_event(cat="DB Maintenance", desc="Starting Health Post-Check")
     try:
         overall, checks = run_health_checks()
         print(f"Health check after maintenance: {overall}")
