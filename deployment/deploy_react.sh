@@ -67,7 +67,6 @@ if [[ "$NUCLEAR" == "true" ]]; then
         exit 1
     fi
 
-    # Backup .env and auth tokens (no database backup – database is untouched)
     info "Backing up .env..."
     [ -f "$PROJECT_DIR/backend/.env" ] && cp "$PROJECT_DIR/backend/.env" /home/god/Documents/.env.pre-nuclear
     cp /home/god/Documents/.env /home/god/Documents/.env.pre-nuclear.master 2>/dev/null || true
@@ -77,7 +76,6 @@ if [[ "$NUCLEAR" == "true" ]]; then
         [ -f "$PROJECT_DIR/$token_file" ] && cp "$PROJECT_DIR/$token_file" "/tmp/${token_file}.backup" || true
     done
 
-    # Wipe everything
     info "Stopping any running services before wipe..."
     sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
     pm2 delete pifitness-next 2>/dev/null || true
@@ -92,32 +90,26 @@ if [[ "$NUCLEAR" == "true" ]]; then
     rm -rf ~/.npm/_cacache
     rm -rf ~/.pm2
 
-    # Re-clone
     info "Cloning repository..."
     git clone https://github.com/patrick-britton/PiFitness.git "$PROJECT_DIR"
     cd "$PROJECT_DIR"
     git fetch origin
     git checkout "$TARGET"
 
-    # Restore .env (backend reads backend/.env; the systemd unit reads project-root .env)
     cp /home/god/Documents/.env "$PROJECT_DIR/backend/.env"
     cp /home/god/Documents/.env "$PROJECT_DIR/.env"
 
-    # Restore auth tokens
     for token_file in garmin_tokens.json oauth1_token.json .spotify_cache; do
         [ -f "/tmp/${token_file}.backup" ] && cp "/tmp/${token_file}.backup" "$PROJECT_DIR/$token_file" || true
     done
 
-    # Create venv
     info "Creating Python virtual environment..."
     python3 -m venv "$VENV_DIR"
     source "$VENV_DIR/bin/activate"
 
-    # Install Python packages
     info "Installing Python dependencies..."
     pip install -r "$PROJECT_DIR/deployment/$REQUIREMENTS_FILE"
 
-    # Install npm packages
     info "Installing npm packages..."
     cd "$FRONTEND_DIR"
     npm install --no-save 2>/dev/null || true
@@ -129,17 +121,16 @@ if [[ "$NUCLEAR" == "true" ]]; then
         done < "$PROJECT_DIR/deployment/$NPM_REQUIREMENTS_FILE"
     fi
 
-    # Build frontend
     info "Building Next.js application..."
     npm run build
 
-    # Install FastAPI systemd service
     info "Installing FastAPI service file..."
     sudo cp "$PROJECT_DIR/deployment/pifitness-fastapi.service" /etc/systemd/system/
     sudo systemctl daemon-reload
 
-    # [HEALTH] Install hardware health helper and timer (if present in the repo)
-    HEALTH_SRC="$PROJECT_DIR/deployment/health"
+    # [HEALTH] Install hardware health helper and timer (relative to this script)
+    SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    HEALTH_SRC="$SELF_DIR/health"
     if [[ -d "$HEALTH_SRC" ]]; then
         info "Installing hardware health helper and timer..."
         sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
@@ -152,7 +143,6 @@ if [[ "$NUCLEAR" == "true" ]]; then
     sudo systemctl enable pifitness-fastapi.service
     sudo systemctl start  pifitness-fastapi.service
 
-    # Start Next.js with PM2
     if ! command -v pm2 &> /dev/null; then
         sudo npm install -g pm2
     fi
@@ -169,7 +159,6 @@ if [[ "$NUCLEAR" == "true" ]]; then
     pm2 start npm --name pifitness-next -- run start -- --port 3000
     pm2 save --force
 
-    # Configure nginx
     NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
     NGINX_SITE="/etc/nginx/sites-available/pifitness"
     sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE"
@@ -181,7 +170,6 @@ if [[ "$NUCLEAR" == "true" ]]; then
     fi
     sudo systemctl reload nginx || error_exit "Failed to reload nginx."
 
-    # Agent timer
     sudo systemctl enable pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
     sudo systemctl start  pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
 
@@ -243,8 +231,9 @@ if [[ "$FAST" == "true" ]]; then
             sudo systemctl reload nginx || error_exit "Failed to reload nginx."
         fi
 
-        # [HEALTH] Install hardware health helper and timer (if present in the repo)
-        HEALTH_SRC="$PROJECT_DIR/deployment/health"
+        # [HEALTH] Install hardware health helper and timer (relative to this script)
+        SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        HEALTH_SRC="$SELF_DIR/health"
         if [[ -d "$HEALTH_SRC" ]]; then
             info "Installing hardware health helper and timer..."
             sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
@@ -309,8 +298,9 @@ if [[ "$FAST" == "true" ]]; then
             info "Services verified and started."
         fi
 
-        # [HEALTH] Install hardware health helper and timer (if present in the repo)
-        HEALTH_SRC="$PROJECT_DIR/deployment/health"
+        # [HEALTH] Install hardware health helper and timer (relative to this script)
+        SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        HEALTH_SRC="$SELF_DIR/health"
         if [[ -d "$HEALTH_SRC" ]]; then
             info "Installing hardware health helper and timer..."
             sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
@@ -356,7 +346,8 @@ if [[ "$FAST" == "true" ]]; then
         info "Only config/docs changed. No service restart needed."
 
         # [HEALTH] Still install health helper if it changed or is new
-        HEALTH_SRC="$PROJECT_DIR/deployment/health"
+        SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        HEALTH_SRC="$SELF_DIR/health"
         if [[ -d "$HEALTH_SRC" ]]; then
             info "Refreshing hardware health helper and timer..."
             sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
@@ -407,8 +398,9 @@ if [[ "$FAST" == "true" ]]; then
 
     sudo nginx -t 2>/dev/null && sudo systemctl reload nginx 2>/dev/null || true
 
-    # [HEALTH] Install hardware health helper and timer (if present in the repo)
-    HEALTH_SRC="$PROJECT_DIR/deployment/health"
+    # [HEALTH] Install hardware health helper and timer (relative to this script)
+    SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    HEALTH_SRC="$SELF_DIR/health"
     if [[ -d "$HEALTH_SRC" ]]; then
         info "Installing hardware health helper and timer..."
         sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
@@ -427,7 +419,6 @@ fi
 # ======================================================================
 info "=== FULL DEPLOY MODE ==="
 
-# --- 1. Stop all services ---
 info "Stopping any running services..."
 rm -f /tmp/*.sock /tmp/*.pid 2>/dev/null || true
 
@@ -444,14 +435,12 @@ for port in 8000 3000; do
     lsof -ti :$port 2>/dev/null | xargs -r kill -9 2>/dev/null || true
 done
 
-# --- 2. Purge caches ---
 info "Purging caches..."
 find "$PROJECT_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 find "$PROJECT_DIR" -type f -name "*.pyc" -exec rm -f {} + 2>/dev/null || true
 rm -rf "$FRONTEND_DIR/.next" 2>/dev/null || true
 sudo rm -rf /var/cache/nginx/* 2>/dev/null || true
 
-# --- 3. Back up local config ---
 info "Backing up local configuration..."
 cd "$PROJECT_DIR"
 
@@ -462,12 +451,10 @@ for token_file in garmin_tokens.json oauth1_token.json .spotify_cache; do
     [ -f "$PROJECT_DIR/$token_file" ] && cp "$PROJECT_DIR/$token_file" "/tmp/${token_file}.backup" || true
 done
 
-# --- 4. Pull the branch ---
 info "Pulling branch: $TARGET"
 git fetch origin
 git reset --hard origin/"$TARGET"
 
-# --- 5. Restore config (prefer the master, fall back to local backup) ---
 info "Restoring configuration..."
 cp /home/god/Documents/.env "$PROJECT_DIR/backend/.env" 2>/dev/null || cp /tmp/.env.backup "$PROJECT_DIR/backend/.env" 2>/dev/null || true
 cp /home/god/Documents/.env "$PROJECT_DIR/.env"        2>/dev/null || cp /tmp/.env.root.backup "$PROJECT_DIR/.env" 2>/dev/null || true
@@ -475,7 +462,6 @@ for token_file in garmin_tokens.json oauth1_token.json .spotify_cache; do
     [ -f "/tmp/${token_file}.backup" ] && cp "/tmp/${token_file}.backup" "$PROJECT_DIR/$token_file" || true
 done
 
-# --- 6. Install Python dependencies ---
 source "$VENV_DIR/bin/activate"
 
 if [[ "$INSTALL_PACKAGES" == "true" ]]; then
@@ -485,7 +471,6 @@ else
     info "Skipping Python package checks"
 fi
 
-# --- 7. Install frontend dependencies ---
 if [[ "$INSTALL_PACKAGES" == "true" ]]; then
     info "Installing npm packages..."
     cd "$FRONTEND_DIR"
@@ -506,21 +491,20 @@ else
     info "Skipping npm package checks"
 fi
 
-# --- 8. Run tests ---
 info "Running automated tests..."
 if ! pytest "$PROJECT_DIR/tests/" -v; then
     error_exit "Tests failed, aborting deployment"
 fi
 info "All tests passed."
 
-# --- 9. Install systemd service files ---
 info "Installing FastAPI service file..."
 sudo cp "$PROJECT_DIR/deployment/pifitness-fastapi.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable pifitness-fastapi.service
 
-# [HEALTH] Install hardware health helper and timer (if present in the repo)
-HEALTH_SRC="$PROJECT_DIR/deployment/health"
+# [HEALTH] Install hardware health helper and timer (relative to this script)
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HEALTH_SRC="$SELF_DIR/health"
 if [[ -d "$HEALTH_SRC" ]]; then
     info "Installing hardware health helper and timer..."
     sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
@@ -530,7 +514,6 @@ if [[ -d "$HEALTH_SRC" ]]; then
     sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
 fi
 
-# --- 10. Build and start Next.js ---
 info "Setting up Next.js server..."
 cd "$FRONTEND_DIR"
 
@@ -565,12 +548,10 @@ fi
 
 cd "$PROJECT_DIR"
 
-# --- 11. Start FastAPI service ---
 info "Starting FastAPI service..."
 sudo systemctl start pifitness-fastapi.service
 TARGET_PORT=8000
 
-# --- 12. Update nginx configuration ---
 info "Updating nginx configuration..."
 NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
 NGINX_SITE="/etc/nginx/sites-available/pifitness"
@@ -598,12 +579,10 @@ sudo systemctl reload nginx || error_exit "Failed to reload nginx."
 info "Verifying nginx configuration..."
 sudo nginx -T 2>/dev/null | grep -A5 "server_name pifitness.duckdns.org" | grep "proxy_pass" | grep -q ":${TARGET_PORT};" || warn "Nginx may not be using the expected port ${TARGET_PORT}"
 
-# --- 13. Restart agent service ---
 info "Restarting agent service..."
 sudo systemctl enable pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
 sudo systemctl start  pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
 
-# --- 14. Cleanup old backups (keep last 2) ---
 cd /home/god/PiFitness/backups 2>/dev/null && ls -1t | tail -n +3 | xargs -r rm -rf 2>/dev/null || true
 
 info "Deployment of react-ui completed successfully!"
