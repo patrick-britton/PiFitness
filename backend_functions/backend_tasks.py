@@ -28,6 +28,7 @@ def nightly_maintenance(days_to_keep=365):
     try:
         overall, checks = run_health_checks()
         print(f"Health check before maintenance: {overall}")
+        log_app_event(cat="DB Maintenance", desc="Health Pre-Check Complete")
     except Exception as e:
         log_app_event(cat="DB Maintenance", desc="Pre-maint health check failed", err=e)
 
@@ -125,6 +126,7 @@ def nightly_maintenance(days_to_keep=365):
     try:
         overall, checks = run_health_checks()
         print(f"Health check after maintenance: {overall}")
+        log_app_event(cat="DB Maintenance", desc="Health Post-Check Complete")
     except Exception as e:
         log_app_event(cat="DB Maintenance", desc="Post-maint health check failed", err=e)
 
