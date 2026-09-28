@@ -73,22 +73,21 @@ if [[ "$NUCLEAR" == "true" ]]; then
         [ -f "$PROJECT_DIR/$token_file" ] && cp "$PROJECT_DIR/$token_file" "/tmp/${token_file}.backup" || true
     done
 
-     # Wipe everything
-     info "Stopping any running services before wipe..."
-     sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
-     sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
-     pm2 delete pifitness-next 2>/dev/null || true
-     # Clear PM2 saved state to purge any stale environment variables
-     rm -f ~/.pm2/dump.pm2
-     for port in 8000 8501 3000; do
-         lsof -ti :$port 2>/dev/null | xargs -r kill -9 2>/dev/null || true
-     done
-     info "Wiping project directory, venv, and npm caches..."
-     rm -rf "$PROJECT_DIR"
-     rm -rf "$VENV_DIR"
-     rm -rf ~/.npm/_cacache
-     # Also wipe PM2's entire cache to be absolutely clean
-     rm -rf ~/.pm2
+    # Wipe everything
+    info "Stopping any running services before wipe..."
+    sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+    pm2 delete pifitness-next 2>/dev/null || true
+    # Clear PM2 saved state to purge any stale environment variables
+    rm -f ~/.pm2/dump.pm2
+    for port in 8000 3000; do
+        lsof -ti :$port 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+    done
+    info "Wiping project directory, venv, and npm caches..."
+    rm -rf "$PROJECT_DIR"
+    rm -rf "$VENV_DIR"
+    rm -rf ~/.npm/_cacache
+    # Also wipe PM2's entire cache to be absolutely clean
+    rm -rf ~/.pm2
 
     # Re-clone
     info "Cloning repository..."
@@ -135,13 +134,18 @@ if [[ "$NUCLEAR" == "true" ]]; then
     # Start services
     info "Starting services..."
     sudo cp "$PROJECT_DIR/deployment/pifitness-fastapi.service" /etc/systemd/system/
-    sudo cp "$PROJECT_DIR/deployment/pifitness-streamlit.service" /etc/systemd/system/
     sudo systemctl daemon-reload
+    sudo systemctl enable pifitness-fastapi.service
     sudo systemctl start pifitness-fastapi.service
 
     # Start Next.js with PM2 (fresh environment)
     if ! command -v pm2 &> /dev/null; then
         sudo npm install -g pm2
+    fi
+    if ! systemctl is-enabled --quiet pm2-god.service 2>/dev/null; then
+        info "Configuring PM2 to survive reboot..."
+        sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u god --hp /home/god > /dev/null 2>&1 \
+            || warn "pm2 startup failed — PM2 will not survive reboot"
     fi
     # Environment already clean, but we ensure no stale PM2 data
     pm2 kill 2>/dev/null || true
@@ -159,14 +163,14 @@ if [[ "$NUCLEAR" == "true" ]]; then
     if [[ ! -f "/etc/nginx/sites-enabled/pifitness" ]]; then
         sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness
     fi
-    sudo rm -f /etc/nginx/sites-enabled/streamlit 2>/dev/null || true
     if ! sudo nginx -t; then
         error_exit "Nginx configuration test failed!"
     fi
     sudo systemctl reload nginx || error_exit "Failed to reload nginx."
 
     # Start agent timer
-    sudo systemctl start pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
+    sudo systemctl enable pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
+    sudo systemctl start  pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
 
     info "Nuclear deployment of react-ui completed."
     exit 0
@@ -178,10 +182,11 @@ fi
 if [[ "$FAST" == "true" ]]; then
     info "=== FAST MODE ==="
 
-    # Ensure any previous Streamlit deployment is shut down
-    info "Stopping any lingering Streamlit services..."
-    sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
-    lsof -ti :8501 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+    if ! systemctl is-enabled --quiet pm2-god.service 2>/dev/null; then
+        info "Configuring PM2 to survive reboot..."
+        sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u god --hp /home/god > /dev/null 2>&1 \
+            || warn "pm2 startup failed — PM2 will not survive reboot"
+    fi
 
     cd "$PROJECT_DIR"
 
@@ -198,13 +203,14 @@ if [[ "$FAST" == "true" ]]; then
     # Force alignment of other components if we just switched branches, even with no code changes
     if [[ "$CURRENT_BRANCH" != "$TARGET" ]]; then
         info "Switching branches. Forcing full restart & nginx realignment..."
-        sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
-        
+
         cp /home/god/Documents/.env "$PROJECT_DIR/backend/.env" 2>/dev/null || true
-        
+        cp /home/god/Documents/.env "$PROJECT_DIR/.env"        2>/dev/null || true
+
         sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
-        sudo systemctl start pifitness-fastapi.service
-        
+        sudo systemctl enable pifitness-fastapi.service 2>/dev/null || true
+        sudo systemctl start  pifitness-fastapi.service
+
         # Clear PM2 data completely and start fresh
         pm2 delete pifitness-next 2>/dev/null || true
         rm -f ~/.pm2/dump.pm2
@@ -214,13 +220,12 @@ if [[ "$FAST" == "true" ]]; then
         pm2 start npm --name pifitness-next -- run start -- --port 3000
         pm2 save --force
         cd "$PROJECT_DIR"
-        
+
         # Update nginx config
         NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
         NGINX_SITE="/etc/nginx/sites-available/pifitness"
         if [[ -f "$NGINX_TEMPLATE" ]]; then
             sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE"
-            sudo rm -f /etc/nginx/sites-enabled/streamlit 2>/dev/null || true
             sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness 2>/dev/null || true
             if ! sudo nginx -t; then
                 error_exit "Nginx configuration test failed!"
@@ -260,7 +265,8 @@ if [[ "$FAST" == "true" ]]; then
         else
             if [[ "$FASTAPI_ACTIVE" == "false" ]]; then
                 info "FastAPI service not running. Starting it..."
-                sudo systemctl start pifitness-fastapi.service
+                sudo systemctl enable pifitness-fastapi.service 2>/dev/null || true
+                sudo systemctl start  pifitness-fastapi.service
             fi
             if [[ "$PM2_ACTIVE" == "false" ]]; then
                 info "Next.js not running. Starting it..."
@@ -319,14 +325,14 @@ if [[ "$FAST" == "true" ]]; then
     fi
 
     cp /home/god/Documents/.env "$PROJECT_DIR/backend/.env" 2>/dev/null || true
+    cp /home/god/Documents/.env "$PROJECT_DIR/.env"        2>/dev/null || true
     unset NEXT_PUBLIC_API_URL
     export NEXT_PUBLIC_APP_ENV=production
 
     if [[ "$BACKEND_CHANGED" == "true" && "$FRONTEND_CHANGED" == "false" ]]; then
         info "Backend-only changes detected. Restarting FastAPI only..."
-        sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
-        sleep 1
-        sudo systemctl start pifitness-fastapi.service
+        sudo systemctl enable  pifitness-fastapi.service 2>/dev/null || true
+        sudo systemctl restart pifitness-fastapi.service
         info "FastAPI restarted."
 
     elif [[ "$FRONTEND_CHANGED" == "true" && "$BACKEND_CHANGED" == "false" ]]; then
@@ -343,7 +349,8 @@ if [[ "$FAST" == "true" ]]; then
 
     elif [[ "$BACKEND_CHANGED" == "true" && "$FRONTEND_CHANGED" == "true" ]]; then
         info "Both backend and frontend changed. Full restart..."
-        sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+        sudo systemctl enable  pifitness-fastapi.service 2>/dev/null || true
+        sudo systemctl restart pifitness-fastapi.service
         cd "$FRONTEND_DIR"
         rm -rf .next
         npm run build
@@ -352,8 +359,6 @@ if [[ "$FAST" == "true" ]]; then
         pm2 start npm --name pifitness-next -- run start -- --port 3000
         pm2 save --force
         cd "$PROJECT_DIR"
-        sleep 1
-        sudo systemctl start pifitness-fastapi.service
         info "Both services restarted."
     fi
 
@@ -375,16 +380,14 @@ rm -f /tmp/*.sock /tmp/*.pid 2>/dev/null || true
 sudo systemctl stop pifitness_agent.service 2>/dev/null || true
 sudo systemctl stop pifitness_agent.timer 2>/dev/null || true
 sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
-sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
 pm2 delete pifitness-next 2>/dev/null || true
 # Clear PM2 saved state
 rm -f ~/.pm2/dump.pm2
 sleep 2
 
 pkill -9 -f "uvicorn" 2>/dev/null || true
-pkill -9 -f "streamlit run" 2>/dev/null || true
 pkill -9 -f "next" 2>/dev/null || true
-for port in 8000 8501 3000; do
+for port in 8000 3000; do
     lsof -ti :$port 2>/dev/null | xargs -r kill -9 2>/dev/null || true
 done
 
@@ -460,7 +463,6 @@ info "All tests passed."
 # --- 9. Install systemd service files ---
 info "Installing systemd service files..."
 sudo cp "$PROJECT_DIR/deployment/pifitness-fastapi.service" /etc/systemd/system/
-sudo cp "$PROJECT_DIR/deployment/pifitness-streamlit.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 
 # --- 10. Build and start Next.js ---
@@ -470,6 +472,12 @@ cd "$FRONTEND_DIR"
 if ! command -v pm2 &> /dev/null; then
     info "Installing PM2 for process management..."
     sudo npm install -g pm2
+fi
+
+if ! systemctl is-enabled --quiet pm2-god.service 2>/dev/null; then
+    info "Configuring PM2 to survive reboot..."
+    sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u god --hp /home/god > /dev/null 2>&1 \
+        || warn "pm2 startup failed — PM2 will not survive reboot"
 fi
 
 # Purge environment variables and any old PM2 state
@@ -496,7 +504,8 @@ cd "$PROJECT_DIR"
 
 # --- 11. Start FastAPI service ---
 info "Starting FastAPI service..."
-sudo systemctl start pifitness-fastapi.service
+sudo systemctl enable pifitness-fastapi.service
+sudo systemctl start  pifitness-fastapi.service
 TARGET_PORT=8000
 
 # --- 12. Update nginx configuration ---
@@ -518,8 +527,6 @@ if [[ ! -f "/etc/nginx/sites-enabled/pifitness" ]]; then
     sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/pifitness
 fi
 
-sudo rm -f /etc/nginx/sites-enabled/streamlit 2>/dev/null || true
-
 info "Testing nginx configuration..."
 sudo nginx -t || error_exit "Nginx configuration test failed."
 
@@ -531,7 +538,8 @@ sudo nginx -T 2>/dev/null | grep -A5 "server_name pifitness.duckdns.org" | grep 
 
 # --- 13. Restart agent service ---
 info "Restarting agent service..."
-sudo systemctl start pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
+sudo systemctl enable pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
+sudo systemctl start  pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
 
 # --- 14. Cleanup old backups (keep last 2) ---
 cd /home/god/PiFitness/backups 2>/dev/null && ls -1t | tail -n +3 | xargs -r rm -rf 2>/dev/null || true
