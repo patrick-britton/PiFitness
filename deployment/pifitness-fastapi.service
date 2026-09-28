@@ -19,7 +19,8 @@ StandardError=journal
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=read-only
-ReadWritePaths=/home/god/PiFitness
+ReadWritePaths=/home/god/PiFitness /home/god/Documents/PiFitness_Local
+ReadWritePaths=/home/god/PiFitness /home/god/Documents/PiFitness_Local /home/god/Documents/DB_Backups
 
 [Install]
 WantedBy=multi-user.target
