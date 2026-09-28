@@ -1,4 +1,5 @@
 import subprocess
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 import json
@@ -17,17 +18,25 @@ def nightly_maintenance(days_to_keep=365):
     # Vacuums the database
     # Optimizes weekly
     # Reindexes and does a full vacuum monthly
+    # Verifies the most recent backup is readable
+    # Runs health checks before and after maintenance
 
-    st = start_timer() # Track elapsed seconds
+    st = start_timer()  # Track elapsed seconds
+
+    # Health snapshot before maintenance
+    try:
+        overall, checks = run_health_checks()
+        print(f"Health check before maintenance: {overall}")
+    except Exception as e:
+        log_app_event(cat="DB Maintenance", desc="Pre-maint health check failed", err=e)
 
     conn, cursor = con_cur()
 
     try:
         conn.autocommit = True
-        # 2. Delete old eventLog rows (>48h)
 
+        # 1. Delete old log rows
         logging_tables = get_log_tables()
-
         for log_table in logging_tables:
             del_sql = f"""
                         DELETE FROM logging.{log_table}
@@ -40,7 +49,7 @@ def nightly_maintenance(days_to_keep=365):
         tsql = "SELECT SUM(total_size_mb) from logging.vw_db_size"
         size_before = one_sql_result(tsql)
 
-        # 3. Vacuum
+        # 2. Vacuum
         maint_start = start_timer()
         cursor.execute("VACUUM;")
         maintenance_type = 'daily'
@@ -55,15 +64,34 @@ def nightly_maintenance(days_to_keep=365):
             maintenance_type = 'monthly'
 
         maint_elapsed_ms = elapsed_ms(maint_start)
-        # # Performance Testing
-        # tsql = "SELECT * FROM public.vw_db_performance_test"
-        # perf_start = start_timer()
-        # cursor.execute(tsql)
-        # _ = cursor.fetchall()
-        # elapsed_ms = elapsed_ms(perf_start)
+
+        # 3. Verify the most recent backup is readable
+        try:
+            import subprocess as _sub
+            from pathlib import Path as _Path
+            _backup_dir = _Path("/home/god/Documents/DB_Backups")
+            _dumps = sorted(_backup_dir.glob("*.dump"),
+                            key=lambda p: p.stat().st_mtime, reverse=True)
+            if _dumps:
+                _newest = _dumps[0]
+                _r = _sub.run(
+                    ["/usr/lib/postgresql/18/bin/pg_restore", "--list", str(_newest)],
+                    capture_output=True, text=True, timeout=120,
+                )
+                _mb = _newest.stat().st_size / 1024 / 1024
+                if _r.returncode == 0:
+                    log_app_event(cat="DB Maintenance",
+                                  desc=f"Backup verified: {_newest.name} ({_mb:.0f} MB)")
+                else:
+                    log_app_event(cat="DB Maintenance",
+                                  desc=f"Backup FAILED verification: {_newest.name}: {_r.stderr[:300]}")
+            else:
+                log_app_event(cat="DB Maintenance", desc="No backups found to verify")
+        except Exception as e:
+            log_app_event(cat="DB Maintenance", desc="Backup verification error", err=e)
 
         # 4. Log results
-        tsql = """INSERT INTO logging.db_size_log (table_name, total_size_mb, table_size_mb, index_size_mb) 
+        tsql = """INSERT INTO logging.db_size_log (table_name, total_size_mb, table_size_mb, index_size_mb)
                 SELECT table_name, total_size_mb, table_size_mb, index_size_mb FROM logging.vw_db_size"""
         qec(tsql)
 
@@ -76,13 +104,12 @@ def nightly_maintenance(days_to_keep=365):
                   desc=f"Time {total_elapsed / 1000:.2f}s | Size {size_before:.1f} → {size_after:.1f}MB",
                   exec_time=total_elapsed)
 
-        tsql = """INSERT into logging.db_stats (size_before_mb, size_after_mb, maintenance_time_ms, 
-                        total_time_ms, maintenance_type) 
+        tsql = """INSERT into logging.db_stats (size_before_mb, size_after_mb, maintenance_time_ms,
+                        total_time_ms, maintenance_type)
                         VALUES (%s, %s, %s, %s, %s);"""
-
         qec(tsql, p=(size_before, size_after, maint_elapsed_ms, total_elapsed, maintenance_type))
-        print('Nightly Maintenance success')
 
+        print('Nightly Maintenance success')
 
     except Exception as e:
         log_app_event(cat="DB Maintenance", desc="Error during maintenance", err=e)
@@ -91,6 +118,13 @@ def nightly_maintenance(days_to_keep=365):
         return False
 
     conn.close()
+
+    # Health snapshot after maintenance
+    try:
+        overall, checks = run_health_checks()
+        print(f"Health check after maintenance: {overall}")
+    except Exception as e:
+        log_app_event(cat="DB Maintenance", desc="Post-maint health check failed", err=e)
 
     return True
 
@@ -166,12 +200,18 @@ def backup_database(keep=7):
 
 
 def run_health_checks():
-    """Returns (overall_status, list_of_check_dicts). Also writes health_checks rows and health_status.json."""
+    """
+    Runs DB, backup, and hardware checks. Writes results to
+    logging.health_checks (one row per check) and to
+    /home/god/Documents/PiFitness_Local/health_status.json for the frontend.
+
+    Returns (overall, checks) where overall is 'ok' | 'warn' | 'critical'.
+    """
     checks = []
     PiFitness = Path("/home/god/Documents/PiFitness_Local")
     BackupDir = Path("/home/god/Documents/DB_Backups")
 
-    # 1. DB checksum failures
+    # 1. DB checksum failures (from the running server's stats)
     row = one_sql_result("""
         SELECT checksum_failures FROM pg_stat_database
         WHERE datname = current_database()
@@ -180,73 +220,136 @@ def run_health_checks():
         "name": "pg_checksum_failures",
         "status": "ok" if row == 0 else "critical",
         "value": row,
-        "message": f"{row} checksum failures reported by PostgreSQL"
+        "message": f"{row} checksum failures reported by PostgreSQL",
     })
 
     # 2. Long-running queries (>5 min)
     row = one_sql_result("""
         SELECT count(*) FROM pg_stat_activity
-        WHERE state <> 'idle' AND now() - query_start > interval '5 minutes'
+        WHERE state <> 'idle'
+          AND now() - query_start > interval '5 minutes'
           AND pid <> pg_backend_pid()
     """) or 0
     checks.append({
         "name": "long_running_queries",
         "status": "ok" if row == 0 else "warn",
         "value": row,
-        "message": f"{row} queries running longer than 5 minutes"
+        "message": f"{row} queries running longer than 5 minutes",
     })
 
     # 3. Backup freshness
-    dumps = sorted(BackupDir.glob("*.dump"), key=lambda p: p.stat().st_mtime, reverse=True)
+    dumps = sorted(BackupDir.glob("*.dump"),
+                   key=lambda p: p.stat().st_mtime, reverse=True)
     if not dumps:
-        checks.append({"name":"backup_freshness","status":"critical","value":None,
-                       "message":"No backup files found"})
+        checks.append({
+            "name": "backup_freshness",
+            "status": "critical",
+            "value": None,
+            "message": "No backup files found in DB_Backups",
+        })
     else:
         newest = dumps[0]
         age_h = (time.time() - newest.stat().st_mtime) / 3600
         size_mb = newest.stat().st_size / 1024 / 1024
         status = "ok" if age_h < 25 and size_mb > 100 else "warn"
-        checks.append({"name":"backup_freshness","status":status,"value":round(age_h,1),
-                       "message":f"Newest dump {newest.name}: {age_h:.1f}h old, {size_mb:.0f}MB"})
+        checks.append({
+            "name": "backup_freshness",
+            "status": status,
+            "value": round(age_h, 1),
+            "message": f"Newest dump {newest.name}: {age_h:.1f}h old, {size_mb:.0f}MB",
+        })
 
-    # 4. Hardware health (from root helper)
+    # 4. Hardware health (written hourly by the root helper)
     hw_file = PiFitness / "hardware_health.json"
-    if hw_file.exists():
-        hw = json.loads(hw_file.read_text())
-        # Stale check
-        hw_age_min = (time.time() - hw_file.stat().st_mtime) / 60
-        if hw_age_min > 180:
-            checks.append({"name":"hw_helper_fresh","status":"warn","value":round(hw_age_min),
-                           "message":f"hardware_health.json is {hw_age_min:.0f} min old"})
-        # Undervoltage
-        checks.append({"name":"undervoltage","status":"ok" if hw.get("throttled_ok") else "critical",
-                       "value":hw.get("throttled"), "message":f"throttled={hw.get('throttled')}"})
-        # NVMe media errors
-        media = int(hw.get("nvme",{}).get("media_errors","0").split()[0] or 0)
-        spare = hw.get("nvme",{}).get("available_spare","100%")
-        checks.append({"name":"nvme_media_errors","status":"ok" if media==0 else "critical",
-                       "value":media, "message":f"media_errors={media}, spare={spare}"})
+    if not hw_file.exists():
+        checks.append({
+            "name": "hw_helper",
+            "status": "warn",
+            "value": None,
+            "message": "hardware_health.json not found — helper may not have run yet",
+        })
     else:
-        checks.append({"name":"hw_helper_fresh","status":"warn","value":None,
-                       "message":"hardware_health.json not found"})
+        age_min = (time.time() - hw_file.stat().st_mtime) / 60
+        if age_min > 180:
+            checks.append({
+                "name": "hw_helper",
+                "status": "warn",
+                "value": round(age_min),
+                "message": f"hardware_health.json is {age_min:.0f} min old",
+            })
 
+        hw = {}
+        try:
+            hw = json.loads(hw_file.read_text())
+        except Exception as e:
+            checks.append({
+                "name": "hw_helper",
+                "status": "warn",
+                "value": None,
+                "message": f"failed to parse hardware_health.json: {e}",
+            })
+
+        throttled = hw.get("throttled", "unknown")
+        checks.append({
+            "name": "undervoltage",
+            "status": "ok" if hw.get("throttled_ok") else "critical",
+            "value": None,
+            "message": f"vcgencmd get_throttled = {throttled}",
+        })
+
+        media_raw = hw.get("nvme", {}).get("media_errors", "0")
+        try:
+            media_int = int(str(media_raw).split()[0])
+        except Exception:
+            media_int = -1
+        checks.append({
+            "name": "nvme_media_errors",
+            "status": "ok" if media_int == 0 else "critical",
+            "value": media_int,
+            "message": f"media_errors={media_raw}, spare={hw.get('nvme', {}).get('available_spare', '?')}",
+        })
+
+        free_gb = hw.get("disk_free_bytes", 0) / 1024 / 1024 / 1024
+        if free_gb > 20:
+            disk_status = "ok"
+        elif free_gb > 5:
+            disk_status = "warn"
+        else:
+            disk_status = "critical"
+        checks.append({
+            "name": "disk_free",
+            "status": disk_status,
+            "value": round(free_gb, 1),
+            "message": f"{free_gb:.1f} GB free on /",
+        })
+
+    # Overall status
     overall = "ok"
     for c in checks:
-        if c["status"] == "critical": overall = "critical"; break
-        if c["status"] == "warn" and overall == "ok": overall = "warn"
+        if c["status"] == "critical":
+            overall = "critical"
+            break
+        if c["status"] == "warn" and overall == "ok":
+            overall = "warn"
 
-    # Persist to DB
+    # Persist to database
     for c in checks:
-        qec("""INSERT INTO logging.health_checks
-               (check_name, status, value, message)
-               VALUES (%s, %s, %s, %s)""",
-            p=(c["name"], c["status"], c["value"], c["message"]))
+        try:
+            qec(
+                """INSERT INTO logging.health_checks
+                   (check_name, status, value, message)
+                   VALUES (%s, %s, %s, %s)""",
+                p=(c["name"], c["status"], c["value"], c["message"]),
+            )
+        except Exception as e:
+            log_app_event(cat="DB Health",
+                          desc=f"Failed to write {c['name']}: {e}", err=e)
 
-    # Persist for the frontend (atomic write)
+    # Persist for the frontend
     status_file = PiFitness / "health_status.json"
     tmp = status_file.with_suffix(".tmp")
     tmp.write_text(json.dumps({
-        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "overall": overall,
         "checks": checks,
     }, indent=2))
