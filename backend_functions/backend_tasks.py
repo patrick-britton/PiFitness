@@ -1,7 +1,7 @@
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-
+import json
 from dotenv import load_dotenv
 
 from backend_functions.database_functions import qec, one_sql_result, con_cur, sql_to_dict, get_log_tables
@@ -163,3 +163,93 @@ def backup_database(keep=7):
     log_app_event(cat="DB Backup", desc=desc, exec_time=total_elapsed)
 
     return backup_file
+
+
+def run_health_checks():
+    """Returns (overall_status, list_of_check_dicts). Also writes health_checks rows and health_status.json."""
+    checks = []
+    PiFitness = Path("/home/god/Documents/PiFitness_Local")
+    BackupDir = Path("/home/god/Documents/DB_Backups")
+
+    # 1. DB checksum failures
+    row = one_sql_result("""
+        SELECT checksum_failures FROM pg_stat_database
+        WHERE datname = current_database()
+    """) or 0
+    checks.append({
+        "name": "pg_checksum_failures",
+        "status": "ok" if row == 0 else "critical",
+        "value": row,
+        "message": f"{row} checksum failures reported by PostgreSQL"
+    })
+
+    # 2. Long-running queries (>5 min)
+    row = one_sql_result("""
+        SELECT count(*) FROM pg_stat_activity
+        WHERE state <> 'idle' AND now() - query_start > interval '5 minutes'
+          AND pid <> pg_backend_pid()
+    """) or 0
+    checks.append({
+        "name": "long_running_queries",
+        "status": "ok" if row == 0 else "warn",
+        "value": row,
+        "message": f"{row} queries running longer than 5 minutes"
+    })
+
+    # 3. Backup freshness
+    dumps = sorted(BackupDir.glob("*.dump"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not dumps:
+        checks.append({"name":"backup_freshness","status":"critical","value":None,
+                       "message":"No backup files found"})
+    else:
+        newest = dumps[0]
+        age_h = (time.time() - newest.stat().st_mtime) / 3600
+        size_mb = newest.stat().st_size / 1024 / 1024
+        status = "ok" if age_h < 25 and size_mb > 100 else "warn"
+        checks.append({"name":"backup_freshness","status":status,"value":round(age_h,1),
+                       "message":f"Newest dump {newest.name}: {age_h:.1f}h old, {size_mb:.0f}MB"})
+
+    # 4. Hardware health (from root helper)
+    hw_file = PiFitness / "hardware_health.json"
+    if hw_file.exists():
+        hw = json.loads(hw_file.read_text())
+        # Stale check
+        hw_age_min = (time.time() - hw_file.stat().st_mtime) / 60
+        if hw_age_min > 180:
+            checks.append({"name":"hw_helper_fresh","status":"warn","value":round(hw_age_min),
+                           "message":f"hardware_health.json is {hw_age_min:.0f} min old"})
+        # Undervoltage
+        checks.append({"name":"undervoltage","status":"ok" if hw.get("throttled_ok") else "critical",
+                       "value":hw.get("throttled"), "message":f"throttled={hw.get('throttled')}"})
+        # NVMe media errors
+        media = int(hw.get("nvme",{}).get("media_errors","0").split()[0] or 0)
+        spare = hw.get("nvme",{}).get("available_spare","100%")
+        checks.append({"name":"nvme_media_errors","status":"ok" if media==0 else "critical",
+                       "value":media, "message":f"media_errors={media}, spare={spare}"})
+    else:
+        checks.append({"name":"hw_helper_fresh","status":"warn","value":None,
+                       "message":"hardware_health.json not found"})
+
+    overall = "ok"
+    for c in checks:
+        if c["status"] == "critical": overall = "critical"; break
+        if c["status"] == "warn" and overall == "ok": overall = "warn"
+
+    # Persist to DB
+    for c in checks:
+        qec("""INSERT INTO logging.health_checks
+               (check_name, status, value, message)
+               VALUES (%s, %s, %s, %s)""",
+            p=(c["name"], c["status"], c["value"], c["message"]))
+
+    # Persist for the frontend (atomic write)
+    status_file = PiFitness / "health_status.json"
+    tmp = status_file.with_suffix(".tmp")
+    tmp.write_text(json.dumps({
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "overall": overall,
+        "checks": checks,
+    }, indent=2))
+    tmp.replace(status_file)
+
+    return overall, checks
