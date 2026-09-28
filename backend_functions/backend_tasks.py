@@ -98,14 +98,17 @@ def nightly_maintenance(days_to_keep=365):
 def backup_database(keep=7):
     # Creates a backup and keeps the most recent 7
 
+    st = start_timer()
+
     for var in ["PG_BACKUP_LOCATION", "PG_HOST", "PG_PORT", "PG_DB", "PG_USER", "PG_PASSWORD"]:
         if os.getenv(var) is None:
             if var == 'PG_BACKUP_LOCATION':
+                log_app_event(cat="DB Backup", desc="Skipped backup: PG_BACKUP_LOCATION not set (running locally?)")
                 print('skipping backup, being run locally')
                 return None
             else:
+                log_app_event(cat="DB Backup", desc=f"Missing required environment variable: {var}", err=f"Missing required environment variable: {var}")
                 raise ValueError(f"Missing required environment variable: {var}")
-
 
     backup_dir = Path(os.getenv("PG_BACKUP_LOCATION"))
     host = os.getenv("PG_HOST")
@@ -131,14 +134,32 @@ def backup_database(keep=7):
 
     env["PGPASSWORD"] = os.getenv("PG_PASSWORD")
 
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    except FileNotFoundError as e:
+        log_app_event(cat="DB Backup", desc="pg_dump binary not found on PATH", err=e,
+                      exec_time=elapsed_ms(st))
+        raise
+
+    dump_elapsed_ms = elapsed_ms(st)
 
     if result.returncode != 0:
+        log_app_event(cat="DB Backup",
+                      desc=f"pg_dump failed (rc={result.returncode}): {backup_file}",
+                      err=result.stderr, exec_time=dump_elapsed_ms)
         raise RuntimeError(f"Backup failed: {result.stderr}")
 
     backups = sorted(Path(backup_dir).glob("*.dump"))
+    pruned = []
     while len(backups) > keep:
         old = backups.pop(0)
+        pruned.append(old.name)
         old.unlink()
+
+    total_elapsed = elapsed_ms(st)
+    desc = f"Backup created: {Path(backup_file).name} ({dump_elapsed_ms / 1000:.2f}s dump)"
+    if pruned:
+        desc += f" | Pruned: {', '.join(pruned)}"
+    log_app_event(cat="DB Backup", desc=desc, exec_time=total_elapsed)
 
     return backup_file

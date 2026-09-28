@@ -14,6 +14,7 @@ import ActivityProcessingPage from '../activities/activity-processing/page';
 import BeachPage from '../activities/beach/page';
 import RecentActivityPage from '../activities/recent-activity/page';
 import LeaderboardsPage from '../activities/leaderboards/page';
+import SegmentManagementPage from '../activities/segment-management/page';
 
 const TABS = MODULE_SUB_PAGES.activities;
 
@@ -147,6 +148,8 @@ export default function ActivitiesPage() {
             <BeachPage />
           ) : activeTab === 'leaderboards' ? (
             <LeaderboardsPage />
+          ) : activeTab === 'segment-management' ? (
+            <SegmentManagementPage />
           ) : (
             <div className="p-8 text-center">
               <p className="text-gray-500 dark:text-gray-400 text-lg">wow such empty</p>

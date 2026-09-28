@@ -103,6 +103,25 @@ from .activities_queries import (
     get_segment_visuals_telemetry,
     stage_leaderboard_visuals,
     get_segment_name,
+    # 009-003 Segment Management (T02)
+    get_segment_activities,
+    get_courses_page,
+    # 009-003 Segment Management (T02b)
+    get_segment_reference_windows,
+    # 009-003 Segment Management (T03)
+    get_activity_route,
+    # 009-003 Segment Management (T06)
+    get_match_candidates,
+    run_find_matches,
+    finalize_candidate_match,
+    bulk_confirm_matches,
+    run_extra_scoring,
+    # 009-003 Segment Management (T05)
+    create_segment,
+    # 009-003 Segment Management (T07)
+    delete_segment,
+    reset_match_tables,
+    rename_segment,
 )
 from .tri_tip_queries import (
     get_tri_tip_event,
@@ -247,6 +266,25 @@ __all__ = [
     'get_segment_visuals_telemetry',
     'stage_leaderboard_visuals',
     'get_segment_name',
+    # 009-003 Segment Management (T02)
+    'get_segment_activities',
+    'get_courses_page',
+    # 009-003 Segment Management (T02b)
+    'get_segment_reference_windows',
+    # 009-003 Segment Management (T03)
+    'get_activity_route',
+    # 009-003 Segment Management (T06)
+    'get_match_candidates',
+    'run_find_matches',
+    'finalize_candidate_match',
+    'bulk_confirm_matches',
+    'run_extra_scoring',
+    # 009-003 Segment Management (T05)
+    'create_segment',
+    # 009-003 Segment Management (T07)
+    'delete_segment',
+    'reset_match_tables',
+    'rename_segment',
     # Tri-tip Timer
     'get_tri_tip_event',
     'list_tri_tip_events',

@@ -1,0 +1,33 @@
+﻿
+> pifitness-frontend@0.1.0 test
+> vitest run
+
+node.exe : [33m(!) Your Vite config uses features that are unsupported by `configLoader: 
+'native'`, which is planned to become the default in a future major version of Vite:
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([33m(!) Your V...ersion of Vite::String) [], Remo 
+   teException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:11:1). Use a `.mjs` extension or 
+set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.1 [39m[90mC:/Users/rickb/vsProjects/PiFitness/frontend/pifitness[39m
+
+ [32mΓ£ô[39m src/lib/__tests__/map-styles.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32mΓ£ô[39m src/lib/__tests__/date-format.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32mΓ£ô[39m src/lib/__tests__/segment-trim.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32mΓ£ô[39m src/app/components/__tests__/IsrcDupeHomeBanner.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 60[2mms[22m[39m
+ [32mΓ£ô[39m src/app/activities/segment-management/components/__tests__/MapStyleSelector.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 197[2mms[22m[39m
+ [32mΓ£ô[39m src/app/activities/segment-management/components/__tests__/ActivitySourceList.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 607[2mms[22m[39m
+ [32mΓ£ô[39m src/app/music/components/__tests__/IsrcReviewView.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 821[2mms[22m[39m
+ [32mΓ£ô[39m src/app/activities/segment-management/components/__tests__/SegmentTrimEditor.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 970[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m69 passed[39m[22m[90m (69)[39m
+[2m   Start at [22m 17:18:14
+[2m   Duration [22m 2.51s[2m (environment 57%, tests 22%, setup 12%, transform 6%, import 4%)[22m
+

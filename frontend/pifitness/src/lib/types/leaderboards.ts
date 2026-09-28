@@ -52,6 +52,15 @@ export interface SegmentListRow {
   last_effort: string | null;
   /** Count of matched activities (attempts). */
   matched_activity_count: number;
+  /**
+   * Reference-geometry pointers (009-003 T02b/OQ-3). The 009-003 picker
+   * (`GET /api/segments/list`) populates them so a segment's own GPS path can
+   * be fetched; the 009-002 leaderboard list does not return them, hence
+   * optional.
+   */
+  activity_reference_id?: number | null;
+  reference_start_point?: number | null;
+  reference_end_point?: number | null;
 }
 
 /** Leaderboard range selector mapped to the corresponding rank column. */
