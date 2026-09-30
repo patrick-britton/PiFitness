@@ -3,12 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '@/lib/api-client';
 import { ActivityRoute, ActivitySummary } from '@/lib/types/segment-management';
-import {
-  cumulativeMeters,
-  gateBound,
-  normalizeGates,
-  trimmedMeters,
-} from '@/lib/segment-trim';
+import { cumulativeMeters, gateBound, normalizeGates } from '@/lib/segment-trim';
 import { defaultStyleForTheme } from '@/lib/map-styles';
 import { isDarkTheme } from '@/lib/theme-version';
 import { formatIsoDate, formatMiles } from '@/lib/date-format';
@@ -17,12 +12,16 @@ import TrimRouteViews from './TrimRouteViews';
 /**
  * Create Segment mode editor (009-003 T08, FR-2/FR-4/FR-5/FR-6).
  *
- * Shows the chosen activity's meta, the name field, the route/elevation views
- * with two trim gates, and the creation controls. The full route is fetched
+ * Shows the chosen activity's meta, the name field, the route/elevation views,
+ * and the creation controls. The full route is fetched
  * ONCE per activity (`GET /api/segments/{id}/route`, no trim params) and the
  * gates slice it client-side, so moving a gate costs no database work on the
  * Pi; the gate meters are sent with the creation call and the stored segment is
  * trimmed server-side by the existing procedure.
+ *
+ * T23: the two trim-gate inputs and the selected-range line are rendered by
+ * TrimRouteViews between the course map and the gate maps; the gate state stays
+ * here because the creation call needs it.
  *
  * Creation offers course or segment (FR-5) and confirms the new id; the two
  * controls afterwards start a new segment from the same activity or return to
@@ -187,39 +186,26 @@ export default function SegmentTrimEditor({ activity, onChooseNewActivity }: Seg
         </p>
       )}
 
-      {!loading && !loadError && hasRoute && route && mapStyle && (
-        <TrimRouteViews
-          coords={route.path_coords}
-          elevations={route.elevations}
-          gates={gates}
-          styleId={mapStyle}
-          token={mapboxToken}
-          onStyleChange={setMapStyle}
-        />
-      )}
-
       {!loading && !loadError && hasRoute && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <GateInput
-              id="seg-gate-start"
-              label="Select start gate"
-              value={gates.startM}
-              max={maxM}
-              onChange={setStartM}
+          {/*
+            T23: the gate controls (start/end inputs + selected-range line) now
+            render inside TrimRouteViews, between the course map and the gate
+            maps. The create/new-activity controls below stay here.
+          */}
+          {route && mapStyle && (
+            <TrimRouteViews
+              coords={route.path_coords}
+              elevations={route.elevations}
+              gates={gates}
+              maxM={maxM}
+              styleId={mapStyle}
+              token={mapboxToken}
+              onStyleChange={setMapStyle}
+              onStartChange={setStartM}
+              onEndChange={setEndM}
             />
-            <GateInput
-              id="seg-gate-end"
-              label="Select end gate"
-              value={gates.endM}
-              max={maxM}
-              onChange={setEndM}
-            />
-          </div>
-
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Selected range: {gates.startM}–{gates.endM} m ({formatMiles(trimmedMeters(gates))} mi)
-          </p>
+          )}
 
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -275,35 +261,3 @@ export default function SegmentTrimEditor({ activity, onChooseNewActivity }: Seg
   );
 }
 
-/** Whole-meter gate input bounded to the activity's distance (FR-4). */
-function GateInput({
-  id,
-  label,
-  value,
-  max,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: number;
-  max: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-        {label}
-      </label>
-      <input
-        id={id}
-        type="number"
-        min={0}
-        max={max}
-        step={5}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-    </div>
-  );
-}

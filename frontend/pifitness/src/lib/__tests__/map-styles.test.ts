@@ -72,9 +72,9 @@ describe('isDarkBasemap', () => {
 });
 
 describe('defaultStyleForTheme', () => {
-  it('prefers the matching-polarity Mapbox style when a token exists', () => {
-    expect(defaultStyleForTheme(false, 'tok')).toBe('mb-light');
-    expect(defaultStyleForTheme(true, 'tok')).toBe('mb-dark');
+  it('defaults to Satellite whenever a token exists (009-003 T17)', () => {
+    expect(defaultStyleForTheme(false, 'tok')).toBe('mb-satellite');
+    expect(defaultStyleForTheme(true, 'tok')).toBe('mb-satellite');
   });
 
   it('falls back to a free style with the same polarity without a token', () => {

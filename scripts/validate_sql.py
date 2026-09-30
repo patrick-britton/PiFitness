@@ -12,6 +12,12 @@ from pathlib import Path
 from pathlib import Path
 from dotenv import load_dotenv
 
+# The verdict lines below carry emoji, and a redirected stdout is not UTF-8 on
+# every host (Windows pipes fall back to the locale codec, which raises
+# UnicodeEncodeError — Bug 009-003-26-2). Reconfigure before anything prints.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_PATH = PROJECT_ROOT / "backend" / ".env"
 load_dotenv(dotenv_path=ENV_PATH)

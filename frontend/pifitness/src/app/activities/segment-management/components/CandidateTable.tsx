@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { useViewportStore } from '@/stores/viewportStore';
 import { CandidateEffort } from '@/lib/types/segment-management';
 import { formatIsoDate, formatMiles } from '@/lib/date-format';
@@ -93,7 +94,7 @@ function Metrics({ row }: { row: CandidateEffort }) {
 
 const HEADERS = ['Activity', 'Confidence', 'Distance', 'Polygon', 'Hausdorff', 'Fréchet', ''];
 
-export default function CandidateTable({
+function CandidateTable({
   rows,
   selectedActivityId,
   busy,
@@ -139,7 +140,7 @@ export default function CandidateTable({
                   type="button"
                   onClick={() => onSelect(row)}
                   aria-label={`Show route for candidate ${row.activity_id}`}
-                  className="px-3 py-2 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 min-h-[44px] inline-flex items-center text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {selected ? 'Route shown' : 'Show route'}
                 </button>
@@ -148,7 +149,7 @@ export default function CandidateTable({
                   onClick={() => onConfirm(row)}
                   disabled={busy}
                   aria-label={`Confirm candidate ${row.activity_id}`}
-                  className="px-3 py-2 text-xs font-medium rounded-md bg-green-700 text-white hover:bg-green-800 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 min-h-[44px] inline-flex items-center text-xs font-medium rounded-md bg-green-700 text-white hover:bg-green-800 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   Confirm
                 </button>
@@ -157,7 +158,7 @@ export default function CandidateTable({
                   onClick={() => onReject(row)}
                   disabled={busy}
                   aria-label={`Reject candidate ${row.activity_id}`}
-                  className="px-3 py-2 text-xs font-medium rounded-md bg-red-700 text-white hover:bg-red-800 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 min-h-[44px] inline-flex items-center text-xs font-medium rounded-md bg-red-700 text-white hover:bg-red-800 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   Reject
                 </button>
@@ -207,7 +208,7 @@ export default function CandidateTable({
                     type="button"
                     onClick={() => onSelect(row)}
                     aria-label={`Show route for candidate ${row.activity_id}`}
-                    className="rounded text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="rounded text-left focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[44px] inline-flex flex-col justify-center px-1"
                   >
                     <span className="block font-medium text-gray-900 dark:text-white tabular-nums">
                       #{row.activity_id}
@@ -259,7 +260,7 @@ export default function CandidateTable({
                       onClick={() => onConfirm(row)}
                       disabled={busy}
                       aria-label={`Confirm candidate ${row.activity_id}`}
-                      className="px-2 py-1 text-xs font-medium rounded-md bg-green-700 text-white hover:bg-green-800 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-2 py-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-xs font-medium rounded-md bg-green-700 text-white hover:bg-green-800 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       Confirm
                     </button>
@@ -268,7 +269,7 @@ export default function CandidateTable({
                       onClick={() => onReject(row)}
                       disabled={busy}
                       aria-label={`Reject candidate ${row.activity_id}`}
-                      className="px-2 py-1 text-xs font-medium rounded-md bg-red-700 text-white hover:bg-red-800 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-2 py-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-xs font-medium rounded-md bg-red-700 text-white hover:bg-red-800 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       Reject
                     </button>
@@ -282,3 +283,14 @@ export default function CandidateTable({
     </div>
   );
 }
+
+/**
+ * Memoised (009-003 T42, fixes Bug 009-003-41-1): the Match Activities session
+ * re-renders on every pick change (a map point or a plot distance), and the
+ * candidate list can hold hundreds of rows, each with five metrics and three
+ * buttons. Its props — `rows`, `selectedActivityId`, `busy` and the three
+ * callbacks, which `MatchSession` now keeps stable — do not change on a pick, so
+ * the memo stops a hover from re-rendering the list at all. Selection, candidate
+ * refreshes and busy transitions still re-render it because those props change.
+ */
+export default memo(CandidateTable);

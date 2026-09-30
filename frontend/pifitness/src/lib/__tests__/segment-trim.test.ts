@@ -14,6 +14,7 @@ import {
   gateBound,
   gateFocusWindow,
   indexWindow,
+  nearestPointAtDistance,
   normalizeGates,
   trimmedMeters,
 } from '../segment-trim';
@@ -134,5 +135,63 @@ describe('indexWindow', () => {
     const coords = straightPath(3);
     const dists = cumulativeMeters(coords);
     expect(indexWindow(coords, dists[1], dists[1])).toEqual([1, 1]);
+  });
+});
+
+describe('nearestPointAtDistance', () => {
+  it('returns that index for a distance that lands exactly on a point', () => {
+    const coords = straightPath(5);
+    const dists = cumulativeMeters(coords);
+    expect(nearestPointAtDistance(coords, dists[3])).toEqual({ index: 3, distanceM: dists[3] });
+  });
+
+  it('returns the nearer of the two points surrounding an in-between distance', () => {
+    const coords = straightPath(5); // 0, ~111, ~222, ~333, ~445 m
+    // 150 m is 39 m past point 1 (~111) but 72 m short of point 2 (~222).
+    expect(nearestPointAtDistance(coords, 150)).toEqual({
+      index: 1,
+      distanceM: cumulativeMeters(coords)[1],
+    });
+    // 190 m flips it: 32 m short of point 2 (~222) vs 79 m past point 1.
+    expect(nearestPointAtDistance(coords, 190)?.index).toBe(2);
+  });
+
+  it('clamps a target before the first point to index 0 and past the last to the final index', () => {
+    const coords = straightPath(4); // last point ~333 m
+    expect(nearestPointAtDistance(coords, -100)).toEqual({ index: 0, distanceM: 0 });
+    expect(nearestPointAtDistance(coords, 5000)).toEqual({
+      index: 3,
+      distanceM: cumulativeMeters(coords)[3],
+    });
+  });
+
+  it('returns null for empty coords', () => {
+    expect(nearestPointAtDistance([], 100)).toBeNull();
+  });
+
+  it('resolves a 3,228 m fixture to the distance ElevationProfile ends its axis at (AC-18 convention)', () => {
+    // Same fixture builder as ElevationProfile.test.tsx: a route whose last
+    // plotted point rounds to exactly 3,228 m, so the axis max is 3,228.
+    const mPerStep = cumulativeMeters([[0, 0], [0, 0.001]])[1];
+    const coords = [[0, 0], [0, (3228 / mPerStep) * 0.001]];
+    const pick = nearestPointAtDistance(coords, 3228);
+    expect(pick).not.toBeNull();
+    expect(pick!.index).toBe(1);
+    // The plot draws x as Math.round(cumulative) and sets scales.x.max to the
+    // last such value — the pick must land on that same distance.
+    expect(Math.round(pick!.distanceM)).toBe(3228);
+  });
+
+  it('uses a caller-supplied cumulative array and ignores one whose length disagrees with coords', () => {
+    const coords = straightPath(5);
+    const dists = cumulativeMeters(coords);
+    // Same answer as recomputing internally…
+    expect(nearestPointAtDistance(coords, 150, dists)).toEqual(
+      nearestPointAtDistance(coords, 150),
+    );
+    // …and a stale memo (length mismatch) must not misalign index -> point.
+    expect(nearestPointAtDistance(coords, 150, dists.slice(0, 2))).toEqual(
+      nearestPointAtDistance(coords, 150),
+    );
   });
 });

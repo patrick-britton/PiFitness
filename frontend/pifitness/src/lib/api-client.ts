@@ -64,6 +64,8 @@ import {
   RejectMatchRequest,
   MatchOperationResponse,
   BulkConfirmRequest,
+  BulkRejectRequest,
+  BulkRejectResponse,
   HausdorffScoringRequest,
   FrechetScoringRequest,
   ScoringResponse,
@@ -675,6 +677,15 @@ export const API = {
         /** Trigger the find-matches pipeline (FR-9, OQ-1). */
     findMatches: (segmentId: number) =>
       fetchAPI<ScoringResponse>(`/api/segments/${segmentId}/matches/find`, { method: "POST" }),
+    /**
+     * Run ONE step of the find-matches pipeline (T20). The UI calls steps
+     * 1..4 in sequence to show per-step progress; same SPs as the blocking
+     * call above.
+     */
+    findMatchesStep: (segmentId: number, step: number) =>
+      fetchAPI<{ message: string }>(`/api/segments/${segmentId}/matches/find/${step}`, {
+        method: "POST",
+      }),
     /** Existing matches + candidates for a segment (FR-9, FR-10). */
     getCandidates: (segmentId: number) =>
       fetchAPI<CandidatesResponse>(`/api/segments/${segmentId}/matches/candidates`),
@@ -693,6 +704,12 @@ export const API = {
     /** Mass-approve remaining candidates (FR-11). */
     bulkConfirm: (segmentId: number, req: BulkConfirmRequest) =>
       fetchAPI<MatchOperationResponse>(`/api/segments/${segmentId}/matches/bulk-confirm`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
+    /** Mass-reject remaining candidates, optionally only confidence > threshold (009-003 T31). */
+    bulkReject: (segmentId: number, req: BulkRejectRequest = {}) =>
+      fetchAPI<BulkRejectResponse>(`/api/segments/${segmentId}/matches/bulk-reject`, {
         method: "POST",
         body: JSON.stringify(req),
       }),

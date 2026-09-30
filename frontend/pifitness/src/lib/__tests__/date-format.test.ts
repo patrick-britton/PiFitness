@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { NO_DATE, formatIsoDate, formatIsoDateTime, formatMiles } from '../date-format';
+import { NO_DATE, formatElapsedDuration, formatIsoDate, formatIsoDateTime, formatMiles } from '../date-format';
 
 describe('formatIsoDate', () => {
   it('renders d-mmm-yyyy', () => {
@@ -47,5 +47,25 @@ describe('formatMiles', () => {
 
   it('formats zero as a real value, not a dash', () => {
     expect(formatMiles(0)).toBe('0.00');
+  });
+});
+
+describe('formatElapsedDuration', () => {
+  it('renders m:ss below one hour', () => {
+    expect(formatElapsedDuration(0)).toBe('0:00');
+    expect(formatElapsedDuration(65)).toBe('1:05');
+  });
+
+  it('renders h:mm:ss at sixty minutes and above', () => {
+    expect(formatElapsedDuration(3599)).toBe('59:59');
+    expect(formatElapsedDuration(3600)).toBe('1:00:00');
+    expect(formatElapsedDuration(3903)).toBe('1:05:03');
+  });
+
+  it('dashes missing, negative, or non-finite input', () => {
+    expect(formatElapsedDuration(null)).toBe(NO_DATE);
+    expect(formatElapsedDuration(undefined)).toBe(NO_DATE);
+    expect(formatElapsedDuration(-1)).toBe(NO_DATE);
+    expect(formatElapsedDuration(Number.NaN)).toBe(NO_DATE);
   });
 });

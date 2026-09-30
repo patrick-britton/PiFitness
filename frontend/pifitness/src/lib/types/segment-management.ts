@@ -33,6 +33,8 @@ export interface RouteQuery {
 export interface ActivityRoute {
   path_coords: number[][];
   elevations: number[];
+  /** Per-point elapsed seconds, 1:1 with path_coords (009-003 T38, OQ-6). */
+  elapsed_s: number[];
   distance_m: number;
 }
 
@@ -131,6 +133,16 @@ export interface MatchOperationResponse {
 /** Request body for POST /api/segments/:id/matches/bulk-confirm (FR-11). */
 export interface BulkConfirmRequest {
   confirm_all: boolean;
+}
+
+/** Request body for POST /api/segments/:id/matches/bulk-reject (009-003 T31). */
+export interface BulkRejectRequest {
+  confidence_over?: number;
+}
+
+/** Response for POST /api/segments/:id/matches/bulk-reject (009-003 T31). */
+export interface BulkRejectResponse {
+  rejected: number;
 }
 
 /** Request body for POST /api/segments/:id/scoring/hausdorff (FR-12). */

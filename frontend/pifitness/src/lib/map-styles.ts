@@ -62,10 +62,12 @@ export function buildStyleUrl(styleId: string, token: string | null): string | n
 }
 
 /**
- * Default style for a theme when no choice exists yet: a token style in the
- * matching polarity when a token is configured, else a free one.
+ * Default style for a theme when no choice exists yet. T17: Satellite is the
+ * default basemap whenever the Mapbox token is configured (either theme
+ * polarity); without a token the free style matching the theme polarity is
+ * used.
  */
 export function defaultStyleForTheme(isDark: boolean, token: string | null): string {
-  if (token) return isDark ? 'mb-dark' : 'mb-light';
+  if (token) return 'mb-satellite';
   return isDark ? 'darkmatter' : 'positron';
 }

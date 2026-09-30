@@ -528,7 +528,7 @@ export default function LeaderboardVisuals({ visuals }: LeaderboardVisualsProps)
     chartRefs.current.forEach((c) => { if (c) c.update('none'); });
   };
 
-  const lineOptions = (axisKey: string, label: string): ChartOptions<'line'> => ({
+  const lineOptions = (axisKey: string, label: string, maxX?: number): ChartOptions<'line'> => ({
     responsive: true,
     animation: false,
     maintainAspectRatio: false,
@@ -542,6 +542,11 @@ export default function LeaderboardVisuals({ visuals }: LeaderboardVisualsProps)
     scales: {
       x: {
         type: 'linear',
+        // 009-003 T29/AC-19: the distance axis terminates at the data limit —
+        // without it Chart.js rounds up to the next "nice" tick and draws
+        // empty plot past the last point (same fix as segment-management's
+        // ElevationProfile, T28).
+        ...(maxX != null && Number.isFinite(maxX) ? { max: maxX } : {}),
         title: { display: true, text: 'Distance (mi)', color: tokenRgb('--muted', isDark) },
         grid: { color: tokenRgb('--grid', isDark) },
         ticks: { color: tokenRgb('--muted', isDark) },
@@ -590,7 +595,21 @@ export default function LeaderboardVisuals({ visuals }: LeaderboardVisualsProps)
             borderDash: i % 2 === 1 ? [6, 3] : undefined,
           };
         });
-        return { key: axis.key, label: axis.label, datasets, options: lineOptions(axis.key, axis.label) };
+        // 009-003 T29/AC-19: the axis stops at the furthest plotted mile.
+        // Plain loop, not Math.max(...pts): series can be long and a spread
+        // that large risks a RangeError (call-stack argument limit).
+        let maxX = 0;
+        for (const d of datasets) {
+          for (const pt of d.data as { x: number; y: number }[]) {
+            if (pt.x > maxX) maxX = pt.x;
+          }
+        }
+        return {
+          key: axis.key,
+          label: axis.label,
+          datasets,
+          options: lineOptions(axis.key, axis.label, maxX),
+        };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [visuals, isDark],

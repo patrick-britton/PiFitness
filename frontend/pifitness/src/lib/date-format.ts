@@ -41,6 +41,26 @@ export function formatMiles(meters: number | null | undefined, decimals = 2): st
   return (meters / 1609.344).toFixed(decimals);
 }
 
+/**
+ * Seconds → elapsed-duration text (009-003 T39b, OQ-6): `h:mm:ss` at 60
+ * minutes or more, otherwise `m:ss` (e.g. `9:05`, `59:59`, `1:05:03`).
+ *
+ * This is the ONE elapsed-time formatter — the pick readout uses it now and
+ * the map marker labels (T40) reuse it, so the app can never grow a second
+ * copy with a different boundary. Missing/negative/non-finite input dashes
+ * like every other formatter in this module.
+ */
+export function formatElapsedDuration(seconds: number | null | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return NO_DATE;
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}
+
 function toDate(iso: string | null | undefined): Date | null {
   if (!iso) return null;
   const d = new Date(iso);
