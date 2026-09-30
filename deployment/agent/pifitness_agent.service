@@ -1,0 +1,28 @@
+[Unit]
+Description=PiFitness Background Task Execution
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=oneshot
+User=god
+Group=god
+WorkingDirectory=/home/god/PiFitness
+Environment="PATH=/home/god/PiFitness/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/home/god/PiFitness/.env
+ExecStart=/home/god/PiFitness/venv/bin/python3 -m agents.background_task_execution
+StandardOutput=journal
+StandardError=journal
+
+# Kill the run if it exceeds this duration
+RuntimeMaxSec=28min
+
+# Give the process this long to handle SIGTERM before SIGKILL
+TimeoutStopSec=30
+
+
+# Security hardening (mirrors FastAPI service)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/god/PiFitness /home/god/Documents/PiFitness_Local /home/god/Documents/DB_Backups

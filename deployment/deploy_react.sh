@@ -78,6 +78,7 @@ if [[ "$NUCLEAR" == "true" ]]; then
 
     info "Stopping any running services before wipe..."
     sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+    sudo systemctl stop pifitness_agent.timer     2>/dev/null || true
     pm2 delete pifitness-next 2>/dev/null || true
     rm -f ~/.pm2/dump.pm2
     for port in 8000 3000; do
@@ -128,17 +129,27 @@ if [[ "$NUCLEAR" == "true" ]]; then
     sudo cp "$PROJECT_DIR/deployment/pifitness-fastapi.service" /etc/systemd/system/
     sudo systemctl daemon-reload
 
-    # [HEALTH] Install hardware health helper and timer (relative to this script)
+    # [AUX] Install auxiliary systemd units (health helper + background task runner)
     SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
     HEALTH_SRC="$SELF_DIR/health"
     if [[ -d "$HEALTH_SRC" ]]; then
         info "Installing hardware health helper and timer..."
         sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
         sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
         sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
-        sudo systemctl daemon-reload
-        sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
     fi
+
+    AGENT_SRC="$SELF_DIR/agent"
+    if [[ -d "$AGENT_SRC" ]]; then
+        info "Installing background task runner service and timer..."
+        sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
+        sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
+    fi
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+    sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
     sudo systemctl enable pifitness-fastapi.service
     sudo systemctl start  pifitness-fastapi.service
@@ -169,9 +180,6 @@ if [[ "$NUCLEAR" == "true" ]]; then
         error_exit "Nginx configuration test failed!"
     fi
     sudo systemctl reload nginx || error_exit "Failed to reload nginx."
-
-    sudo systemctl enable pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
-    sudo systemctl start  pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
 
     info "Nuclear deployment of react-ui completed."
     exit 0
@@ -231,17 +239,27 @@ if [[ "$FAST" == "true" ]]; then
             sudo systemctl reload nginx || error_exit "Failed to reload nginx."
         fi
 
-        # [HEALTH] Install hardware health helper and timer (relative to this script)
+        # [AUX] Install auxiliary systemd units (health helper + background task runner)
         SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
         HEALTH_SRC="$SELF_DIR/health"
         if [[ -d "$HEALTH_SRC" ]]; then
             info "Installing hardware health helper and timer..."
             sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
             sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
             sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
-            sudo systemctl daemon-reload
-            sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
         fi
+
+        AGENT_SRC="$SELF_DIR/agent"
+        if [[ -d "$AGENT_SRC" ]]; then
+            info "Installing background task runner service and timer..."
+            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
+            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
+        fi
+
+        sudo systemctl daemon-reload
+        sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+        sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
         info "Services and nginx realigned for react-ui."
         exit 0
@@ -298,17 +316,27 @@ if [[ "$FAST" == "true" ]]; then
             info "Services verified and started."
         fi
 
-        # [HEALTH] Install hardware health helper and timer (relative to this script)
+        # [AUX] Install auxiliary systemd units (health helper + background task runner)
         SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
         HEALTH_SRC="$SELF_DIR/health"
         if [[ -d "$HEALTH_SRC" ]]; then
             info "Installing hardware health helper and timer..."
             sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
             sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
             sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
-            sudo systemctl daemon-reload
-            sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
         fi
+
+        AGENT_SRC="$SELF_DIR/agent"
+        if [[ -d "$AGENT_SRC" ]]; then
+            info "Installing background task runner service and timer..."
+            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
+            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
+        fi
+
+        sudo systemctl daemon-reload
+        sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+        sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
         exit 0
     fi
@@ -345,17 +373,27 @@ if [[ "$FAST" == "true" ]]; then
     if [[ "$ONLY_CONFIG" == "true" ]]; then
         info "Only config/docs changed. No service restart needed."
 
-        # [HEALTH] Still install health helper if it changed or is new
+        # [AUX] Install auxiliary systemd units (health helper + background task runner)
         SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
         HEALTH_SRC="$SELF_DIR/health"
         if [[ -d "$HEALTH_SRC" ]]; then
-            info "Refreshing hardware health helper and timer..."
+            info "Installing hardware health helper and timer..."
             sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
             sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
             sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
-            sudo systemctl daemon-reload
-            sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
         fi
+
+        AGENT_SRC="$SELF_DIR/agent"
+        if [[ -d "$AGENT_SRC" ]]; then
+            info "Installing background task runner service and timer..."
+            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
+            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
+        fi
+
+        sudo systemctl daemon-reload
+        sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+        sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
         exit 0
     fi
@@ -398,17 +436,27 @@ if [[ "$FAST" == "true" ]]; then
 
     sudo nginx -t 2>/dev/null && sudo systemctl reload nginx 2>/dev/null || true
 
-    # [HEALTH] Install hardware health helper and timer (relative to this script)
+    # [AUX] Install auxiliary systemd units (health helper + background task runner)
     SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
     HEALTH_SRC="$SELF_DIR/health"
     if [[ -d "$HEALTH_SRC" ]]; then
         info "Installing hardware health helper and timer..."
         sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
         sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
         sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
-        sudo systemctl daemon-reload
-        sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
     fi
+
+    AGENT_SRC="$SELF_DIR/agent"
+    if [[ -d "$AGENT_SRC" ]]; then
+        info "Installing background task runner service and timer..."
+        sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
+        sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
+    fi
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+    sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
     info "Fast deployment of react-ui completed."
     exit 0
@@ -502,17 +550,27 @@ sudo cp "$PROJECT_DIR/deployment/pifitness-fastapi.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable pifitness-fastapi.service
 
-# [HEALTH] Install hardware health helper and timer (relative to this script)
+# [AUX] Install auxiliary systemd units (health helper + background task runner)
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 HEALTH_SRC="$SELF_DIR/health"
 if [[ -d "$HEALTH_SRC" ]]; then
     info "Installing hardware health helper and timer..."
     sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
     sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
     sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
-    sudo systemctl daemon-reload
-    sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
 fi
+
+AGENT_SRC="$SELF_DIR/agent"
+if [[ -d "$AGENT_SRC" ]]; then
+    info "Installing background task runner service and timer..."
+    sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
+    sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
+fi
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
 info "Setting up Next.js server..."
 cd "$FRONTEND_DIR"
@@ -578,10 +636,6 @@ sudo systemctl reload nginx || error_exit "Failed to reload nginx."
 
 info "Verifying nginx configuration..."
 sudo nginx -T 2>/dev/null | grep -A5 "server_name pifitness.duckdns.org" | grep "proxy_pass" | grep -q ":${TARGET_PORT};" || warn "Nginx may not be using the expected port ${TARGET_PORT}"
-
-info "Restarting agent service..."
-sudo systemctl enable pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
-sudo systemctl start  pifitness_agent.timer 2>/dev/null || warn "Agent timer not available"
 
 cd /home/god/PiFitness/backups 2>/dev/null && ls -1t | tail -n +3 | xargs -r rm -rf 2>/dev/null || true
 
