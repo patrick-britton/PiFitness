@@ -97,7 +97,7 @@ export default function MapStyleSelector({ value, onChange, id, className = '' }
         disabled={loading || (merged?.options.length ?? 0) === 0}
         onChange={(e) => onChange(e.target.value)}
         aria-describedby={error ? `${id}-error` : undefined}
-        className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
+        className="w-full min-h-[44px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
       >
         {loading && <option value={value}>Loading basemaps…</option>}
         {!loading && (merged?.options.length ?? 0) === 0 && <option value={value}>No basemaps</option>}

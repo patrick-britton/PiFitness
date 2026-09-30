@@ -4,8 +4,10 @@
  * jsdom has no WebGL and no canvas, so the map and the Chart.js profile are
  * stubbed: what is asserted is the editor's own behaviour — the activity meta,
  * the gate-bounded range, the creation call and its confirmation, and the two
- * controls that change activity / start a new segment. Rendering of the map and
- * profile stays a human runtime check.
+ * controls that change activity / start a new segment. T23 moved the gate
+ * inputs into TrimRouteViews, so they render together with the maps and appear
+ * once the basemap style has loaded. Rendering of the map and profile stays a
+ * human runtime check.
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -57,6 +59,7 @@ const getMapConfig = vi.mocked(API.config.getMapConfig);
 const ROUTE: ActivityRoute = {
   path_coords: Array.from({ length: 11 }, (_, i) => [0, i * 0.001]),
   elevations: Array.from({ length: 11 }, (_, i) => 100 + i),
+  elapsed_s: Array.from({ length: 11 }, (_, i) => i * 10),
   distance_m: 1111,
 };
 
@@ -88,6 +91,7 @@ describe('SegmentTrimEditor', () => {
 
     expect(await screen.findByText(/24408723933/)).toBeInTheDocument();
     expect(screen.getByText(/1\.00 mi/)).toBeInTheDocument();
+    // The range line lives with the maps (T23), so it arrives with the style.
     expect(await screen.findByText(/Selected range: 0–1111 m \(0\.69 mi\)/)).toBeInTheDocument();
   });
 
@@ -163,7 +167,7 @@ describe('SegmentTrimEditor', () => {
   });
 
   it('explains when the activity has no GPS route (empty state)', async () => {
-    getRoute.mockResolvedValue({ data: { path_coords: [], elevations: [], distance_m: 5000 } });
+    getRoute.mockResolvedValue({ data: { path_coords: [], elevations: [], elapsed_s: [], distance_m: 5000 } });
     render(<SegmentTrimEditor activity={ACTIVITY} onChooseNewActivity={vi.fn()} />);
 
     expect(

@@ -66,7 +66,11 @@ describe('MapStyleSelector', () => {
     await waitFor(() => expect(screen.getByRole('combobox')).not.toBeDisabled());
     const options = screen.getAllByRole('option').map((o) => o.textContent);
     expect(options).toEqual(['Positron', 'Dark Matter']);
-    expect(onChange).toHaveBeenCalledWith('positron');
+    // The re-point runs in a passive effect ONE COMMIT after the catalogue
+    // resolves, while the combobox is already enabled in that same commit — so
+    // this call must be awaited, never asserted synchronously after the waitFor
+    // above (Bug 009-010-11-3: a loaded CPU makes the one-tick race fail).
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('positron'));
   });
 
   it('offers satellite styles when the token is available', async () => {

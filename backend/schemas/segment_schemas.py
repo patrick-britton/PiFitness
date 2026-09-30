@@ -35,6 +35,7 @@ class RouteQuery(BaseModel):
 class ActivityRoute(BaseModel):
     path_coords: List[List[float]]
     elevations: List[float]
+    elapsed_s: List[int]
     distance_m: float
 
 
@@ -128,6 +129,14 @@ class MatchOperationResponse(BaseModel):
 
 class BulkConfirmRequest(BaseModel):
     confirm_all: bool
+
+
+class BulkRejectRequest(BaseModel):
+    confidence_over: Optional[float] = None
+
+
+class BulkRejectResponse(BaseModel):
+    rejected: int
 
 
 class HausdorffScoringRequest(BaseModel):

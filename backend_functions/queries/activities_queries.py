@@ -769,7 +769,9 @@ def get_activity_route(
 
     Single activity-meta lookup plus ONE ordered GPS scan of
     activities.activity_details (lat/lon non-null, ordered by ts_utc):
-    path_coords as [lon, lat] pairs, elevations aligned 1:1 with path points.
+    path_coords as [lon, lat] pairs, elevations aligned 1:1 with path points,
+    and elapsed_s (per-point elapsed seconds from elapsed_duration_s, 1:1
+    aligned — 009-003 T38/OQ-6; elapsed seconds only, never a timestamp).
     Optional start_m/end_m trims by distance_mm (trim-gate support, FR-4);
     None = full range. Parameterized, no pandas, no in-memory rollups.
 
@@ -779,7 +781,8 @@ def get_activity_route(
         end_m: Trim end in meters; None = full distance.
 
     Returns:
-        Dict {path_coords, elevations, distance_m} or None when no activity row.
+        Dict {path_coords, elevations, elapsed_s, distance_m} or None when no
+        activity row.
     """
     meta = sql_to_dict(
         "SELECT activity_id, distance_m FROM activities.activities WHERE activity_id = %s",
@@ -788,7 +791,7 @@ def get_activity_route(
     if not meta:
         return None
     sql = """
-        SELECT longitude, latitude, elevation_m
+        SELECT longitude, latitude, elevation_m, elapsed_duration_s
         FROM activities.activity_details
         WHERE activity_id = %s
           AND latitude IS NOT NULL AND longitude IS NOT NULL
@@ -799,10 +802,12 @@ def get_activity_route(
     rows = sql_to_dict(sql, (activity_id, start_m, start_m, end_m, end_m)) or []
     path_coords = [[float(r["longitude"]), float(r["latitude"])] for r in rows]
     elevations = [float(r["elevation_m"]) if r["elevation_m"] is not None else 0.0 for r in rows]
+    elapsed_s = [int(r["elapsed_duration_s"]) if r["elapsed_duration_s"] is not None else 0 for r in rows]
     dist = meta[0].get("distance_m")
     return {
         "path_coords": path_coords,
         "elevations": elevations,
+        "elapsed_s": elapsed_s,
         "distance_m": float(dist) if dist is not None else 0.0,
     }
 
@@ -834,7 +839,7 @@ def get_match_candidates(segment_id: int) -> Dict[str, Any]:
         FROM activities.vw_temp_segment_matches_downselect v
         JOIN activities.activities a ON a.activity_id = v.activity_id
         WHERE v.segment_id = %s
-        ORDER BY v.confidence DESC
+        ORDER BY v.confidence ASC
     """
     rows = sql_to_dict(cand_sql, (segment_id,)) or []
     exist_sql = """
@@ -892,6 +897,18 @@ def get_match_candidates(segment_id: int) -> Dict[str, Any]:
     return {"data": data, "count": len(data), "existing_match_count": existing_match_count}
 
 
+# The four legacy find-matches pipeline steps, in order (009-003, T06/T20/FR-9).
+# `uses_segment_id` marks the SPs that take the segment id parameter; the split
+# (run_find_step) and all-in-one (run_find_matches) flows share this table so
+# they cannot drift.
+_FIND_STEPS: Dict[int, tuple] = {
+    1: ("CALL activities.segment_matching_match_activities(%s)", True),
+    2: ("CALL activities.segment_matching_pair_generation(%s)", True),
+    3: ("CALL activities.segment_matches_all_polygon()", False),
+    4: ("CALL activities.segment_matching_mass_confirmation(1)", False),
+}
+
+
 def run_find_matches(segment_id: int) -> Dict[str, Any]:
     """
     Run the legacy find-matches pipeline for a segment (009-003, T06/FR-9).
@@ -899,7 +916,8 @@ def run_find_matches(segment_id: int) -> Dict[str, Any]:
     Exact legacy sequence from segment_creation.py::render_segment_matches:
     match_activities -> pair_generation -> matches_all_polygon ->
     mass_confirmation(1). Synchronous blocking CALLs; frontend shows a spinner
-    per OQ-1. Parameterized; no pandas.
+    per OQ-1. Parameterized; no pandas; shares the step table with
+    run_find_step (T20) so the split and all-in-one flows cannot drift.
     """
     seg = sql_to_dict(
         "SELECT segment_id FROM activities.segments WHERE segment_id = %s",
@@ -907,18 +925,50 @@ def run_find_matches(segment_id: int) -> Dict[str, Any]:
     )
     if not seg:
         raise ValueError(f"segment_id={segment_id} not found")
-    steps = [
-        ("CALL activities.segment_matching_match_activities(%s)", [int(segment_id)]),
-        ("CALL activities.segment_matching_pair_generation(%s)", [int(segment_id)]),
-        ("CALL activities.segment_matches_all_polygon()", None),
-        ("CALL activities.segment_matching_mass_confirmation(1)", None),
-    ]
-    for proc, params in steps:
-        err = qec(proc, params)
+    for step, (proc, uses_segment_id) in _FIND_STEPS.items():
+        err = qec(proc, [int(segment_id)] if uses_segment_id else None)
         if err:
-            raise ValueError(f"find-matches step failed [{proc}]: {err}")
+            raise ValueError(f"find-matches step failed [{step}] [{proc}]: {err}")
     result = get_match_candidates(int(segment_id))
     return {"message": f"Find matches complete for segment {segment_id}", "candidates": result["data"]}
+
+
+def run_find_step(segment_id: int, step: int) -> Dict[str, Any]:
+    """
+    Run ONE step of the find-matches pipeline (009-003, T20/FR-9).
+
+    The match view runs steps 1..4 in sequence (same SPs, same order as
+    run_find_matches — no algorithm change) so the UI can show a per-step
+    progress checklist with real step boundaries. One existence check + one SP
+    CALL per request; parameterized; no pandas. Step map: 1 =
+    segment_matching_match_activities, 2 = segment_matching_pair_generation,
+    3 = segment_matches_all_polygon, 4 = segment_matching_mass_confirmation(1).
+
+    Args:
+        segment_id: The segment being matched.
+        step: 1..4, the pipeline step to run.
+
+    Returns:
+        Dict {message} per the step endpoint contract.
+
+    Raises:
+        ValueError: Unknown segment (404), step out of range (422), or SP
+            failure (500).
+    """
+    seg = sql_to_dict(
+        "SELECT segment_id FROM activities.segments WHERE segment_id = %s",
+        (segment_id,),
+    )
+    if not seg:
+        raise ValueError(f"segment_id={segment_id} not found")
+    entry = _FIND_STEPS.get(int(step))
+    if entry is None:
+        raise ValueError(f"step must be 1..4 (got {step})")
+    proc, uses_segment_id = entry
+    err = qec(proc, [int(segment_id)] if uses_segment_id else None)
+    if err:
+        raise ValueError(f"find-matches step failed [{step}] [{proc}]: {err}")
+    return {"message": f"Find-matches step {step} complete for segment {segment_id}"}
 
 
 def finalize_candidate_match(
@@ -1015,6 +1065,95 @@ def bulk_confirm_matches(segment_id: int, confirm_all: bool) -> Dict[str, Any]:
             "matched_count": int(matched[0]["cnt"]) if matched else 0,
         },
     }
+
+
+def bulk_reject_matches(
+    segment_id: int, confidence_over: Optional[float] = None
+) -> Dict[str, Any]:
+    """
+    Reject every current candidate of a segment (009-003, T31/AC-20, AC-22;
+    T37/Bug 009-003-36-1: atomic single-connection mass write).
+
+    Reads the pending rows from activities.vw_temp_segment_matches_downselect
+    for the segment (optionally only rows with confidence > confidence_over —
+    strict, so a row at exactly the threshold survives), then CALLs
+    segment_matching_finalize_match(FALSE, ...) once per row on ONE
+    non-autocommit connection with a single commit() — the delete_segment /
+    reset_match_tables transaction pattern in this module — so a mid-loop
+    failure rolls the whole reject back instead of leaving rows 1..k-1
+    finalized behind (Bug 009-003-36-1). The finalize procedure commits
+    nothing internally (verified against its definition: INSERT ... ON
+    CONFLICT + downselect DELETE only), so the whole pass is atomic; the
+    legacy qec-per-row loop cost N connection setups per request on the Pi.
+    No staging.update_segment_details call (approval-only per the T06 legacy
+    flow). No DDL, no SP change.
+
+    Args:
+        segment_id: The segment whose pending candidates are rejected.
+        confidence_over: Optional strict lower bound; only rows with
+            confidence strictly greater than this value are rejected.
+
+    Returns:
+        Dict {rejected: n} with the number of finalized rejects.
+
+    Raises:
+        ValueError: When the segment does not exist, confidence_over is not
+            a number, or any finalize CALL fails (all prior rows roll back).
+    """
+    seg = sql_to_dict(
+        "SELECT segment_id FROM activities.segments WHERE segment_id = %s",
+        (segment_id,),
+    )
+    if not seg:
+        raise ValueError(f"segment_id={segment_id} not found")
+    if confidence_over is not None:
+        try:
+            threshold = float(confidence_over)
+        except (TypeError, ValueError):
+            raise ValueError("confidence_over must be a number")
+    else:
+        threshold = None
+    cand_sql = """
+        SELECT activity_id, best_start_dist, best_end_dist, confidence
+        FROM activities.vw_temp_segment_matches_downselect
+        WHERE segment_id = %s
+    """
+    params: List[Any] = [int(segment_id)]
+    if threshold is not None:
+        cand_sql += " AND confidence > %s"
+        params.append(threshold)
+    cands = sql_to_dict(cand_sql, tuple(params)) or []
+    rejected = 0
+    if cands:
+        # One connection, one transaction, one commit for the whole pass
+        # (Bug 009-003-36-1). N cur.execute CALLs on the shared cursor —
+        # plain executemany is avoided so each row's failure rolls back
+        # everything committed by this pass.
+        conn = get_conn()
+        conn.autocommit = False
+        try:
+            cur = conn.cursor()
+            for cand in cands:
+                activity_id = int(cand["activity_id"])
+                start = int(cand["best_start_dist"])
+                end = int(cand["best_end_dist"])
+                conf = float(cand["confidence"]) if cand["confidence"] is not None else 0.0
+                cur.execute(
+                    "CALL activities.segment_matching_finalize_match(FALSE, %s, %s, %s, %s, %s::NUMERIC)",
+                    [activity_id, int(segment_id), start, end, conf],
+                )
+                rejected += 1
+            conn.commit()
+            cur.close()
+        except Exception as e:
+            conn.rollback()
+            # Same surfacing as the legacy qec-per-row loop: any CALL failure
+            # becomes a ValueError "bulk reject failed: ..." (endpoint maps
+            # it to 422; only the segment lookup produces "not found" / 404).
+            raise ValueError(f"bulk reject failed: {e}")
+        finally:
+            conn.close()
+    return {"rejected": rejected}
 
 
 def run_extra_scoring(segment_id: int, kind: str) -> Dict[str, Any]:
@@ -1480,8 +1619,10 @@ __all__ = [
     # 009-003 Segment Management (T06)
     'get_match_candidates',
     'run_find_matches',
+    'run_find_step',
     'finalize_candidate_match',
     'bulk_confirm_matches',
+    'bulk_reject_matches',
     'run_extra_scoring',
     # 009-003 Segment Management (T05)
     'create_segment',

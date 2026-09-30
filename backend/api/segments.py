@@ -10,7 +10,7 @@ from decimal import Decimal
 from datetime import date, datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from backend_functions.database_functions import sql_to_dict
 from backend.schemas.segment_schemas import (
@@ -19,6 +19,7 @@ from backend.schemas.segment_schemas import (
     ConfirmMatchRequest,
     RejectMatchRequest,
     BulkConfirmRequest,
+    BulkRejectResponse,
     HausdorffScoringRequest,
     FrechetScoringRequest,
     DeleteSegmentResponse,
@@ -36,8 +37,10 @@ from backend_functions.queries import (
     create_segment,
     get_match_candidates,
     run_find_matches,
+    run_find_step,
     finalize_candidate_match,
     bulk_confirm_matches,
+    bulk_reject_matches,
     run_extra_scoring,
     delete_segment,
     reset_match_tables,
@@ -330,8 +333,9 @@ async def get_activity_route_endpoint(
     """
     Activity route + elevation for Create Segment mode (009-003, FR-2/FR-4).
 
-    Returns path_coords ([lon, lat] pairs) and elevations (1:1 aligned)
-    from activities.activity_details, plus the activity distance_m, matching
+    Returns path_coords ([lon, lat] pairs), elevations (1:1 aligned) and
+    elapsed_s (1:1 elapsed seconds, 009-003 T38/OQ-6) from
+    activities.activity_details, plus the activity distance_m, matching
     the RouteResponse contract. Optional start_m/end_m trims the range
     (trim gates, FR-4). Declared before the legacy /segments/{segment_id}
     routes below; static /activities, /list, /courses stay above so no
@@ -399,6 +403,27 @@ async def find_matches_route(segment_id: int):
         raise HTTPException(status_code=500, detail=msg)
 
 
+@router.post("/segments/{segment_id}/matches/find/{step}")
+async def find_matches_step_route(segment_id: int, step: int):
+    """
+    Run one step of the find-matches pipeline (009-003, T20/FR-9).
+
+    The UI calls steps 1..4 in sequence and renders a per-step progress
+    checklist; the SPs, order, and parameterization are identical to the
+    blocking POST /segments/{id}/matches/find. Unknown step -> 422; unknown
+    segment -> 404; SP failure -> 500.
+    """
+    try:
+        return run_find_step(int(segment_id), int(step))
+    except ValueError as e:
+        msg = str(e)
+        if "not found" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        if "step must be" in msg:
+            raise HTTPException(status_code=422, detail=msg)
+        raise HTTPException(status_code=500, detail=msg)
+
+
 @router.get("/segments/{segment_id}/matches/candidates")
 async def get_candidates_route(segment_id: int):
     """Candidate efforts with confidence/deviation metrics (FR-9, FR-10)."""
@@ -445,6 +470,36 @@ async def bulk_confirm_route(segment_id: int, request: BulkConfirmRequest):
     """Mass-approve remaining candidates (FR-11); requires confirm_all=true."""
     try:
         return bulk_confirm_matches(int(segment_id), bool(request.confirm_all))
+    except ValueError as e:
+        msg = str(e)
+        if "not found" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=422, detail=msg)
+
+
+@router.post("/segments/{segment_id}/matches/bulk-reject", response_model=BulkRejectResponse)
+async def bulk_reject_route(segment_id: int, request: Request):
+    """Reject every remaining candidate (009-003, T31/AC-20, AC-22).
+
+    Optional body {"confidence_over": n} rejects only rows with confidence
+    strictly greater than n. Empty body / empty set -> 200 {"rejected": 0}.
+    """
+    try:
+        confidence_over = None
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+        if body is not None:
+            if not isinstance(body, dict):
+                raise HTTPException(status_code=422, detail="body must be an object")
+            if "confidence_over" in body:
+                confidence_over = body["confidence_over"]
+                if not isinstance(confidence_over, (int, float)) or isinstance(confidence_over, bool):
+                    raise HTTPException(status_code=422, detail="confidence_over must be a number")
+        return bulk_reject_matches(int(segment_id), confidence_over)
+    except HTTPException:
+        raise
     except ValueError as e:
         msg = str(e)
         if "not found" in msg:

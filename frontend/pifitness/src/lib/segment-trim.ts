@@ -106,3 +106,77 @@ export function indexWindow(coords: number[][], fromM: number, toM: number): [nu
   }
   return first === -1 ? null : [first, last];
 }
+
+/** The plotted point nearest a picked distance (009-003 T39a, AC-26/AC-27). */
+export interface NearestPoint {
+  /** Index into the route's `coords` (and its cumulative-distance array). */
+  index: number;
+  /**
+   * Cumulative distance of that point in meters, on the SAME `cumulativeMeters()`
+   * basis the elevation plot draws its x axis from — never the DB's `distance_mm`.
+   * Sub-meter precision; callers displaying it should round to whole meters to
+   * match the plot's rounded x values (`ElevationProfile` plots `Math.round`).
+   */
+  distanceM: number;
+}
+
+/**
+ * Index of the route point nearest `targetM` along the path, with that point's
+ * cumulative distance (009-003 T39a — the shared pick maths behind the
+ * map↔elevation link).
+ *
+ * The distance basis is `cumulativeMeters()` (the very array `ElevationProfile`
+ * plots), so the x the pick maths resolves and the x the axis draws can never
+ * disagree. Callers should compute the cumulative array ONCE per route and pass
+ * it in (`cumulative`) so a hover/tap frame costs one linear scan and no
+ * recompute on a Pi/phone; the parameter is ignored when its length does not
+ * match `coords` (a stale memo would misalign index → point).
+ *
+ * Clamping: a target before the first point resolves to index 0 and one past
+ * the last point to the final index (cumulative distance is non-decreasing).
+ * Empty coords return null.
+ */
+export function nearestPointAtDistance(
+  coords: number[][],
+  targetM: number,
+  cumulative?: number[],
+): NearestPoint | null {
+  const dists =
+    cumulative && cumulative.length === coords.length ? cumulative : cumulativeMeters(coords);
+  if (dists.length === 0) return null;
+  const target = Number.isFinite(targetM) ? targetM : 0;
+  let best = 0;
+  let bestGap = Math.abs(dists[0] - target);
+  for (let i = 1; i < dists.length; i += 1) {
+    const gap = Math.abs(dists[i] - target);
+    if (gap < bestGap) {
+      best = i;
+      bestGap = gap;
+    }
+  }
+  return { index: best, distanceM: dists[best] };
+}
+
+/**
+ * Index of the route point nearest a picked `[lng, lat]` (009-003 T39b,
+ * AC-26) — the coordinate sibling of `nearestPointAtDistance`, which resolves
+ * a distance rather than a position. The map reports where the user pointed;
+ * the readout needs the route point at that spot and its elapsed time, so the
+ * scan runs over the already-memoized coords, one pick at a time (the caller
+ * rAF-throttles hover) — no precomputed index lives on the Pi. Empty coords
+ * or a non-finite target return null.
+ */
+export function nearestIndexAtLngLat(coords: number[][], lngLat: [number, number]): number | null {
+  if (coords.length === 0) return null;
+  if (!lngLat || !lngLat.every((v) => Number.isFinite(v))) return null;
+  let best = 0;
+  let bestM = Infinity;
+  for (let i = 0; i < coords.length; i += 1) {
+    const m = metersBetween(coords[i], lngLat);
+    if (m < bestM) {
+      bestM = m;
+      best = i;
+    }
+  }
+  return best;
+}

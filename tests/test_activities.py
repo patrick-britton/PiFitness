@@ -258,6 +258,192 @@ def test_leaderboard_segments_invalid_params():
     assert response.status_code == 422
 
 
+def test_segment_bulk_reject_full_and_threshold():
+    """POST /api/segments/{id}/matches/bulk-reject (009-003 T31, T37).
+
+    Full reject finalizes every pending candidate; confidence_over rejects
+    only rows strictly above the threshold (a row at exactly 200 survives).
+    T37/Bug 009-003-36-1: the mass write runs on ONE non-autocommit
+    connection with ONE commit (fake connection mocked here, same style as
+    tests/test_isrc_dupes.py), so no database is required.
+    """
+    import unittest.mock as mock
+
+    import backend_functions.queries.activities_queries as aq
+
+    rows = [
+        {"activity_id": 11, "best_start_dist": 0, "best_end_dist": 100, "confidence": 50.0},
+        {"activity_id": 12, "best_start_dist": 0, "best_end_dist": 100, "confidence": 200.0},
+        {"activity_id": 13, "best_start_dist": 0, "best_end_dist": 100, "confidence": 250.0},
+    ]
+    mock_conn = mock.MagicMock()
+    mock_cur = mock.MagicMock()
+    mock_conn.cursor.return_value = mock_cur
+
+    with mock.patch(
+        "backend_functions.queries.activities_queries.sql_to_dict",
+        side_effect=[[{"segment_id": 9}], rows],
+    ), mock.patch.object(aq, "get_conn", return_value=mock_conn) as conn_mock:
+        response = client.post("/api/segments/9/matches/bulk-reject", json={})
+        assert response.status_code == 200
+        assert response.json() == {"rejected": 3}
+        # One connection, one commit, no rollback (atomic mass write).
+        conn_mock.assert_called_once()
+        mock_conn.commit.assert_called_once()
+        mock_conn.rollback.assert_not_called()
+        mock_conn.close.assert_called_once()
+        # All N finalize CALLs ran on that single connection's cursor.
+        assert mock_cur.execute.call_count == 3
+        # Every finalize call rejects (FALSE) with the row's own window/confidence.
+        for call in mock_cur.execute.call_args_list:
+            sql, params = call[0]
+            assert "CALL activities.segment_matching_finalize_match(FALSE" in sql
+            assert params[1] == 9
+
+    # Threshold case: strict > pushed into the candidate read (row at 200 survives).
+    mock_conn2 = mock.MagicMock()
+    mock_cur2 = mock.MagicMock()
+    mock_conn2.cursor.return_value = mock_cur2
+    with mock.patch(
+        "backend_functions.queries.activities_queries.sql_to_dict",
+        side_effect=[[{"segment_id": 9}], [rows[2]]],
+    ) as read_mock, mock.patch.object(aq, "get_conn", return_value=mock_conn2) as conn_mock:
+        response = client.post("/api/segments/9/matches/bulk-reject", json={"confidence_over": 200})
+        assert response.status_code == 200
+        assert response.json() == {"rejected": 1}
+        # Threshold is pushed into the candidate read (strict >).
+        _, read_params = read_mock.call_args[0]
+        assert list(read_params) == [9, 200.0]
+        conn_mock.assert_called_once()
+        assert mock_cur2.execute.call_count == 1
+        mock_conn2.commit.assert_called_once()
+        mock_conn2.rollback.assert_not_called()
+
+
+def test_segment_bulk_reject_failure_rolls_back():
+    """A mid-loop CALL failure rolls the whole pass back (T37/Bug 009-003-36-1):
+    rollback() is called, commit() never is, and the error still surfaces
+    through the endpoint with the unchanged 422 mapping."""
+    import unittest.mock as mock
+
+    import backend_functions.queries.activities_queries as aq
+
+    rows = [
+        {"activity_id": 11, "best_start_dist": 0, "best_end_dist": 100, "confidence": 50.0},
+        {"activity_id": 12, "best_start_dist": 0, "best_end_dist": 100, "confidence": 200.0},
+        {"activity_id": 13, "best_start_dist": 0, "best_end_dist": 100, "confidence": 250.0},
+    ]
+    mock_conn = mock.MagicMock()
+    mock_cur = mock.MagicMock()
+    mock_conn.cursor.return_value = mock_cur
+    # Row 2's CALL fails; rows 1 and 3 would have succeeded.
+    mock_cur.execute.side_effect = [None, Exception("deadlock detected"), None]
+
+    with mock.patch(
+        "backend_functions.queries.activities_queries.sql_to_dict",
+        side_effect=[[{"segment_id": 9}], rows],
+    ), mock.patch.object(aq, "get_conn", return_value=mock_conn):
+        response = client.post("/api/segments/9/matches/bulk-reject", json={})
+        assert response.status_code == 422
+        assert "bulk reject failed" in response.json()["detail"]
+        assert mock_cur.execute.call_count == 2  # aborted at the failing row
+        mock_conn.rollback.assert_called_once()
+        mock_conn.commit.assert_not_called()
+        mock_conn.close.assert_called_once()
+
+
+def test_segment_bulk_reject_empty_404_422():
+    """Empty candidate set -> 200 {rejected: 0} without opening a write
+    connection (T37); unknown segment -> 404; bad body -> 422."""
+    import unittest.mock as mock
+
+    import backend_functions.queries.activities_queries as aq
+
+    with mock.patch(
+        "backend_functions.queries.activities_queries.sql_to_dict",
+        side_effect=[[{"segment_id": 9}], []],
+    ), mock.patch.object(aq, "get_conn") as conn_mock:
+        response = client.post("/api/segments/9/matches/bulk-reject", json={})
+        assert response.status_code == 200
+        assert response.json() == {"rejected": 0}
+        conn_mock.assert_not_called()
+
+    with mock.patch(
+        "backend_functions.queries.activities_queries.sql_to_dict",
+        return_value=[],
+    ):
+        response = client.post("/api/segments/99/matches/bulk-reject", json={})
+        assert response.status_code == 404
+
+    # Bad body is rejected by the endpoint before any helper/DB interaction.
+    response = client.post("/api/segments/9/matches/bulk-reject", json={"confidence_over": "high"})
+    assert response.status_code == 422
+
+
+def test_activity_route_elapsed_s():
+    """GET /api/segments/{id}/route returns elapsed_s 1:1 with path_coords
+    (009-003 T38/OQ-6): ints, monotonically non-decreasing, no timestamp
+    field, first/last spot-checked against activity_details; a trimmed
+    window stays 1:1; the 404/422 paths are unchanged."""
+    from backend_functions.database_functions import sql_to_dict
+
+    list_response = client.get("/api/activities")
+    assert list_response.status_code == 200
+    list_data = list_response.json()
+    if list_data["count"] == 0:
+        pytest.skip("no activities in database")
+    activity_id = list_data["data"][0]["activity_id"]
+
+    response = client.get(f"/api/segments/{activity_id}/route")
+    assert response.status_code == 200
+    data = response.json()["data"]
+    # elapsed_s joined the contract; no ts_utc/timestamp field may appear.
+    assert set(data.keys()) == {"path_coords", "elevations", "elapsed_s", "distance_m"}
+    elapsed = data["elapsed_s"]
+    assert len(elapsed) == len(data["path_coords"]) == len(data["elevations"])
+    assert all(isinstance(v, int) for v in elapsed)
+    assert all(b >= a for a, b in zip(elapsed, elapsed[1:]))
+
+    if elapsed:
+        edges = sql_to_dict(
+            """
+            SELECT elapsed_duration_s FROM activities.activity_details
+            WHERE activity_id = %s AND latitude IS NOT NULL AND longitude IS NOT NULL
+            ORDER BY ts_utc ASC LIMIT 1
+            """,
+            (activity_id,),
+        )
+        assert elapsed[0] == int(edges[0]["elapsed_duration_s"])
+        edges = sql_to_dict(
+            """
+            SELECT elapsed_duration_s FROM activities.activity_details
+            WHERE activity_id = %s AND latitude IS NOT NULL AND longitude IS NOT NULL
+            ORDER BY ts_utc DESC LIMIT 1
+            """,
+            (activity_id,),
+        )
+        assert elapsed[-1] == int(edges[0]["elapsed_duration_s"])
+
+        # Trimmed window: elapsed_s stays 1:1 with the trimmed coords.
+        dist = float(data["distance_m"])
+        if dist > 100:
+            trimmed = client.get(
+                f"/api/segments/{activity_id}/route",
+                params={"start_m": 10, "end_m": min(60.0, dist)},
+            ).json()["data"]
+            assert len(trimmed["elapsed_s"]) == len(trimmed["path_coords"])
+            assert all(isinstance(v, int) for v in trimmed["elapsed_s"])
+            assert all(
+                b >= a for a, b in zip(trimmed["elapsed_s"], trimmed["elapsed_s"][1:])
+            )
+
+    # 404 (unknown activity) and 422 (negative start_m) are unchanged.
+    assert client.get("/api/segments/99999999/route").status_code == 404
+    assert client.get(
+        f"/api/segments/{activity_id}/route", params={"start_m": -1}
+    ).status_code == 422
+
+
 def test_leaderboard_contract_shape():
     """Test GET /api/activities/leaderboard/{id} returns the Leaderboard
     contract (009-002 T04), with the query helper mocked so no DB is required."""

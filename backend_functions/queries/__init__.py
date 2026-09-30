@@ -113,8 +113,10 @@ from .activities_queries import (
     # 009-003 Segment Management (T06)
     get_match_candidates,
     run_find_matches,
+    run_find_step,
     finalize_candidate_match,
     bulk_confirm_matches,
+    bulk_reject_matches,
     run_extra_scoring,
     # 009-003 Segment Management (T05)
     create_segment,
@@ -278,6 +280,7 @@ __all__ = [
     'run_find_matches',
     'finalize_candidate_match',
     'bulk_confirm_matches',
+    'bulk_reject_matches',
     'run_extra_scoring',
     # 009-003 Segment Management (T05)
     'create_segment',
