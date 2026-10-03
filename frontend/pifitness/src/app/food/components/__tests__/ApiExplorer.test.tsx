@@ -17,9 +17,17 @@ vi.mock('@/lib/api-client', () => ({
   API: { foodLookup: { searchUsda: vi.fn(), lookupOff: vi.fn() } },
 }));
 
-// The camera scanner is camera/wasm code loaded client-side only; stub it out so
-// these tests exercise the OFF panel's fallback wiring without a camera.
-vi.mock('next/dynamic', () => ({ default: () => () => null }));
+// The camera scanner is camera/wasm code loaded client-side only; stub it with a
+// control that fires onScan so these tests exercise the OFF panel wiring.
+vi.mock('next/dynamic', () => ({
+  default:
+    () =>
+    (props: { onScan?: (value: string, format: string) => void }) => (
+      <button type="button" onClick={() => props.onScan?.('737628064502', 'ean_13')}>
+        mock-scan
+      </button>
+    ),
+}));
 
 const searchUsda = vi.mocked(API.foodLookup.searchUsda);
 const lookupOff = vi.mocked(API.foodLookup.lookupOff);
@@ -88,6 +96,30 @@ describe('ApiExplorer', () => {
     await user.type(screen.getByLabelText(/Food name/i), 'x');
     await user.click(screen.getByRole('button', { name: /Search USDA/i }));
     expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('a successful camera scan stops the camera and looks the code up', async () => {
+    const user = userEvent.setup();
+    lookupOff.mockResolvedValue({ upstreamStatus: 200, body: { status: 1 } });
+    render(<ApiExplorer />);
+    await user.click(screen.getByRole('button', { name: /Start camera scan/i }));
+    await user.click(screen.getByRole('button', { name: /mock-scan/i }));
+    expect(lookupOff).toHaveBeenCalledWith('737628064502');
+    // Camera released: scanner controls gone, start control back.
+    expect(screen.queryByRole('button', { name: /mock-scan/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Start camera scan/i })).toBeInTheDocument();
+  });
+
+  it('a repeat lookup of the same barcode is skipped (OFF 429 guard)', async () => {
+    const user = userEvent.setup();
+    lookupOff.mockResolvedValue({ upstreamStatus: 200, body: { status: 1 } });
+    render(<ApiExplorer />);
+    await user.click(screen.getByRole('button', { name: /Start camera scan/i }));
+    await user.click(screen.getByRole('button', { name: /Enter barcode manually/i }));
+    await user.type(screen.getByLabelText(/Barcode/i), '737628064502');
+    await user.click(screen.getByRole('button', { name: /Look up barcode/i }));
+    await user.click(screen.getByRole('button', { name: /Look up barcode/i }));
+    expect(lookupOff).toHaveBeenCalledTimes(1);
   });
 
   it('renders in all three layout variants', async () => {

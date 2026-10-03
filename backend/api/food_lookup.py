@@ -35,6 +35,10 @@ _TIMEOUT_S = 15.0
 _PAGE_SIZE_DEFAULT = 10
 _PAGE_SIZE_MAX = 100
 
+# OFF rate-limits aggressively and blocks default httpx/python user-agents.
+# Identify the backend proxy so repeat dev-tool lookups are attributable.
+_OFF_HEADERS = {"User-Agent": "PiFitness/010-001-dev-diagnostic (contact: local dev tool)"}
+
 _BARCODE_RE = re.compile(r"^[0-9A-Za-z\-]{1,32}$")
 
 
@@ -118,7 +122,7 @@ async def lookup_off(barcode: str = ""):
         return _local_error(400, "ValidationError", "barcode must be 1-32 alphanumeric characters")
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT_S) as client:
-            upstream = await client.get(_OFF_PRODUCT_URL.format(barcode=barcode))
+            upstream = await client.get(_OFF_PRODUCT_URL.format(barcode=barcode), headers=_OFF_HEADERS)
     except httpx.TimeoutException:
         return _local_error(502, "UpstreamError", "Open Food Facts request timed out")
     except httpx.HTTPError as e:
