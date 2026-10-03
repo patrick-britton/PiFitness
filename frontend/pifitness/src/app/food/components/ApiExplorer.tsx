@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useViewportStore } from '../../../stores/viewportStore';
 import { API } from '../../../lib/api-client';
@@ -108,6 +108,10 @@ export default function ApiExplorer() {
   const [scannerError, setScannerError] = useState<ScannerErrorCode | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [state, setState] = useState<PanelState>({ kind: 'empty' });
+  // Guards against OFF hammering: one in-flight OFF request at a time, and the
+  // same code is never looked up twice in a row (scan bursts, double-taps).
+  const offInFlightRef = useRef(false);
+  const lastOffCodeRef = useRef<string | null>(null);
 
   const runUsda = useCallback(async () => {
     const q = query.trim();
@@ -125,12 +129,19 @@ export default function ApiExplorer() {
   const runOff = useCallback(async (rawCode: string) => {
     const code = rawCode.trim();
     if (!code) { setState({ kind: 'error', message: 'Enter a barcode first.' }); return; }
+    // Same code twice in a row (scan burst / double tap) or while a lookup is
+    // already running: skip — OFF 429s aggressively on repeat traffic.
+    if (code === lastOffCodeRef.current || offInFlightRef.current) return;
+    lastOffCodeRef.current = code;
+    offInFlightRef.current = true;
     setState({ kind: 'loading' });
     try {
       const response = await API.foodLookup.lookupOff(code);
       setState({ kind: 'result', label: `Open Food Facts: ${code}`, response });
     } catch (e) {
       setState({ kind: 'error', message: e instanceof Error ? e.message : 'Barcode lookup failed.' });
+    } finally {
+      offInFlightRef.current = false;
     }
   }, []);
 
@@ -141,6 +152,17 @@ export default function ApiExplorer() {
   }, []);
 
   const stopScan = useCallback(() => setScannerActive(false), []);
+
+  // A successful decode ends the scan session: releasing the camera here
+  // (rather than in the scanner) keeps continuous-scan reusable while this
+  // dev page stops the indicator light as soon as the lookup starts.
+  const handleScan = useCallback(
+    (value: string) => {
+      setScannerActive(false);
+      void runOff(value);
+    },
+    [runOff],
+  );
 
   // Manual entry is a *fallback*: revealed explicitly, or automatically once the
   // camera reports any of the six error states.
@@ -179,7 +201,7 @@ export default function ApiExplorer() {
           {scannerActive ? (
             <BarcodeScanner
               active={scannerActive}
-              onScan={(value) => { void runOff(value); }}
+              onScan={handleScan}
               onError={(code) => setScannerError(code)}
               devSimulateValue={DEV_SIMULATE_VALUE}
             />
