@@ -233,6 +233,7 @@ export const MODULE_SUB_PAGES: Record<NavigationModule, SubNavigationConfig[]> =
     { id: 'recipe-selection', label: 'Recipe Selection', iconName: 'MenuBook', path: '/recipe-selection' },
     { id: 'recipe-creation', label: 'Recipe Creation', iconName: 'Create', path: '/recipe-creation' },
     { id: 'tri-tip-timer', label: 'Tri-tip Timer', iconName: 'Timer', path: '/tri-tip-timer' },
+    { id: 'api-explorer', label: 'API Explorer (DEV-ONLY)', iconName: 'Science', path: '/api-explorer' },
   ],
   exercises: [
     { id: 'timer-activation', label: 'Timer Activation', iconName: 'PlayArrow', path: '/timer-activation' },

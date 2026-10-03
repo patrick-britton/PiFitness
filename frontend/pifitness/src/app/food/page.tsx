@@ -10,6 +10,7 @@ import { useState, useCallback } from 'react';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore, MODULE_SUB_PAGES } from '../../stores/uiStore';
 import TriTipTimer from './components/TriTipTimer';
+import ApiExplorer from './components/ApiExplorer';
 import * as Icons from '@mui/icons-material';
 
 const TABS = MODULE_SUB_PAGES.food;
@@ -138,6 +139,8 @@ export default function FoodPage() {
         <div className="max-w-7xl mx-auto">
           {activeTab === 'tri-tip-timer' ? (
             <TriTipTimer />
+          ) : activeTab === 'api-explorer' ? (
+            <ApiExplorer />
           ) : (
             <div className="p-8 text-center">
               <p className="text-gray-500 dark:text-gray-400 text-lg">

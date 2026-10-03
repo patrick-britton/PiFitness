@@ -78,6 +78,9 @@ import {
   CoursesResponse,
 } from './types/segment-management';
 import {
+  FoodLookupResponse,
+} from './types/food-lookup';
+import {
   NowPlayingResponse,
   MusicActionResponse,
   MusicAddTargetsResponse,
@@ -750,6 +753,27 @@ export const API = {
       if (query?.page_size != null) params.set("page_size", String(query.page_size));
       const qs = params.toString();
       return fetchAPI<CoursesResponse>(`/api/segments/courses${qs ? `?${qs}` : ""}`);
+    },
+  },
+
+  /**
+   * Food API raw-JSON diagnostic proxy (010-001, dev-only viewer).
+   * Returns the upstream body verbatim; non-2xx upstream still arrives as
+   * HTTP 200 with `upstreamStatus` set. Local proxy failures throw (the
+   * fetchAPI error path) with the raw local-error body as the message.
+   */
+  foodLookup: {
+    searchUsda: (query: string, pageSize = 10, dataType?: string) => {
+      const params = new URLSearchParams();
+      params.set('query', query);
+      params.set('pageSize', String(pageSize));
+      if (dataType?.trim()) params.set('dataType', dataType.trim());
+      return fetchAPI<FoodLookupResponse>(`/api/food/lookup/usda?${params.toString()}`);
+    },
+    lookupOff: (barcode: string) => {
+      const params = new URLSearchParams();
+      params.set('barcode', barcode);
+      return fetchAPI<FoodLookupResponse>(`/api/food/lookup/off?${params.toString()}`);
     },
   },
 
