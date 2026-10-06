@@ -37,6 +37,7 @@ vi.mock('maplibre-gl', () => {
     isStyleLoaded() {
       return true;
     }
+    on() {}
     once() {}
     off() {}
     getSource() {

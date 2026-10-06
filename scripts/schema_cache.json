@@ -204,7 +204,7 @@
   "activities.activity_details": [
     {
       "name": "activity_id",
-      "nullable": true,
+      "nullable": false,
       "type": "bigint"
     },
     {
@@ -3447,93 +3447,6 @@
       "type": "double precision"
     }
   ],
-  "health.vw_weight_viz": [
-    {
-      "name": "date_val",
-      "nullable": true,
-      "type": "date"
-    },
-    {
-      "name": "total_lb",
-      "nullable": true,
-      "type": "numeric"
-    },
-    {
-      "name": "bone_lb",
-      "nullable": true,
-      "type": "numeric"
-    },
-    {
-      "name": "muscle_lb",
-      "nullable": true,
-      "type": "numeric"
-    },
-    {
-      "name": "fat_lb",
-      "nullable": true,
-      "type": "numeric"
-    },
-    {
-      "name": "water_lb",
-      "nullable": true,
-      "type": "numeric"
-    },
-    {
-      "name": "bmi",
-      "nullable": true,
-      "type": "numeric"
-    },
-    {
-      "name": "tgt_lb",
-      "nullable": true,
-      "type": "numeric"
-    },
-    {
-      "name": "lb_from_target",
-      "nullable": true,
-      "type": "numeric"
-    },
-    {
-      "name": "year",
-      "nullable": true,
-      "type": "smallint"
-    },
-    {
-      "name": "day_of_year",
-      "nullable": true,
-      "type": "smallint"
-    },
-    {
-      "name": "relative_day",
-      "nullable": true,
-      "type": "integer"
-    },
-    {
-      "name": "relative_year",
-      "nullable": true,
-      "type": "integer"
-    },
-    {
-      "name": "relative_30",
-      "nullable": true,
-      "type": "double precision"
-    },
-    {
-      "name": "relative_90",
-      "nullable": true,
-      "type": "double precision"
-    },
-    {
-      "name": "dm30",
-      "nullable": true,
-      "type": "double precision"
-    },
-    {
-      "name": "dm90",
-      "nullable": true,
-      "type": "double precision"
-    }
-  ],
   "health.weight_target": [
     {
       "name": "ts_utc",
@@ -3665,6 +3578,38 @@
     },
     {
       "name": "maintenance_type",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "logging.health_checks": [
+    {
+      "name": "check_id",
+      "nullable": false,
+      "type": "bigint"
+    },
+    {
+      "name": "check_time_utc",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "check_name",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "status",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "value",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "message",
       "nullable": true,
       "type": "text"
     }
