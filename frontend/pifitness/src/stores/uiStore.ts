@@ -228,10 +228,9 @@ export const MODULE_SUB_PAGES: Record<NavigationModule, SubNavigationConfig[]> =
     { id: 'weight-targets', label: 'Weight Targets', iconName: 'TrackChanges', path: '/weight-targets' },
   ],
   food: [
-    { id: 'logging', label: 'Food Logging', iconName: 'EditNote', path: '/logging' },
-    { id: 'summary', label: 'Food Summary', iconName: 'Summarize', path: '/summary' },
-    { id: 'recipe-selection', label: 'Recipe Selection', iconName: 'MenuBook', path: '/recipe-selection' },
-    { id: 'recipe-creation', label: 'Recipe Creation', iconName: 'Create', path: '/recipe-creation' },
+    { id: 'logging', label: 'Diary', iconName: 'EditNote', path: '/logging' },
+    { id: 'summary', label: 'Recipe Box', iconName: 'Summarize', path: '/summary' },
+    { id: 'recipe-selection', label: 'Food Database', iconName: 'MenuBook', path: '/recipe-selection' },
     { id: 'tri-tip-timer', label: 'Tri-tip Timer', iconName: 'Timer', path: '/tri-tip-timer' },
     { id: 'api-explorer', label: 'API Explorer (DEV-ONLY)', iconName: 'Science', path: '/api-explorer' },
   ],

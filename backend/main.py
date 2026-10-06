@@ -26,7 +26,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.config import get_settings
-from backend.api import activities, health, admin, music, segments, auth, tri_tip, volleyball, exercises, config, food_lookup
+from backend.api import activities, health, admin, music, segments, auth, tri_tip, volleyball, exercises, config, food_lookup, food
 
 # ---------------------------------------------------------------------------
 # Application Initialization
@@ -128,6 +128,9 @@ app.include_router(exercises.router)
 
 # 010-001: food API raw-JSON diagnostic proxy (dev-only viewer backend)
 app.include_router(food_lookup.router)
+
+# 010-002: food skeleton routes (Option B stubs, contract shapes)
+app.include_router(food.router)
 
 @app.get("/api/health")
 async def health():

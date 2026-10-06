@@ -1,7 +1,7 @@
 /**
  * Food Module Page
  * Inline tab navigation matching admin module pattern.
- * Sub-pages: Food Logging, Food Summary, Recipe Selection, Recipe Creation, Tri-tip Timer
+ * Sub-pages: Diary, Recipe Box, Food Database, Tri-tip Timer, API Explorer (DEV-ONLY)
  */
 
 'use client';
@@ -11,6 +11,9 @@ import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore, MODULE_SUB_PAGES } from '../../stores/uiStore';
 import TriTipTimer from './components/TriTipTimer';
 import ApiExplorer from './components/ApiExplorer';
+import Diary from './components/Diary';
+import RecipeBox from './components/RecipeBox';
+import FoodDatabase from './components/FoodDatabase';
 import * as Icons from '@mui/icons-material';
 
 const TABS = MODULE_SUB_PAGES.food;
@@ -137,17 +140,23 @@ export default function FoodPage() {
       {/* Active Tab Content */}
       <div className="p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
-          {activeTab === 'tri-tip-timer' ? (
+          {activeTab === 'logging' ? (
+            <Diary />
+          ) : activeTab === 'summary' ? (
+            <RecipeBox />
+          ) : activeTab === 'recipe-selection' ? (
+            <FoodDatabase />
+          ) : activeTab === 'tri-tip-timer' ? (
             <TriTipTimer />
           ) : activeTab === 'api-explorer' ? (
             <ApiExplorer />
           ) : (
             <div className="p-8 text-center">
               <p className="text-gray-500 dark:text-gray-400 text-lg">
-                wow such empty
+                {activeTabConfig.label}
               </p>
               <p className="text-gray-400 dark:text-gray-500 mt-2">
-                future home of {activeTabConfig.label}
+                Module skeleton arrives in a later task
               </p>
             </div>
           )}

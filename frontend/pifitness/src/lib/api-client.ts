@@ -81,6 +81,19 @@ import {
   FoodLookupResponse,
 } from './types/food-lookup';
 import {
+  UsualFood,
+  DayEntry,
+  DiaryStats,
+  DiaryUpdateRequest,
+  LogEntryRequest,
+  LogApiEntryRequest,
+  CombinedSearchResult,
+  NutrientSnapshot,
+  RecipeSummary,
+  FoodListResponse,
+  FoodRow,
+} from './types/food-contract';
+import {
   NowPlayingResponse,
   MusicActionResponse,
   MusicAddTargetsResponse,
@@ -775,6 +788,82 @@ export const API = {
       params.set('barcode', barcode);
       return fetchAPI<FoodLookupResponse>(`/api/food/lookup/off?${params.toString()}`);
     },
+  },
+
+  /**
+   * Food skeleton reads (010-002 T05) — contract shapes from /api/food.
+   */
+  food: {
+    /** Time-of-day weighted usual foods. */
+    usuals: (at?: string) =>
+      fetchAPI<UsualFood[]>(
+        `/api/food/usuals${at ? `?at=${encodeURIComponent(at)}` : ''}`,
+      ),
+    /** One day's snapshot history as DayEntry[]. */
+    diary: (day: string) =>
+      fetchAPI<DayEntry[]>(`/api/food/diary?day=${encodeURIComponent(day)}`),
+    /** Three-bar header aggregates for a device-local day (010-003). */
+    diaryStats: (day: string) =>
+      fetchAPI<DiaryStats>(
+        `/api/food/diary/stats?day=${encodeURIComponent(day)}`,
+      ),
+    /** Edit an entry; a new logged_at moves it to that day (010-003 OQ-5). */
+    updateDiaryEntry: (entryId: number, body: DiaryUpdateRequest) =>
+      fetchAPI<DayEntry>(`/api/food/diary/${entryId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    /** Delete an entry (snapshot history removed; the food row is untouched). */
+    deleteDiaryEntry: (entryId: number) =>
+      fetchAPI<{ success: boolean; entry_id: number }>(
+        `/api/food/diary/${entryId}`,
+        { method: 'DELETE' },
+      ),
+    /** Recipe Box list as RecipeSummary[]. */
+    recipes: () => fetchAPI<RecipeSummary[]>('/api/food/recipes'),
+    /** Top-10 time-of-day suggestions (010-003 T06). */
+    suggest: (at?: string) =>
+      fetchAPI<UsualFood[]>(
+        `/api/food/suggest${at ? `?at=${encodeURIComponent(at)}` : ''}`,
+      ),
+    /** Tiered combined search; backend trims to ≤30, show-more is client-side (010-003 T06). */
+    combinedSearch: (q: string, limit = 30) =>
+      fetchAPI<CombinedSearchResult[]>(
+        `/api/food/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+      ),
+    /** Log a saved food; server snapshots name + nutrients (010-003 T06). */
+    logEntry: (body: LogEntryRequest) =>
+      fetchAPI<DayEntry>('/api/food/diary', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    /** Persist-on-log an API hit into foods.foods then log it (010-003 T06). */
+    logApiEntry: (body: LogApiEntryRequest) =>
+      fetchAPI<DayEntry>('/api/food/diary/from-api', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    /** Alive food row by barcode for the scan-first DB check (010-003 T08). */
+    byBarcode: (barcode: string) =>
+      fetchAPI<{
+        found: boolean; barcode: string; food_id?: number | null;
+        name: string; source?: string; fdc_id?: number | null;
+        nutrients?: NutrientSnapshot | null;
+        /** T10 (OQ-8): row serving for scan-DB popup default/panel. */
+        serving_size?: number | null;
+        serving_unit?: string | null;
+        serving_text?: string | null;
+      }>(`/api/food/by-barcode?barcode=${encodeURIComponent(barcode)}`),
+    /** Food Database page as FoodListResponse (server-side ranked search). */
+    foods: (query?: { q?: string; limit?: number }) => {
+      const params = new URLSearchParams();
+      if (query?.q != null && query.q !== '') params.set('q', query.q);
+      if (query?.limit != null) params.set('limit', String(query.limit));
+      const qs = params.toString();
+      return fetchAPI<FoodListResponse>(`/api/food/foods${qs ? `?${qs}` : ''}`);
+    },
+    /** One alive food row — hydrates suggestion-pick panels (010-003 T10). */
+    foodById: (foodId: number) => fetchAPI<FoodRow>(`/api/food/foods/${foodId}`),
   },
 
   /**
