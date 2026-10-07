@@ -41,6 +41,24 @@
  *   POST /api/food/diary also accepts LogApiEntryRequest (usda/off payload)
  *     -> persists to foods.foods then logs the snapshot entry.
  *
+ * 010-005 additions (Recipe Box feature):
+ *   GET    /api/food/recipes/{recipe_id}           -> RecipeDetail
+ *   PUT    /api/food/recipes/{recipe_id}           -> SaveRecipeRequest -> RecipeSummary
+ *   DELETE /api/food/recipes/{recipe_id}           -> { success, recipe_id, food_id }
+ *     (soft-deletes the recipe row AND its source='recipe' food row)
+ *   POST   /api/food/recipes/{recipe_id}/complete  -> RecipeSummary (times_prepared += 1,
+ *     cook state cleared)
+ *   GET    /api/food/recipes/{recipe_id}/cook      -> CookState (empty lists = no session)
+ *   PUT    /api/food/recipes/{recipe_id}/cook      -> CookStateUpdate -> CookState
+ *   DELETE /api/food/recipes/{recipe_id}/cook      -> { success: true }
+ *   POST   /api/food/recipes (extended) now requires ingredients + servings_count
+ *     + serving_unit; server derives grams-per-unit into food.foods.serving_size
+ *     (OQ-2) and snapshots combined nutrients. Category set per OQ-1:
+ *     Breakfast | Lunch | Dinner | Side | Dessert | Drink ('Appetizer' removed).
+ *   POST   /api/food/persist -> PersistApiFoodRequest -> PersistApiFoodResponse
+ *     (persist-only: a recipe-create pick materializes an unsaved usda/off
+ *      hit into foods.foods with NO diary write — OQ-3, T12.)
+ *
  * Unit conversion (OQ-1, FDA label column, authoritative for kcal math):
  *   UNIT_TO_G_OR_ML = { g: 1, ml: 1, oz: 28, serving: per-row serving_size,
  *     tsp: 5, tbsp: 15, 'fl oz': 30, cup: 240 }
@@ -61,9 +79,9 @@
 /** Where a food row came from. */
 export type FoodSource = 'api' | 'db' | 'recipe';
 
-/** Recipe category filter (Recipe Box). */
+/** Recipe category filter (Recipe Box). 010-005 OQ-1: 'Side' replaces 'Appetizer'. */
 export type RecipeCategory =
-  | 'Breakfast' | 'Lunch' | 'Dinner' | 'Dessert' | 'Drink' | 'Appetizer';
+  | 'Breakfast' | 'Lunch' | 'Dinner' | 'Side' | 'Dessert' | 'Drink';
 
 /** Canonical per-100g nutrient snapshot (frozen at write time; null = unreported, never 0). */
 export interface NutrientSnapshot {
@@ -238,5 +256,85 @@ export interface RecipeStep {
 export interface SaveRecipeRequest {
   title: string;
   category: RecipeCategory;
+  /** 010-005: the predefined ingredient list (≥1); aggregated server-side. */
+  ingredients: RecipeIngredient[];
+  /** 010-005 OQ-2: yield, e.g. 8 with serving_unit 'slice'. */
+  servings_count: number;
+  serving_unit: string;
   steps: RecipeStep[];
+}
+
+// ---------------------------------------------------------------------------
+// 010-005 (Recipe Box) additions — mirrors backend food_contract_schemas.py.
+// ---------------------------------------------------------------------------
+
+/** One line of a recipe's predefined ingredient list.
+ * `name` is read-side only (GET detail); writes carry food_id/qty/unit. */
+export interface RecipeIngredient {
+  food_id: number;
+  qty: number;
+  unit: string;
+  name?: string | null;
+}
+
+/** A stored step as served to the cook/create screens (foods carry names). */
+export interface RecipeStepDetail {
+  step_no: number;
+  instruction: string;
+  timer_seconds: number | null;
+  foods: RecipeIngredient[];
+}
+
+/** GET /api/food/recipes/{id} — full recipe for create-view/cook mode.
+ * servings_count/serving_unit are null only for pre-010-005 rows. */
+export interface RecipeDetail {
+  recipe_id: number;
+  title: string;
+  category: RecipeCategory;
+  times_prepared: number;
+  food_id: number | null;
+  servings_count: number | null;
+  serving_unit: string | null;
+  ingredients: RecipeIngredient[];
+  steps: RecipeStepDetail[];
+}
+
+/** Identity of one checked ingredient line inside a step. */
+export interface CookFoodCheck {
+  step_no: number;
+  food_id: number;
+  unit: string;
+}
+
+/** One running timer as an absolute deadline (survives sleep/screen-off). */
+export interface CookTimer {
+  step_no: number;
+  /** ISO-8601 instant; the countdown derives from it, never a local tick. */
+  ends_at: string;
+}
+
+/** PUT body for /recipes/{id}/cook — full replace of the session. */
+export interface CookStateUpdate {
+  checked_steps: number[];
+  checked_foods: CookFoodCheck[];
+  timers: CookTimer[];
+}
+
+/** GET /recipes/{id}/cook — empty lists = no active session. */
+export interface CookState extends CookStateUpdate {
+  recipe_id: number;
+  updated_at: string | null;
+}
+
+/** 010-005 T12 (OQ-3): POST /api/food/persist — the payload half of
+ * LogApiEntryRequest; the create flow calls this at pick time so every
+ * session ingredient line can carry a real food_id. */
+export interface PersistApiFoodRequest {
+  usda_payload?: ApiFoodPayload;
+  off_payload?: ApiFoodPayload;
+}
+
+/** 010-005 T12: the new (or natural-key-deduped existing) foods row id. */
+export interface PersistApiFoodResponse {
+  food_id: number;
 }

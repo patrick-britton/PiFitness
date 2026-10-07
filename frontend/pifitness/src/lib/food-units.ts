@@ -21,18 +21,29 @@ export const UNIT_TO_G_OR_ML: Record<string, number> = {
 
 /**
  * Preview kcal for `qty` × `unit` from a per-100g figure, or `null` when it
- * cannot be computed (unknown/`serving` unit or no kcal figure). Mirrors the
- * server's `_kcal_for` so the popup's number matches what will be saved.
+ * cannot be computed (unit unknown to the table with no `ownUnit` match, or
+ * no kcal figure). `ownUnit` is the row's own serving `{size, label}` so a
+ * recipe's `pancake` resolves through its grams-per-unit exactly like the
+ * server's `_kcal_for` — the popup number matches what will be saved.
  */
 export function previewKcal(
   kcalPer100g: number | null | undefined,
   qty: number,
   unit: string,
+  ownUnit?: { size: number; unit: string } | null,
 ): number | null {
   if (kcalPer100g == null || !Number.isFinite(qty) || qty <= 0) return null;
-  const gramsPerUnit = UNIT_TO_G_OR_ML[(unit || '').trim().toLowerCase()];
-  if (gramsPerUnit == null) return null;
-  return (kcalPer100g * (qty * gramsPerUnit)) / 100;
+  const key = (unit || '').trim().toLowerCase();
+  const gramsPerUnit = UNIT_TO_G_OR_ML[key];
+  if (gramsPerUnit != null) return (kcalPer100g * (qty * gramsPerUnit)) / 100;
+  // 010-005 T10 (OQ-2): a unit matching the row's own serving label (a
+  // recipe's derived grams-per-unit) resolves via its size — mirrors the
+  // server's `_kcal_for` unit==serving_unit branch.
+  if (ownUnit != null && ownUnit.size > 0
+    && key === ownUnit.unit.trim().toLowerCase()) {
+    return (kcalPer100g * (qty * ownUnit.size)) / 100;
+  }
+  return null;
 }
 
 /** T10 (OQ-8): feed unit families the picker knows (mirrors the backend's

@@ -22,7 +22,8 @@ TARGET_SCHEMAS = [
     'health', 'health_migration',
     'music', 'music_migration',
     'staging', 'staging_migration',
-    'logging', 'tasks', 'api_services'
+    'logging', 'tasks', 'api_services',
+    'food', 'food_migration',
 ]
 
 CACHE_FILE = PROJECT_ROOT / 'scripts' / 'schema_cache.json'
