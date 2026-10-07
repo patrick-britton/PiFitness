@@ -13,6 +13,17 @@ Endpoints (contract from T01; shapes served exactly):
     POST /api/food/recipes                   -> RecipeSummary (snapshot write)
     POST /api/food/foods/{id}/delete         -> soft-delete
     POST /api/food/foods/{id}/restore        -> restore
+010-005 (Recipe Box, contract from 010-005 design T01):
+    GET    /api/food/recipes/{recipe_id}       -> RecipeDetail
+    PUT    /api/food/recipes/{recipe_id}       -> SaveRecipeRequest -> RecipeSummary
+    DELETE /api/food/recipes/{recipe_id}       -> { success, recipe_id, food_id }
+    POST   /api/food/recipes/{recipe_id}/complete -> RecipeSummary
+    POST   /api/food/recipes (extended: ingredients + servings + steps)
+    GET    /api/food/recipes/{recipe_id}/cook -> CookState (empty = no session)
+    PUT    /api/food/recipes/{recipe_id}/cook -> CookStateUpdate -> CookState
+    DELETE /api/food/recipes/{recipe_id}/cook -> { success: true } (idempotent)
+    POST   /api/food/persist                    -> { food_id } (persist-only, NO
+    diary write — recipe-create picks, 010-005 T12 / OQ-3)
 """
 
 from datetime import date, datetime
@@ -35,15 +46,28 @@ from backend_functions.queries.food_queries import (
     update_diary_entry,
     delete_diary_entry,
     save_recipe,
+    get_recipe,
+    update_recipe,
+    delete_recipe,
+    complete_recipe,
+    get_cook_state,
+    save_cook_state,
+    clear_cook_state,
     set_food_deleted,
 )
 from backend.schemas.food_contract_schemas import (
     CombinedSearchResult,
+    CookState,
+    CookStateUpdate,
     DiaryStats,
     DiaryUpdateRequest,
     FoodRow,
     LogApiEntryRequest,
     LogEntryRequest,
+    PersistApiFoodRequest,
+    PersistApiFoodResponse,
+    RecipeDetail,
+    RecipeSummary,
     SaveRecipeRequest,
 )
 
@@ -279,52 +303,63 @@ async def combined_search(
     return out[:limit]
 
 
-@router.post("/diary/from-api", status_code=201)
-async def log_api_entry(req: LogApiEntryRequest):
-    """Persist-on-log: normalize an API hit into foods.foods, then log it."""
+def _persist_api_payload(payload) -> dict:
+    """Normalize one API hit and persist it into foods.foods (010-005 T12).
+
+    Shared by POST /diary/from-api (persist-then-log) and POST /persist
+    (persist-only recipe-create picks) so the normalizer lives in exactly
+    one place. Natural-key dedupe inside `persist_api_food` returns the
+    existing row for a repeat fdcId/barcode. Raises ValueError -> 400.
+    """
     from backend_functions.food_normalize import (
         normalize_off, normalize_usda_branded, normalize_usda_survey,
         serving_fields)
+    provider = payload.provider
+    raw = payload.nutrients_raw or {}
+    # T10 (OQ-8): the feed's standard serving (fail-closed; survey rows
+    # carry none). Display text is kept, never parsed.
+    if provider == "usda":
+        dtype = (raw.get("dataType") or "") if isinstance(raw, dict) else ""
+        if dtype == "Branded":
+            per100, needs_review, reason = normalize_usda_branded(raw)
+            normalized_from = "usda_branded"
+        else:
+            per100 = normalize_usda_survey(raw)
+            needs_review = any(v is None for v in per100.values())
+            reason = "unreported at source" if needs_review else ""
+            normalized_from = ("usda_legacy" if dtype in ("SR Legacy", "Foundation")
+                               else "usda_survey")
+        fdc_id, barcode = payload.fdcId, None
+        s_size, s_unit, s_text = serving_fields(
+            raw.get("servingSize"), raw.get("servingSizeUnit"),
+            raw.get("householdServingFullText")) if isinstance(raw, dict) else (None, None, None)
+    else:
+        nutr = raw.get("nutriments", raw) if isinstance(raw, dict) else {}
+        per100 = normalize_off(nutr if isinstance(nutr, dict) else {})
+        needs_review = any(v is None for v in per100.values())
+        reason = "unreported at source" if needs_review else ""
+        normalized_from = "off"
+        fdc_id, barcode = None, payload.barcode
+        s_size, s_unit, s_text = serving_fields(
+            raw.get("serving_quantity"), raw.get("serving_quantity_unit"),
+            raw.get("serving_size") if isinstance(
+                raw.get("serving_size"), str) else None
+        ) if isinstance(raw, dict) else (None, None, None)
+    return persist_api_food(provider, payload.name, fdc_id, barcode,
+                            raw, per100, needs_review, reason or None,
+                            normalized_from=normalized_from,
+                            serving_size=s_size, serving_unit=s_unit,
+                            serving_text=s_text)
+
+
+@router.post("/diary/from-api", status_code=201)
+async def log_api_entry(req: LogApiEntryRequest):
+    """Persist-on-log: normalize an API hit into foods.foods, then log it."""
     payload = req.usda_payload or req.off_payload
     if payload is None:
         raise HTTPException(status_code=400, detail="usda/off payload required")
-    provider = payload.provider
     try:
-        raw = payload.nutrients_raw or {}
-        # T10 (OQ-8): the feed's standard serving (fail-closed; survey rows
-        # carry none). Display text is kept, never parsed.
-        if provider == "usda":
-            dtype = (raw.get("dataType") or "") if isinstance(raw, dict) else ""
-            if dtype == "Branded":
-                per100, needs_review, reason = normalize_usda_branded(raw)
-                normalized_from = "usda_branded"
-            else:
-                per100 = normalize_usda_survey(raw)
-                needs_review = any(v is None for v in per100.values())
-                reason = "unreported at source" if needs_review else ""
-                normalized_from = ("usda_legacy" if dtype in ("SR Legacy", "Foundation")
-                                   else "usda_survey")
-            fdc_id, barcode = payload.fdcId, None
-            s_size, s_unit, s_text = serving_fields(
-                raw.get("servingSize"), raw.get("servingSizeUnit"),
-                raw.get("householdServingFullText")) if isinstance(raw, dict) else (None, None, None)
-        else:
-            nutr = raw.get("nutriments", raw) if isinstance(raw, dict) else {}
-            per100 = normalize_off(nutr if isinstance(nutr, dict) else {})
-            needs_review = any(v is None for v in per100.values())
-            reason = "unreported at source" if needs_review else ""
-            normalized_from = "off"
-            fdc_id, barcode = None, payload.barcode
-            s_size, s_unit, s_text = serving_fields(
-                raw.get("serving_quantity"), raw.get("serving_quantity_unit"),
-                raw.get("serving_size") if isinstance(
-                    raw.get("serving_size"), str) else None
-            ) if isinstance(raw, dict) else (None, None, None)
-        row = persist_api_food(provider, payload.name, fdc_id, barcode,
-                               raw, per100, needs_review, reason or None,
-                               normalized_from=normalized_from,
-                               serving_size=s_size, serving_unit=s_unit,
-                               serving_text=s_text)
+        row = _persist_api_payload(payload)
         entry = log_diary_entry(food_id=row["food_id"], qty=req.qty,
                                 unit=req.unit, logged_at=req.logged_at)
         _log_pick_if_any(req.rank, req.result_source, req.query)
@@ -333,6 +368,28 @@ async def log_api_entry(req: LogApiEntryRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to log API entry: {e}")
+
+
+@router.post("/persist", status_code=201, response_model=PersistApiFoodResponse)
+async def persist_food(req: PersistApiFoodRequest):
+    """010-005 T12 (OQ-3): persist-only — NO diary write.
+
+    The recipe-create flow calls this when an unsaved usda/off hit (or a
+    barcode-miss OFF scan) is picked, so the pick becomes a real food_id
+    immediately and every session ingredient line can reference it; dedupe
+    on fdcId/barcode returns the existing row. Serving fields carry through
+    exactly like /diary/from-api so the 'serving' unit resolves later.
+    """
+    payload = req.usda_payload or req.off_payload
+    if payload is None:
+        raise HTTPException(status_code=400, detail="usda/off payload required")
+    try:
+        row = _persist_api_payload(payload)
+        return {"food_id": row["food_id"]}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to persist food: {e}")
 
 
 @router.get("/by-barcode")
@@ -407,14 +464,126 @@ async def log_entry(req: LogEntryRequest):
 
 @router.post("/recipes", status_code=201)
 async def create_recipe(req: SaveRecipeRequest):
-    """Save a recipe -> RecipeSummary (snapshot recipe-food row)."""
+    """Save a recipe -> RecipeSummary (snapshot recipe-food row + servings)."""
     try:
-        steps = [s.model_dump() for s in req.steps]
-        return save_recipe(title=req.title, category=req.category, steps=steps)
+        return save_recipe(
+            title=req.title,
+            category=req.category,
+            ingredients=[i.model_dump() for i in req.ingredients],
+            servings_count=req.servings_count,
+            serving_unit=req.serving_unit,
+            steps=[s.model_dump() for s in req.steps],
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save recipe: {e}")
+
+
+@router.get("/recipes/{recipe_id}", response_model=RecipeDetail)
+async def recipe_detail(recipe_id: int):
+    """010-005: full recipe for create-view/cook mode -> RecipeDetail."""
+    try:
+        detail = get_recipe(recipe_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch recipe: {e}")
+    if detail is None:
+        raise HTTPException(status_code=404, detail="recipe not found")
+    return detail
+
+
+@router.put("/recipes/{recipe_id}", response_model=RecipeSummary)
+async def edit_recipe(recipe_id: int, req: SaveRecipeRequest):
+    """010-005: full replace (edit flow) -> RecipeSummary; 404 when missing."""
+    try:
+        updated = update_recipe(
+            recipe_id,
+            title=req.title,
+            category=req.category,
+            ingredients=[i.model_dump() for i in req.ingredients],
+            servings_count=req.servings_count,
+            serving_unit=req.serving_unit,
+            steps=[s.model_dump() for s in req.steps],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update recipe: {e}")
+    if updated is None:
+        raise HTTPException(status_code=404, detail="recipe not found")
+    return updated
+
+
+@router.delete("/recipes/{recipe_id}")
+async def remove_recipe(recipe_id: int):
+    """010-005: soft-delete recipe + its source='recipe' food row (AC-6)."""
+    try:
+        result = delete_recipe(recipe_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete recipe: {e}")
+    if result is None:
+        raise HTTPException(status_code=404, detail="recipe not found")
+    return result
+
+
+@router.post("/recipes/{recipe_id}/complete", response_model=RecipeSummary)
+async def finish_recipe(recipe_id: int):
+    """010-005: cook finished -> times_prepared += 1, cook state cleared."""
+    try:
+        summary = complete_recipe(recipe_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to complete recipe: {e}")
+    if summary is None:
+        raise HTTPException(status_code=404, detail="recipe not found")
+    return summary
+
+
+@router.get("/recipes/{recipe_id}/cook", response_model=CookState)
+async def cook_session(recipe_id: int):
+    """010-005: active cook session -> CookState (empty lists = none)."""
+    try:
+        return get_cook_state(recipe_id)
+    except Exception as e:
+        raise HTTPException(status_code=500,
+                            detail=f"Failed to fetch cook state: {e}")
+
+
+@router.put("/recipes/{recipe_id}/cook", response_model=CookState)
+async def update_cook_session(recipe_id: int, req: CookStateUpdate):
+    """010-005: full replace of the session (checks + absolute timer
+    deadlines). `ends_at` must be an ISO-8601 instant (AC-5: countdowns
+    derive from the stored instant, never a local tick)."""
+    for i, t in enumerate(req.timers):
+        try:
+            datetime.fromisoformat(t.ends_at)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"timers[{i}].ends_at must be an ISO-8601 instant")
+    try:
+        state = save_cook_state(
+            recipe_id,
+            checked_steps=list(req.checked_steps),
+            checked_foods=[c.model_dump() for c in req.checked_foods],
+            timers=[t.model_dump() for t in req.timers],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500,
+                            detail=f"Failed to save cook state: {e}")
+    if state is None:
+        raise HTTPException(status_code=404, detail="recipe not found")
+    return state
+
+
+@router.delete("/recipes/{recipe_id}/cook")
+async def discard_cook_session(recipe_id: int):
+    """010-005: discard the session (idempotent; no row is not an error)."""
+    try:
+        clear_cook_state(recipe_id)
+    except Exception as e:
+        raise HTTPException(status_code=500,
+                            detail=f"Failed to clear cook state: {e}")
+    return {"success": True}
 
 
 @router.get("/foods/{food_id}", response_model=FoodRow)

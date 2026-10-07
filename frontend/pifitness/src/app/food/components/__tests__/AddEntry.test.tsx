@@ -6,9 +6,10 @@
  * The camera scanner is stubbed (client-only wasm) via next/dynamic.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AddEntry from '../AddEntry';
+import { defaultAmount } from '../FoodSearchPicker';
 import { API } from '@/lib/api-client';
 import type { CombinedSearchResult, DayEntry, UsualFood } from '@/lib/types/food-contract';
 
@@ -420,5 +421,56 @@ describe('AddEntry', () => {
     expect(screen.getByRole('dialog', { name: /Confirm Oatmeal/i })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Cancel$/i }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('010-005 T10: recipe pick opens at qty 1 in its own serving unit and logs qty 3 pancake (AC-10)', async () => {
+    const user = userEvent.setup();
+    combinedSearch.mockResolvedValue([{
+      ...hit(0),
+      kind: 'db-recipe', food_id: 42, name: 'Pancakes',
+      mode_qty: null, mode_unit: null,
+      kcal_preview: 250,
+      serving_size: 40, serving_unit: 'pancake', serving_text: null,
+      nutrients: {
+        kcal_per_100g: 250, protein_g: 6, fat_g: 10, carbs_g: 30,
+        fiber_g: 2, sugars_g: 5, sodium_mg: 400, caffeine_mg: null,
+      },
+    }]);
+    render(<AddEntry onDone={() => {}} />);
+    await screen.findByText('Oatmeal');
+    await user.type(screen.getByLabelText(/Food name/i), 'pan');
+    await user.click(screen.getByRole('button', { name: /^Search$/i }));
+    await user.click(await screen.findByText('Pancakes'));
+    const dialog = await screen.findByRole('dialog', { name: /Confirm Pancakes/i });
+
+    // AC-10 defaults: qty 1, own label selected AND offered in the unit set.
+    expect((within(dialog).getByLabelText('Quantity') as HTMLInputElement).value).toBe('1');
+    expect((within(dialog).getByLabelText('Unit') as HTMLSelectElement).value).toBe('pancake');
+    expect(within(dialog).getByRole('option', { name: 'pancake' })).toBeInTheDocument();
+    // Live kcal preview resolves via the row's grams-per-unit (1 × 40 g).
+    expect(within(dialog).getByRole('status')).toHaveTextContent('≈ 100 kcal');
+
+    await user.clear(within(dialog).getByLabelText('Quantity'));
+    await user.type(within(dialog).getByLabelText('Quantity'), '3');
+    expect(within(dialog).getByRole('status')).toHaveTextContent('≈ 300 kcal');
+    await user.click(within(dialog).getByRole('button', { name: /^Confirm$/i }));
+    expect(logEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ food_id: 42, qty: 3, unit: 'pancake' }));
+  });
+
+  it('010-005 T10: recipe default beats history mode; non-recipe defaults unchanged', () => {
+    // Recipe with history still opens at qty 1 in its own unit (AC-10).
+    expect(defaultAmount({ mode_qty: 2, mode_unit: 'g', serving: null, sourceKind: 'db-recipe', recipe_serving_unit: 'slice' }))
+      .toEqual({ qty: 1, unit: 'slice' });
+    // Recipe without a serving label falls back to the existing chain.
+    expect(defaultAmount({ mode_qty: 2, mode_unit: 'g', serving: null, sourceKind: 'db-recipe', recipe_serving_unit: null }))
+      .toEqual({ qty: 2, unit: 'g' });
+    // Non-recipe picks keep today's defaults: mode → feed serving → 100 g.
+    expect(defaultAmount({ mode_qty: 40, mode_unit: 'g', serving: { size: 15, unit: 'g' }, sourceKind: 'db-food', recipe_serving_unit: null }))
+      .toEqual({ qty: 40, unit: 'g' });
+    expect(defaultAmount({ mode_qty: null, mode_unit: null, serving: { size: 310.5, unit: 'ml' }, sourceKind: 'off', recipe_serving_unit: null }))
+      .toEqual({ qty: 310.5, unit: 'ml' });
+    expect(defaultAmount({ mode_qty: null, mode_unit: null, serving: null, sourceKind: 'usda', recipe_serving_unit: null }))
+      .toEqual({ qty: 100, unit: 'g' });
   });
 });

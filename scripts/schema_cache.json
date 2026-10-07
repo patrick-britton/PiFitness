@@ -2995,6 +2995,553 @@
       "type": "text"
     }
   ],
+  "food.diary_entries": [
+    {
+      "name": "entry_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "food_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "name_snapshot",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "kcal_per_100g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "protein_g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "fat_g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "carbs_g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "fiber_g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "sugars_g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "sodium_mg",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "caffeine_mg",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "is_partial",
+      "nullable": false,
+      "type": "boolean"
+    },
+    {
+      "name": "qty",
+      "nullable": false,
+      "type": "double precision"
+    },
+    {
+      "name": "unit",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "kcal",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "logged_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "created_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "food.foods": [
+    {
+      "name": "food_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "name",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "source",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "fdc_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "barcode",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "kcal_per_100g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "protein_g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "fat_g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "carbs_g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "fiber_g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "sugars_g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "sodium_mg",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "caffeine_mg",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "serving_size",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "serving_unit",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "serving_text",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "nutrients_raw",
+      "nullable": true,
+      "type": "jsonb"
+    },
+    {
+      "name": "normalized_from",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "needs_review",
+      "nullable": false,
+      "type": "boolean"
+    },
+    {
+      "name": "review_reason",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "quality_score",
+      "nullable": false,
+      "type": "double precision"
+    },
+    {
+      "name": "is_deleted",
+      "nullable": false,
+      "type": "boolean"
+    },
+    {
+      "name": "deleted_at",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "created_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "food.recipe_cook_states": [
+    {
+      "name": "recipe_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "checked_steps",
+      "nullable": false,
+      "type": "jsonb"
+    },
+    {
+      "name": "checked_foods",
+      "nullable": false,
+      "type": "jsonb"
+    },
+    {
+      "name": "timers",
+      "nullable": false,
+      "type": "jsonb"
+    },
+    {
+      "name": "updated_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "food.recipe_ingredients": [
+    {
+      "name": "recipe_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "ingredient_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "food_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "qty",
+      "nullable": false,
+      "type": "double precision"
+    },
+    {
+      "name": "unit",
+      "nullable": false,
+      "type": "text"
+    }
+  ],
+  "food.recipe_step_foods": [
+    {
+      "name": "recipe_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "step_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "food_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "qty",
+      "nullable": false,
+      "type": "double precision"
+    },
+    {
+      "name": "unit",
+      "nullable": false,
+      "type": "text"
+    }
+  ],
+  "food.recipe_steps": [
+    {
+      "name": "step_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "recipe_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "step_no",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "instruction",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "timer_seconds",
+      "nullable": true,
+      "type": "integer"
+    }
+  ],
+  "food.recipes": [
+    {
+      "name": "recipe_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "title",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "category",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "times_prepared",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "food_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "is_deleted",
+      "nullable": false,
+      "type": "boolean"
+    },
+    {
+      "name": "deleted_at",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "created_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "servings_count",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "serving_unit",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
+  "food.tri_tip_events": [
+    {
+      "name": "tri_tip_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "weight_lbs",
+      "nullable": false,
+      "type": "numeric"
+    },
+    {
+      "name": "shape",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "target_internal_temp_f",
+      "nullable": false,
+      "type": "numeric"
+    },
+    {
+      "name": "status",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "started_at",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "completed_at",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "label",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "notes",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "created_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "food.tri_tip_readings": [
+    {
+      "name": "reading_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "tri_tip_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "recorded_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "grill_temp_f",
+      "nullable": false,
+      "type": "numeric"
+    },
+    {
+      "name": "internal_temp_f",
+      "nullable": false,
+      "type": "numeric"
+    },
+    {
+      "name": "note",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "created_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "food.vw_food_search": [
+    {
+      "name": "food_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "source",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "kcal_per_100g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "caffeine_mg",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "quality_score",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "needs_review",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "rank_score",
+      "nullable": true,
+      "type": "double precision"
+    }
+  ],
+  "food.vw_usual_foods": [
+    {
+      "name": "food_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "source",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "kcal_per_100g",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "quality_score",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "times_eaten",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "hour_weight",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "mode_qty",
+      "nullable": true,
+      "type": "double precision"
+    },
+    {
+      "name": "mode_unit",
+      "nullable": true,
+      "type": "text"
+    }
+  ],
   "health.body_battery_raw": [
     {
       "name": "ts_utc",

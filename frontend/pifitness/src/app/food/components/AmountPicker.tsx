@@ -1,13 +1,21 @@
-/** Shared amount picker T06: qty+unit once for diary/recipe logging. */
+/** Shared amount picker T06: qty+unit once for diary/recipe logging.
+ * 010-005 T10: `extraUnit` offers one caller-supplied label (a recipe's own
+ * serving unit, e.g. `pancake`) alongside the closed unit set — the union
+ * stays closed for every other consumer. */
 'use client';
 import { useState } from 'react';
 const UNITS = ['g', 'ml', 'tsp', 'tbsp', 'fl oz', 'cup', 'oz', 'serving'] as const;
-export type AmountUnit = (typeof UNITS)[number];
+export type AmountUnit = (typeof UNITS)[number] | (string & {});
 export interface Amount { qty: number; unit: AmountUnit; }
-export default function AmountPicker({ value, onChange }: { value?: Amount; onChange?: (a: Amount) => void }) {
+export default function AmountPicker({ value, onChange, extraUnit }: {
+  value?: Amount; onChange?: (a: Amount) => void; extraUnit?: string | null;
+}) {
   const [qty, setQty] = useState(value?.qty ?? 100);
   const [unit, setUnit] = useState<AmountUnit>(value?.unit ?? 'g');
   const emit = (nq: number, nu: AmountUnit) => onChange?.({ qty: nq, unit: nu });
+  const options = extraUnit && !UNITS.includes(extraUnit as (typeof UNITS)[number])
+    ? [...UNITS, extraUnit]
+    : [...UNITS];
   return (
     <div className="flex items-center gap-2" aria-label="Amount picker">
       <label className="sr-only" htmlFor="amount-qty">Quantity</label>
@@ -17,7 +25,7 @@ export default function AmountPicker({ value, onChange }: { value?: Amount; onCh
       <label className="sr-only" htmlFor="amount-unit">Unit</label>
       <select id="amount-unit" value={unit} onChange={(e) => { const nu = e.target.value as AmountUnit; setUnit(nu); emit(qty, nu); }}
         className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white">
-        {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+        {options.map((u) => <option key={u} value={u}>{u}</option>)}
       </select>
     </div>
   );

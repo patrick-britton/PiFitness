@@ -5,11 +5,11 @@
  * Behaviour only (jsdom has no layout engine): day navigation, the three-bar
  * stats summary, the edit popup (live kcal + Save), the undo-vs-confirm delete,
  * and the add-entry mode toggle. The camera scanner is stubbed (camera/wasm is
- * client-only) so the shared FoodFinder still mounts in add mode.
+ * client-only) so the shared FoodSearchPicker still mounts in add mode.
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Diary from '../Diary';
 import { API } from '@/lib/api-client';
@@ -158,5 +158,21 @@ describe('Diary', () => {
     expect(screen.getByRole('dialog', { name: /Edit Banana/i })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Cancel$/i }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('010-005 T10: editing a logged recipe entry keeps its own serving unit label', async () => {
+    const user = userEvent.setup();
+    const recipeMeal = { ...MEAL, entry_id: 9, name_snapshot: 'Pancakes', qty: 3, unit: 'pancake', kcal: 300 };
+    diary.mockResolvedValue([recipeMeal]);
+    updateDiaryEntry.mockResolvedValue(recipeMeal);
+    render(<Diary />);
+    await user.click(await screen.findByText('Pancakes'));
+    const dialog = await screen.findByRole('dialog', { name: /Edit Pancakes/i });
+    const sel = within(dialog).getByLabelText('Unit') as HTMLSelectElement;
+    expect(sel.value).toBe('pancake');
+    expect(within(dialog).getByRole('option', { name: 'pancake' })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: /^Save$/i }));
+    await waitFor(() => expect(updateDiaryEntry).toHaveBeenCalledWith(
+      9, expect.objectContaining({ qty: 3, unit: 'pancake' })));
   });
 });

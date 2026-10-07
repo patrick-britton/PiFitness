@@ -87,9 +87,15 @@ import {
   DiaryUpdateRequest,
   LogEntryRequest,
   LogApiEntryRequest,
+  PersistApiFoodRequest,
+  PersistApiFoodResponse,
   CombinedSearchResult,
   NutrientSnapshot,
   RecipeSummary,
+  RecipeDetail,
+  CookState,
+  CookStateUpdate,
+  SaveRecipeRequest,
   FoodListResponse,
   FoodRow,
 } from './types/food-contract';
@@ -843,6 +849,47 @@ export const API = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    /** Persist-only an API hit into foods.foods — recipe-create picks (010-005 T12, OQ-3). */
+    persistApiFood: (body: PersistApiFoodRequest) =>
+      fetchAPI<PersistApiFoodResponse>('/api/food/persist', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    /** Save a recipe — snapshot recipe-food row + servings (010-005 T06). */
+    saveRecipe: (body: SaveRecipeRequest) =>
+      fetchAPI<RecipeSummary>('/api/food/recipes', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    /** Full recipe for cook/edit screens (010-005 T08). */
+    recipeDetail: (recipeId: number) =>
+      fetchAPI<RecipeDetail>(`/api/food/recipes/${recipeId}`),
+    /** Active cook session — empty lists = no session (010-005 T08). */
+    getCookState: (recipeId: number) =>
+      fetchAPI<CookState>(`/api/food/recipes/${recipeId}/cook`),
+    /** Full replace of the cook session: checks + absolute timer deadlines (010-005 T08). */
+    saveCookState: (recipeId: number, body: CookStateUpdate) =>
+      fetchAPI<CookState>(`/api/food/recipes/${recipeId}/cook`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    /** Finish cooking — times_prepared += 1, cook state cleared (010-005 T08). */
+    completeRecipe: (recipeId: number) =>
+      fetchAPI<RecipeSummary>(`/api/food/recipes/${recipeId}/complete`, {
+        method: 'POST',
+      }),
+    /** Full replace of a recipe — edit flow re-saves the snapshot (010-005 T09). */
+    updateRecipe: (recipeId: number, body: SaveRecipeRequest) =>
+      fetchAPI<RecipeSummary>(`/api/food/recipes/${recipeId}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
+    /** Soft-delete recipe + its source='recipe' food row (010-005 T09). */
+    deleteRecipe: (recipeId: number) =>
+      fetchAPI<{ success: boolean; recipe_id: number; food_id: number | null }>(
+        `/api/food/recipes/${recipeId}`,
+        { method: 'DELETE' },
+      ),
     /** Alive food row by barcode for the scan-first DB check (010-003 T08). */
     byBarcode: (barcode: string) =>
       fetchAPI<{

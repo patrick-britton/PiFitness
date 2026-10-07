@@ -10,6 +10,10 @@ DB: existing `food` schema alongside tri-tip tables.
 010-003 (Diary): DiaryStats, DiaryUpdateRequest, CombinedSearchResult,
 LogApiEntryRequest; FDA-label unit table; device-local day; entry-moves-day;
 tiered ranking with completeness gate + plausibility penalties.
+010-005 (Recipe Box): RecipeIngredient, RecipeStepDetail, RecipeDetail,
+CookState (+Update); SaveRecipeRequest += ingredients/servings; category
+set Breakfast|Lunch|Dinner|Side|Dessert|Drink ('Appetizer' removed, OQ-1);
+grams-per-unit derived into food.foods.serving_size (OQ-2).
 """
 
 from typing import List, Literal, Optional
@@ -18,7 +22,7 @@ from pydantic import BaseModel, Field
 
 FoodSource = Literal["api", "db", "recipe"]
 RecipeCategory = Literal[
-    "Breakfast", "Lunch", "Dinner", "Dessert", "Drink", "Appetizer"
+    "Breakfast", "Lunch", "Dinner", "Side", "Dessert", "Drink"
 ]
 
 
@@ -113,9 +117,86 @@ class RecipeStep(BaseModel):
     foods: List[RecipeStepFood] = Field(default_factory=list)
 
 
+# ---------------------------------------------------------------------------
+# 010-005 (Recipe Box) additions — mirrors food-contract.ts.
+# ---------------------------------------------------------------------------
+
+class RecipeIngredient(BaseModel):
+    """One line of a recipe's predefined ingredient list.
+
+    `name` is read-side only (GET detail joins food.foods once); writes
+    carry food_id + qty + unit and the server derives the name.
+    """
+
+    food_id: int
+    qty: float = Field(..., gt=0)
+    unit: str
+    name: Optional[str] = None
+
+
+class RecipeStepDetail(BaseModel):
+    """A stored step as served to the cook/create screens (with names)."""
+
+    step_no: int = Field(..., ge=1)
+    instruction: str
+    timer_seconds: Optional[int] = Field(None, ge=0)
+    foods: List[RecipeIngredient] = Field(default_factory=list)
+
+
+class RecipeDetail(BaseModel):
+    """GET /api/food/recipes/{id} — full recipe for create-view/cook mode.
+
+    servings_count/serving_unit are NULL only for rows predating the
+    010-005 DDL; every new save requires them.
+    """
+
+    recipe_id: int
+    title: str
+    category: RecipeCategory
+    times_prepared: int = Field(..., ge=0)
+    food_id: Optional[int] = None
+    servings_count: Optional[int] = Field(None, gt=0)
+    serving_unit: Optional[str] = None
+    ingredients: List[RecipeIngredient] = Field(default_factory=list)
+    steps: List[RecipeStepDetail] = Field(default_factory=list)
+
+
+class CookFoodCheck(BaseModel):
+    """Identity of one checked ingredient line inside a step."""
+
+    step_no: int = Field(..., ge=1)
+    food_id: int
+    unit: str
+
+
+class CookTimer(BaseModel):
+    """One running timer as an absolute deadline (survives sleep/off)."""
+
+    step_no: int = Field(..., ge=1)
+    ends_at: str  # ISO-8601 instant
+
+
+class CookStateUpdate(BaseModel):
+    """PUT body for /recipes/{id}/cook — full replace of the session."""
+
+    checked_steps: List[int] = Field(default_factory=list)
+    checked_foods: List[CookFoodCheck] = Field(default_factory=list)
+    timers: List[CookTimer] = Field(default_factory=list)
+
+
+class CookState(CookStateUpdate):
+    """GET /api/food/recipes/{id}/cook — empty lists = no active session."""
+
+    recipe_id: int
+    updated_at: Optional[str] = None
+
+
 class SaveRecipeRequest(BaseModel):
     title: str
     category: RecipeCategory
+    ingredients: List[RecipeIngredient] = Field(min_length=1)
+    servings_count: int = Field(..., gt=0)
+    serving_unit: str = Field(..., min_length=1)
     steps: List[RecipeStep] = Field(default_factory=list)
 
 
@@ -223,3 +304,18 @@ class LogApiEntryRequest(BaseModel):
     query: Optional[str] = None
     rank: Optional[int] = Field(None, ge=0)
     result_source: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# 010-005 T12 (OQ-3) additions — persist-only pick; mirrors food-contract.ts.
+# ---------------------------------------------------------------------------
+
+
+class PersistApiFoodRequest(BaseModel):
+    """Payload half of LogApiEntryRequest — persist WITHOUT a diary write."""
+    usda_payload: Optional[ApiFoodPayload] = None
+    off_payload: Optional[ApiFoodPayload] = None
+
+
+class PersistApiFoodResponse(BaseModel):
+    food_id: int
