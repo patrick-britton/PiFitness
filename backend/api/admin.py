@@ -48,6 +48,20 @@ from backend_functions.queries import (
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
+def _failed_run_message(failed) -> str:
+    """Aggregate per-task reasons into the async-run error_message (004-005 T11).
+
+    Keeps the count prefix the UI already parses while appending the
+    underlying `<task_name>: <error>` detail so a failed run surfaces its
+    real reason instead of a bare count.
+    """
+    details = "; ".join(
+        f"{r.get('task_name', r.get('task_id', '?'))}: {r.get('error', 'failed')}"
+        for r in failed
+    )
+    return f"Task execution completed with {len(failed)} failure(s): {details}"
+
+
 # Pydantic models for request bodies
 class TaskConfigEdit(BaseModel):
     task_frequency: str
@@ -250,7 +264,7 @@ def execute_task_v2_async(task_name: str, request: Optional[TaskExecuteRequest] 
                         execution_id,
                         status='failed',
                         result=result,
-                        error_message=f"Task execution completed with {len(failed)} failure(s)"
+                        error_message=_failed_run_message(failed)
                     )
                 else:
                     update_task_execution(

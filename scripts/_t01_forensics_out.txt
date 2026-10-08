@@ -1,0 +1,310 @@
+﻿
+=== 1. live activities.resample_activity_to_distance body ===
+  -- activities.resample_activity_to_distance (oid 19690)
+CREATE OR REPLACE PROCEDURE activities.resample_activity_to_distance(IN p_activity_id bigint)
+ LANGUAGE plpgsql
+AS $procedure$
+
+BEGIN
+
+    -- 1. Cleanup existing records for this activity
+
+    DELETE FROM activities.activity_details_distance WHERE activity_id = p_activity_id;
+
+
+
+    INSERT INTO activities.activity_details_distance (
+
+        activity_type_id, activity_id, distance_m, elapsed_duration_ms,
+
+        latitude, longitude, heartrate_bpm, cadence_spm, air_temp_c,
+
+        elevation_m, speed_mmps, vertical_speed_mps, vert_oscillation_cm,
+
+        stride_length_cm, vert_ratio, ground_contact_time_ms,
+
+        ground_contact_balance_left, performance_condition, loc_point
+
+    )
+
+    WITH  base as (
+
+        SELECT
+
+            activity_type_id, activity_id,
+
+            distance_mm,
+
+            elapsed_duration_s,
+
+            latitude, longitude,
+
+            elevation_m_smooth as elevation_m, heartrate_bpm, cadence_spm, air_temp_c,
+
+            speed_mmps, vertical_speed_mps, vert_oscillation_cm,
+
+            stride_length_cm, vert_ratio, ground_contact_time_ms,
+
+            ground_contact_balance_left, performance_condition
+
+        FROM activities.activity_details
+
+            where activity_id = p_activity_id --20678335982
+
+                  )
+
+
+
+        , normalized_base as (
+
+            select activity_type_id, activity_id,
+
+            distance_mm - (SELECT MIN(distance_mm) FROM base) as distance_mm,
+
+            elapsed_duration_s,
+
+            latitude, longitude,
+
+            elevation_m, heartrate_bpm, cadence_spm, air_temp_c,
+
+            speed_mmps, vertical_speed_mps, vert_oscillation_cm,
+
+            stride_length_cm, vert_ratio, ground_contact_time_ms,
+
+            ground_contact_balance_left, performance_condition from base
+
+
+
+        )
+
+
+
+
+
+
+
+
+
+        ,segment_bounds AS (
+
+        -- Create pairs of points (current and next) for all metrics
+
+        SELECT
+
+            activity_type_id, activity_id,
+
+            (distance_mm / 1000.0) AS d1,
+
+            LEAD(distance_mm / 1000.0) OVER (ORDER BY elapsed_duration_s) AS d2,
+
+            (elapsed_duration_s * 1000) AS t1,
+
+            LEAD(elapsed_duration_s * 1000) OVER (ORDER BY elapsed_duration_s) AS t2,
+
+            -- Spatial
+
+            latitude AS lat1, LEAD(latitude) OVER (ORDER BY elapsed_duration_s) AS lat2,
+
+            longitude AS lon1, LEAD(longitude) OVER (ORDER BY elapsed_duration_s) AS lon2,
+
+            -- Core Metrics
+
+            elevation_m::float AS ele1, LEAD(elevation_m::float) OVER (ORDER BY elapsed_duration_s) AS ele2,
+
+            heartrate_bpm::float AS hr1, LEAD(heartrate_bpm::float) OVER (ORDER BY elapsed_duration_s) AS hr2,
+
+            cadence_spm::float AS cad1, LEAD(cadence_spm::float) OVER (ORDER BY elapsed_duration_s) AS cad2,
+
+            air_temp_c::float AS tmp1, LEAD(air_temp_c::float) OVER (ORDER BY elapsed_duration_s) AS tmp2,
+
+            speed_mmps::float AS spd1, LEAD(speed_mmps::float) OVER (ORDER BY elapsed_duration_s) AS spd2,
+
+            -- Advanced Metrics
+
+            vertical_speed_mps::float AS v_spd1, LEAD(vertical_speed_mps::float) OVER (ORDER BY elapsed_duration_s) AS v_spd2,
+
+            vert_oscillation_cm::float AS v_osc1, LEAD(vert_oscillation_cm::float) OVER (ORDER BY elapsed_duration_s) AS v_osc2,
+
+            stride_length_cm::float AS strd1, LEAD(stride_length_cm::float) OVER (ORDER BY elapsed_duration_s) AS strd2,
+
+            vert_ratio::float AS v_rat1, LEAD(vert_ratio::float) OVER (ORDER BY elapsed_duration_s) AS v_rat2,
+
+            ground_contact_time_ms::float AS gct1, LEAD(ground_contact_time_ms::float) OVER (ORDER BY elapsed_duration_s) AS gct2,
+
+            ground_contact_balance_left::float AS gcb1, LEAD(ground_contact_balance_left::float) OVER (ORDER BY elapsed_duration_s) AS gcb2,
+
+            performance_condition::float AS perf1, LEAD(performance_condition::float) OVER (ORDER BY elapsed_duration_s) AS perf2
+
+        FROM normalized_base
+
+    )
+
+         ,distance_grid AS (
+
+             -- Generate one row for every meter from 0 to total distance
+
+             SELECT m as dist_m
+
+             FROM generate_series(
+
+                          0,
+
+                          (SELECT (MAX(distance_mm)/1000)::int FROM normalized_base
+
+                          )
+
+                  ) m
+
+         )
+
+
+
+         ,interpolated AS (
+
+             -- Match each meter-mark to the corresponding original segment
+
+             SELECT
+
+                 s.*, g.dist_m AS target_dist,
+
+                 CASE
+
+                     WHEN s.d2 IS NULL then 0
+
+                     WHEN s.d2 = s.d1 THEN 0
+
+                     ELSE (g.dist_m - s.d1) / (s.d2 - s.d1)
+
+                     END AS f
+
+             FROM distance_grid g
+
+                      JOIN segment_bounds s ON g.dist_m >= s.d1 AND (g.dist_m < s.d2 OR (s.d2 IS NULL AND g.dist_m = s.d1))
+
+         )
+
+    SELECT
+
+        activity_type_id, activity_id, target_dist,
+
+        round(t1 + (COALESCE(t2,t1) - t1) * f)::integer AS elapsed_duration_ms,
+
+        (lat1 + (COALESCE(lat2,lat1) - lat1) * f)::numeric(9,6) AS latitude,
+
+        (lon1 + (COALESCE(lon2,lon1) - lon1) * f)::numeric(9,6) AS longitude,
+
+        round(hr1 + (COALESCE(hr2,hr1) - hr1) * f)::smallint AS heartrate_bpm,
+
+        round(cad1 + (COALESCE(cad2,cad1) - cad1) * f)::smallint AS cadence_spm,
+
+        round(tmp1 + (COALESCE(tmp2,tmp1) - tmp1) * f)::smallint AS air_temp_c,
+
+        round(ele1 + (COALESCE(ele2,ele1) - ele1) * f)::numeric(7,2) AS elevation_m,
+
+        round(spd1 + (COALESCE(spd2,spd1) - spd1) * f)::bigint AS speed_mmps,
+
+        round(v_spd1 + (COALESCE(v_spd2,v_spd1) - v_spd1) * f)::numeric(5,1) AS vertical_speed_mps,
+
+        round(v_osc1 + (COALESCE(v_osc2,v_osc1) - v_osc1) * f)::numeric(5,2) AS vert_oscillation_cm,
+
+        round(strd1 + (COALESCE(strd2,strd1) - strd1) * f)::numeric(4,1) AS stride_length_cm,
+
+        round(v_rat1 + (COALESCE(v_rat2,v_rat1) - v_rat1) * f)::numeric(4,2) AS vert_ratio,
+
+        round(gct1 + (COALESCE(gct2,gct1) - gct1) * f)::smallint AS ground_contact_time_ms,
+
+        round(gcb1 + (COALESCE(gcb2,gcb1) - gcb1) * f)::numeric(4,2) AS ground_contact_balance_left,
+
+        round(perf1 + (COALESCE(perf2,perf1) - perf1) * f)::smallint AS performance_condition,
+
+        st_makepoint((lon1 + (COALESCE(lon2,lon1) - lon1) * f)::numeric(9,6) ,(lat1 + (COALESCE(lat2,lat1) - lat1) * f)::numeric(9,6))
+
+    FROM interpolated
+
+    ON CONFLICT(activity_id, distance_m) DO UPDATE
+
+    set elevation_m = EXCLUDED.elevation_m;
+
+
+
+    UPDATE activities.activity_details_distance
+
+     SET elevation_m_smooth = elevation_m
+
+    where elevation_m_smooth is null and activity_id = p_activity_id;
+
+
+
+    CALL activities.assign_elevation_reference_distance(p_activity_id);
+
+
+
+END;
+
+$procedure$
+
+
+=== 2. constraints + indexes on activities.activity_details_distance ===
+  constraints (3):
+    [n] activity_details_distance_activity_id_not_null: NOT NULL activity_id
+    [n] activity_details_distance_distance_m_not_null: NOT NULL distance_m
+    [p] activity_details_distance_pkey: PRIMARY KEY (activity_id, distance_m)
+  indexes (5):
+    CREATE INDEX activity_details_activity_id_distance_mm_idx_dist ON activities.activity_details_distance USING btree (activity_id, distance_m)
+    CREATE UNIQUE INDEX activity_details_distance_pkey ON activities.activity_details_distance USING btree (activity_id, distance_m)
+    CREATE INDEX idx_act_detail_lat_lon_dist ON activities.activity_details_distance USING btree (latitude, longitude)
+    CREATE INDEX idx_large_table_loc_point_dist ON activities.activity_details_distance USING gist (loc_point)
+    CREATE INDEX idx_loc_point_grid_dist ON activities.activity_details_distance USING gist (grid_5m_00_id)
+
+=== 3. candidate activities (error-log id + processing queue) ===
+  candidates: [20678335982, 3262162962, 3259650230, 3252286731]
+
+=== 4. source-row probes on activities.activity_details ===
+  duplicate (activity_id, elapsed_duration_s) rows: 0
+  duplicate (activity_id, distance_mm) rows: 50
+    act 3252286731 @ 625850mm x 3
+    act 3252286731 @ 654830mm x 2
+    act 3252286731 @ 1370480mm x 6
+    act 3252286731 @ 1395310mm x 2
+    act 3252286731 @ 2212770mm x 2
+    act 3252286731 @ 2708880mm x 2
+    act 3252286731 @ 4153740mm x 2
+    act 3252286731 @ 4525470mm x 2
+    act 3252286731 @ 4549530mm x 3
+    act 3252286731 @ 4877870mm x 2
+  non-monotonic distance_mm (ordered by elapsed_duration_s):
+    act 3252286731: 1 backwards steps
+    act 3259650230: 1 backwards steps
+    act 3262162962: 3 backwards steps
+
+=== 5. duplicate target_dist in the failing INSERT source (replicated as SELECT) ===
+  act 20678335982: no duplicate target_dist - source is clean
+  act 3262162962: 20+ duplicate target_dist values (first: [(4318.0, 2), (4319.0, 2), (8059.0, 2), (8060.0, 2), (8061.0, 2)])
+  act 3259650230: 15+ duplicate target_dist values (first: [(9031.0, 2), (9032.0, 2), (9033.0, 2), (9034.0, 2), (9035.0, 2)])
+  act 3252286731: 20+ duplicate target_dist values (first: [(1363.0, 2), (1364.0, 2), (1365.0, 2), (1366.0, 2), (1367.0, 2)])
+
+=== 6. timing probes (restore-window hypothesis) ===
+  queue entries:
+    act 3252286731: queued 2026-10-07 14:42:27.503378-07:00 x1
+    act 3259650230: queued 2026-10-07 14:42:27.503378-07:00 x1
+    act 3262162962: queued 2026-10-07 14:42:27.503378-07:00 x1
+  activity start times:
+    act 3252286731: 2018-12-27 12:58:24-08:00
+    act 3259650230: 2018-12-30 11:09:18-08:00
+    act 3262162962: 2018-12-31 10:46:00-08:00
+    act 20678335982: 2025-10-13 08:23:21-07:00
+  duplicate-distance groups (timestamp spread):
+    act 3252286731 @ 1370480mm x6 [2018-12-27 13:25:54-08:00 .. 2018-12-27 13:32:48-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 4549530mm x3 [2018-12-27 13:55:06-08:00 .. 2018-12-27 13:58:10-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 5469230mm x3 [2018-12-27 14:02:32-08:00 .. 2018-12-27 14:20:32-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 13472230mm x3 [2018-12-27 14:56:05-08:00 .. 2018-12-27 14:56:07-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 625850mm x3 [2018-12-27 13:00:16-08:00 .. 2018-12-27 13:23:06-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 4153740mm x2 [2018-12-27 13:50:56-08:00 .. 2018-12-27 13:51:12-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 4525470mm x2 [2018-12-27 13:52:56-08:00 .. 2018-12-27 13:54:43-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 4877870mm x2 [2018-12-27 13:59:16-08:00 .. 2018-12-27 13:59:21-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 4886460mm x2 [2018-12-27 13:59:33-08:00 .. 2018-12-27 13:59:43-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 5360030mm x2 [2018-12-27 14:01:09-08:00 .. 2018-12-27 14:02:02-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 5468740mm x2 [2018-12-27 14:02:30-08:00 .. 2018-12-27 14:02:31-08:00] spread(GPS drift/pauses)
+    act 3252286731 @ 6447220mm x2 [2018-12-27 14:23:10-08:00 .. 2018-12-27 14:23:29-08:00] spread(GPS drift/pauses)
+
+=== done - read-only; no writes issued ===

@@ -461,6 +461,7 @@ export default function TaskList() {
         task_frequency: r.task_frequency ?? null,
         consecutive_failures: r.consecutive_failures ?? 0,
         is_active_failure: !!r.is_active_failure,
+        last_failure_message: r.last_failure_message != null ? String(r.last_failure_message) : null,
         last_executed_utc: r.last_executed_utc ?? null,
         last_execution_utc: r.last_execution_utc ?? null,
         last_executed: r.last_executed ?? null,
@@ -658,13 +659,13 @@ export default function TaskList() {
     return `${minutes.toFixed(1)} min`;
   }
 
-  function getStatusBadge(isFailure: boolean) {
+  function getStatusBadge(isFailure: boolean, failureMessage?: string | null) {
     const label = isFailure ? 'Error' : 'Success';
     const colorClass = isFailure
       ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
       : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
+      <span title={isFailure && failureMessage ? failureMessage : undefined} className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
         {label}
       </span>
     );
@@ -890,7 +891,14 @@ export default function TaskList() {
                     </td>
                     {!isPortrait && (
                       <>
-                        <td className="px-4 py-3">{getStatusBadge(!!row.is_active_failure)}</td>
+                        <td className="px-4 py-3">
+                          {getStatusBadge(!!row.is_active_failure, row.last_failure_message)}
+                          {!!row.is_active_failure && !!row.last_failure_message && (
+                            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 max-w-[280px] break-words">
+                              {row.last_failure_message}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           <span
                             title={lastExecutedUtc ? new Date(lastExecutedUtc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }) : '-'}
@@ -912,13 +920,18 @@ export default function TaskList() {
                     {isPortrait && (
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1 min-w-[140px]">
-                          <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium w-full text-center whitespace-nowrap ${
+                          <span title={row.is_active_failure && row.last_failure_message ? row.last_failure_message : undefined} className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium w-full text-center whitespace-nowrap ${
                             row.is_active_failure
                               ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
                               : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
                           }`}>
                             {row.is_active_failure ? 'Error' : 'Success'}
                           </span>
+                          {row.is_active_failure && row.last_failure_message && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400 text-center break-words">
+                              {row.last_failure_message}
+                            </span>
+                          )}
                           <span
                             title={lastExecutedUtc ? new Date(lastExecutedUtc).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'medium', timeStyle: 'short' }) : '-'}
                             className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium w-full text-center whitespace-nowrap ${lastExecutionChipClass}`}

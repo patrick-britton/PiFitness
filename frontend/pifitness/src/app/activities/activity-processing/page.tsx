@@ -23,6 +23,38 @@ const MUSIC_OPTIONS: { id: Music; label: string }[] = [
   { id: 'no_music', label: 'No Music' },
 ];
 
+/**
+ * Finalize the checklist after a failed/aborted run (AC-3 / Bug 004-005-3):
+ * no step may be left `pending`. The interrupted (`running`) step goes red
+ * with the run's message; if the run died before any step errored (non-OK
+ * response, lock conflict), the first unexecuted step becomes the red failing
+ * step so there is always a visible failing step; every other unstarted step
+ * becomes terminal `skipped`. Steps already terminal keep their state — an
+ * existing `error` keeps its own underlying message.
+ */
+export function finalizeFailedSteps(
+  steps: ProcessStepResult[],
+  message: string
+): ProcessStepResult[] {
+  if (steps.length === 0) return steps;
+  let hasError = steps.some((s) => s.status === 'error');
+  return steps.map((s) => {
+    if (s.status === 'complete' || s.status === 'skipped' || s.status === 'error') {
+      return s;
+    }
+    if (s.status === 'running') {
+      hasError = true;
+      return { ...s, status: 'error' as const, error: s.error ?? message };
+    }
+    // pending
+    if (!hasError) {
+      hasError = true;
+      return { ...s, status: 'error' as const, error: s.error ?? message };
+    }
+    return { ...s, status: 'skipped' as const };
+  });
+}
+
 export default function ActivityProcessingPage() {
   const { layoutVariant } = useViewportStore();
   const { setActiveSubPage } = useUIStore();
@@ -90,11 +122,18 @@ export default function ActivityProcessingPage() {
 
       setSummary(terminal.summary ?? null);
 
-      if (!terminal.success && terminal.error) {
-        setError(terminal.error);
+      if (!terminal.success) {
+        // Terminal failure (step error, lock conflict, etc.) — never strand
+        // steps in `pending`; show the banner with the run's message (AC-3).
+        const message = terminal.error || 'Processing failed';
+        setError(message);
+        setSteps((prev) => finalizeFailedSteps(prev, message));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Processing failed');
+      // Non-OK response or stream cut short — same finalization (AC-3).
+      const message = err instanceof Error ? err.message : 'Processing failed';
+      setError(message);
+      setSteps((prev) => finalizeFailedSteps(prev, message));
     } finally {
       setLoading(false);
     }
@@ -254,7 +293,7 @@ export default function ActivityProcessingPage() {
 
       {/* Error */}
       {error && !loading && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
+        <div role="alert" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
           <p className="text-sm text-red-700 dark:text-red-300">Error: {error}</p>
         </div>
       )}
