@@ -60,6 +60,9 @@ export default function StepChecklist({ steps, loadingStart }: StepChecklistProp
         return (
           <div
             key={step.step_id}
+            data-testid="step-row"
+            data-step-id={step.step_id}
+            data-status={step.status}
             className={`flex items-start gap-3 p-4 rounded-md border ${
               isRunning
                 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'

@@ -16,6 +16,7 @@ type TaskSummaryRow = Record<string, any>;
 interface AugmentedRow {
   task_name: string;
   is_active_failure: boolean;
+  last_failure_message?: string | null;
   last_executed_utc?: string | null;
   last_execution_utc?: string | null;
   last_executed?: string | null;
@@ -65,13 +66,13 @@ function formatDuration(totalMs: number | null): string {
   return `${minutes.toFixed(1)} min`;
 }
 
-function getStatusBadge(isFailure: boolean) {
+function getStatusBadge(isFailure: boolean, failureMessage?: string | null) {
   const label = isFailure ? 'Error' : 'Success';
   const colorClass = isFailure
     ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
     : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
+    <span title={isFailure && failureMessage ? failureMessage : undefined} className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}`}>
       {label}
     </span>
   );
@@ -134,6 +135,7 @@ export default function TaskSummary() {
       return {
         task_name: String(r.task_name ?? r.name ?? 'Unknown'),
         is_active_failure: !!r.is_active_failure,
+        last_failure_message: r.last_failure_message != null ? String(r.last_failure_message) : null,
         last_executed_utc: r.last_executed_utc ?? null,
         last_execution_utc: r.last_execution_utc ?? null,
         last_executed: r.last_executed ?? null,
@@ -221,7 +223,14 @@ export default function TaskSummary() {
               return (
                 <tr key={row.task_name} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{row.task_name}</td>
-                  <td className="px-4 py-3">{getStatusBadge(!!row.is_active_failure)}</td>
+                  <td className="px-4 py-3">
+                    {getStatusBadge(!!row.is_active_failure, row.last_failure_message)}
+                    {!!row.is_active_failure && !!row.last_failure_message && (
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 max-w-[280px] break-words">
+                        {row.last_failure_message}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                     <span
                       title={formatExactTime(lastExecutedUtc)}

@@ -12,6 +12,15 @@ from backend_functions.music_functions import get_playlist_list
 from backend_functions.service_logins import get_spotify_client
 
 
+class NoWorkToSync(Exception):
+    """The extractor's work-queue iterator is empty — nothing was requested.
+
+    Distinct from an API failure (004-005 OQ-4a / Bug 004-005-6): the runner
+    treats this as a successful no-op (informational log, success reconcile)
+    instead of 'No API response to load'.
+    """
+
+
 def extract_json_limit_50(client=None, td=None):
     curr_ts = int(datetime.now(pytz.UTC).timestamp() * 1000)
     args= {
@@ -534,6 +543,18 @@ def extract_pirate_universal(client=None, td=None, aid=None):
     else:
         print(f"Unknown loop strategy: {loop_strategy}")
         return []
+
+    if not iter_list:
+        # Empty work queue (e.g. vw_activity_ids_to_sync has no eligible rows):
+        # nothing was requested, so this is a successful no-op — NOT an API
+        # failure. The runner catches NoWorkToSync and reconciles success.
+        # (004-005 OQ-4a / Bug 004-005-6; canonical message, distinct from
+        # 'No API response to load'.)
+        raise NoWorkToSync(
+            f"No work to sync for Task #{td.get('task_id')}: "
+            f"{td.get('task_name')} (loop_strategy={loop_strategy}; "
+            f"work queue is empty)"
+        )
 
     # 2. Extract routing instructions
     path_keys = safe_parse(td.get('iter_path_keys'), [])

@@ -159,10 +159,21 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
                         continue
 
                 task_fail, client_dict = extract_load_flatten(client_dict, task_dict)
+                if task_fail:
+                    # Detailed message surfaced by the helper (T02 pattern for
+                    # the extract/load/SPROC paths — Bug 004-005-4); the single
+                    # outer reconcile below writes it.
+                    fail_msg = task_fail if isinstance(task_fail, str) else None
 
             if run_python and not task_fail:
                 print(f"Starting Python Execution for task #{task_id} : {task_name}")
-                task_fail = execute_python(d=task_dict)
+                py_fail = execute_python(d=task_dict)
+                task_fail = bool(py_fail)
+                if task_fail:
+                    # Underlying failure message (e.g. the aggregate
+                    # activity_post_processing error with failed activity ids)
+                    # so reconcile/results carry the real reason (Bug 004-005-2).
+                    fail_msg = py_fail
 
             if not task_fail:
                 print(f"{task_name}: Successful")
@@ -173,7 +184,7 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
                               data_event='Complete')
                 reconcile_task_dates(task_dict)
             else:
-                error_msg = f"Task execution failed for {task_name}"
+                error_msg = fail_msg or f"Task execution failed for {task_name}"
                 log_app_event(cat=f"Task #{task_id}: {task_name}",
                               desc=f"Task Failed",
                               err=error_msg,
@@ -223,7 +234,12 @@ def extract_load_flatten(cd, td):
         td: Task dictionary
 
     Returns:
-        tuple: (task_fail, client_dict)
+        tuple: (task_fail, client_dict) where task_fail is None on success
+        or the failure message (str) on failure. The caller
+        (ultimate_task_executioner) reconciles the task unconditionally, so no
+        reconcile happens here — this avoids the double consecutive_failures
+        increment and keeps the detailed message as the final
+        last_failure_message (Bug 004-005-4; T02 pattern).
     """
     # Ensure client is established
     if not cd:
@@ -241,8 +257,7 @@ def extract_load_flatten(cd, td):
                       err=err_msg,
                       task_id=td.get('task_id'),
                       data_event='Login')
-        reconcile_task_dates(td, task_fail=True, e=err_msg)
-        return True, None
+        return err_msg, None
 
     if not cd.get('client'):
         error_msg = 'No client within dictionary'
@@ -251,8 +266,7 @@ def extract_load_flatten(cd, td):
                       err=error_msg,
                       task_id=td.get('task_id'),
                       data_event='Login')
-        reconcile_task_dates(td, task_fail=True, e=error_msg)
-        return True, None
+        return error_msg, None
 
     extract_function_name = td.get('python_extraction_function')
     module_name = 'backend_functions.json_extractors'
@@ -268,8 +282,7 @@ def extract_load_flatten(cd, td):
                       err=error_msg,
                       task_id=td.get('task_id'),
                       data_event='Module')
-        reconcile_task_dates(td, task_fail=True, e=f"Failed To get extraction Function {e}")
-        return True, cd
+        return f"Failed To get extraction Function {e}", cd
 
     # Extract JSON
     print(f"Extracting data for Task #{td.get('task_id')}: {td.get('task_name')}: Function: {local_function}")
@@ -285,6 +298,21 @@ def extract_load_flatten(cd, td):
                           data_event='Extract')
         print(f"Data Extraction Success for Task #{td.get('task_id')}: {td.get('task_name')}")
     except Exception as e:
+        from backend_functions.json_extractors import NoWorkToSync
+        if isinstance(e, NoWorkToSync):
+            # Empty work queue = successful no-op (004-005 OQ-4a / Bug 004-005-6):
+            # nothing was requested, so no API calls were attempted and there is
+            # nothing to load/flatten. Informational log + sentinel return; the
+            # caller reconciles success (no consecutive_failures increment).
+            # Canonical message — distinct from 'No API response to load'.
+            no_work_msg = str(e)
+            print(no_work_msg)
+            log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",
+                          desc=no_work_msg,
+                          exec_time=elapsed_ms(t0),
+                          task_id=td.get('task_id'),
+                          data_event='No work to sync')
+            return None, cd
         error_msg = f"Extraction error: {str(e)}"
         print(f"Data Extraction Failed for Task #{td.get('task_id')}: {td.get('task_name')} : {e}")
         json_data = None
@@ -293,8 +321,7 @@ def extract_load_flatten(cd, td):
                       err=error_msg,
                       task_id=td.get('task_id'),
                       data_event='Extract')
-        reconcile_task_dates(td, task_fail=True, e=f"Failed Extraction {e}")
-        return True, cd
+        return f"Failed Extraction {e}", cd
 
     if not json_data:
         error_msg = 'No API response to load'
@@ -304,8 +331,7 @@ def extract_load_flatten(cd, td):
                       task_id=td.get('task_id'),
                       data_event='No data from API'
                                             )
-        reconcile_task_dates(td, task_fail=True, e=error_msg)
-        return True, cd
+        return error_msg, cd
 
     # 000-001 AC-8: fail-loud payload validation for playlist sync tasks.
     # Aborts before any staging load/SPROC (no deletes) when the payload is
@@ -313,11 +339,7 @@ def extract_load_flatten(cd, td):
     api_fn = td.get('api_function_name', '')
     if api_fn in ('playlist_items', 'current_user_playlists'):
         if not validate_playlist_payload(json_data, td):
-            reconcile_task_dates(
-                td, task_fail=True,
-                e=f"Playlist payload validation failed (api_function_name={api_fn})"
-            )
-            return True, cd
+            return (f"Playlist payload validation failed (api_function_name={api_fn})", cd)
 
     print(f"Loading data for Task #{td.get('task_id')}: {td.get('task_name')}")
     t0 = start_timer()
@@ -337,8 +359,7 @@ def extract_load_flatten(cd, td):
                       err=error_msg,
                       task_id=td.get('task_id'),
                       data_event='Load')
-        reconcile_task_dates(td, task_fail=True, e=f"Failed TO Load {e}")
-        return True, cd
+        return f"Failed TO Load {e}", cd
 
     t0 = start_timer()
     flatten_failure = execute_sproc(d=td, sproc_type='flatten')
@@ -354,7 +375,10 @@ def execute_sproc(d, sproc_type):
         sproc_type: Type of stored procedure ('flatten', 'interpolation', etc.)
 
     Returns:
-        bool: True if failed, False if successful
+        None on success, or the failure message (str) on failure. The caller
+        (ultimate_task_executioner, via extract_load_flatten) reconciles the
+        task unconditionally, so no reconcile happens here (Bug 004-005-4;
+        T02 pattern).
     """
     print(f"Starting SPROC {sproc_type} for #{d.get('task_id')}: {d.get('task_name')}")
     retrieval_key = f"{sproc_type}_sproc"
@@ -375,8 +399,7 @@ def execute_sproc(d, sproc_type):
                       err=error_msg,
                       task_id=d.get('task_id'),
                       data_event=sproc_type)
-        reconcile_task_dates(d, task_fail=True, e=error_msg)
-        return True
+        return error_msg
 
     t0 = start_timer()
 
@@ -391,15 +414,14 @@ def execute_sproc(d, sproc_type):
                           task_id=d.get('task_id'),
                           data_event=sproc_type
                           )
-            reconcile_task_dates(d, task_fail=True, e=f'Failed to execute sql: {returns}')
-            return True
+            return f'Failed to execute sql: {returns}'
         else:
             log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
                           desc=f"SPROC Success: {sproc_type}",
                           exec_time=elapsed_ms(t0),
                           task_id=d.get('task_id'),
                           data_event=sproc_type)
-            return False
+            return None
     except Exception as e:
         error_msg = f"SPROC execution error: {str(e)}"
         log_app_event(cat=f"Task #{d.get('task_id')}: {d.get('task_name')}",
@@ -407,8 +429,7 @@ def execute_sproc(d, sproc_type):
                       err=error_msg,
                       task_id=d.get('task_id'),
                       data_event=sproc_type)
-        reconcile_task_dates(d, task_fail=True, e=error_msg)
-        return True
+        return error_msg
 
 def execute_python(d=None):
     """
@@ -418,7 +439,11 @@ def execute_python(d=None):
         d: Task dictionary
 
     Returns:
-        bool: True if failed, False if successful
+        None on success, or the failure message (str) on failure. The caller
+        (ultimate_task_executioner) reconciles the task unconditionally, so no
+        reconcile happens here — this avoids the double consecutive_failures
+        increment and keeps the detailed message (with failed activity ids) as
+        the final last_failure_message (Bug 004-005-2 / OQ-1).
     """
     print(f"Starting Python Execution for #{d.get('task_id')}: {d.get('task_name')}")
     module_function = d.get('python_execution_function')
@@ -435,8 +460,7 @@ def execute_python(d=None):
                       task_id=d.get('task_id'),
                       data_event='Python'
                       )
-        reconcile_task_dates(d, task_fail=True, e=f"Python Failure: {e}")
-        return True
+        return error_msg
 
     t0 = start_timer()
 
@@ -447,7 +471,7 @@ def execute_python(d=None):
                       exec_time=elapsed_ms(t0),
                       task_id=d.get('task_id'),
                       data_event='Python')
-        return False
+        return None
 
     except Exception as e:
         error_msg = f"Python Failure: {str(e)}"
@@ -457,8 +481,7 @@ def execute_python(d=None):
                       err=error_msg,
                       task_id=d.get('task_id'),
                       data_event='Python')
-        reconcile_task_dates(d, task_fail=True, e=f"Python Function Failure {e}")
-        return True
+        return error_msg
 
 def reconcile_task_dates(task_dict, task_fail=False, e=None):
     """
@@ -554,6 +577,10 @@ def reconcile_task_dates(task_dict, task_fail=False, e=None):
 def metric_interpolation(task_dict):
     """
     Perform metric interpolation with enhanced error handling.
+
+    NOTE (004-005 T09): dead code — no callers (verified by repo-wide search).
+    Left untouched: it still reconciles internally, but since nothing calls
+    it, it cannot double-reconcile. Delete on a future cleanup pass.
 
     Args:
         task_dict: Task dictionary

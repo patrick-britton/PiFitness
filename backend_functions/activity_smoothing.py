@@ -389,6 +389,7 @@ def activity_post_processing(manual_list=None):
 
     ac = len(activity_list)
     ctr = 1
+    failures = []
 
     log_app_event(cat='Task Executioner',
                   desc=f'Activity Post Processing: List has {ac} activities.',
@@ -398,17 +399,33 @@ def activity_post_processing(manual_list=None):
     for a in activity_list:
         int_a = int(a)
         t0 = start_timer()
-        
-        has_error = False
+
+        failed_step = None
+        fail_reason = None
         for step_id, ms, error in activity_post_processing_steps(int_a):
             if error:
-                has_error = True
+                failed_step = step_id
+                fail_reason = error
                 break
-        
-        if not has_error:
+
+        if failed_step is None:
             print(f"{ctr}/{ac} | ID# {int_a} | {elapsed_ms(t0)} ms")
         else:
+            # Per-activity halt on first sub-step error is unchanged; the
+            # activity stays queued for retry (its queue row is only deleted
+            # by activity_post_processing_steps on full success).
             print(f"{ctr}/{ac} | ID# {int_a} | FAILED")
+            failures.append(f"activity {int_a} [{failed_step}]: {fail_reason}")
         ctr += 1
+
+    # OQ-1 (option c) / Bug 004-005-2: every queued activity is attempted,
+    # then an aggregate failure is raised so execute_python reconciles the
+    # task run as failed with the failed activity ids + reasons instead of
+    # silently reporting success.
+    if failures:
+        raise RuntimeError(
+            f"Activity Post Processing failed for {len(failures)}/{ac} "
+            f"activities -> " + "; ".join(failures)
+        )
 
     return True

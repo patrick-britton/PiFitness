@@ -1,0 +1,1010 @@
+﻿
+=== TASK_CONFIG_4_19 ===
+[
+ {
+  "task_id": 4,
+  "task_name": "Activities",
+  "run_extract": true,
+  "run_python": false,
+  "python_extraction_function": "extract_pirate_universal",
+  "python_login_function": "backend_functions.service_logins.pirate_garmin_login",
+  "python_execution_function": "N/A",
+  "flatten_sproc": "staging.activities_flatten(4, 'Pirate Activities')",
+  "api_function_name": "activities.search"
+ },
+ {
+  "task_id": 19,
+  "task_name": "Activity Details",
+  "run_extract": true,
+  "run_python": false,
+  "python_extraction_function": "extract_pirate_universal",
+  "python_login_function": "backend_functions.service_logins.pirate_garmin_login",
+  "python_execution_function": null,
+  "flatten_sproc": "staging.flatten_activity_details(19, 'Pirate Activity Details')",
+  "api_function_name": "activities.details"
+ }
+]
+
+=== TASK_CONFIGURATION_4_19 ===
+[
+ {
+  "task_id": 4,
+  "task_name": "Activities",
+  "last_executed_utc": "2026-10-07 19:30:15.132261-07:00",
+  "last_succeeded_utc": "2026-10-07 19:30:15.132261-07:00",
+  "last_failed_utc": "2026-09-27 14:59:32.660401-07:00",
+  "consecutive_failures": 0,
+  "last_failure_message": "Task execution failed for Activities"
+ },
+ {
+  "task_id": 19,
+  "task_name": "Activity Details",
+  "last_executed_utc": "2026-10-08 10:38:35.618420-07:00",
+  "last_succeeded_utc": "2026-10-08 05:30:36.263843-07:00",
+  "last_failed_utc": "2026-10-08 10:38:35.618420-07:00",
+  "consecutive_failures": 5,
+  "last_failure_message": "No API response to load"
+ }
+]
+
+=== TASK_EXECUTIONS_4_19 ===
+[
+ {
+  "execution_id": 222,
+  "task_id": 19,
+  "task_name": "Activity Details",
+  "status": "failed",
+  "started_at": "2026-10-08 10:38:34.787714",
+  "completed_at": "2026-10-08 10:38:35.718991",
+  "error_message": "Task execution completed with 1 failure(s)",
+  "result_preview": "{\"status\": \"complete\", \"results\": [{\"error\": \"No API response to load\", \"success\": false, \"task_id\": 19, \"task_name\": \"Activity Details\"}], \"tasks_processed\": 1}"
+ },
+ {
+  "execution_id": 205,
+  "task_id": 4,
+  "task_name": "Activities",
+  "status": "success",
+  "started_at": "2026-08-28 12:31:35.232674",
+  "completed_at": "2026-08-28 12:31:50.320915",
+  "error_message": null,
+  "result_preview": "{\"status\": \"complete\", \"results\": [{\"error\": null, \"success\": true, \"task_id\": 4, \"task_name\": \"Activities\"}], \"tasks_processed\": 1}"
+ },
+ {
+  "execution_id": 203,
+  "task_id": 19,
+  "task_name": "Activity Details",
+  "status": "success",
+  "started_at": "2026-08-28 12:26:24.150965",
+  "completed_at": "2026-08-28 12:26:33.326093",
+  "error_message": null,
+  "result_preview": "{\"status\": \"complete\", \"results\": [{\"error\": null, \"success\": true, \"task_id\": 19, \"task_name\": \"Activity Details\"}], \"tasks_processed\": 1}"
+ },
+ {
+  "execution_id": 190,
+  "task_id": 19,
+  "task_name": "Activity Details",
+  "status": "success",
+  "started_at": "2026-07-06 19:38:31.535507",
+  "completed_at": "2026-07-06 19:38:56.415958",
+  "error_message": null,
+  "result_preview": "{\"status\": \"complete\", \"results\": [{\"error\": null, \"success\": true, \"task_id\": 19, \"task_name\": \"Activity Details\"}], \"tasks_processed\": 1}"
+ },
+ {
+  "execution_id": 189,
+  "task_id": 19,
+  "task_name": "Activity Details",
+  "status": "failed",
+  "started_at": "2026-07-06 18:52:56.453807",
+  "completed_at": "2026-07-06 18:52:57.584999",
+  "error_message": "Task execution completed with 1 failure(s)",
+  "result_preview": "{\"status\": \"complete\", \"results\": [{\"error\": \"Task execution failed for Activity Details\", \"success\": false, \"task_id\": 19, \"task_name\": \"Activity Details\"}], \"tasks_processed\": 1}"
+ },
+ {
+  "execution_id": 188,
+  "task_id": 19,
+  "task_name": "Activity Details",
+  "status": "failed",
+  "started_at": "2026-07-06 18:52:32.882414",
+  "completed_at": "2026-07-06 18:52:33.939538",
+  "error_message": "Task execution completed with 1 failure(s)",
+  "result_preview": "{\"status\": \"complete\", \"results\": [{\"error\": \"Task execution failed for Activity Details\", \"success\": false, \"task_id\": 19, \"task_name\": \"Activity Details\"}], \"tasks_processed\": 1}"
+ }
+]
+
+=== NO_API_RESPONSE_EVENTS ===
+[
+ {
+  "event_time_utc": "2026-10-08 10:38:35.573493-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Failed",
+  "task_id": 19,
+  "error_text": "No API response to load"
+ },
+ {
+  "event_time_utc": "2026-10-08 10:38:35.528449-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Loading ignored",
+  "task_id": 19,
+  "error_text": "No API response to load"
+ },
+ {
+  "event_time_utc": "2026-10-08 09:30:07.950212-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Loading ignored",
+  "task_id": 19,
+  "error_text": "No API response to load"
+ },
+ {
+  "event_time_utc": "2026-10-08 08:00:08.329673-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Loading ignored",
+  "task_id": 19,
+  "error_text": "No API response to load"
+ },
+ {
+  "event_time_utc": "2026-09-27 03:57:29.488584-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Loading ignored",
+  "task_id": 19,
+  "error_text": "No API response to load"
+ },
+ {
+  "event_time_utc": "2026-08-25 05:13:59.474288-07:00",
+  "event_category": "Task #8: Body Composition - 6 AM",
+  "event_description": "Loading ignored",
+  "task_id": 8,
+  "error_text": "No API response to load"
+ },
+ {
+  "event_time_utc": "2026-08-25 04:12:26.307976-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Loading ignored",
+  "task_id": 19,
+  "error_text": "No API response to load"
+ },
+ {
+  "event_time_utc": "2026-08-25 02:42:56.226850-07:00",
+  "event_category": "Task #1: Steps",
+  "event_description": "Loading ignored",
+  "task_id": 1,
+  "error_text": "No API response to load"
+ },
+ {
+  "event_time_utc": "2026-08-25 02:42:51.967349-07:00",
+  "event_category": "Task #15: Fitness Age",
+  "event_description": "Loading ignored",
+  "task_id": 15,
+  "error_text": "No API response to load"
+ },
+ {
+  "event_time_utc": "2026-08-25 02:42:40.349559-07:00",
+  "event_category": "Task #14: Training Status",
+  "event_description": "Loading ignored",
+  "task_id": 14,
+  "error_text": "No API response to load"
+ }
+]
+
+=== TASK19_RECENT_EVENTS ===
+[
+ {
+  "event_time_utc": "2026-10-08 10:38:35.573493-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Failed",
+  "error_text": "No API response to load",
+  "data_event": "Complete"
+ },
+ {
+  "event_time_utc": "2026-10-08 10:38:35.528449-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Loading ignored",
+  "error_text": "No API response to load",
+  "data_event": "No data from API"
+ },
+ {
+  "event_time_utc": "2026-10-08 10:38:35.426006-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Login Success",
+  "error_text": null,
+  "data_event": "Login"
+ },
+ {
+  "event_time_utc": "2026-10-08 10:38:35.001667-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Started",
+  "error_text": null,
+  "data_event": "Begin"
+ },
+ {
+  "event_time_utc": "2026-10-08 09:30:07.969890-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Failed",
+  "error_text": "Task execution failed for Activity Details",
+  "data_event": "Complete"
+ },
+ {
+  "event_time_utc": "2026-10-08 09:30:07.950212-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Loading ignored",
+  "error_text": "No API response to load",
+  "data_event": "No data from API"
+ },
+ {
+  "event_time_utc": "2026-10-08 09:30:07.929943-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Login Success",
+  "error_text": null,
+  "data_event": "Login"
+ },
+ {
+  "event_time_utc": "2026-10-08 09:30:07.847219-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Started",
+  "error_text": null,
+  "data_event": "Begin"
+ },
+ {
+  "event_time_utc": "2026-10-08 08:00:08.349461-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Failed",
+  "error_text": "Task execution failed for Activity Details",
+  "data_event": "Complete"
+ },
+ {
+  "event_time_utc": "2026-10-08 08:00:08.329673-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Loading ignored",
+  "error_text": "No API response to load",
+  "data_event": "No data from API"
+ },
+ {
+  "event_time_utc": "2026-10-08 08:00:08.309155-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Login Success",
+  "error_text": null,
+  "data_event": "Login"
+ },
+ {
+  "event_time_utc": "2026-10-08 08:00:08.226011-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Started",
+  "error_text": null,
+  "data_event": "Begin"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:36.244828-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Successful Completion",
+  "error_text": null,
+  "data_event": "Complete"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:36.232562-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "SPROC Success: Flatten",
+  "error_text": null,
+  "data_event": "Flatten"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:34.536139-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Successful Load",
+  "error_text": null,
+  "data_event": "Load"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:34.297281-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Valid Extraction",
+  "error_text": null,
+  "data_event": "Extract"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:28.571303-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Login Success",
+  "error_text": null,
+  "data_event": "Login"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:28.488739-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Started",
+  "error_text": null,
+  "data_event": "Begin"
+ },
+ {
+  "event_time_utc": "2026-10-08 03:00:35.295611-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Successful Completion",
+  "error_text": null,
+  "data_event": "Complete"
+ },
+ {
+  "event_time_utc": "2026-10-08 03:00:35.283389-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "SPROC Success: Flatten",
+  "error_text": null,
+  "data_event": "Flatten"
+ },
+ {
+  "event_time_utc": "2026-10-08 03:00:33.589768-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Successful Load",
+  "error_text": null,
+  "data_event": "Load"
+ },
+ {
+  "event_time_utc": "2026-10-08 03:00:33.358950-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Valid Extraction",
+  "error_text": null,
+  "data_event": "Extract"
+ },
+ {
+  "event_time_utc": "2026-10-08 03:00:27.390171-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Login Success",
+  "error_text": null,
+  "data_event": "Login"
+ },
+ {
+  "event_time_utc": "2026-10-08 03:00:27.308219-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Started",
+  "error_text": null,
+  "data_event": "Begin"
+ },
+ {
+  "event_time_utc": "2026-10-08 01:00:15.759511-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Successful Completion",
+  "error_text": null,
+  "data_event": "Complete"
+ },
+ {
+  "event_time_utc": "2026-10-08 01:00:15.747235-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "SPROC Success: Flatten",
+  "error_text": null,
+  "data_event": "Flatten"
+ },
+ {
+  "event_time_utc": "2026-10-08 01:00:14.048829-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Successful Load",
+  "error_text": null,
+  "data_event": "Load"
+ },
+ {
+  "event_time_utc": "2026-10-08 01:00:13.812402-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Valid Extraction",
+  "error_text": null,
+  "data_event": "Extract"
+ },
+ {
+  "event_time_utc": "2026-10-08 01:00:07.840555-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Login Success",
+  "error_text": null,
+  "data_event": "Login"
+ },
+ {
+  "event_time_utc": "2026-10-08 01:00:07.758007-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Started",
+  "error_text": null,
+  "data_event": "Begin"
+ }
+]
+
+=== ACTIVITY_DETAIL_SYNC_EVENTS ===
+[
+ {
+  "event_time_utc": "2026-03-23 10:03:54.235615-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "4 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-23 08:03:14.627605-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-23 06:02:29.896737-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-23 04:01:29.239646-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-23 02:00:29.626360-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-22 23:59:54.041967-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-22 20:58:53.056235-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-22 17:57:53.122523-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-22 14:56:03.436812-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-22 11:54:53.241197-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-22 08:29:04.825719-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "4 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-22 07:22:33.155614-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-22 05:21:03.366963-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-22 03:20:09.246334-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-22 01:18:58.569859-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-21 21:17:00.867709-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-21 18:15:23.594502-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-21 15:14:23.223040-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-21 12:12:48.991529-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "3 activities to download",
+  "error_text": null
+ },
+ {
+  "event_time_utc": "2026-03-21 08:47:19.832994-07:00",
+  "event_category": "Activity Detail Sync",
+  "event_description": "4 activities to download",
+  "error_text": null
+ }
+]
+
+=== SYNC_VIEW_COUNT ===
+[
+ {
+  "n": 0,
+  "min_id": null,
+  "max_id": null
+ }
+]
+
+=== SYNC_VIEW_ROWS ===
+[]
+
+=== RECENT_ACTIVITY_DETAILS ===
+[
+ {
+  "activity_id": 24640204951,
+  "detail_rows": 1250
+ },
+ {
+  "activity_id": 24627524260,
+  "detail_rows": 1357
+ },
+ {
+  "activity_id": 24614854206,
+  "detail_rows": 1272
+ },
+ {
+  "activity_id": 24606326398,
+  "detail_rows": 1431
+ },
+ {
+  "activity_id": 24592950387,
+  "detail_rows": 1279
+ }
+]
+
+=== GARMIN_SERVICE_STATE ===
+[
+ {
+  "api_service_name": "Garmin",
+  "api_service_function": "backend_functions.service_logins.get_garmin_client",
+  "api_credential_requirements": "email, password",
+  "rate_limit_detected_utc": null,
+  "rate_limit_cleared_utc": null
+ },
+ {
+  "api_service_name": "Pirate Garmin",
+  "api_service_function": "backend_functions.service_logins.pirate_garmin_login",
+  "api_credential_requirements": null,
+  "rate_limit_detected_utc": null,
+  "rate_limit_cleared_utc": null
+ }
+]
+
+=== LOOP_METADATA ===
+[
+ {
+  "task_id": 4,
+  "task_name": "Activities",
+  "api_function_name": "activities.search",
+  "loop_strategy": "single_run",
+  "iter_path_keys": "[]",
+  "iter_query_keys": "[]",
+  "value_recency": "2026-10-07 07:16:29-07:00",
+  "static_path_params": "{}",
+  "static_query_params": "{\"start\": \"0\", \"limit\": \"100\"}"
+ },
+ {
+  "task_id": 19,
+  "task_name": "Activity Details",
+  "api_function_name": "activities.details",
+  "loop_strategy": "activity",
+  "iter_path_keys": "[\"activity_id\"]",
+  "iter_query_keys": "[]",
+  "value_recency": "2026-10-07 07:16:30-07:00",
+  "static_path_params": "{}",
+  "static_query_params": "{\"maxChartSize\": \"2000\", \"maxPolylineSize\": \"4000\"}"
+ }
+]
+
+=== SYNC_VIEW_DEF ===
+[
+ {
+  "def": " SELECT activity_id,\n    round(duration_elapsed_s, 0) * 2::numeric AS max_points\n   FROM activities.activities\n  WHERE NOT is_downloaded AND NOT activity_type_name ~~ '%treadmill%'::text AND distance_m > 1000::numeric\n  ORDER BY (activity_type_name ~~ '%running%'::text) DESC, start_time_utc DESC\n LIMIT 15;"
+ }
+]
+
+=== EXTRACTION_FAILURE_EVENTS ===
+[
+ {
+  "event_time_utc": "2026-10-08 05:30:37.381440-07:00",
+  "event_description": "Extraction Failure for : 2026-10-08",
+  "data_event": "Extraction Failure"
+ },
+ {
+  "event_time_utc": "2026-10-08 03:00:37.340199-07:00",
+  "event_description": "Extraction Failure for : 2026-10-08",
+  "data_event": "Extraction Failure"
+ },
+ {
+  "event_time_utc": "2026-10-08 01:00:17.573347-07:00",
+  "event_description": "Extraction Failure for : 2026-10-08",
+  "data_event": "Extraction Failure"
+ },
+ {
+  "event_time_utc": "2026-10-07 06:00:08.233418-07:00",
+  "event_description": "Extraction Failure for : 2026-10-07",
+  "data_event": "Extraction Failure"
+ },
+ {
+  "event_time_utc": "2026-10-07 03:30:15.299573-07:00",
+  "event_description": "Extraction Failure for : 2026-10-07",
+  "data_event": "Extraction Failure"
+ },
+ {
+  "event_time_utc": "2026-10-07 01:00:17.665644-07:00",
+  "event_description": "Extraction Failure for : 2026-10-07",
+  "data_event": "Extraction Failure"
+ }
+]
+
+=== SYNC_VIEW_FUNNEL ===
+[
+ {
+  "not_downloaded": 297,
+  "not_dl_gt1k": 0,
+  "eligible": 0
+ }
+]
+
+=== NOT_DOWNLOADED_SAMPLE ===
+[
+ {
+  "activity_id": 24433861052,
+  "activity_type_name": "walking",
+  "distance_m": "552.76",
+  "is_downloaded": false,
+  "start_time_utc": "2026-09-20 08:02:07-07:00"
+ },
+ {
+  "activity_id": 24358933319,
+  "activity_type_name": "walking",
+  "distance_m": "171.52",
+  "is_downloaded": false,
+  "start_time_utc": "2026-09-14 08:25:48-07:00"
+ },
+ {
+  "activity_id": 24358926339,
+  "activity_type_name": "walking",
+  "distance_m": "29.49",
+  "is_downloaded": false,
+  "start_time_utc": "2026-09-14 07:38:15-07:00"
+ },
+ {
+  "activity_id": 24260920459,
+  "activity_type_name": "walking",
+  "distance_m": "893.58",
+  "is_downloaded": false,
+  "start_time_utc": "2026-09-06 07:33:49-07:00"
+ },
+ {
+  "activity_id": 24260908306,
+  "activity_type_name": "walking",
+  "distance_m": "17.51",
+  "is_downloaded": false,
+  "start_time_utc": "2026-09-06 06:43:11-07:00"
+ },
+ {
+  "activity_id": 24223937208,
+  "activity_type_name": "walking",
+  "distance_m": "196.70",
+  "is_downloaded": false,
+  "start_time_utc": "2026-09-03 07:41:59-07:00"
+ },
+ {
+  "activity_id": 24223924851,
+  "activity_type_name": "walking",
+  "distance_m": "26.40",
+  "is_downloaded": false,
+  "start_time_utc": "2026-09-03 06:55:11-07:00"
+ },
+ {
+  "activity_id": 24184820948,
+  "activity_type_name": "walking",
+  "distance_m": "266.75",
+  "is_downloaded": false,
+  "start_time_utc": "2026-08-31 07:52:24-07:00"
+ },
+ {
+  "activity_id": 24184811901,
+  "activity_type_name": "walking",
+  "distance_m": "212.51",
+  "is_downloaded": false,
+  "start_time_utc": "2026-08-31 07:01:40-07:00"
+ },
+ {
+  "activity_id": 23915028258,
+  "activity_type_name": "indoor_climbing",
+  "distance_m": null,
+  "is_downloaded": false,
+  "start_time_utc": "2026-08-09 09:51:49-07:00"
+ }
+]
+
+=== LAST_ARRIVALS ===
+[
+ {
+  "last_activity_start": "2026-10-07 06:35:10-07:00",
+  "last_downloaded_start": "2026-10-07 06:35:10-07:00",
+  "last_not_downloaded_start": "2026-09-20 08:02:07-07:00"
+ }
+]
+
+=== ACCEPTABLE_FAILURES ===
+[
+ {
+  "acceptable_failures": 5
+ }
+]
+
+=== SHOULD_EXECUTE_NOW ===
+[
+ {
+  "task_id": 4,
+  "task_name": "Activities",
+  "should_execute": false,
+  "consecutive_failures": 0,
+  "next_planned_execution_utc": "2026-10-07 23:30:15.132261-07:00"
+ },
+ {
+  "task_id": 19,
+  "task_name": "Activity Details",
+  "should_execute": false,
+  "consecutive_failures": 5,
+  "next_planned_execution_utc": "2026-10-08 15:38:35.618420-07:00"
+ },
+ {
+  "task_id": 21,
+  "task_name": "Activity Detail Post Processing",
+  "should_execute": false,
+  "consecutive_failures": 0,
+  "next_planned_execution_utc": "2026-10-08 11:01:44.725717-07:00"
+ }
+]
+
+=== STG_IMPORTS_TASK19_TODAY ===
+[]
+
+=== EVENTS_0530_0800 ===
+[
+ {
+  "event_time_utc": "2026-10-08 05:30:28.465352-07:00",
+  "event_category": "Task Executioner",
+  "event_description": "Planned execution of 6 tasks"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:28.488739-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Task Started"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:28.571303-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Login Success"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:34.297281-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Valid Extraction"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:34.536139-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Successful Load"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:36.232562-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "SPROC Success: Flatten"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:36.244828-07:00",
+  "event_category": "Task #19: Activity Details",
+  "event_description": "Successful Completion"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:36.273960-07:00",
+  "event_category": "Task #3: Heartrate Variation (HRV)",
+  "event_description": "Task Started"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:36.353359-07:00",
+  "event_category": "Task #3: Heartrate Variation (HRV)",
+  "event_description": "Login Success"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:37.381440-07:00",
+  "event_category": "Task #3: Heartrate Variation (HRV)",
+  "event_description": "Extraction Failure for : 2026-10-08"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:37.391036-07:00",
+  "event_category": "Task #3: Heartrate Variation (HRV)",
+  "event_description": "Valid Extraction"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:37.410616-07:00",
+  "event_category": "Task #3: Heartrate Variation (HRV)",
+  "event_description": "Successful Load"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:37.434074-07:00",
+  "event_category": "Task #3: Heartrate Variation (HRV)",
+  "event_description": "SPROC Success: Flatten"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:37.443545-07:00",
+  "event_category": "Task #3: Heartrate Variation (HRV)",
+  "event_description": "Successful Completion"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:37.472514-07:00",
+  "event_category": "Task #6: Sleep",
+  "event_description": "Task Started"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:37.551183-07:00",
+  "event_category": "Task #6: Sleep",
+  "event_description": "Login Success"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:39.110118-07:00",
+  "event_category": "Task #6: Sleep",
+  "event_description": "Valid Extraction"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:39.139303-07:00",
+  "event_category": "Task #6: Sleep",
+  "event_description": "Successful Load"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:39.281647-07:00",
+  "event_category": "Task #6: Sleep",
+  "event_description": "SPROC Success: Flatten"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:39.291282-07:00",
+  "event_category": "Task #6: Sleep",
+  "event_description": "Successful Completion"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:39.320518-07:00",
+  "event_category": "Task #14: Training Status",
+  "event_description": "Task Started"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:39.399411-07:00",
+  "event_category": "Task #14: Training Status",
+  "event_description": "Login Success"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:41.505979-07:00",
+  "event_category": "Task #14: Training Status",
+  "event_description": "Valid Extraction"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:41.532476-07:00",
+  "event_category": "Task #14: Training Status",
+  "event_description": "Successful Load"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:41.562245-07:00",
+  "event_category": "Task #14: Training Status",
+  "event_description": "SPROC Success: Flatten"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:41.574532-07:00",
+  "event_category": "Task #14: Training Status",
+  "event_description": "Successful Completion"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:41.612079-07:00",
+  "event_category": "Task #15: Fitness Age",
+  "event_description": "Task Started"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:41.692958-07:00",
+  "event_category": "Task #15: Fitness Age",
+  "event_description": "Login Success"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:45.002725-07:00",
+  "event_category": "Task #15: Fitness Age",
+  "event_description": "Valid Extraction"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:45.022111-07:00",
+  "event_category": "Task #15: Fitness Age",
+  "event_description": "Successful Load"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:45.044509-07:00",
+  "event_category": "Task #15: Fitness Age",
+  "event_description": "SPROC Success: Flatten"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:45.053928-07:00",
+  "event_category": "Task #15: Fitness Age",
+  "event_description": "Successful Completion"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:45.083174-07:00",
+  "event_category": "Task #1: Steps",
+  "event_description": "Task Started"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:45.161879-07:00",
+  "event_category": "Task #1: Steps",
+  "event_description": "Login Success"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:49.030333-07:00",
+  "event_category": "Task #1: Steps",
+  "event_description": "Valid Extraction"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:49.065892-07:00",
+  "event_category": "Task #1: Steps",
+  "event_description": "Successful Load"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:49.095933-07:00",
+  "event_category": "Task #1: Steps",
+  "event_description": "SPROC Success: Flatten"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:49.108835-07:00",
+  "event_category": "Task #1: Steps",
+  "event_description": "Successful Completion"
+ },
+ {
+  "event_time_utc": "2026-10-08 05:30:49.143888-07:00",
+  "event_category": "Task Executioner",
+  "event_description": "Execution complete 6 tasks"
+ },
+ {
+  "event_time_utc": "2026-10-08 06:00:08.232323-07:00",
+  "event_category": "Task Executioner",
+  "event_description": "Planned execution of 2 tasks"
+ }
+]
+
+=== PATH_EVENTS ===
+[
+ {
+  "event_time_utc": "2026-10-08 07:01:44.667560-07:00",
+  "event_category": "Task Executioner",
+  "event_description": "Activity Post Processing Substep: build_activity_path for 3252286731"
+ },
+ {
+  "event_time_utc": "2026-10-08 07:01:18.730551-07:00",
+  "event_category": "Task Executioner",
+  "event_description": "Activity Post Processing Substep: build_activity_path for 3259650230"
+ },
+ {
+  "event_time_utc": "2026-10-08 07:00:57.564853-07:00",
+  "event_category": "Task Executioner",
+  "event_description": "Activity Post Processing Substep: build_activity_path for 3262162962"
+ },
+ {
+  "event_time_utc": "2026-10-07 15:21:57.406485-07:00",
+  "event_category": "Task Executioner",
+  "event_description": "Activity Post Processing Substep: build_activity_path for 24640204951"
+ },
+ {
+  "event_time_utc": "2026-10-07 14:42:39.909654-07:00",
+  "event_category": "Task Executioner",
+  "event_description": "Activity Post Processing Substep: build_activity_path for 24640204951"
+ },
+ {
+  "event_time_utc": "2026-10-07 13:00:26.832846-07:00",
+  "event_category": "Task Executioner",
+  "event_description": "Activity Post Processing Substep: build_activity_path for 24640204951"
+ }
+]
