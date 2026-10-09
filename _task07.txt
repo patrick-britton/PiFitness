@@ -1,0 +1,11 @@
+=== TASK T07 ===
+
+- **Surface:** backend
+- **Skill:** backend-engineer
+- **Complexity:** medium
+- **Depends‑on:** T02, T04, T05, T09
+- **Traces‑to:** FR-1, FR-2, FR-3
+- **Detail:** Code review of all changed code: (1) pandas used anywhere without explicit waiver — none allowed; (2) no excessive/redundant DB calls (e.g., per-substep `log_app_event` writes, `qec` opening a fresh connection per call); (3) queries/indexes Pi-5 appropriate. Pre-existing violations found → append remediation tasks even if seemingly out of scope.
+- **Verify:** Review findings recorded in Design Notes; each violation has a follow-up task or documented waiver; zero new `import pandas`.
+- **Status:** todo
+

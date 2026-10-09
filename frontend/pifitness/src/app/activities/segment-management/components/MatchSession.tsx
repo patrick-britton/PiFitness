@@ -787,7 +787,7 @@ const finalize = useCallback(
             <p className="text-xs text-gray-600 dark:text-gray-400">
               {segment.is_course ? 'Course' : 'Segment'} ID#{' '}
               <span className="tabular-nums">{segment.segment_id}</span> ·{' '}
-              {segment.distance_mi.toFixed(2)} mi
+              {segment.distance_mi.toFixed(1)} mi
               {segment.elevation_gain != null ? ` · ${segment.elevation_gain} m elev` : ''}
               {segment.activity_type_name ? ` · ${segment.activity_type_name}` : ''}
             </p>

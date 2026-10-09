@@ -1196,7 +1196,11 @@ def create_segment(
     flow exactly: CALL activities.segment_matching_segment_creation, resolve the
     new id via MAX(segment_id), then CALL
     activities.segment_matching_finalize_match(TRUE, ...) to record the source
-    activity's own confirmed match (confidence 0). Parameterized; no pandas.
+    activity's own confirmed match (confidence 0), then a scoped
+    CALL staging.update_segment_details(activity_id) so the reference
+    activity's segments_details row exists at creation time (004-005 Bug 8 —
+    creation previously skipped the sole segments_details writer, leaving the
+    reference match invisible to report/leaderboard views). Parameterized; no pandas.
 
     Args:
         segment_name: New segment/course name (non-empty, <= 200 chars).
@@ -1246,6 +1250,13 @@ def create_segment(
     )
     if err:
         raise ValueError(f"finalize match failed: {err}")
+    # 004-005 Bug 8: write the reference activity's segments_details row at
+    # creation time. Scoped to the source activity (per-activity, never the
+    # unscoped NULL variant — the full-scan variant hit a corrupt heap page,
+    # see confirm_match above). Same failure mapping as confirm_match.
+    err = qec("CALL staging.update_segment_details(%s);", [int(activity_id)])
+    if err:
+        raise ValueError(f"update_segment_details failed: {err}")
     return int(new_id)
 
 
