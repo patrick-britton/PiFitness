@@ -40,7 +40,7 @@ export default function SegmentPickerTable({ rows, onSelect }: SegmentPickerTabl
                 </span>
               </div>
               <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                                  {row.is_course ? 'Course' : 'Segment'} · {row.distance_mi.toFixed(2)} mi
+                                  {row.is_course ? 'Course' : 'Segment'} · {row.distance_mi.toFixed(1)} mi
                 {row.elevation_gain != null ? ` · ${row.elevation_gain} m elev` : ''}
               </div>
               <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
@@ -97,7 +97,7 @@ export default function SegmentPickerTable({ rows, onSelect }: SegmentPickerTabl
                 {row.last_effort ? formatIsoDate(row.last_effort) : '—'}
               </td>
               <td className="px-4 py-2 text-gray-700 dark:text-gray-300 tabular-nums text-right">
-                                {row.distance_mi.toFixed(2)} mi
+                                {row.distance_mi.toFixed(1)} mi
               </td>
               <td className="px-4 py-2 text-gray-700 dark:text-gray-300 tabular-nums text-right">
                 {row.elevation_gain != null ? `${row.elevation_gain} m` : '—'}

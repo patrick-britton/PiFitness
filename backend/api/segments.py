@@ -281,7 +281,8 @@ async def create_segment_route(request: CreateSegmentRequest):
     Create a course/segment from an activity range (009-003, FR-5).
 
     Calls activities.segment_matching_segment_creation via the create_segment
-    helper (same two-CALL flow as the legacy Streamlit creation path),
+    helper (creation → finalize → scoped update_segment_details, mirroring the
+    legacy Streamlit creation path plus the Bug 8 details write),
     then finalizes the source activity's own confirmed match. Returns the
     new segment_id per the CreateSegmentResponse contract. map_style is
     accepted for contract symmetry (frontend's active basemap) and ignored
