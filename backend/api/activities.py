@@ -20,7 +20,7 @@ from backend_functions.queries import (
     get_activity_by_id,
     get_activity_telemetry,
     get_segment_matches,
-    get_activity_report_header_view_by_type,
+    get_activity_report_target,
     get_activity_report_efforts,
     get_activity_report_charts,
     get_activity_course_path,
@@ -49,9 +49,11 @@ from backend.schemas.activity_schemas import (
     ActivityReportHeader,
     ActivityReportSegment,
     ActivityReportCharts,
+    ActivityReportNav,
+    ActivityEfficiencyMetric,
+    ActivityReportEfficiency,
     ActivityElevationPoint,
     ActivityHeartratePoint,
-    ActivityPacePoint,
 )
 from backend.schemas.leaderboard_schemas import (
     Leaderboard,
@@ -702,10 +704,8 @@ def _build_process_summary(
 
 
 # ---------------------------------------------------------------------------
-# Activity Report endpoint (009-001)
+# Activity Report endpoint (009-001, reworked 004-006)
 # ---------------------------------------------------------------------------
-
-VALID_REPORT_TYPES = ('Run', 'Walk')
 
 
 def _format_total_time(total_time_s: float) -> str:
@@ -727,11 +727,6 @@ def _format_pace(distance_mi: float, total_time_s: float) -> str:
     minutes = int(secs_per_mi // 60)
     remainder = secs_per_mi - (minutes * 60)
     return f"{minutes}:{remainder:05.2f}/mi"
-
-
-def _is_run_type(activity_type: str) -> bool:
-    """True for the Run report type (running/trail); False for Walk (walk/hike)."""
-    return (activity_type or '').lower() == 'run'
 
 
 def _safe_float(value) -> Optional[float]:
@@ -770,88 +765,67 @@ def _safe_int_default(value, default: int = 0) -> int:
 
 
 @router.get("/report")
-async def get_activity_report(activity_type: str = 'Run'):
+async def get_activity_report(activity_id: Optional[int] = None):
     """
-    Get the Recent Activity Report for the most recent Run or Walk activity (009-007 B2).
+    Get the Recent Activity Report (004-006 T03).
 
-    The toggle maps to activities.vw_activity_header_stats.activity_type_basic
-    ('run' | 'walk'): the single returned row IS the target (one row per type,
-    always with a non-null path by construction). Its activity_id drives the
-    per-minute chart series, course path, and efforts queries. Header display
-    strings + HR median/max come straight from the view; numerics/elevation
-    join from activities.activities. Read-only; no writes, no fallback.
+    Resolves the target via activities.f_report_header: no id = newest
+    qualifying activity (run/walk/hike/trail, >1000 m, non-null path —
+    resolved OQ-1 B); an explicit activity_id selects that qualifying
+    activity and returns its prev/next nav ids. Header displays + HR come
+    from the same single call; charts, course path, and efforts are separate
+    activity-scoped queries (~1 ms each, T02). Read-only; no writes.
 
     Args:
-        activity_type: 'Run' or 'Walk'. Defaults to 'Run'.
+        activity_id: Optional qualifying activity id; default = newest.
 
     Returns:
         ActivityReport matching the cross-surface contract.
     """
-    if activity_type not in VALID_REPORT_TYPES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"activity_type must be one of {VALID_REPORT_TYPES}",
-        )
-
     try:
-        type_key = 'run' if activity_type == 'Run' else 'walk'
-        header_row = get_activity_report_header_view_by_type(type_key)
-        if header_row is None:
+        target = get_activity_report_target(activity_id)
+        if target is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"No report data found for activity_type='{activity_type}'",
+                detail=f"No qualifying activity for activity_id={activity_id}",
             )
-        activity_id = int(header_row['activity_id'])
+        resolved_id = int(target['activity_id'])
+        activity_type_name = str(target.get('activity_type_name') or '')
+        # Run-ish types (running, trail_running) gate the efficiency bullets
+        # (run/trail-run course efforts only — 004-006).
+        is_runish = 'run' in activity_type_name.lower()
 
-        hr_median = _safe_float(header_row.get('hr_median'))
-        hr_max = _safe_float(header_row.get('hr_maximum'))
-        view_displays = {
-            'distance_display': str(header_row.get('distance_display') or ''),
-            'duration_display': str(header_row.get('duration_display') or ''),
-            'pace_display': str(header_row.get('pace_display') or ''),
-        }
+        chart_rows = get_activity_report_charts(resolved_id) or []
+        course_path = get_activity_course_path(resolved_id) or []
 
-        chart_rows = get_activity_report_charts(activity_id) or []
-        course_path = get_activity_course_path(activity_id) or []
-
-        effort_rows = get_activity_report_efforts(activity_id) or []
+        effort_rows = get_activity_report_efforts(resolved_id) or []
         effort_rows = [r for r in effort_rows if r.get('segment_id') is not None]
         course_row = next((r for r in effort_rows if r.get('is_course')), None)
 
-        # show_efficiency_placeholder: true for Run (running/trail); false for Walk.
-        # Resolved via the activity_type selected (the report only serves Run/Walk).
-        show_eff = _is_run_type(activity_type)
-
-        # Numeric distance/time: prefer activities columns; fall back to parsing
-        # the view's display strings only if the numeric columns are missing.
-        distance_mi = _safe_float(header_row.get('distance_mi'))
-        if distance_mi is None:
-            try:
-                distance_mi = _safe_float(str(header_row.get('distance_display') or '').split()[0])
-            except (TypeError, ValueError, IndexError, AttributeError):
-                distance_mi = None
+        distance_mi = _safe_float(target.get('distance_mi'))
         distance_mi = distance_mi if distance_mi is not None else 0.0
-
-        total_time_raw = header_row.get('duration_elapsed_s')
-        if total_time_raw is None:
-            total_time_raw = header_row.get('duration_s')
-        if total_time_raw is None:
-            total_time_raw = header_row.get('total_time_s')
-        total_time_s = _safe_float_default(total_time_raw, 0.0)
+        total_time_raw = _safe_float(target.get('duration_elapsed_s'))
 
         header = ActivityReportHeader(
-            start_utc=str(header_row['start_utc']) if header_row.get('start_utc') is not None else '',
+            start_utc=str(target['start_time_utc']) if target.get('start_time_utc') is not None else '',
             distance_mi=distance_mi,
-            distance_display=view_displays['distance_display'],
-            elevation_m_gain=_safe_float(header_row.get('elevation_m_gain')),
-            total_time_s=total_time_s,
+            distance_display=str(target.get('distance_display') or ''),
+            elevation_m_gain=_safe_float(target.get('elevation_m_gain')),
+            total_time_s=_safe_float_default(total_time_raw, 0.0),
             total_time_text=_format_total_time(total_time_raw),
-            total_time_display=view_displays['duration_display'],
+            total_time_display=str(target.get('total_time_display') or ''),
             pace_text=_format_pace(distance_mi, total_time_raw),
-            pace_display=view_displays['pace_display'],
-            hr_median=hr_median,
-            hr_max=hr_max,
-            show_efficiency_placeholder=show_eff,
+            pace_display=str(target.get('pace_display') or ''),
+            hr_median=_safe_float(target.get('hr_median')),
+            hr_max=_safe_float(target.get('hr_maximum')),
+            activity_name=target.get('activity_name'),
+            activity_type_name=activity_type_name,
+            distance_m=_safe_float_default(target.get('distance_m'), 0.0),
+        )
+
+        nav = ActivityReportNav(
+            prev_activity_id=_safe_int(target.get('prev_activity_id')),
+            next_activity_id=_safe_int(target.get('next_activity_id')),
         )
 
         course = None
@@ -859,7 +833,7 @@ async def get_activity_report(activity_type: str = 'Run'):
         if course_row:
             course = ActivityReportSegment(
                 segment_id=_safe_int_default(course_row.get('segment_id'), 0),
-                name=str(course_row.get('name') or ''),
+                name=str(course_row.get('segment_name') or ''),
                 is_course=True,
                 all_time_rank=_safe_int(course_row.get('all_time_rank')),
                 total_attempts=_safe_int_default(course_row.get('total_attempts'), 0),
@@ -874,7 +848,7 @@ async def get_activity_report(activity_type: str = 'Run'):
                 continue
             segments.append(ActivityReportSegment(
                 segment_id=_safe_int_default(r.get('segment_id'), 0),
-                name=str(r.get('name') or ''),
+                name=str(r.get('segment_name') or ''),
                 is_course=False,
                 all_time_rank=_safe_int(r.get('all_time_rank')),
                 total_attempts=_safe_int_default(r.get('total_attempts'), 0),
@@ -882,26 +856,34 @@ async def get_activity_report(activity_type: str = 'Run'):
                 best_delta_s=_safe_float(r.get('best_delta_s')),
             ))
 
+        # Efficiency bullets (004-006): only run/trail-run efforts on a course;
+        # current values + prior-10 means come from the T02 view row.
+        efficiency = None
+        if course_row and is_runish:
+            def _metric(current_key: str, avg_key: str) -> ActivityEfficiencyMetric:
+                return ActivityEfficiencyMetric(
+                    current=_safe_float(course_row.get(current_key)),
+                    prior10_avg=_safe_float(course_row.get(avg_key)),
+                )
+            efficiency = ActivityReportEfficiency(
+                avg_cadence=_metric('avg_cadence', 'prior10_avg_cadence'),
+                avg_stride_length=_metric('avg_stride_length', 'prior10_avg_stride_length'),
+                avg_gct=_metric('avg_gct', 'prior10_avg_gct'),
+                avg_vert_ratio=_metric('avg_vert_ratio', 'prior10_avg_vert_ratio'),
+            )
+
         charts = ActivityReportCharts(
             elevation=[
                 ActivityElevationPoint(
-                    minute=_safe_int_default(r.get('minute'), 0),
+                    distance_m=_safe_float_default(r.get('distance_m'), 0.0),
                     elevation_m=_safe_float_default(r.get('elevation_m'), 0.0),
                 )
                 for r in chart_rows
             ],
             heartrate=[
                 ActivityHeartratePoint(
-                    minute=_safe_int_default(r.get('minute'), 0),
+                    distance_m=_safe_float_default(r.get('distance_m'), 0.0),
                     heartrate_bpm=_safe_float(r.get('heartrate_bpm')),
-                )
-                for r in chart_rows
-            ],
-            pace=[
-                ActivityPacePoint(
-                    minute=_safe_int_default(r.get('minute'), 0),
-                    pace_sec_per_mi=_safe_float(r.get('pace_sec_per_mi')),
-                    pace_text=r.get('pace_text'),
                 )
                 for r in chart_rows
             ],
@@ -915,12 +897,13 @@ async def get_activity_report(activity_type: str = 'Run'):
                 continue
 
         report = ActivityReport(
-            activity_id=activity_id,
-            activity_type=activity_type,
+            activity_id=resolved_id,
+            nav=nav,
             header=header,
             course=course,
             segments=segments,
             has_segments=bool(course_row or segments),
+            efficiency=efficiency,
             charts=charts,
             course_path=safe_path,
         )

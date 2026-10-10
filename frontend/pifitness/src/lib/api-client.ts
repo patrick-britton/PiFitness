@@ -11,7 +11,6 @@ import {
 } from './types/activity-processing';
 import {
   ActivityReport,
-  ActivityReportType,
 } from './types/activity-report';
 import {
   Leaderboard,
@@ -592,10 +591,14 @@ export const API = {
     getSegments: () => fetchAPI<any[]>("/api/segments"),
     getSegmentMatches: (segmentId: string) => fetchAPI<any[]>(`/api/segments/${segmentId}/matches`),
     /**
-     * Fetch the Recent Activity Report for the most recent Run or Walk activity (009-001).
+     * Fetch the Recent Activity Report (004-006): optional activity_id —
+     * omitted = newest qualifying activity (run / trail run / walk / hike,
+     * >1000 m, non-null path).
      */
-    getReport: (activityType: ActivityReportType) =>
-      fetchAPI<ActivityReport>(`/api/activities/report?activity_type=${activityType}`),
+    getReport: (activityId?: number) =>
+      fetchAPI<ActivityReport>(
+        `/api/activities/report${activityId != null ? `?activity_id=${activityId}` : ''}`,
+      ),
     /**
      * Fetch the filterable segment/course list for the Leaderboards page (009-002).
      */

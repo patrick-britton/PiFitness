@@ -203,174 +203,43 @@ def get_activity_stats(activity_id: int) -> Optional[Dict[str, Any]]:
     return result[0] if result else None
 
 
-def resolve_latest_activity_id(activity_type: str) -> Optional[int]:
+def get_activity_report_target(activity_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     """
-    Resolve the most recent activity_id for a run/walk activity type (009-001, FR-2).
+    Resolve the report target + header + prev/next nav in ONE call (004-006 T03).
 
-    Uses the same activities.vw_last_activity_id_by_type view as Activity Processing.
-    The view bakes in most-recent selection (max activity_id) and distance constraints.
+    Calls activities.f_report_header(p_activity_id): NULL resolves the newest
+    qualifying activity (run/walk/hike/trail, >1000 m, non-null path — OQ-1 B);
+    an explicit id resolves that activity (None when it does not qualify).
+    Returns the full function row: header displays/numerics, HR median/max,
+    and prev/next_activity_id over the qualifying set.
 
     Args:
-        activity_type: 'Run' or 'Walk' (the view's activity_type key)
+        activity_id: Optional target activity; None = newest qualifying.
 
     Returns:
-        Optional[int]: The resolved activity_id, or None if the view has no row.
+        Optional[Dict[str, Any]]: Function row or None when unresolvable.
     """
-    sql = """
-        SELECT activity_id
-        FROM activities.vw_last_activity_id_by_type
-        WHERE activity_type = %s
-    """
-    row = one_sql_result(sql, (activity_type,))
-    return int(row) if row is not None else None
-
-
-def get_activity_report_header(activity_id: int) -> Optional[Dict[str, Any]]:
-    """
-    Retrieve the report summary header values for an activity (009-001 FR-4 / 009-006 OQ-1).
-
-    Sourced from the canonical activities.activities row (start_time_utc,
-    distance_m, duration_s, elevation_m_gain) per the human's OQ-1 direction,
-    not from the charting/aggregate view. HR median/75th/max are computed
-    separately via get_activity_percentile_hr (kept for accuracy, OQ-4).
-
-    Args:
-        activity_id: The activity ID
-
-    Returns:
-        Optional[Dict[str, Any]]: Header values or None if the activity has no row.
-    """
-    sql = """
-        SELECT
-            start_time_utc AS start_utc,
-            m2mi(distance_m) AS distance_mi,
-            duration_s AS total_time_s,
-            elevation_m_gain
-        FROM activities.activities
-        WHERE activity_id = %s
-    """
+    sql = "SELECT * FROM activities.f_report_header(%s)"
     result = sql_to_dict(sql, (activity_id,))
     return result[0] if result else None
-
-
-def get_activity_report_header_view_by_type(activity_type_basic: str) -> Optional[Dict[str, Any]]:
-    """
-    Resolve the report target + header in ONE query (009-007 B2).
-
-    Queries activities.vw_activity_header_stats for the single row matching
-    activity_type_basic ('run' | 'walk'). By construction the view holds one
-    row per type, always with a non-null activity_path — the returned
-    activity_id is the canonical target for all downstream report queries
-    (charts, course path, efforts). Returns display strings (distance,
-    duration, pace), HR median/max, start_time_utc, plus elevation_m_gain
-    and numeric distance/time joined from activities.activities (the view
-    does not carry elevation gain). Returns None when the view has no row
-    for the type (→ endpoint 404, no fallback per human direction).
-    """
-    sql = """
-        SELECT
-            v.activity_id,
-            v.activity_type_basic,
-            v.distance_mi AS distance_display,
-            v.duration_display,
-            v.pace_display,
-            v.start_time_utc AS start_utc,
-            v.hr_median,
-            v.hr_maximum,
-            a.elevation_m_gain,
-            m2mi(a.distance_m) AS distance_mi,
-            a.duration_elapsed_s,
-            a.duration_s
-        FROM activities.vw_activity_header_stats v
-        LEFT JOIN activities.activities a ON a.activity_id = v.activity_id
-        WHERE v.activity_type_basic = %s
-    """
-    result = sql_to_dict(sql, (activity_type_basic,))
-    return result[0] if result else None
-
-
-def get_activity_report_header_view(activity_id: int) -> Optional[Dict[str, Any]]:
-    """
-    Retrieve the report header from activities.vw_activity_header_stats (009-007).
-
-    Returns display strings (distance_mi, duration_display, pace_display),
-    HR median/max, start_time_utc, and elevation_m_gain joined from
-    activities.activities (the view does not carry elevation gain).
-    Returns None when the activity has no row in the view.
-    """
-    sql = """
-        SELECT
-            v.activity_id,
-            v.activity_type_basic,
-            v.distance_mi AS distance_display,
-            v.duration_display,
-            v.pace_display,
-            v.start_time_utc AS start_utc,
-            v.hr_median,
-            v.hr_maximum,
-            a.elevation_m_gain,
-            m2mi(a.distance_m) AS distance_mi,
-            a.duration_elapsed_s,
-            a.duration_s
-        FROM activities.vw_activity_header_stats v
-        LEFT JOIN activities.activities a ON a.activity_id = v.activity_id
-        WHERE v.activity_id = %s
-    """
-    result = sql_to_dict(sql, (activity_id,))
-    return result[0] if result else None
-
-
-def get_activity_percentile_hr(activity_id: int, frac: float) -> Optional[float]:
-    """
-    Compute a heart-rate percentile over an activity's telemetry (009-001, FR-4).
-
-    Args:
-        activity_id: The activity ID
-        frac: The percentile fraction (0.5 for median, 0.75 for 75th).
-
-    Returns:
-        Optional[float]: The percentile HR value, or None if no HR data.
-    """
-    sql = """
-        SELECT percentile_cont(%s) WITHIN GROUP (ORDER BY heartrate_bpm)
-        FROM activities.activity_details
-        WHERE activity_id = %s AND heartrate_bpm IS NOT NULL
-    """
-    row = one_sql_result(sql, (frac, activity_id))
-    return float(row) if row is not None else None
-
-
-_PACE_SEC_PER_MI_MM = 1609344.0  # millimeters in a mile (speed is mm/s)
-
-
-def _format_pace_mmss(sec_per_mi: Optional[float]) -> Optional[str]:
-    """Format seconds-per-mile as m:ss.ms (one decimal); minutes may exceed 60.
-
-    The minutes count continues past 60 rather than converting to hours, per the
-    report's pace formatting rule (009-006). Returns None for an undefined pace.
-    """
-    if sec_per_mi is None:
-        return None
-    secs = round(float(sec_per_mi), 1)
-    mins = int(secs) // 60
-    rem = secs - mins * 60
-    return f"{mins}:{rem:04.1f}"
 
 
 def get_activity_report_charts(activity_id: int) -> List[Dict[str, Any]]:
     """
-    Per-minute elevation/heartrate/pace series for an activity (009-006).
-
-    Uses the provided per-minute aggregate over activities.activity_details
-    (minute-of-activity buckets) and adds a computed numeric pace (seconds per
-    mile) plus formatted pace text (m:ss.ms) for the frontend charts.
+    Per-minute elevation + heartrate series for an activity (009-006),
+    extended 004-006 with the bucket's cumulative `distance_m`
+    (max(distance_mm)/1000) so charts share a distance x-axis. T09 narrowed
+    the select: pace/speed columns and the minute key were dropped with the
+    removed pace chart (final contract: distance_m/elevation_m/heartrate_bpm).
+    The aggregate filters on the (activity_id, ts_utc) PK prefix (T02 EXPLAIN:
+    ~7 ms; no seq scans, no spills).
 
     Args:
         activity_id: The activity ID
 
     Returns:
         List[Dict[str, Any]]: One row per elapsed minute with keys
-        minute, elevation_m, heartrate_bpm, speed_mps, pace_sec_per_mi, pace_text.
+        distance_m, elevation_m, heartrate_bpm.
     """
     sql = """
         WITH pre_aggs AS (
@@ -378,32 +247,24 @@ def get_activity_report_charts(activity_id: int) -> List[Dict[str, Any]]:
                    floor(elapsed_duration_s / 60) AS minute_of_activity,
                    round(avg(heartrate_bpm), 1)   AS heartrate_bpm,
                    round(avg(elevation_m), 0)     AS elevation_m,
-                   avg(speed_mmps::NUMERIC(25,3)) AS speed_mmps
+                   max(distance_mm)               AS distance_mm
             FROM activities.activity_details
             WHERE activity_id = %s AND elapsed_duration_s IS NOT NULL
             GROUP BY activity_id, minute_of_activity
         )
         SELECT
-            minute_of_activity,
             heartrate_bpm,
             elevation_m,
-            round(speed_mmps / 1000.0, 1) AS speed_mps,
-            CASE
-                WHEN speed_mmps = 0 OR speed_mmps IS NULL THEN NULL
-                ELSE round(%s / speed_mmps, 1)
-            END AS pace_sec_per_mi
+            round(distance_mm / 1000.0, 1) AS distance_m
         FROM pre_aggs
         ORDER BY minute_of_activity ASC
     """
-    rows = sql_to_dict(sql, (activity_id, _PACE_SEC_PER_MI_MM))
+    rows = sql_to_dict(sql, (activity_id,))
     return [
         {
-            "minute": int(r["minute_of_activity"]),
+            "distance_m": r["distance_m"],
             "elevation_m": r["elevation_m"],
             "heartrate_bpm": r["heartrate_bpm"],
-            "speed_mps": r["speed_mps"],
-            "pace_sec_per_mi": r["pace_sec_per_mi"],
-            "pace_text": _format_pace_mmss(r["pace_sec_per_mi"]),
         }
         for r in rows
     ]
@@ -441,12 +302,13 @@ def get_activity_course_path(activity_id: int) -> List[List[float]]:
 
 def get_activity_report_efforts(activity_id: int) -> List[Dict[str, Any]]:
     """
-    Retrieve course + crossed-segment comparison rows for the report (009-001, FR-3/FR-4).
+    Retrieve course + crossed-segment comparison rows for the report (004-006 T03).
 
-    Returns the activity's segment rows from vw_activity_summary (name, is_course,
-    all_time_rank, best_delta_s, prior_delta_s) plus a per-segment total_attempts
-    denominator (count(*) over vw_segment_leaderboard for the segment) per OQ-3.
-    Course detail is sourced from the leaderboard view via is_course = true (OQ-4).
+    Reads activities.vw_report_segment_efforts (T02): per-segment efforts for
+    this activity with best-excluding-current deltas, prior attempt, RANK-style
+    all-time rank, scoped total_attempts, the current attempt's efficiency
+    metrics, and prior-10 averages. Replaces the old vw_activity_summary +
+    whole-leaderboard count path (10.9 s measured; new path ~1 ms).
 
     Args:
         activity_id: The activity ID
@@ -455,22 +317,10 @@ def get_activity_report_efforts(activity_id: int) -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Effort rows ordered courses first, then start time.
     """
     sql = """
-        SELECT
-            s.segment_id,
-            s.segment_name AS name,
-            s.is_course,
-            s.all_time_rank,
-            s.best_delta_s,
-            s.prior_delta_s,
-            lb.total_attempts
-        FROM activities.vw_activity_summary s
-        LEFT JOIN (
-            SELECT segment_id, count(*) AS total_attempts
-            FROM activities.vw_segment_leaderboard
-            GROUP BY segment_id
-        ) lb ON lb.segment_id = s.segment_id
-        WHERE s.activity_id = %s
-        ORDER BY s.is_course DESC, s.activity_start_utc
+        SELECT *
+        FROM activities.vw_report_segment_efforts
+        WHERE activity_id = %s
+        ORDER BY is_course DESC, start_time_utc
     """
     result = sql_to_dict(sql, (activity_id,))
     return result if result else []
@@ -1606,11 +1456,7 @@ __all__ = [
     'get_segment_matches',
     'get_recent_activities',
     'get_activity_stats',
-    'resolve_latest_activity_id',
-    'get_activity_report_header',
-    'get_activity_report_header_view',
-    'get_activity_report_header_view_by_type',
-    'get_activity_percentile_hr',
+    'get_activity_report_target',
     'get_activity_report_efforts',
     'get_activity_report_charts',
     'get_activity_course_path',

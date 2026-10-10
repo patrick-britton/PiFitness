@@ -107,10 +107,12 @@ class ProcessActivityResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Activity Report Schemas (009-001)
+# Activity Report Schemas (009-001, reworked 004-006)
 # Mirrors the frontend cross-surface contract in
 # frontend/pifitness/src/lib/types/activity-report.ts.
-# GET /api/activities/report?activity_type=Run|Walk
+# GET /api/activities/report?activity_id=<id>?
+# Optional id; default = newest qualifying activity (run / trail run / walk /
+# hike, >1000 m, non-null activity_path — 004-006 resolved OQ-1 B).
 # ---------------------------------------------------------------------------
 
 
@@ -129,8 +131,14 @@ class ActivityReportHeader(BaseModel):
     pace_display: str = Field(..., description="Pace display from vw_activity_header_stats (e.g. '10:09.9/mi')")
     hr_median: Optional[float] = Field(None, description="Median heart rate, when available")
     hr_max: Optional[float] = Field(None, description="Maximum heart rate, when available")
-    show_efficiency_placeholder: bool = Field(
-        ..., description="True for Run/Trail activities -> show the running-efficiency placeholder"
+    activity_name: Optional[str] = Field(
+        None, description="Activity name from activities.activities (title fallback when not a course)"
+    )
+    activity_type_name: str = Field(
+        ..., description="Raw activity type name (e.g. 'running', 'trail_running', 'hiking', 'walking')"
+    )
+    distance_m: float = Field(
+        ..., description="Total activity distance in METERS (exact; x-axis max for HR/elevation charts)"
     )
 
 
@@ -150,36 +158,54 @@ class ActivityReportSegment(BaseModel):
 
 
 class ActivityElevationPoint(BaseModel):
-    """A single per-minute elevation sample."""
-    minute: int = Field(..., description="Elapsed minute (0-based) within the activity")
-    elevation_m: float = Field(..., description="Average elevation for the minute (m)")
+    """A single chart sample; x-axis is cumulative distance in meters (004-006)."""
+    distance_m: float = Field(..., description="Cumulative distance at the sample (meters)")
+    elevation_m: float = Field(..., description="Average elevation for the sample (m)")
 
 
 class ActivityHeartratePoint(BaseModel):
-    """A single per-minute heart-rate sample."""
-    minute: int = Field(..., description="Elapsed minute (0-based) within the activity")
-    heartrate_bpm: Optional[float] = Field(None, description="Average heart rate for the minute (bpm)")
-
-
-class ActivityPacePoint(BaseModel):
-    """A single per-minute pace sample (numeric + formatted text)."""
-    minute: int = Field(..., description="Elapsed minute (0-based) within the activity")
-    pace_sec_per_mi: Optional[float] = Field(None, description="Numeric pace in seconds per mile (one decimal)")
-    pace_text: Optional[str] = Field(None, description="Formatted pace as m:ss.ms")
+    """A single heart-rate chart sample; x-axis is cumulative distance in meters (004-006)."""
+    distance_m: float = Field(..., description="Cumulative distance at the sample (meters)")
+    heartrate_bpm: Optional[float] = Field(None, description="Average heart rate for the sample (bpm)")
 
 
 class ActivityReportCharts(BaseModel):
-    """Per-minute chart series served with the report."""
-    elevation: List[ActivityElevationPoint] = Field(..., description="Per-minute elevation series")
-    heartrate: List[ActivityHeartratePoint] = Field(..., description="Per-minute heart-rate series")
-    pace: List[ActivityPacePoint] = Field(..., description="Per-minute pace series")
+    """Chart series served with the report (009-006, reworked 004-006)."""
+    elevation: List[ActivityElevationPoint] = Field(..., description="Elevation series keyed by distance")
+    heartrate: List[ActivityHeartratePoint] = Field(..., description="Heart-rate series keyed by distance")
+
+
+class ActivityReportNav(BaseModel):
+    """Prev/next navigation across the qualifying-activity set (004-006)."""
+    prev_activity_id: Optional[int] = Field(
+        None, description="Prior (older) qualifying activity id; null on the oldest"
+    )
+    next_activity_id: Optional[int] = Field(
+        None, description="Next (newer) qualifying activity id; null on the newest"
+    )
+
+
+class ActivityEfficiencyMetric(BaseModel):
+    """One running-efficiency metric: current attempt vs prior-10 course average."""
+    current: Optional[float] = Field(None, description="Current attempt's value, when recorded")
+    prior10_avg: Optional[float] = Field(
+        None, description="Mean over the prior 10 attempts at the same course, when any exist"
+    )
+
+
+class ActivityReportEfficiency(BaseModel):
+    """Bullet-chart data; present only for run/trail-run course efforts, else null (004-006)."""
+    avg_cadence: ActivityEfficiencyMetric = Field(..., description="Avg cadence (spm)")
+    avg_stride_length: ActivityEfficiencyMetric = Field(..., description="Avg stride length (cm)")
+    avg_gct: ActivityEfficiencyMetric = Field(..., description="Avg ground contact time (ms)")
+    avg_vert_ratio: ActivityEfficiencyMetric = Field(..., description="Avg vertical ratio (%)")
 
 
 class ActivityReport(BaseModel):
     """Full report for a single activity."""
     activity_id: int = Field(..., description="The resolved activity id (footer caption)")
-    activity_type: Literal['Run', 'Walk'] = Field(
-        ..., description="Which activity-type selection produced this report"
+    nav: ActivityReportNav = Field(
+        ..., description="Prev/next navigation across the qualifying-activity set (004-006)"
     )
     header: ActivityReportHeader = Field(..., description="Summary header metrics")
     course: Optional[ActivityReportSegment] = Field(
@@ -191,5 +217,11 @@ class ActivityReport(BaseModel):
     has_segments: bool = Field(
         ..., description="True when the report has any course or segment rows (drives FR-5 nav)"
     )
-    charts: ActivityReportCharts = Field(..., description="Per-minute chart series (elevation/heartrate/pace)")
+    efficiency: Optional[ActivityReportEfficiency] = Field(
+        None,
+        description="Bullet data for run/trail-run course efforts; null otherwise (004-006)",
+    )
+    charts: ActivityReportCharts = Field(
+        ..., description="Chart series (elevation/heartrate) keyed by cumulative distance"
+    )
     course_path: List[List[float]] = Field(..., description="Simplified course path as [lon, lat] pairs")

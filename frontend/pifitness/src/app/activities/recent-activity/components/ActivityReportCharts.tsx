@@ -1,10 +1,13 @@
 /**
- * Activity Report Charts (009-006, T05).
+ * Activity Report Charts (009-006, reworked 004-006 T05).
  *
- * Chart.js (react-chartjs-2) plots fed by the pre-aggregated per-minute series:
- *   - Elevation: bare area chart, no labels/gridlines/titles/axis lines.
- *   - Heart rate: red line with thin axes, y = min−10 .. max+10 bpm.
- *   - Pace: green line, same style, y = numeric seconds/mile.
+ * Chart.js (react-chartjs-2) plots fed by the pre-aggregated distance-keyed series:
+ *   - Elevation: bare area chart, no labels/gridlines/titles/axis lines,
+ *     x = distance (m) 0 → activity length.
+ *   - Heart rate: red line, no gridlines/ticks, median/max reference lines,
+ *     x = distance (m) 0 → activity length. Stacked directly above elevation
+ *     at 0 px gap so the pair reads as a single chart.
+ *   - Course shape: MapLibre GL line layer (no tiles — Pi/offline friendly).
  *
  * Colors come from design-system tokens via getComputedStyle (light/dark) and are
  * rebuilt on theme change (MutationObserver), matching the TriTipChart/DbSizeView
@@ -31,7 +34,6 @@ import { Line } from 'react-chartjs-2';
 import {
   ActivityElevationPoint,
   ActivityHeartratePoint,
-  ActivityPacePoint,
 } from '@/lib/types/activity-report';
 import { tokenRgb } from '@/lib/token-color';
 
@@ -110,15 +112,22 @@ function referenceLinesPlugin(lines: { value: number; label: string; color: stri
 }
 
 /**
- * Elevation area chart: uncolored, no labels/gridlines/titles/axis lines.
- * x = elapsed minute 0→max; y = min−10 → max+10 m. Fixed height/width.
+ * Elevation area chart (004-006 T05): uncolored, no labels/gridlines/titles/
+ * axis lines. x = distance (m), fixed 0 → xMax (activity length); y = min−10
+ * → max+10 m. Zero padding/margin — the parent stacks it flush beneath HR.
  */
-export function ElevationChart({ points }: { points: ActivityElevationPoint[] }) {
+export function ElevationChart({
+  points,
+  xMax,
+}: {
+  points: ActivityElevationPoint[];
+  xMax: number;
+}) {
   const themeVersion = useThemeVersion();
   const isDark =
     typeof window !== 'undefined' &&
     document.documentElement.classList.contains('dark');
-  const data = points.map((p) => ({ x: p.minute, y: p.elevation_m }));
+  const data = points.map((p) => ({ x: p.distance_m, y: p.elevation_m }));
   const [mn, mx] = range(data) ?? [0, 0];
   const lineColor = tokenRgb('--muted', isDark);
   const fillColor = isDark ? 'rgba(148,163,184,0.25)' : 'rgba(107,114,128,0.25)';
@@ -127,10 +136,11 @@ export function ElevationChart({ points }: { points: ActivityElevationPoint[] })
   const options: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: { padding: 0 },
     plugins: { legend: { display: false }, tooltip: { enabled: false } },
     scales: {
-      x: { type: 'linear', display: false, min: 0, ticks: { display: false }, grid: { display: false } },
-      y: { type: 'linear', display: false, min: mn - 10, max: mx + 10, ticks: { display: false }, grid: { display: false } },
+      x: { type: 'linear', display: false, min: 0, max: xMax, ticks: { display: false }, grid: { display: false }, border: { display: false } },
+      y: { type: 'linear', display: false, min: mn - 10, max: mx + 10, ticks: { display: false }, grid: { display: false }, border: { display: false } },
     },
   };
   const dataset: ChartDataset<'line', XY[]> = {
@@ -155,39 +165,25 @@ export function ElevationChart({ points }: { points: ActivityElevationPoint[] })
     </div>
   );
 }
-/** Filter consecutive near-duplicate points (GPS jitter reduction). */
-function filterNearDuplicates(
-  data: XY[],
-  tol = 1e-6,
-): XY[] {
-  if (data.length < 2) return data;
-  const out: XY[] = [data[0]];
-  for (let i = 1; i < data.length; i++) {
-    const prev = out[out.length - 1];
-    if (
-      Math.abs(data[i].x - prev.x) > tol ||
-      Math.abs(data[i].y - prev.y) > tol
-    ) {
-      out.push(data[i]);
-    }
-  }
-  return out;
-}
-
-/** Shared line-chart options builder: no gridlines, no ticks, no axis labels. */
+/** Shared line-chart options builder (004-006 T05): x = distance 0 → xMax,
+ *  no gridlines, no ticks, no axis labels/lines. */
 function lineOptions(
   yRange: [number, number] | null,
+  xMax: number,
 ): ChartOptions<'line'> {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    layout: { padding: 0 },
     plugins: { legend: { display: false }, tooltip: { enabled: false } },
     scales: {
       x: {
         type: 'linear',
         min: 0,
+        max: xMax,
         ticks: { display: false },
         grid: { display: false },
+        border: { display: false },
       },
       y: {
         type: 'linear',
@@ -195,20 +191,29 @@ function lineOptions(
         max: yRange ? yRange[1] + 10 : undefined,
         ticks: { display: false },
         grid: { display: false },
+        border: { display: false },
       },
     },
   };
 }
 
-/** Heart-rate line chart: red, no gridlines/ticks, median/max reference lines. */
-export function HeartrateChart({ points }: { points: ActivityHeartratePoint[] }) {
+/** Heart-rate line chart (004-006 T05): red, median/max reference lines.
+ *  Full width; x = distance (m) 0 → xMax. Zero bottom padding/margin so the
+ *  elevation area below reads as one continuous chart (0 px seam). */
+export function HeartrateChart({
+  points,
+  xMax,
+}: {
+  points: ActivityHeartratePoint[];
+  xMax: number;
+}) {
   const themeVersion = useThemeVersion();
   const isDark =
     typeof window !== 'undefined' &&
     document.documentElement.classList.contains('dark');
   const data = points
     .filter((p) => p.heartrate_bpm != null)
-    .map((p) => ({ x: p.minute, y: p.heartrate_bpm as number }));
+    .map((p) => ({ x: p.distance_m, y: p.heartrate_bpm as number }));
   void themeVersion;
   const lineColor = tokenRgb('--danger', isDark);
 
@@ -231,12 +236,12 @@ export function HeartrateChart({ points }: { points: ActivityHeartratePoint[] })
     tension: 0.2,
   };
   return (
-    <div className="flex flex-col" aria-label="Heart rate over time" role="img">
+    <div className="flex flex-col p-0 m-0" aria-label="Heart rate over distance" role="img">
       <span className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Heart Rate</span>
-      <div className="w-full" style={{ height: 180 }}>
+      <div className="w-full p-0 m-0" style={{ height: 180 }}>
         <Line
           data={{ datasets: [dataset] }}
-          options={lineOptions(range(data))}
+          options={lineOptions(range(data), xMax)}
           plugins={[referenceLinesPlugin(refLines)]}
         />
       </div>
@@ -244,46 +249,6 @@ export function HeartrateChart({ points }: { points: ActivityHeartratePoint[] })
   );
 }
 
-/** Pace line chart: green, no gridlines/ticks, 8:00 and 9:00 reference lines. */
-export function PaceChart({ points }: { points: ActivityPacePoint[] }) {
-  const themeVersion = useThemeVersion();
-  const isDark =
-    typeof window !== 'undefined' &&
-    document.documentElement.classList.contains('dark');
-  const data = points
-    .filter((p) => p.pace_sec_per_mi != null)
-    .map((p) => ({ x: p.minute, y: p.pace_sec_per_mi as number }));
-  void themeVersion;
-  const lineColor = tokenRgb('--ok', isDark);
-
-  const refLines = [
-    { value: 480, label: '8:00', color: lineColor },
-    { value: 540, label: '9:00', color: lineColor },
-  ];
-
-  const dataset: ChartDataset<'line', XY[]> = {
-    label: 'Pace',
-    data,
-    borderColor: lineColor,
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    pointRadius: 0,
-    pointHoverRadius: 3,
-    tension: 0.2,
-  };
-  return (
-    <div className="flex flex-col" aria-label="Pace over time" role="img">
-      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Pace</span>
-      <div className="w-full" style={{ height: 180 }}>
-        <Line
-          data={{ datasets: [dataset] }}
-          options={lineOptions(range(data))}
-          plugins={[referenceLinesPlugin(refLines)]}
-        />
-      </div>
-    </div>
-  );
-}
 /**
  * Course shape (009-007, T05 / OQ-2 Option B): MapLibre GL line layer on a
  * blank style (no tile dependency — Pi/offline friendly). Renders the

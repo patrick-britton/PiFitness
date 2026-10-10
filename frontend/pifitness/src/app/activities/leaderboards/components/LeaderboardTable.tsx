@@ -337,54 +337,16 @@ export default function LeaderboardTable({ segmentId, segmentName, embedded = fa
 
   return (
     <div className="space-y-4">
-      {/* Controls: range + type + refresh */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {!embedded && (
-            <div>
-              <h3 className="text-base font-semibold text-gray-900 dark:text-white">{segmentName}</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {visibleEfforts.length} effort{visibleEfforts.length === 1 ? '' : 's'}
-              </p>
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-3">
-            <div>
-              <label htmlFor="lb-range" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Range</label>
-              <select
-                id="lb-range"
-                value={range}
-                onChange={(e) => { setRange(e.target.value as LeaderboardRange); setSelected(new Set()); }}
-                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {RANGE_OPTIONS.map((r) => (<option key={r} value={r}>{r}</option>))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="lb-type" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Type</label>
-              <select
-                id="lb-type"
-                value={type}
-                onChange={(e) => setType(e.target.value as LeaderboardType)}
-                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {TYPE_OPTIONS.map((t) => (<option key={t} value={t}>{t}</option>))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={fetchLeaderboard}
-                disabled={loading}
-                className="px-3 py-1.5 text-sm font-medium rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                aria-label="Refresh leaderboard"
-              >
-                {loading ? 'Refreshing...' : 'Refresh'}
-              </button>
-            </div>
-          </div>
+      {/* Host header (009-009 T01): suppressed when the host renders its own
+          name + X header (recent-activity embedded / focus view). */}
+      {!embedded && (
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">{segmentName}</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {visibleEfforts.length} effort{visibleEfforts.length === 1 ? '' : 's'}
+          </p>
         </div>
-      </div>
+      )}
 
       {loading && !data && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-6 text-center">
@@ -499,6 +461,49 @@ export default function LeaderboardTable({ segmentId, segmentName, embedded = fa
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Controls: range + type + refresh — below the race-generation block
+          and above the rankings table (004-006 T08 / AC-8; the description
+          moves the filters here for BOTH hosts — shared element). */}
+      {!visuals && data && (
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div>
+              <label htmlFor="lb-range" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Range</label>
+              <select
+                id="lb-range"
+                value={range}
+                onChange={(e) => { setRange(e.target.value as LeaderboardRange); setSelected(new Set()); }}
+                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {RANGE_OPTIONS.map((r) => (<option key={r} value={r}>{r}</option>))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="lb-type" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Type</label>
+              <select
+                id="lb-type"
+                value={type}
+                onChange={(e) => setType(e.target.value as LeaderboardType)}
+                className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {TYPE_OPTIONS.map((t) => (<option key={t} value={t}>{t}</option>))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={fetchLeaderboard}
+                disabled={loading}
+                className="px-3 py-1.5 text-sm font-medium rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                aria-label="Refresh leaderboard"
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

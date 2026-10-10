@@ -1961,6 +1961,108 @@
       "type": "numeric"
     }
   ],
+  "activities.vw_report_segment_efforts": [
+    {
+      "name": "segment_id",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "segment_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "is_course",
+      "nullable": true,
+      "type": "boolean"
+    },
+    {
+      "name": "activity_id",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "start_time_utc",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "elapsed_duration_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_cadence",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_stride_length",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_gct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "avg_vert_ratio",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "all_time_rank",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "total_attempts",
+      "nullable": true,
+      "type": "bigint"
+    },
+    {
+      "name": "prior_time_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "best_time_excl_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "prior_delta_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "best_delta_s",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "prior10_avg_cadence",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "prior10_avg_stride_length",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "prior10_avg_gct",
+      "nullable": true,
+      "type": "numeric"
+    },
+    {
+      "name": "prior10_avg_vert_ratio",
+      "nullable": true,
+      "type": "numeric"
+    }
+  ],
   "activities.vw_run_timing": [
     {
       "name": "activity_id",

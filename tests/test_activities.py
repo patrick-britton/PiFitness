@@ -85,41 +85,54 @@ def test_activity_segments():
 
 
 def test_activity_report_contract_shape():
-    """Test GET /api/activities/report returns the cross-surface ActivityReport
-    shape (009-001 T02), with query helpers mocked so no DB is required."""
+    """Test GET /api/activities/report returns the T01 cross-surface ActivityReport
+    shape (004-006 T03), with query helpers mocked so no DB is required."""
     import backend.api.activities as api_activities
 
-    header = {
+    target = {
         "activity_id": 1234,
-        "start_utc": "2026-09-01T12:00:00+00:00",
+        "activity_type_name": "running",
+        "activity_name": "Morning Run",
+        "start_time_utc": "2026-09-01T12:00:00+00:00",
+        "distance_m": 8046.7,
         "distance_mi": 5.0,
         "distance_display": "5.0 mi",
-        "duration_display": "45:00.0",
+        "duration_elapsed_s": 2700.0,
+        "total_time_display": "45:00.0",
         "pace_display": "9:00.0/mi",
+        "elevation_m_gain": 120.5,
         "hr_median": 150.0,
         "hr_maximum": 182.0,
-        "total_time_s": 2700.0,
-        "elevation_m_gain": 120.5,
+        "prev_activity_id": 1233,
+        "next_activity_id": 1235,
     }
     chart_rows = [
-        {"minute": 0, "elevation_m": 120, "heartrate_bpm": 155.0,
+        {"minute": 0, "distance_m": 0.0, "elevation_m": 120, "heartrate_bpm": 155.0,
          "speed_mps": 3.0, "pace_sec_per_mi": 570.5, "pace_text": "9:30.5"},
-        {"minute": 1, "elevation_m": 132, "heartrate_bpm": 168.0,
+        {"minute": 1, "distance_m": 180.5, "elevation_m": 132, "heartrate_bpm": 168.0,
          "speed_mps": 3.1, "pace_sec_per_mi": 555.0, "pace_text": "9:15.0"},
     ]
     efforts = [
         {
             "segment_id": 11,
-            "name": "My Course",
+            "segment_name": "My Course",
             "is_course": True,
             "all_time_rank": 2,
             "prior_delta_s": -12.5,
             "best_delta_s": 8.25,
             "total_attempts": 47,
+            "avg_cadence": 172.0,
+            "prior10_avg_cadence": 170.0,
+            "avg_stride_length": 110.0,
+            "prior10_avg_stride_length": 108.0,
+            "avg_gct": 240.0,
+            "prior10_avg_gct": 245.0,
+            "avg_vert_ratio": 8.5,
+            "prior10_avg_vert_ratio": 8.7,
         },
         {
             "segment_id": 22,
-            "name": "Hill Sprint",
+            "segment_name": "Hill Sprint",
             "is_course": False,
             "all_time_rank": 15,
             "prior_delta_s": 3.0,
@@ -129,15 +142,16 @@ def test_activity_report_contract_shape():
     ]
 
     import unittest.mock as mock
-    with mock.patch.object(api_activities, "get_activity_report_header_view_by_type", return_value=header), \
+    with mock.patch.object(api_activities, "get_activity_report_target", return_value=target), \
          mock.patch.object(api_activities, "get_activity_report_charts", return_value=chart_rows), \
          mock.patch.object(api_activities, "get_activity_course_path", return_value=[[-122.42, 37.77], [-122.43, 37.78]]), \
          mock.patch.object(api_activities, "get_activity_report_efforts", return_value=efforts):
-        response = client.get("/api/activities/report?activity_type=Run")
+        response = client.get("/api/activities/report?activity_id=1234")
         assert response.status_code == 200
         data = response.json()
         assert data["activity_id"] == 1234
-        assert data["activity_type"] == "Run"
+        assert "activity_type" not in data  # deprecated field dropped in T09
+        assert data["nav"] == {"prev_activity_id": 1233, "next_activity_id": 1235}
         assert data["has_segments"] is True
         assert data["header"]["total_time_text"] == "0:45:00.000"
         assert data["header"]["pace_text"] == "9:00.00/mi"
@@ -145,7 +159,10 @@ def test_activity_report_contract_shape():
         assert "hr_p75" not in data["header"]
         assert data["header"]["hr_max"] == 182.0
         assert data["header"]["elevation_m_gain"] == 120.5
-        assert data["header"]["show_efficiency_placeholder"] is True
+        assert data["header"]["activity_name"] == "Morning Run"
+        assert data["header"]["activity_type_name"] == "running"
+        assert data["header"]["distance_m"] == 8046.7
+        assert "show_efficiency_placeholder" not in data["header"]  # dropped T09
         # Course mapped from the is_course row; segments exclude the course row.
         assert data["course"]["name"] == "My Course"
         assert data["course"]["all_time_rank"] == 2
@@ -154,18 +171,24 @@ def test_activity_report_contract_shape():
         assert data["segments"][0]["name"] == "Hill Sprint"
         assert data["segments"][0]["is_course"] is False
         assert data["segments"][0]["prior_delta_s"] == 3.0
+        # Efficiency bullets populated for run course efforts.
+        assert data["efficiency"]["avg_cadence"] == {"current": 172.0, "prior10_avg": 170.0}
         # New 009-006 chart series + course path fields ride on the same report.
         assert data["course_path"] == [[-122.42, 37.77], [-122.43, 37.78]]
-        assert data["charts"]["elevation"][0] == {"minute": 0, "elevation_m": 120.0}
+        # Final chart contract (T09): distance-keyed series only — no minute
+        # keys, no pace series (extra fixture keys are ignored by the endpoint).
+        assert data["charts"]["elevation"][0] == {"distance_m": 0.0, "elevation_m": 120.0}
         assert data["charts"]["heartrate"][1]["heartrate_bpm"] == 168.0
-        assert data["charts"]["pace"][0]["pace_sec_per_mi"] == 570.5
-        assert data["charts"]["pace"][0]["pace_text"] == "9:30.5"
+        assert "pace" not in data["charts"]
 
 
 def test_activity_report_invalid_type():
-    """Test GET /api/activities/report rejects an unknown activity_type."""
-    response = client.get("/api/activities/report?activity_type=Ride")
-    assert response.status_code == 422
+    """Test GET /api/activities/report 404s on an unknown/non-qualifying id (004-006 T03)."""
+    import backend.api.activities as api_activities
+    import unittest.mock as mock
+    with mock.patch.object(api_activities, "get_activity_report_target", return_value=None):
+        response = client.get("/api/activities/report?activity_id=999999999")
+        assert response.status_code == 404
 
 
 def test_leaderboard_segments_contract_shape():
@@ -722,31 +745,38 @@ def test_stage_leaderboard_visuals_bulk_insert():
 
 
 def test_activity_report_walk_no_placeholder():
-    """Test a Walk report does not show the running-efficiency placeholder."""
+    """Test a Walk report has null efficiency (004-006 T03; the deprecated
+    activity_type/show_efficiency_placeholder fields were dropped in T09)."""
     import backend.api.activities as api_activities
     import unittest.mock as mock
 
-    header = {
+    target = {
         "activity_id": 999,
-        "start_utc": "2026-09-01T10:00:00+00:00",
+        "activity_type_name": "walking",
+        "activity_name": "Evening Walk",
+        "start_time_utc": "2026-09-01T10:00:00+00:00",
+        "distance_m": 3218.7,
         "distance_mi": 2.0,
         "distance_display": "2.0 mi",
-        "duration_display": "30:00.0",
+        "duration_elapsed_s": 1800.0,
+        "total_time_display": "30:00.0",
         "pace_display": "15:00.0/mi",
+        "elevation_m_gain": None,
         "hr_median": 120.0,
         "hr_maximum": 160.0,
-        "total_time_s": 1800.0,
-        "elevation_m_gain": None,
+        "prev_activity_id": None,
+        "next_activity_id": 1000,
     }
-    with mock.patch.object(api_activities, "get_activity_report_header_view_by_type", return_value=header), \
+    with mock.patch.object(api_activities, "get_activity_report_target", return_value=target), \
          mock.patch.object(api_activities, "get_activity_report_charts", return_value=[]), \
          mock.patch.object(api_activities, "get_activity_course_path", return_value=[]), \
          mock.patch.object(api_activities, "get_activity_report_efforts", return_value=[]):
-        response = client.get("/api/activities/report?activity_type=Walk")
+        response = client.get("/api/activities/report?activity_id=999")
         assert response.status_code == 200
         data = response.json()
-        assert data["activity_type"] == "Walk"
-        assert data["header"]["show_efficiency_placeholder"] is False
+        assert "activity_type" not in data
+        assert "show_efficiency_placeholder" not in data["header"]
+        assert data["efficiency"] is None
         assert data["course"] is None
         assert data["segments"] == []
         assert data["has_segments"] is False

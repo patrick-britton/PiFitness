@@ -1,14 +1,14 @@
 /**
  * Activity Report Types
  *
- * Cross-surface data contract for the Recent Activity Report feature (009-001).
- * Shared between the frontend (React) and backend (FastAPI Pydantic models).
+ * Cross-surface data contract for the Recent Activity Report feature (009-001,
+ * reworked by 004-006). Shared between the frontend (React) and backend
+ * (FastAPI Pydantic models in backend/schemas/activity_schemas.py).
  *
- * GET /api/activities/report?activity_type=Run|Walk
+ * GET /api/activities/report?activity_id=<id>?
+ * Optional id; default = newest qualifying activity (run / trail run / walk /
+ * hike, >1000 m, non-null activity_path — 004-006 resolved OQ-1 B).
  */
-
-/** Activity-type selector for the report target selection. */
-export type ActivityReportType = 'Run' | 'Walk';
 
 /** Metrics displayed in the report's summary header for a single activity. */
 export interface ActivityReportHeader {
@@ -34,8 +34,12 @@ export interface ActivityReportHeader {
   hr_median: number | null;
   /** Maximum heart rate, when available. */
   hr_max: number | null;
-  /** True for Run/Trail activities -> show the running-efficiency placeholder. */
-  show_efficiency_placeholder: boolean;
+  /** Activity name from activities.activities (title fallback when not a course). */
+  activity_name: string | null;
+  /** Raw activity type name (e.g. 'running', 'trail_running', 'hiking', 'walking'). */
+  activity_type_name: string;
+  /** Total activity distance in METERS (exact; x-axis max for the HR/elevation charts). */
+  distance_m: number;
 }
 
 /** A course or crossed segment with its comparison against prior/best efforts. */
@@ -56,45 +60,62 @@ export interface ActivityReportSegment {
   best_delta_s: number | null;
 }
 
-/** A single per-minute elevation sample. */
+/** A single chart sample. x-axis is cumulative distance in meters (004-006). */
 export interface ActivityElevationPoint {
-  /** Elapsed minute within the activity (0-based). */
-  minute: number;
-  /** Average elevation for the minute, in meters. */
+  /** Cumulative distance at the sample (meters). */
+  distance_m: number;
+  /** Average elevation for the sample, in meters. */
   elevation_m: number;
 }
 
-/** A single per-minute heart-rate sample. */
+/** A single heart-rate chart sample. x-axis is cumulative distance in meters (004-006). */
 export interface ActivityHeartratePoint {
-  /** Elapsed minute within the activity (0-based). */
-  minute: number;
-  /** Average heart rate for the minute, in bpm; null when no HR data. */
+  /** Cumulative distance at the sample (meters). */
+  distance_m: number;
+  /** Average heart rate for the sample, in bpm; null when no HR data. */
   heartrate_bpm: number | null;
 }
 
-/** A single per-minute pace sample (numeric + formatted text). */
-export interface ActivityPacePoint {
-  /** Elapsed minute within the activity (0-based). */
-  minute: number;
-  /** Numeric pace in seconds per mile (one decimal); null when speed is 0/unknown. */
-  pace_sec_per_mi: number | null;
-  /** Formatted pace as m:ss.ms; null when pace is undefined. */
-  pace_text: string | null;
-}
-
-/** Per-minute chart series served with the report (009-006). */
+/** Chart series served with the report (009-006, reworked 004-006). */
 export interface ActivityReportCharts {
   elevation: ActivityElevationPoint[];
   heartrate: ActivityHeartratePoint[];
-  pace: ActivityPacePoint[];
+}
+
+/** Prev/next navigation across the qualifying-activity set (004-006). */
+export interface ActivityReportNav {
+  /** Prior (older) qualifying activity id, or null when on the oldest. */
+  prev_activity_id: number | null;
+  /** Next (newer) qualifying activity id, or null when on the newest. */
+  next_activity_id: number | null;
+}
+
+/** One running-efficiency metric: current attempt vs prior-10 course average. */
+export interface ActivityEfficiencyMetric {
+  /** Current attempt's value, when recorded. */
+  current: number | null;
+  /** Mean over the prior 10 attempts at the same course, when any exist. */
+  prior10_avg: number | null;
+}
+
+/**
+ * Running-efficiency bullet-chart data (004-006). Present only for run /
+ * trail-run efforts on a course; null otherwise (replaces
+ * header.show_efficiency_placeholder).
+ */
+export interface ActivityReportEfficiency {
+  avg_cadence: ActivityEfficiencyMetric;
+  avg_stride_length: ActivityEfficiencyMetric;
+  avg_gct: ActivityEfficiencyMetric;
+  avg_vert_ratio: ActivityEfficiencyMetric;
 }
 
 /** Full report for a single activity. */
 export interface ActivityReport {
   /** The resolved activity id (footer caption). */
   activity_id: number;
-  /** Which activity-type selection produced this report. */
-  activity_type: ActivityReportType;
+  /** Prev/next navigation across the qualifying-activity set. */
+  nav: ActivityReportNav;
   /** Summary header metrics. */
   header: ActivityReportHeader;
   /** The matched course row, when the activity is a course effort; else null. */
@@ -103,7 +124,9 @@ export interface ActivityReport {
   segments: ActivityReportSegment[];
   /** True when the report has any course or segment rows (drives FR-5 nav). */
   has_segments: boolean;
-  /** Per-minute chart series (elevation, heart rate, pace) for the activity. */
+  /** Efficiency bullet data for run/trail-run course efforts; else null. */
+  efficiency: ActivityReportEfficiency | null;
+  /** Chart series (elevation, heart rate) keyed by cumulative distance. */
   charts: ActivityReportCharts;
   /** Simplified course path as [lon, lat] pairs (bare shape; no basemap). */
   course_path: number[][];
