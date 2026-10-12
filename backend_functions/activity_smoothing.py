@@ -250,7 +250,16 @@ def delete_queue_for_activity(int_a: int):
 
 def activity_post_processing_steps(activity_id: int):
     """
-    Generator that yields (step_id, elapsed_ms, error) for each sub-step of post processing for a single activity.
+    Generator for the post-processing sub-steps of a single activity.
+
+    Yields 3-tuples `(step_id, elapsed_ms, error)`:
+      - `(step_id, None, None)` is a START MARKER yielded BEFORE the sub-step
+        runs, so streaming consumers can emit a 'running' event while the step
+        is actually executing (Bug 004-007-7-5);
+      - `(step_id, elapsed_ms, error)` is the terminal tuple yielded AFTER it
+        finishes (elapsed_ms always an int).
+
+    Halts on the first sub-step error (terminal tuple with error set).
     """
     int_a = int(activity_id)
 
@@ -270,6 +279,7 @@ def activity_post_processing_steps(activity_id: int):
     ]
 
     for step_id, fn in steps:
+        yield (step_id, None, None)  # start marker — consumer emits 'running' now
         t0 = start_timer()
         error = None
         try:
@@ -331,6 +341,7 @@ def activity_post_processing_steps(activity_id: int):
         ]
 
         for step_id, fn in segment_steps:
+            yield (step_id, None, None)  # start marker — consumer emits 'running' now
             t0 = start_timer()
             error = None
             try:

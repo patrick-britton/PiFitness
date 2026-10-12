@@ -10,6 +10,7 @@ import {
   ProcessStepEvent,
   ProcessStepStartEvent,
   ProcessSummaryData,
+  PLAYLIST_STEPS,
   STEP_ORDER,
 } from '@/lib/types/activity-processing';
 import StepChecklist from './StepChecklist';
@@ -68,6 +69,14 @@ export default function ActivityProcessingPage() {
   const [steps, setSteps] = useState<ProcessStepResult[]>([]);
   const [summary, setSummary] = useState<ProcessSummaryData | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  // 004-007 OQ-1: target distance captured from the resolve_activity terminal
+  // event (read from `result`, never rendered as step text). Sync steps use
+  // static estimates from t=0; every later step sizes from this value.
+  const [distanceM, setDistanceM] = useState<number | null>(null);
+  // Bug 004-007-7-4: captured at submit so the checklist shows the six
+  // playlist rows only when this run will shuffle — mirrors the backend's
+  // `do_shuffle = is_last_run and req.music != "no_music"`.
+  const [showPlaylistSteps, setShowPlaylistSteps] = useState(false);
 
   const canSubmit = mode === 'last_walk' || music !== null;
 
@@ -77,10 +86,16 @@ export default function ActivityProcessingPage() {
     setError(null);
     setSteps([]);
     setSummary(null);
+    setDistanceM(null);
     setSubmitted(true);
 
     const startTime = Date.now();
     setLoadingStart(startTime);
+
+    // Bug 004-007-7-4: same gate as the backend's do_shuffle — the six
+    // playlist rows belong to this run only when it will shuffle.
+    const willShuffle = mode === 'last_run' && music != null && music !== 'no_music';
+    setShowPlaylistSteps(willShuffle);
 
     try {
       const request: ProcessActivityRequest =
@@ -88,8 +103,8 @@ export default function ActivityProcessingPage() {
           ? { mode, music }
           : { mode };
 
-      // Build initial pending steps
-      setSteps(STEP_ORDER.map((stepId) => ({
+      // Build initial pending steps (playlist rows only when in the flow)
+      setSteps(STEP_ORDER.filter((stepId) => willShuffle || !PLAYLIST_STEPS.has(stepId)).map((stepId) => ({
         step_id: stepId,
                 status: 'pending' as const,
         elapsed_ms: 0,
@@ -97,6 +112,18 @@ export default function ActivityProcessingPage() {
 
       // onStep — called for each running start event and each terminal step event via NDJSON
       const onStep = (event: ProcessStepStartEvent | ProcessStepEvent) => {
+        // Capture the target distance for estimate sizing (OQ-1): read from
+        // the resolve_activity terminal event's `result`, never rendered.
+        if (
+          event.step_id === 'resolve_activity' &&
+          event.status !== 'running' &&
+          'result' in event &&
+          event.result != null &&
+          typeof event.result.distance_m === 'number' &&
+          Number.isFinite(event.result.distance_m)
+        ) {
+          setDistanceM(event.result.distance_m);
+        }
         setSteps((prev) => {
           const existing = prev.find((s) => s.step_id === event.step_id);
           const next: ProcessStepResult = {
@@ -147,6 +174,7 @@ export default function ActivityProcessingPage() {
     setSummary(null);
     setSubmitted(false);
     setLoadingStart(null);
+    setShowPlaylistSteps(false);
   }, []);
 
   // Navigate to the existing Recent Activity Report placeholder sub-page (FR-15).
@@ -241,7 +269,11 @@ export default function ActivityProcessingPage() {
       {/* End-of-run confirmation (FR-14) — shown at the TOP of the results area (Bug T10-1) */}
       {!loading && summary && (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4">
-          <p className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">Processing complete</p>
+          <p className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">
+            {summary.total_elapsed_ms != null
+              ? `Complete in ${(summary.total_elapsed_ms / 1000).toFixed(1)}s`
+              : 'Processing complete'}
+          </p>
           <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
             {summary.total_elapsed_ms != null && (
               <p>
@@ -287,7 +319,12 @@ export default function ActivityProcessingPage() {
           {loading && steps.length === 0 && (
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Processing activity...</p>
           )}
-          <StepChecklist steps={steps} loadingStart={loading ? loadingStart : null} />
+          <StepChecklist
+            steps={steps}
+            loadingStart={loading ? loadingStart : null}
+            distanceM={distanceM}
+            showPlaylistSteps={showPlaylistSteps}
+          />
         </div>
       )}
 

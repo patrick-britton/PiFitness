@@ -87,6 +87,8 @@ export type ProcessStepId =
  * Step result data (populated on completion of relevant steps)
  */
 export interface ProcessStepResultData {
+  /** Target activity distance in metres (from resolve_activity, 004-007 OQ-1) */
+  distance_m?: number;
   /** Number of songs heard (from lookup_playlist) */
   song_count?: number;
   /** Number of songs sent to Spotify (from report_shuffle) */
@@ -232,3 +234,18 @@ export const STEP_ORDER: readonly ProcessStepId[] = [
   'segment_mass_confirm_3',
   'segment_update_details',
 ];
+
+/**
+ * The six playlist-shuffle step ids (Bug 004-007-7-4).
+ * These run only when the request will shuffle — the checklist hides them
+ * otherwise. Must mirror the backend gate:
+ * `do_shuffle = is_last_run and req.music != "no_music"`.
+ */
+export const PLAYLIST_STEPS: ReadonlySet<ProcessStepId> = new Set([
+  'lookup_playlist',
+  'insert_history',
+  'query_isrc_stats',
+  'send_to_spotify',
+  'verify_spotify',
+  'report_shuffle',
+]);

@@ -35,6 +35,7 @@ class ProcessActivityRequest(BaseModel):
 
 class ProcessStepResultData(BaseModel):
     """Optional result data from a processing step"""
+    distance_m: Optional[float] = Field(None, description="Target activity distance in metres (resolve_activity, 004-007 OQ-1)")
     song_count: Optional[int] = Field(None, description="Number of songs heard")
     songs_sent: Optional[int] = Field(None, description="Number of songs sent to Spotify")
     first_song: Optional[str] = Field(None, description="First song heard")

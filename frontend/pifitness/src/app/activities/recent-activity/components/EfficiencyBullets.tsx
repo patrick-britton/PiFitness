@@ -1,19 +1,21 @@
 /**
- * Efficiency Bullets (004-006 T06).
+ * Efficiency Bars (004-007 T04; replaces the 004-006 T06 bullet charts).
  *
- * Four horizontal bullet charts (current-value bar + reference line at
- * `prior10_avg`) for Cadence, Stride, GCT, and Vert Ratio. Each row is a
- * side-by-side grid: short label LEFT, Chart.js horizontal bar immediately to
- * its right, values beneath the bar. Rendered only when `efficiency != null`
- * — the backend gates that to run/trail-run efforts on a course.
+ * One precise horizontal Chart.js bar row per metric (Cadence, Stride Length,
+ * GCT, Vert Ratio): axis centered on the most-recent value (MRAV) with bounds
+ * MRAV ± 1.5·|MRAV−PAV|, the bar spans exactly MRAV→PAV, the lower value is
+ * labeled at the bar's left end and the higher value at its right end, square
+ * corners, no gridlines/axis lines. End-value labels are drawn by a small
+ * canvas plugin in the same style as the old reference-line plugin.
  *
- * Chart.js (react-chartjs-2, the house charting library) draws the bars on
- * canvas in device pixels: no viewBox stretching (which warped the old SVG
- * pills' rounded ends) and a pixel-space inline plugin for the reference
- * line. Colors resolve via `tokenRgb` with theme-aware fallbacks — never a
- * bare `rgb(var(--…))` reference to an undeclared token, which paints nothing
- * (Bug 004-006-T06-1, second recheck). Values are text-labelled so meaning
- * never rides on color alone (design-system.md).
+ * Bar color is green when the current value improves on the prior-10 average
+ * given the metric direction (higher-better: Cadence, Stride Length;
+ * lower-better: GCT, Vert Ratio) and red when worse. When MRAV equals PAV no
+ * bar is drawn — the row shows the metric value plus deemphasized
+ * "No change vs prior" text (OQ-3). Missing current or prior-10 values fall
+ * back to the existing text-only rows ("no reading / prior-10 avg
+ * unavailable / no prior attempts", AC-3). Values are text-labelled so
+ * meaning never rides on color alone (design-system.md).
  */
 'use client';
 
@@ -32,6 +34,10 @@ import {
 import { Bar } from 'react-chartjs-2';
 import type { ActivityEfficiencyMetric } from '@/lib/types/activity-report';
 import { tokenRgb } from '@/lib/token-color';
+import {
+  efficiencyBarGeometry,
+  type EfficiencyBarGeometry,
+} from '@/lib/efficiency-bar-geometry';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -40,7 +46,11 @@ export interface EfficiencyBulletDatum {
   metric: ActivityEfficiencyMetric;
   unit: string;
   format: (v: number) => string;
+  /** True for Cadence/Stride Length; false for GCT/Vert Ratio. */
+  higherBetter: boolean;
 }
+
+export type EfficiencyBarDatum = EfficiencyBulletDatum;
 
 function fmt1(v: number): string {
   return v.toFixed(1);
@@ -54,11 +64,12 @@ export const EFFICIENCY_BULLETS: Array<{
   label: string;
   unit: string;
   format: (v: number) => string;
+  higherBetter: boolean;
 }> = [
-  { key: 'avg_cadence', label: 'Cadence', unit: 'spm', format: fmt1 },
-  { key: 'avg_stride_length', label: 'Stride', unit: 'cm', format: fmt0 },
-  { key: 'avg_gct', label: 'GCT', unit: 'ms', format: fmt0 },
-  { key: 'avg_vert_ratio', label: 'Vert Ratio', unit: '%', format: fmt1 },
+  { key: 'avg_cadence', label: 'Cadence', unit: 'spm', format: fmt1, higherBetter: true },
+  { key: 'avg_stride_length', label: 'Stride Length', unit: 'cm', format: fmt0, higherBetter: true },
+  { key: 'avg_gct', label: 'GCT', unit: 'ms', format: fmt0, higherBetter: false },
+  { key: 'avg_vert_ratio', label: 'Vert Ratio', unit: '%', format: fmt1, higherBetter: false },
 ];
 
 /** Increment a version when the `dark` class on <html> toggles (theme change). */
@@ -75,82 +86,58 @@ function useThemeVersion(): number {
   return version;
 }
 
-/** Scale domain for one bullet: [0, max(current, ref) × 1.1], min span 1. */
-export function bulletDomain(
-  current: number | null,
-  ref: number | null,
-): [number, number] {
-  const peak = Math.max(current ?? 0, ref ?? 0, 0);
-  return [0, Math.max(peak * 1.1, 1)];
-}
-
-/** Fraction (0–1) of the track a value fills within a domain. */
-export function bulletFrac(value: number | null, max: number): number {
-  if (value == null || max <= 0) return 0;
-  return Math.min(Math.max(value / max, 0), 1);
-}
-
 /**
  * A prior-10 reference is usable only when present AND positive (Bug
  * 004-006-T06-2: -99.0 sentinel-poisoned averages arrive negative and must
- * never draw a line or print a nonsense value).
+ * never draw a bar or print a nonsense value).
  */
 export function refVisible(ref: number | null | undefined): ref is number {
   return ref != null && ref > 0;
 }
 
-/** Reference-line position (0–1) within the track; call only when refVisible. */
-export function refFraction(current: number | null, ref: number): number {
-  const [, hi] = bulletDomain(current, ref);
-  return bulletFrac(ref, hi);
-}
-
-interface BulletPalette {
-  bar: string;
-  ref: string;
-  refOutline: string;
+interface BarPalette {
+  good: string;
+  bad: string;
   tick: string;
-  grid: string;
 }
 
-function bulletPalette(isDark: boolean): BulletPalette {
+function barPalette(isDark: boolean): BarPalette {
   return {
-    bar: tokenRgb('--chart-1', isDark),
-    ref: tokenRgb('--warn', isDark),
-    refOutline: tokenRgb('--text', isDark),
+    good: tokenRgb('--ok', isDark),
+    bad: tokenRgb('--danger', isDark),
     tick: tokenRgb('--muted', isDark),
-    grid: tokenRgb('--grid', isDark),
   };
 }
 
-export interface BulletChartSpec {
-  data: ChartData<'bar', number[], string>;
+export interface EfficiencyBarSpec {
+  data: ChartData<'bar', number[][], string>;
   options: ChartOptions<'bar'>;
   plugins: Plugin<'bar'>[];
 }
 
 /**
- * Pure builder for one bullet row's Chart.js spec — unit-testable without a
- * canvas. Current value is the horizontal bar; the prior-10 average is a
- * vertical reference line drawn by the `bulletRefLine` inline plugin.
+ * Pure builder for one metric row's Chart.js spec — unit-testable without a
+ * canvas. The floating bar spans exactly MRAV→PAV on an MRAV-centered axis;
+ * end-value labels are drawn by the `efficiencyEndLabels` inline plugin.
  */
-export function buildBulletChart(
-  current: number | null,
-  ref: number | null,
-  max: number,
-  palette: BulletPalette,
-): BulletChartSpec {
-  const data: ChartData<'bar', number[], string> = {
+export function buildEfficiencyBar(
+  geo: EfficiencyBarGeometry,
+  current: number,
+  prior: number,
+  format: (v: number) => string,
+  palette: BarPalette,
+): EfficiencyBarSpec {
+  const color = geo.improved ? palette.good : palette.bad;
+  const data: ChartData<'bar', number[][], string> = {
     labels: [''],
     datasets: [
       {
-        // Null current (e.g. watch recorded cadence only) → empty dataset so
-        // Chart.js draws NO bar stub at the origin; the ref line still draws.
-        data: current == null ? [] : [current],
-        backgroundColor: palette.bar,
+        // Floating bar: exactly [min(MRAV,PAV), max(MRAV,PAV)].
+        data: [[Math.min(current, prior), Math.max(current, prior)]],
+        backgroundColor: color,
         borderWidth: 0,
         borderSkipped: false,
-        borderRadius: 5,
+        borderRadius: 0,
         barThickness: 14,
       },
     ],
@@ -164,34 +151,31 @@ export function buildBulletChart(
     layout: { padding: 0 },
     scales: {
       y: { display: false, grid: { display: false } },
-      x: { min: 0, max, display: false, grid: { display: false }, ticks: { display: false } },
+      x: { min: geo.min, max: geo.max, display: false, grid: { display: false }, ticks: { display: false } },
     },
   };
-  const refLine: Plugin<'bar'> = {
-    id: 'bulletRefLine',
+  const endLabels: Plugin<'bar'> = {
+    id: 'efficiencyEndLabels',
     afterDatasetsDraw(chart) {
-      if (ref == null) return;
       const { ctx, chartArea, scales } = chart;
       if (!chartArea) return;
-      const x = scales.x.getPixelForValue(ref);
-      if (!Number.isFinite(x)) return;
+      const loX = scales.x.getPixelForValue(Math.min(current, prior));
+      const hiX = scales.x.getPixelForValue(Math.max(current, prior));
+      if (!Number.isFinite(loX) || !Number.isFinite(hiX)) return;
+      const loText = format(Math.min(current, prior));
+      const hiText = format(Math.max(current, prior));
       ctx.save();
-      ctx.strokeStyle = palette.refOutline;
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(x, chartArea.top - 2);
-      ctx.lineTo(x, chartArea.bottom + 2);
-      ctx.stroke();
-      ctx.strokeStyle = palette.ref;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(x, chartArea.top - 2);
-      ctx.lineTo(x, chartArea.bottom + 2);
-      ctx.stroke();
+      ctx.font = '11px sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = palette.tick;
+      ctx.textAlign = 'right';
+      ctx.fillText(loText, Math.max(loX - 4, chartArea.left), (chartArea.top + chartArea.bottom) / 2);
+      ctx.textAlign = 'left';
+      ctx.fillText(hiText, Math.min(hiX + 4, chartArea.right), (chartArea.top + chartArea.bottom) / 2);
       ctx.restore();
     },
   };
-  return { data, options, plugins: ref != null ? [refLine] : [] };
+  return { data, options, plugins: [endLabels] };
 }
 
 function EfficiencyBulletRow({
@@ -199,48 +183,71 @@ function EfficiencyBulletRow({
   metric,
   unit,
   format,
+  higherBetter,
   palette,
-}: EfficiencyBulletDatum & { palette: BulletPalette }) {
-  // Capture the narrowed ref so TS knows it's non-null when showRef.
-  const ref = refVisible(metric.prior10_avg) ? metric.prior10_avg : null;
-  const [, hi] = bulletDomain(metric.current, ref);
-  const spec = buildBulletChart(metric.current, ref, hi, palette);
+}: EfficiencyBulletDatum & { palette: BarPalette }) {
   const curText =
     metric.current != null ? `${format(metric.current)} ${unit}` : 'no reading';
-  const refText =
-    ref != null
-      ? `prior-10 avg ${format(ref)} ${unit}`
-      : metric.prior10_avg != null
-        ? 'prior-10 avg unavailable'
-        : 'no prior attempts';
+  const priorRaw = metric.prior10_avg;
+  // AC-3 null fallback: text-only row, never a degenerate axis. A usable
+  // prior still prints its value (existing behavior); only a missing or
+  // sentinel-poisoned prior prints the unavailable/no-attempts text.
+  if (metric.current == null || !refVisible(priorRaw)) {
+    const refText =
+      metric.current == null && refVisible(priorRaw)
+        ? `prior-10 avg ${format(priorRaw)} ${unit}`
+        : priorRaw != null
+          ? 'prior-10 avg unavailable'
+          : 'no prior attempts';
+    return (
+      <div
+        data-testid="efficiency-row"
+        className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5"
+      >
+        <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-200">
+          {label}
+        </p>
+        <p className="col-start-2 shrink-0 text-left text-xs tabular-nums text-gray-500 dark:text-gray-400">
+          {curText} · {refText}
+        </p>
+      </div>
+    );
+  }
+  // OQ-3: MRAV = PAV suppresses the bar.
+  const geo = efficiencyBarGeometry(metric.current, priorRaw, higherBetter);
+  if (!geo || geo.noChange) {
+    return (
+      <div
+        data-testid="efficiency-row"
+        className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5"
+      >
+        <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-200">
+          {label}
+        </p>
+        <p className="col-start-2 shrink-0 text-left text-xs tabular-nums text-gray-500 dark:text-gray-400">
+          {curText} · <span className="opacity-70">No change vs prior</span>
+        </p>
+      </div>
+    );
+  }
+  const spec = buildEfficiencyBar(geo, metric.current, priorRaw, format, palette);
   return (
     <div
-      data-testid="bullet-row"
+      data-testid="efficiency-row"
       className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5"
     >
       <p className="truncate text-xs font-medium text-gray-700 dark:text-gray-200">
         {label}
       </p>
-      {/*
-        Bug 004-006-T06-1 (Chart.js rebuild): the bar AND the reference line
-        are canvas-drawn in device pixels (no viewBox stretch). The ref marker
-        host carries the `bullet-ref-line` test id when the ref is usable.
-      */}
-      <div
-        className="relative h-6 min-w-0"
-        {...(ref != null ? { 'data-testid': 'bullet-ref-line' } : {})}
-      >
+      <div className="relative h-6 min-w-0" data-testid="efficiency-bar">
         <Bar
           data={spec.data}
           options={spec.options}
           plugins={spec.plugins}
-          aria-label={`${label}: ${curText}, ${refText}`}
+          aria-label={`${label}: ${curText}, prior-10 avg ${format(priorRaw)} ${unit}`}
           role="img"
         />
       </div>
-      <p className="col-start-2 row-start-2 shrink-0 text-left text-xs tabular-nums text-gray-500 dark:text-gray-400">
-        {curText} · {refText}
-      </p>
     </div>
   );
 }
@@ -255,7 +262,7 @@ export function EfficiencyBullets({
     typeof window !== 'undefined' &&
     document.documentElement.classList.contains('dark');
   void themeVersion; // recompute palette on theme toggle
-  const palette = bulletPalette(isDark);
+  const palette = barPalette(isDark);
   return (
     <div
       className="mt-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4"

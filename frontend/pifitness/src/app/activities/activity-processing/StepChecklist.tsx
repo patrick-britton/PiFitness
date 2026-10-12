@@ -1,52 +1,73 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ProcessStepResult, STEP_LABELS } from '@/lib/types/activity-processing';
+import {
+  PLAYLIST_STEPS,
+  ProcessStepResult,
+  STEP_LABELS,
+  STEP_ORDER,
+  type ProcessStepId,
+} from '@/lib/types/activity-processing';
+import { estimateStepMs } from '@/lib/step-estimates';
 
 interface StepChecklistProps {
   steps: ProcessStepResult[];
   /** If provided, used to compute a live elapsed timer for the currently running step */
   loadingStart?: number | null;
+  /** Target activity distance (m) captured from the resolve_activity event; null until resolved */
+  distanceM?: number | null;
+  /** When false, the six playlist-shuffle rows are not rendered at all
+   *  (Bug 004-007-7-4) — mirrors the backend's do_shuffle gate. */
+  showPlaylistSteps?: boolean;
 }
 
-export default function StepChecklist({ steps, loadingStart }: StepChecklistProps) {
+const SYNC_STEPS: ReadonlySet<ProcessStepId> = new Set(['sync_activities', 'sync_details']);
+
+/** Estimate for one row: sync steps use their static constants from t=0 (OQ-6);
+ *  every other step needs distanceM; without it there is no bar yet. */
+export function estimateForStep(stepId: ProcessStepId, distanceM: number | null | undefined): number | null {
+  if (SYNC_STEPS.has(stepId)) return estimateStepMs(stepId, 0);
+  if (distanceM == null || !Number.isFinite(distanceM)) return null;
+  try {
+    return estimateStepMs(stepId, distanceM);
+  } catch {
+    return null;
+  }
+}
+
+/** Bar fill fraction (0–1) and over-estimate flag for a row. */
+export function barFraction(elapsedMs: number, estimateMs: number | null): { frac: number; over: boolean } {
+  if (estimateMs == null || estimateMs <= 0) return { frac: 0, over: false };
+  return { frac: Math.min(elapsedMs / estimateMs, 1), over: elapsedMs > estimateMs };
+}
+
+export default function StepChecklist({ steps, loadingStart, distanceM, showPlaylistSteps = true }: StepChecklistProps) {
   const [, setTick] = useState(0);
 
   useEffect(() => {
-    // Use 100ms interval for smooth timer updates
-    const id = setInterval(() => setTick((t) => t + 1), 100);
+    // 250 ms tick: smooth enough for the bars, cheaper than 100 ms on the Pi.
+    const id = setInterval(() => setTick((t) => t + 1), 250);
     return () => clearInterval(id);
   }, []);
 
-    // The current (running) step — exactly one during a run, pinned to the top (green)
-  const runningStep = steps.find((s) => s.status === 'running');
-
-  // Terminal steps (complete / error / skipped) — most-recent-completed first.
-  // Completed steps render gray beneath the green current step; every executed
-  // step reaches a visible terminal state here (Bug #2 / FR-12).
-  const terminalSteps = steps
-    .filter((s) => s.status === 'complete' || s.status === 'error' || s.status === 'skipped')
-    .reverse();
-
-  // Pending steps (not yet started) — keep original execution order at the bottom
-  const pendingSteps = steps.filter((s) => s.status === 'pending');
-
-  // Assemble display order: current → terminal (newest first) → pending
-  const displaySteps: ProcessStepResult[] = [
-    ...(runningStep ? [runningStep] : []),
-    ...terminalSteps,
-    ...pendingSteps,
-  ];
+  // AC-4: every STEP_ORDER row renders in execution order — no re-sorting,
+  // so all 31 rows fit a 375×667 viewport without scrolling. The six
+  // playlist rows are omitted entirely when the run won't shuffle
+  // (Bug 004-007-7-4), regardless of the skipped events the backend emits.
+  const byId = new Map(steps.map((s) => [s.step_id, s]));
+  const displaySteps: ProcessStepResult[] = STEP_ORDER.filter(
+    (id) => showPlaylistSteps || !PLAYLIST_STEPS.has(id)
+  ).map(
+    (id) => byId.get(id) ?? { step_id: id, status: 'pending' as const, elapsed_ms: 0 },
+  );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-0.5">
       {displaySteps.map((step) => {
         const label = STEP_LABELS[step.step_id];
         const isRunning = step.status === 'running';
         const isComplete = step.status === 'complete';
         const isError = step.status === 'error';
-        const isSkipped = step.status === 'skipped';
-        const isPending = step.status === 'pending';
 
         // Compute elapsed time — live for the running step, stored for terminal steps
         let elapsedMs = step.elapsed_ms;
@@ -57,111 +78,108 @@ export default function StepChecklist({ steps, loadingStart }: StepChecklistProp
           elapsedMs = Date.now() - stepStart;
         }
 
+        const estimateMs = estimateForStep(step.step_id, distanceM);
+        const { frac, over } = barFraction(elapsedMs, estimateMs);
+        const showBar = estimateMs != null && (isRunning || isComplete);
+
         return (
           <div
             key={step.step_id}
             data-testid="step-row"
             data-step-id={step.step_id}
             data-status={step.status}
-            className={`flex items-start gap-3 p-4 rounded-md border ${
+            className={`px-2 py-1 rounded border text-xs ${
               isRunning
                 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
                 : isError
                 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                : isSkipped
-                ? 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 opacity-70'
                 : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
             }`}
           >
-            <div className="flex-shrink-0 mt-0.5">
-              {isRunning && (
-                <svg className="w-5 h-5 text-green-600 dark:text-green-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              )}
-              {isComplete && (
-                <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-              {isError && (
-                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
-              {isSkipped && (
-                <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                </svg>
-              )}
-              {isPending && (
-                <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" strokeWidth={2} />
-                </svg>
-              )}
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <p className={`text-sm font-medium ${
-                  isRunning
-                    ? 'text-green-900 dark:text-green-100'
-                    : isError
+            {/* Two-column row (Bug 004-007-7-5): name/timing on the left,
+                a dedicated always-rendered bar track on the right so the
+                status bar is never squeezed into the text line. */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <span
+                  className={`shrink-0 inline-block w-1.5 h-1.5 rounded-full ${
+                    isComplete
+                      ? 'bg-green-600 dark:bg-green-400'
+                      : isRunning
+                      ? 'bg-gray-400 dark:bg-gray-500'
+                      : isError
+                      ? 'bg-red-600 dark:bg-red-400'
+                      : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                  aria-hidden="true"
+                />
+                <p className={`flex-1 truncate font-medium ${
+                  isError
                     ? 'text-red-900 dark:text-red-100'
-                    : isSkipped
-                    ? 'text-gray-500 dark:text-gray-400'
                     : 'text-gray-700 dark:text-gray-200'
                 }`}>
                   {label}
+                  {isError && step.error && (
+                    <span className="font-normal text-red-700 dark:text-red-300"> — {step.error}</span>
+                  )}
                 </p>
-                <span className={`text-xs font-mono ${
-                  isRunning
-                    ? 'text-green-700 dark:text-green-300'
-                    : isError
-                    ? 'text-red-700 dark:text-red-300'
-                    : isSkipped
-                    ? 'text-gray-500 dark:text-gray-400'
-                    : 'text-gray-500 dark:text-gray-400'
-                }`}>
-                  {isComplete || isError ? `${elapsedMs.toLocaleString()} ms` : isRunning ? `${elapsedMs.toLocaleString()} ms` : '-'}
+                <span className="shrink-0 font-mono tabular-nums text-gray-500 dark:text-gray-400">
+                  {isComplete || isError || isRunning ? `${Math.round(elapsedMs).toLocaleString()} ms` : '–'}
                 </span>
               </div>
 
-              {/* Live progress bar for the running (current) step */}
-              {isRunning && (
-                <div className="mt-2 w-full bg-green-200 dark:bg-green-800 rounded-full h-1.5 overflow-hidden">
+              {/* Dedicated bar track (AC-5): gray while running, red past the
+                  estimate (capped at full width), green on completion. The
+                  track itself is always visible; the progressbar fill only
+                  renders when there is something to show. */}
+              <div
+                data-testid="step-bar-track"
+                className="shrink-0 w-20 sm:w-28 h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700"
+              >
+                {showBar && (
                   <div
-                    className="bg-green-600 dark:bg-green-400 h-full rounded-full transition-[width] duration-300 ease-out"
-                    style={{ width: `${Math.min(95, (elapsedMs / 30000) * 100)}%` }}
-                  />
-                </div>
-              )}
-
-              {isError && step.error && (
-                <p className="mt-1 text-sm text-red-700 dark:text-red-300 break-words">
-                  {step.error}
-                </p>
-              )}
-
-              {isComplete && step.result && (
-                <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                  {/* lookup_playlist: songs heard */}
-                  {step.result.song_count != null && (
-                    <span>{step.result.song_count} songs heard. </span>
-                  )}
-                  {/* report_shuffle: songs sent to Spotify */}
-                  {step.result.songs_sent != null && (
-                    <span>{step.result.songs_sent} songs sent. </span>
-                  )}
-                  {step.result.first_song && (
-                    <span>First: {step.result.first_song}. </span>
-                  )}
-                  {step.result.last_song && (
-                    <span>Last: {step.result.last_song}. </span>
-                  )}
-                </div>
-              )}
+                    data-testid="step-bar"
+                    data-over={over && isRunning ? 'true' : 'false'}
+                    className="h-full"
+                    role="progressbar"
+                    aria-label={`${label} progress`}
+                    aria-valuenow={Math.round(frac * 100)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <div
+                      className={`h-full rounded-full ${
+                        isComplete
+                          ? 'bg-green-600 dark:bg-green-400'
+                          : over
+                          ? 'bg-red-600 dark:bg-red-400'
+                          : 'bg-gray-400 dark:bg-gray-500'
+                      }`}
+                      style={{ width: `${Math.round(frac * 100)}%` }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
+
+            {isComplete && step.result && (
+              <div className="mt-0.5 text-gray-600 dark:text-gray-300">
+                {/* lookup_playlist: songs heard */}
+                {step.result.song_count != null && (
+                  <span>{step.result.song_count} songs heard. </span>
+                )}
+                {/* report_shuffle: songs sent to Spotify */}
+                {step.result.songs_sent != null && (
+                  <span>{step.result.songs_sent} songs sent. </span>
+                )}
+                {step.result.first_song && (
+                  <span>First: {step.result.first_song}. </span>
+                )}
+                {step.result.last_song && (
+                  <span>Last: {step.result.last_song}. </span>
+                )}
+              </div>
+            )}
           </div>
         );
       })}

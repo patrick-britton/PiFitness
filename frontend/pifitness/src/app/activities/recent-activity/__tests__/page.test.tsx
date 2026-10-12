@@ -126,8 +126,8 @@ describe('RecentActivityPage segment list (AC-7)', () => {
 
     expect(await screen.findByText('1 segment:')).toBeInTheDocument();
     expect(screen.getByText('Canal Straight')).toBeInTheDocument();
-    expect(screen.getByText(/0\.58s slower/)).toBeInTheDocument();
-    expect(screen.getByText(/21:37 faster/)).toBeInTheDocument();
+    expect(screen.getByText(/0\.58s faster/)).toBeInTheDocument();
+    expect(screen.getByText(/21:37 slower/)).toBeInTheDocument();
     expect(screen.queryByText('No Segments Found.')).not.toBeInTheDocument();
   });
 

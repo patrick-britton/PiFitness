@@ -287,12 +287,24 @@ def _process_generator(req: ProcessActivityRequest):
             t0 = time.perf_counter()
             try:
                 post_row = _resolve_activity_id("Run" if is_last_run else "Walk")
+                # 004-007 OQ-1: emit the exact target's distance alongside the
+                # resolve so the UI can size per-step estimates without a
+                # pre-fetch (stale by design). One extra PK-scoped SELECT.
+                distance_m = None
+                try:
+                    distance_m = one_sql_result(
+                        "SELECT distance_m FROM activities.activities WHERE activity_id = %s",
+                        (post_row,),
+                    )
+                    distance_m = float(distance_m) if distance_m is not None else None
+                except Exception:
+                    distance_m = None
                 result = ProcessStepResult(
                     step_id="resolve_activity",
                     status="complete",
                     elapsed_ms=int((time.perf_counter() - t0) * 1000),
                     error=None,
-                    result=None,
+                    result=ProcessStepResultData(distance_m=distance_m),
                 )
             except Exception as e:
                 post_row = None
@@ -446,8 +458,14 @@ def _process_generator(req: ProcessActivityRequest):
                     substeps = activity_post_processing_steps(post_row)
                 except Exception as e:  # defensive: guarantee a terminal event (Bug #2)
                     substeps = [("post_processing", 0, str(e))]
+                # Bug 004-007-7-5: the generator yields a start marker
+                # (step_id, None, None) BEFORE each sub-step runs and the
+                # terminal (step_id, ms, error) AFTER — emit 'running' at the
+                # marker so the UI can animate while the step executes.
                 for step_id, elapsed_ms, error in substeps:
-                    yield json.dumps(_start_event(step_id)) + "\n"
+                    if elapsed_ms is None and error is None:
+                        yield json.dumps(_start_event(step_id)) + "\n"
+                        continue
                     if error:
                         has_error = True
                         step = ProcessStepResult(

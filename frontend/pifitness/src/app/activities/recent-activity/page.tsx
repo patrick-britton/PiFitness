@@ -34,12 +34,13 @@ import {
  * Tailwind dark: tokens (design-system.md).
  */
 
-/** Format an absolute delta + direction (e.g. 75 → "1:15 slower"). Shared with
- *  the course info bar; card rows use formatCardDelta (AC-7 thresholds). */
+/** Format an absolute delta + direction (e.g. 75 → "1:15 faster"). Shared with
+ *  the course info bar; card rows use formatCardDelta (AC-7 thresholds).
+ *  Deltas are reference-minus-current, so positive means this effort was faster. */
 function formatInfoDelta(delta: number | null, noun: string): string {
   if (delta == null) return `— ${noun}`;
   if (delta === 0) return `0:00 ${noun}`;
-  const label = delta > 0 ? 'slower' : 'faster';
+  const label = delta > 0 ? 'faster' : 'slower';
   return `${formatAbsMSS(delta)} ${label} ${noun}`;
 }
 
@@ -65,7 +66,7 @@ function CourseInfoBar({ course }: { course: ActivityReportSegment }) {
     course.best_delta_s != null &&
     course.prior_delta_s === course.best_delta_s
   ) {
-    text = `${formatAbsMSS(course.prior_delta_s)} ${course.prior_delta_s > 0 ? 'slower' : 'faster'} than prior/best`;
+    text = `${formatAbsMSS(course.prior_delta_s)} ${course.prior_delta_s > 0 ? 'faster' : 'slower'} than prior/best`;
   } else {
     text = `${formatInfoDelta(course.prior_delta_s, 'than prior')}, ${formatInfoDelta(course.best_delta_s, 'than best')}`;
   }
@@ -370,6 +371,7 @@ export default function RecentActivityPage() {
                 metric: report.efficiency![b.key],
                 unit: b.unit,
                 format: b.format,
+                higherBetter: b.higherBetter,
               }))}
             />
           )}

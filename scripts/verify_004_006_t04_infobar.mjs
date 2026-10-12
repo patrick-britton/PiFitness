@@ -7,7 +7,7 @@ function formatAbsMSS(delta) {
 function formatInfoDelta(delta, noun) {
   if (delta == null) return `\u2014 ${noun}`;
   if (delta === 0) return `0:00 ${noun}`;
-  return `${formatAbsMSS(delta)} ${delta > 0 ? 'slower' : 'faster'} ${noun}`;
+  return `${formatAbsMSS(delta)} ${delta > 0 ? 'faster' : 'slower'} ${noun}`;
 }
 function infoText(course) {
   const rank = course.all_time_rank;
@@ -17,14 +17,14 @@ function infoText(course) {
       : 'fastest attempt';
   if (course.prior_delta_s != null && course.best_delta_s != null
       && course.prior_delta_s === course.best_delta_s)
-    return `${formatAbsMSS(course.prior_delta_s)} ${course.prior_delta_s > 0 ? 'slower' : 'faster'} than prior/best`;
+    return `${formatAbsMSS(course.prior_delta_s)} ${course.prior_delta_s > 0 ? 'faster' : 'slower'} than prior/best`;
   return `${formatInfoDelta(course.prior_delta_s, 'than prior')}, ${formatInfoDelta(course.best_delta_s, 'than best')}`;
 }
 const cases = [
   [{ all_time_rank: 1, prior_delta_s: 211.74, best_delta_s: 211.74 }, 'faster by 3:32 vs best'],
-  [{ all_time_rank: 2, prior_delta_s: -12.5, best_delta_s: 8.25 }, '0:13 faster than prior, 0:08 slower than best'],
-  [{ all_time_rank: 3, prior_delta_s: 30, best_delta_s: 30 }, '0:30 slower than prior/best'],
-  [{ all_time_rank: 5, prior_delta_s: 75, best_delta_s: -130 }, '1:15 slower than prior, 2:10 faster than best'],
+  [{ all_time_rank: 2, prior_delta_s: 12.5, best_delta_s: -8.25 }, '0:13 faster than prior, 0:08 slower than best'],
+  [{ all_time_rank: 3, prior_delta_s: -30, best_delta_s: -30 }, '0:30 slower than prior/best'],
+  [{ all_time_rank: 5, prior_delta_s: -75, best_delta_s: 130 }, '1:15 slower than prior, 2:10 faster than best'],
 ];
 let fail = 0;
 for (const [course, want] of cases) {

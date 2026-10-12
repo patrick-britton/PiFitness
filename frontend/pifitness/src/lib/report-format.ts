@@ -2,8 +2,10 @@
  * Report delta formatting for the Recent Activity page (004-006 T07 / AC-7).
  *
  * Card prior/best deltas use absolute formatting with correct faster/slower
- * words and NEVER negative seconds:
- *   - |delta| < 1.0 s  → 2 decimals ("0.58s slower", "0.18s faster")
+ * words and NEVER negative seconds. Deltas arrive reference-minus-current
+ * (vw_report_segment_efforts: prior/best elapsed minus this effort's elapsed),
+ * so positive means this effort was FASTER:
+ *   - |delta| < 1.0 s  → 2 decimals ("0.58s faster", "0.18s slower")
  *   - |delta| < 60.0 s → whole seconds ("10s slower", "59s faster")
  *   - |delta| >= 60.0 s → m:ss ("1:01 slower", "21:37 faster")
  * Null → "—". Zero → "0.00s".
@@ -33,10 +35,10 @@ export function formatCardDelta(delta: number | null, noun?: string): string {
   const abs = Math.abs(delta);
   if (abs >= 60) {
     const mss = formatAbsMSS(delta);
-    const label = delta > 0 ? 'slower' : 'faster';
+    const label = delta > 0 ? 'faster' : 'slower';
     return noun ? `${mss} ${label} ${noun}` : `${mss} ${label}`;
   }
-  const label = delta > 0 ? 'slower' : 'faster';
+  const label = delta > 0 ? 'faster' : 'slower';
   if (abs < 1) {
     return noun ? `${abs.toFixed(2)}s ${label} ${noun}` : `${abs.toFixed(2)}s ${label}`;
   }
