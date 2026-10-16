@@ -24,6 +24,7 @@ TARGET_SCHEMAS = [
     'staging', 'staging_migration',
     'logging', 'tasks', 'api_services',
     'food', 'food_migration',
+    'volleyball',  # 006-003: volleyball surface needs cache coverage
 ]
 
 CACHE_FILE = PROJECT_ROOT / 'scripts' / 'schema_cache.json'

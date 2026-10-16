@@ -22,8 +22,13 @@ Lifecycle: active -> completed, or active -> (abandoned/deleted).
 - `tag_last_point` (006-002) annotates the most recently recorded point
   (whichever team scored it) with a notable-play event_type; it never
   creates a point and overwriting the last point's tag is allowed.
+- `insert_game_event` / `list_game_events` (006-003) append and read the
+  scorekeeper's Time Out / message rows in volleyball.game_events
+  (active-only; points are never duplicated there).
+- `add_point` stamps `first_entry_at` once (set-once; undo never clears it,
+  so the viewer's "In Warmups" state cannot return mid-game).
 - `end_game` sets status='completed' and `completed_at` = MAX(recorded_at).
-- `abandon_game` deletes the game (points cascade).
+- `abandon_game` deletes the game (points and game_events cascade).
 
 Single-active invariant (block-and-guide): creating a game while another is
 'active' raises VolleyballActiveGameExistsError carrying the blocking game,
@@ -65,6 +70,12 @@ VALID_SCORING_TEAMS = ("SR", "OPPONENT")
 # Notable-play tags writable onto a point (006-002).
 VALID_EVENT_TYPES = ("Ace", "Block", "Spike", "Dive")
 
+# Game-event kinds writable to volleyball.game_events (006-003).
+VALID_GAME_EVENT_KINDS = ("timeout", "message")
+
+# Message length bound for kind='message' (mirrors the API schema, 006-003).
+GAME_EVENT_MESSAGE_MAX = 240
+
 # ---------------------------------------------------------------------------
 # Readers
 # ---------------------------------------------------------------------------
@@ -75,6 +86,7 @@ _GAME_COLUMNS = """
             status,
             started_at,
             completed_at,
+            first_entry_at,
             label,
             notes,
             partner_number,
@@ -130,6 +142,20 @@ def get_game_points(game_id: int) -> Sequence[Dict[str, Any]]:
     return sql_to_dict(sql, (game_id,))
 
 
+def list_game_events(game_id: int) -> Sequence[Dict[str, Any]]:
+    """
+    Return all non-scoring game events (006-003) for a game, oldest first.
+    Served by the (game_id, recorded_at) index — one narrow read per poll.
+    """
+    sql = """
+        SELECT event_id, game_id, kind, message, recorded_at, created_at
+        FROM volleyball.game_events
+        WHERE game_id = %s
+        ORDER BY recorded_at, event_id
+    """
+    return sql_to_dict(sql, (game_id,))
+
+
 def get_game_score(game_id: int) -> Dict[str, int]:
     """
     Derive the score for a game by COUNT-ing points per team (event sourcing).
@@ -149,7 +175,7 @@ def get_game_score(game_id: int) -> Dict[str, int]:
 
 
 def get_game_detail(game_id: int) -> Optional[Dict[str, Any]]:
-    """Return a game with its points (oldest first) and derived score."""
+    """Return a game with its points (oldest first), events, and derived score."""
     game = get_game(game_id)
     if game is None:
         return None
@@ -157,6 +183,7 @@ def get_game_detail(game_id: int) -> Optional[Dict[str, Any]]:
         "game": game,
         "points": list(get_game_points(game_id)),
         "score": get_game_score(game_id),
+        "events": list(list_game_events(game_id)),
     }
 
 
@@ -173,6 +200,7 @@ def list_game_history() -> Sequence[Dict[str, Any]]:
             g.status,
             g.started_at,
             g.completed_at,
+            g.first_entry_at,
             g.label,
             g.notes,
             g.partner_number,
@@ -195,6 +223,7 @@ def list_game_history() -> Sequence[Dict[str, Any]]:
                 "status": r["status"],
                 "started_at": r["started_at"],
                 "completed_at": r["completed_at"],
+                "first_entry_at": r["first_entry_at"],
                 "label": r["label"],
                 "notes": r["notes"],
                 "partner_number": r["partner_number"],
@@ -256,7 +285,10 @@ def add_point(
     selected event and writes it alongside the next point). Only valid
     while the game is 'active'. The point's recorded_at is server-assigned
     (DEFAULT now()); started_at is kept equal to MIN(recorded_at) of the
-    game's points.
+    game's points, and first_entry_at is stamped once (set-once, 006-003:
+    COALESCE keeps the earliest value so undo-all cannot resurrect the
+    viewer's "In Warmups" state — it also self-heals games that already
+    had points when the column was added).
 
     Raises:
         VolleyballNotFoundError: game does not exist.
@@ -292,18 +324,24 @@ def add_point(
     if not rows:
         raise VolleyballError("Failed to record point.")
 
+    # One UPDATE piggybacks the set-once stamp on the existing started_at
+    # refresh — no extra round trip per point (Pi 5 friendly).
     err = qec(
         """
             UPDATE volleyball.games
             SET started_at = (
                 SELECT MIN(recorded_at) FROM volleyball.points WHERE game_id = %s
+            ),
+            first_entry_at = COALESCE(
+                first_entry_at,
+                (SELECT MIN(recorded_at) FROM volleyball.points WHERE game_id = %s)
             )
             WHERE game_id = %s
         """,
-        (game_id, game_id),
+        (game_id, game_id, game_id),
     )
     if err:
-        raise VolleyballError(f"Failed to refresh started_at: {err}")
+        raise VolleyballError(f"Failed to refresh started_at/first_entry_at: {err}")
     return rows[0]
 
 
@@ -426,6 +464,56 @@ def tag_last_point(game_id: int, event_type: str) -> Dict[str, Any]:
     )
     if not rows:
         raise VolleyballError("Tagged point disappeared after update.")
+    return rows[0]
+
+
+def insert_game_event(
+    game_id: int, kind: str, message: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Append a non-scoring game event (006-003): kind='timeout' (message must
+    be NULL) or kind='message' (non-blank message, 1..GAME_EVENT_MESSAGE_MAX
+    chars). Only valid while the game is 'active' — same guard style as
+    tag_last_point (404 missing game / 409 not active at the router).
+
+    Raises:
+        VolleyballNotFoundError: game does not exist.
+        VolleyballStateError: game is not 'active', bad kind, or bad message.
+    """
+    if kind not in VALID_GAME_EVENT_KINDS:
+        raise VolleyballStateError(
+            f"Invalid kind '{kind}' (expected one of {VALID_GAME_EVENT_KINDS})."
+        )
+    if kind == "timeout":
+        if message is not None:
+            raise VolleyballStateError("A timeout event must not carry a message.")
+    else:
+        if message is None or not message.strip():
+            raise VolleyballStateError("A message event requires non-blank text.")
+        if len(message) > GAME_EVENT_MESSAGE_MAX:
+            raise VolleyballStateError(
+                f"Message exceeds {GAME_EVENT_MESSAGE_MAX} characters."
+            )
+
+    game = get_game(game_id)
+    if game is None:
+        raise VolleyballNotFoundError(f"Volleyball game {game_id} not found.")
+    if game["status"] != "active":
+        raise VolleyballStateError(
+            f"Cannot record a '{kind}' on game {game_id} in status "
+            f"'{game['status']}' (expected 'active')."
+        )
+
+    rows = sql_insert_returning(
+        """
+            INSERT INTO volleyball.game_events (game_id, kind, message)
+            VALUES (%s, %s, %s)
+            RETURNING event_id, game_id, kind, message, recorded_at, created_at
+        """,
+        (game_id, kind, message),
+    )
+    if not rows:
+        raise VolleyballError("Failed to record game event.")
     return rows[0]
 
 

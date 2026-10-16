@@ -38,6 +38,9 @@ import {
   VolleyballCreateGameRequest,
   VolleyballAddPointRequest,
   VolleyballTagEventRequest,
+  VolleyballGameDetail,
+  VolleyballGameEvent,
+  VolleyballMessageRequest,
   VolleyballScoringTeam,
 } from './types/volleyball';
 import {
@@ -531,6 +534,9 @@ export const API = {
   volleyball: {
     getHistory: () => fetchAPI<VolleyballHistoryResponse>("/api/sports/volleyball"),
     getActive: () => fetchAPI<VolleyballActiveResponse>("/api/sports/volleyball/active"),
+    /** Single game + points + events + derived score (006-003); fetched on demand. */
+    getGame: (id: number) =>
+      fetchAPI<VolleyballGameDetail>(`/api/sports/volleyball/${id}`),
     createGame: (req: VolleyballCreateGameRequest) =>
       fetchAPI<VolleyballGame>("/api/sports/volleyball", {
         method: "POST",
@@ -551,6 +557,17 @@ export const API = {
         `/api/sports/volleyball/${id}/points/latest/event`,
         { method: "POST", body: JSON.stringify(req) }
       ),
+    /** Record a Time Out event on the active game (006-003). */
+    timeoutGame: (id: number) =>
+      fetchAPI<VolleyballGameEvent>(`/api/sports/volleyball/${id}/timeout`, {
+        method: "POST",
+      }),
+    /** Record a scorekeeper message on the active game (006-003). */
+    sendMessage: (id: number, req: VolleyballMessageRequest) =>
+      fetchAPI<VolleyballGameEvent>(`/api/sports/volleyball/${id}/message`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      }),
     endGame: (id: number) =>
       fetchAPI<VolleyballGame>(`/api/sports/volleyball/${id}/end`, { method: "POST" }),
     abandonGame: (id: number) =>

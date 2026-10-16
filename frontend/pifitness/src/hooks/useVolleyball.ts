@@ -12,6 +12,8 @@ import { API } from "../lib/api-client";
 import {
   VolleyballCreateGameRequest,
   VolleyballEventType,
+  VolleyballGameDetail,
+  VolleyballMessageRequest,
   VolleyballScoringTeam,
 } from "../lib/types/volleyball";
 
@@ -24,6 +26,7 @@ export const volleyballKeys = {
   history: () => [...volleyballKeys.all, "history"] as const,
   active: () => [...volleyballKeys.all, "active"] as const,
   viewerActive: () => [...volleyballKeys.all, "viewer-active"] as const,
+  detail: (id: number) => [...volleyballKeys.all, "detail", id] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -147,6 +150,43 @@ export function useTagVolleyballEvent() {
   return useMutation({
     mutationFn: ({ id, eventType }: { id: number; eventType: VolleyballEventType }) =>
       API.volleyball.tagLastEvent(id, { event_type: eventType }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: volleyballKeys.all });
+    },
+  });
+}
+
+/**
+ * Full game detail (game + points + events + score) for an expanded history
+ * card. Fetched on demand — never polled; `enabled` gates the fetch so only
+ * an expanded card triggers it.
+ */
+export function useVolleyballGameDetail({ id, enabled }: { id: number; enabled: boolean }) {
+  return useQuery({
+    queryKey: volleyballKeys.detail(id),
+    queryFn: () => API.volleyball.getGame(id),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+/** Record a Time Out event on the active game (006-003). */
+export function useTimeoutVolleyballGame() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => API.volleyball.timeoutGame(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: volleyballKeys.all });
+    },
+  });
+}
+
+/** Record a scorekeeper message on the active game (006-003). */
+export function useSendVolleyballMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, message }: { id: number; message: string }) =>
+      API.volleyball.sendMessage(id, { message }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: volleyballKeys.all });
     },

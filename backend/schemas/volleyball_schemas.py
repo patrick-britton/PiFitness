@@ -11,7 +11,7 @@ so only request bodies are strictly validated here.
 """
 
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 VolleyballScoringTeam = Literal["SR", "OPPONENT"]
@@ -55,3 +55,18 @@ class VolleyballTagEventRequest(BaseModel):
         ...,
         description="Notable-play tag written onto the most recently recorded point (either team's).",
     )
+
+
+class VolleyballMessageRequest(BaseModel):
+    """Request body for POST /api/sports/volleyball/{id}/message (006-003)."""
+    message: str = Field(
+        ..., min_length=1, max_length=240, strip_whitespace=True,
+        description="Scorekeeper text for the log as 'Scorekeeper: {message}' "
+                    "(blank after trim -> 422; mirrors GAME_EVENT_MESSAGE_MAX).",
+    )
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def _trim_message(cls, value: str) -> str:
+        """Trim so a blank-after-trim message fails min_length -> 422 (T04 verify / AC-3)."""
+        return value.strip() if isinstance(value, str) else value

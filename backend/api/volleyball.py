@@ -3,15 +3,18 @@ Volleyball Scorekeeping API Endpoints
 =====================================
 
 FastAPI endpoints for the Beach Volleyball scorekeeping feature
-(volleyball.games / volleyball.points).
+(volleyball.games / volleyball.points / volleyball.game_events).
 
-Endpoints (contract from .features/designs_active/006-001_design.md):
+Endpoints (contract: frontend/pifitness/src/lib/types/volleyball.ts):
     GET    /api/sports/volleyball                      -> game history (completed_at desc, w/ scores)
-    GET    /api/sports/volleyball/active               -> active game + points + derived score, or game: null
+    GET    /api/sports/volleyball/active               -> active game + points + events + derived score, or game: null
+    GET    /api/sports/volleyball/{id}                 -> game detail (game + points + events + score); 404 when missing (006-003)
     POST   /api/sports/volleyball                      -> create game (opponent name + SR partner); 409 if one is active
     POST   /api/sports/volleyball/{id}/points          -> add a point for a team
     DELETE /api/sports/volleyball/{id}/points/{team}   -> remove that team's most recent point
     POST   /api/sports/volleyball/{id}/points/latest/event -> tag the most recent point (either team) with an event_type (006-002)
+    POST   /api/sports/volleyball/{id}/timeout         -> record a Time Out event (active only; 404/409) (006-003)
+    POST   /api/sports/volleyball/{id}/message         -> record a scorekeeper message (active only; 404/409/422) (006-003)
     POST   /api/sports/volleyball/{id}/end             -> end game (completed_at = MAX(recorded_at))
     DELETE /api/sports/volleyball/{id}                 -> abandon game (cascade deletes its points)
 """
@@ -28,6 +31,7 @@ from backend_functions.queries import (
     add_point,
     remove_last_point,
     tag_last_point,
+    insert_game_event,
     end_game,
     abandon_game,
     VolleyballActiveGameExistsError,
@@ -39,6 +43,7 @@ from backend.schemas.volleyball_schemas import (
     VolleyballCreateGameRequest,
     VolleyballAddPointRequest,
     VolleyballTagEventRequest,
+    VolleyballMessageRequest,
 )
 
 router = APIRouter(prefix="/api/sports/volleyball", tags=["volleyball"])
@@ -49,7 +54,7 @@ def _serialize_game(game: dict) -> dict:
     if game is None:
         return None
     out = dict(game)
-    for field in ("started_at", "completed_at", "created_at"):
+    for field in ("started_at", "completed_at", "first_entry_at", "created_at"):
         if isinstance(out.get(field), datetime):
             out[field] = out[field].isoformat()
     return out
@@ -64,14 +69,24 @@ def _serialize_point(point: dict) -> dict:
     return out
 
 
+def _serialize_event(event: dict) -> dict:
+    """Normalize a game event record's timestamps to ISO strings (006-003)."""
+    out = dict(event)
+    for field in ("recorded_at", "created_at"):
+        if isinstance(out.get(field), datetime):
+            out[field] = out[field].isoformat()
+    return out
+
+
 def _serialize_detail(detail: dict) -> dict:
-    """Shape a game detail (game + points + score) to the contract."""
+    """Shape a game detail (game + points + events + score) to the contract."""
     if detail is None:
         return None
     return {
         "game": _serialize_game(detail["game"]),
         "points": [_serialize_point(p) for p in detail["points"]],
         "score": detail["score"],
+        "events": [_serialize_event(e) for e in detail["events"]],
     }
 
 
@@ -205,3 +220,62 @@ async def abandon(game_id: int):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to abandon volleyball game: {str(e)}")
+
+
+# --- 006-003 routes (declared AFTER the literal GET /active route so the
+# /{game_id} path parameter can never shadow it) ---------------------------
+
+@router.post("/{game_id}/timeout")
+async def timeout(game_id: int):
+    """
+    Record a Time Out event (006-003). Active only: 404 unknown game,
+    409 game not active. Returns the created VolleyballGameEvent.
+    """
+    try:
+        return _serialize_event(insert_game_event(game_id, "timeout"))
+    except VolleyballNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except VolleyballStateError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except VolleyballError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to record timeout: {str(e)}")
+
+
+@router.post("/{game_id}/message")
+async def message(game_id: int, req: VolleyballMessageRequest):
+    """
+    Record a scorekeeper message for the game log (006-003). Active only:
+    404 unknown game, 409 game not active, 422 blank/oversized text (schema).
+    Returns the created VolleyballGameEvent.
+    """
+    try:
+        return _serialize_event(insert_game_event(game_id, "message", req.message))
+    except VolleyballNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except VolleyballStateError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except VolleyballError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to record message: {str(e)}")
+
+
+@router.get("/{game_id}")
+async def detail(game_id: int):
+    """
+    Full game detail — game + points + events + score (006-003); used by the
+    history-card expansion. 404 when the game does not exist.
+    """
+    try:
+        found = get_game_detail(game_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail=f"Volleyball game {game_id} not found.")
+        return _serialize_detail(found)
+    except HTTPException:
+        raise
+    except VolleyballError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch volleyball game: {str(e)}")

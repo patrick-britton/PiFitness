@@ -21,6 +21,8 @@ import { useViewportStore } from '../../../stores/viewportStore';
 import { useVolleyballViewerActive } from '../../../hooks/useVolleyball';
 import VolleyballScoreChart from '../../activities/beach/components/VolleyballScoreChart';
 import VolleyballGameHistory from '../../activities/beach/components/VolleyballGameHistory';
+import VolleyballGameLog from '../../activities/beach/components/VolleyballGameLog';
+import VolleyballMomentumBar from '../../activities/beach/components/VolleyballMomentumBar';
 
 export default function BeachViewer() {
   const { layoutVariant } = useViewportStore();
@@ -101,6 +103,21 @@ export default function BeachViewer() {
       ? null
       : `Playing with #${g.partner_number}${g.partner_name ? ` ${g.partner_name}` : ''}`;
 
+  // Viewer status banner (006-003): "In Warmups" until the first entry —
+  // first_entry_at is set-once, so undoing every point cannot bring it back.
+  // Otherwise "Time out" while the latest timeout is newer than the latest
+  // point (no points yet => no banner).
+  const latestPoint = game.points[game.points.length - 1] ?? null;
+  const latestTimeout = game.events
+    .filter((e) => e.kind === 'timeout')
+    .slice(-1)[0] ?? null;
+  let banner: string | null = null;
+  if (g.first_entry_at === null) {
+    banner = 'In Warmups';
+  } else if (latestTimeout && latestPoint && latestTimeout.recorded_at > latestPoint.recorded_at) {
+    banner = 'Time out';
+  }
+
   // Non-interactive score card: same look as the scorekeeper's scoreboard
   // (including the 006-002 light-mode SR color) but with no tap targets.
   const teamDisplay = (team: 'SR' | 'OPPONENT') => {
@@ -117,7 +134,7 @@ export default function BeachViewer() {
         className="flex-1 rounded-lg p-4 flex flex-col items-center justify-center gap-2 text-center"
         style={{ backgroundColor: bgColor }}
       >
-        <p className="text-sm font-semibold text-gray-100 uppercase tracking-wide truncate max-w-full">
+        <p className="text-sm font-semibold text-gray-100 uppercase tracking-wide">
           {name}
         </p>
         <p
@@ -136,7 +153,15 @@ export default function BeachViewer() {
       {partnerLine && (
         <p className="text-sm italic text-gray-600 dark:text-gray-300">{partnerLine}</p>
       )}
-
+      {banner && (
+        <p className="text-sm italic font-semibold text-gray-600 dark:text-gray-300">{banner}</p>
+      )}
+      {/* Momentum bar (006-003): between the partner line/banner and the score boxes,
+          growing center->left (SR) / center->right (opponent). */}
+      <VolleyballMomentumBar
+        points={game.points}
+        opponentName={g.team_b_name}
+      />
       {/* Scoreboard (display only — no increment/decrement controls) */}
       <div className="flex items-stretch gap-3">
         {teamDisplay('SR')}
@@ -149,7 +174,10 @@ export default function BeachViewer() {
       {/* Event-marked running-score chart (presentational, shared) */}
       <VolleyballScoreChart detail={game} />
 
-      {/* Completed game log beneath the in-progress chart */}
+      {/* Game log beneath the in-progress chart (006-003) */}
+      <VolleyballGameLog detail={game} />
+
+      {/* Completed game history beneath the log (human request 2026-10-16) */}
       <VolleyballGameHistory />
     </div>
   );

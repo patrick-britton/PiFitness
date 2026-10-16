@@ -25,6 +25,8 @@ import {
   useRemoveVolleyballPoint,
   useEndVolleyballGame,
   useAbandonVolleyballGame,
+  useTimeoutVolleyballGame,
+  useSendVolleyballMessage,
 } from '../../../../hooks/useVolleyball';
 import {
   VolleyballBlockedResponse,
@@ -33,6 +35,7 @@ import {
 } from '../../../../lib/types/volleyball';
 import VolleyballScoreChart from './VolleyballScoreChart';
 import VolleyballGameHistory from './VolleyballGameHistory';
+import VolleyballMomentumBar from './VolleyballMomentumBar';
 
 /** Extract a 409 blocked_by payload from a fetchAPI error message. */
 function parseBlocked(error: unknown): VolleyballBlockedResponse | null {
@@ -70,12 +73,15 @@ export default function BeachVolleyball() {
   const removePoint = useRemoveVolleyballPoint();
   const endGame = useEndVolleyballGame();
   const abandonGame = useAbandonVolleyballGame();
+  const timeoutGame = useTimeoutVolleyballGame();
+  const sendMessage = useSendVolleyballMessage();
 
   const [opponentName, setOpponentName] = useState('');
   const [partnerNumber, setPartnerNumber] = useState('');
   const [partnerName, setPartnerName] = useState('');
   const [pendingEvent, setPendingEvent] = useState<VolleyballEventType | null>(null);
   const [confirmAbandon, setConfirmAbandon] = useState(false);
+  const [message, setMessage] = useState('');
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -142,6 +148,12 @@ export default function BeachVolleyball() {
       if (count <= 0) return;
       removePoint.mutate({ id: g.game_id, scoringTeam: team });
     };
+    const handleTimeout = () => {
+      timeoutGame.mutate(g.game_id);
+    };
+    const handleSendMessage = () => {
+      sendMessage.mutate({ id: g.game_id, message }, { onSuccess: () => setMessage('') });
+    };
     const teamCard = (team: VolleyballScoringTeam) => {
       const isSR = team === 'SR';
       const teamScore = isSR ? score.sr : score.opponent;
@@ -156,7 +168,7 @@ export default function BeachVolleyball() {
           className="flex-1 rounded-lg p-4 flex flex-col items-center justify-center gap-2 text-center"
           style={{ backgroundColor: bgColor }}
         >
-          <p className="text-sm font-semibold text-gray-100 uppercase tracking-wide truncate max-w-full">
+          <p className="text-sm font-semibold text-gray-100 uppercase tracking-wide">
             {name}
           </p>
           <button
@@ -186,6 +198,12 @@ export default function BeachVolleyball() {
         {partnerLine && (
           <p className="text-sm italic text-gray-600 dark:text-gray-300">{partnerLine}</p>
         )}
+        {/* Momentum bar (006-003): between the partner line and the score boxes,
+            growing center->left (SR) / center->right (opponent). */}
+        <VolleyballMomentumBar
+          points={game.points}
+          opponentName={g.team_b_name}
+        />
         {/* Prominent scoreboard */}
         <div className="flex items-stretch gap-3">
           {teamCard('SR')}
@@ -272,7 +290,9 @@ export default function BeachVolleyball() {
         {(addPoint.isError ||
           removePoint.isError ||
           endGame.isError ||
-          abandonGame.isError) && (
+          abandonGame.isError ||
+          timeoutGame.isError ||
+          sendMessage.isError) && (
           <div className="rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 text-sm text-red-700 dark:text-red-300">
             An action failed — the scoreboard will refresh automatically.
           </div>
@@ -280,6 +300,13 @@ export default function BeachVolleyball() {
 
         {/* End Game / Abandon (below the chart) */}
         <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => timeoutGame.mutate(g.game_id)}
+            disabled={timeoutGame.isPending}
+            className="min-h-[44px] px-4 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            Time out
+          </button>
           <button
             onClick={() => endGame.mutate(g.game_id)}
             disabled={endGame.isPending}
@@ -314,6 +341,26 @@ export default function BeachVolleyball() {
               </button>
             </span>
           )}
+        </div>
+
+        {/* Scorekeeper message (006-003) */}
+        <div className="flex gap-2 mt-2">
+          <input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Message to the fans…"
+            maxLength={240}
+            disabled={sendMessage.isPending}
+            className="flex-1 min-h-[44px] rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white px-3 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Scorekeeper message"
+          />
+          <button
+            onClick={handleSendMessage}
+            disabled={!message.trim() || sendMessage.isPending}
+            className="min-h-[44px] px-4 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            {sendMessage.isPending ? 'Sending…' : 'Send'}
+          </button>
         </div>
       </div>
     );

@@ -8342,5 +8342,126 @@
       "nullable": true,
       "type": "text"
     }
+  ],
+  "volleyball.game_events": [
+    {
+      "name": "event_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "game_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "kind",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "message",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "recorded_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "created_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "volleyball.games": [
+    {
+      "name": "game_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "team_b_name",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "status",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "started_at",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "completed_at",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "label",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "notes",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "created_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "partner_number",
+      "nullable": true,
+      "type": "integer"
+    },
+    {
+      "name": "partner_name",
+      "nullable": true,
+      "type": "text"
+    },
+    {
+      "name": "first_entry_at",
+      "nullable": true,
+      "type": "timestamp with time zone"
+    }
+  ],
+  "volleyball.points": [
+    {
+      "name": "point_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "game_id",
+      "nullable": false,
+      "type": "integer"
+    },
+    {
+      "name": "scoring_team",
+      "nullable": false,
+      "type": "text"
+    },
+    {
+      "name": "recorded_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "created_at",
+      "nullable": false,
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "event_type",
+      "nullable": true,
+      "type": "text"
+    }
   ]
 }

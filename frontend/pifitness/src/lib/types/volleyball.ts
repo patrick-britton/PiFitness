@@ -4,20 +4,26 @@
  * Cross-surface data contract for the Beach Volleyball scorekeeping feature.
  * Shared between frontend (React) and backend (FastAPI Pydantic models).
  *
- * Maps directly to the pre-built backend tables (no migrations; designs 006-001 + 006-002):
+ * Maps directly to the backend tables (designs 006-001, 006-002, 006-003;
+ * 006-003 adds its own DDL — see .features/migrations/006-003_*):
  *   volleyball.games   (game lifecycle; Team A is always "SR"; 006-002 adds
- *                       partner_number/partner_name for match context)
+ *                       partner_number/partner_name for match context;
+ *                       006-003 adds first_entry_at — set-once first entry)
  *   volleyball.points  (one row per scored point — event sourcing;
  *                       score is derived by counting rows, never stored;
  *                       006-002 adds event_type for notable-play tags)
+ *   volleyball.game_events (scorekeeper Time Out / message rows; 006-003)
  *
  * Endpoints (backend/api/volleyball.py, prefix /api/sports/volleyball):
  *   GET    /api/sports/volleyball                      -> game history (completed_at desc, w/ final scores)
- *   GET    /api/sports/volleyball/active               -> active game + points + derived score, or game: null
+ *   GET    /api/sports/volleyball/active               -> active game + points + events + derived score, or game: null
+ *   GET    /api/sports/volleyball/{id}                 -> game detail (game + points + events + score); 404 if missing (006-003)
  *   POST   /api/sports/volleyball                      -> create game (opponent name + SR partner); 409 if one is active
  *   POST   /api/sports/volleyball/{id}/points          -> add a point for a team
  *   DELETE /api/sports/volleyball/{id}/points/{team}   -> remove that team's most recent point
  *   POST   /api/sports/volleyball/{id}/points/latest/event -> tag the most recent point (either team) with an event_type (006-002)
+ *   POST   /api/sports/volleyball/{id}/timeout         -> record a Time Out event (active only; 404/409) (006-003)
+ *   POST   /api/sports/volleyball/{id}/message         -> record a scorekeeper message (active only; 404/409/422) (006-003)
  *   POST   /api/sports/volleyball/{id}/end             -> end game (completed_at = MAX(recorded_at))
  *   DELETE /api/sports/volleyball/{id}                 -> abandon game (cascade deletes its points)
  */
@@ -48,6 +54,10 @@ export interface VolleyballGame {
   started_at: string | null;
   /** MAX(recorded_at) of this game's points once completed. */
   completed_at: string | null;
+  /** First recorded entry of the game (006-003). Set once by the first point
+   * and never reset by undo; null until then — drives the viewer's
+   * "In Warmups" banner. */
+  first_entry_at: string | null;
   /** SR side's partner jersey number for this match (006-002). Nullable in the
    *  DB for pre-006-002 rows; required by the API at creation going forward. */
   partner_number: number | null;
@@ -89,6 +99,29 @@ export interface VolleyballScore {
   opponent: number;
 }
 
+/** Kind of non-scoring game event (006-003). */
+export type VolleyballGameEventKind = 'timeout' | 'message';
+
+/**
+ * A scorekeeper-recorded game event (006-003).
+ * Maps to volleyball.game_events — Time Out clicks and messages to the fans.
+ * Points are never duplicated here; the game log merges points + events.
+ */
+export interface VolleyballGameEvent {
+  /** Primary key (SERIAL). */
+  event_id: number;
+  /** Parent game id. */
+  game_id: number;
+  /** Event kind: 'timeout' drives the viewer banner; both kinds land in the log. */
+  kind: VolleyballGameEventKind;
+  /** Message text for kind='message'; null for kind='timeout'. */
+  message: string | null;
+  /** Server-assigned timestamp (DEFAULT now()). */
+  recorded_at: string;
+  /** Row creation time. */
+  created_at: string;
+}
+
 /** A game enriched with its points and derived score. */
 export interface VolleyballGameDetail {
   /** The game record. */
@@ -97,6 +130,8 @@ export interface VolleyballGameDetail {
   points: VolleyballPoint[];
   /** Score derived by counting points per team. */
   score: VolleyballScore;
+  /** Non-scoring game events in recorded order (recorded_at asc; 006-003). */
+  events: VolleyballGameEvent[];
 }
 
 /** A completed game with its final derived score (history list). */
@@ -157,4 +192,10 @@ export interface VolleyballAddPointRequest {
 export interface VolleyballTagEventRequest {
   /** The notable-play tag to write onto the most recently recorded point. */
   event_type: VolleyballEventType;
+}
+
+/** Request body for POST /api/sports/volleyball/{id}/message (006-003). */
+export interface VolleyballMessageRequest {
+  /** Scorekeeper text for the log as "Scorekeeper: {message}" (1..240 chars; server validates). */
+  message: string;
 }

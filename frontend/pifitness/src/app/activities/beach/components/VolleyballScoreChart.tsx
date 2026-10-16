@@ -15,7 +15,7 @@
  *     (Bug T08-5: drawn as a canvas polygon, not Chart.js' asterisk 'star')
  *   - no legend, no chart title, no gridlines, no axis titles
  *   - marker only on the most recent point of each line
- *   - y-axis fixed to 28 points (begins at 0)
+ *   - y-axis auto-scales to the score; x-axis covers every point (21-point minimum on both; see volleyballAxis)
  */
 'use client';
 
@@ -77,6 +77,20 @@ function drawFivePointStar(
 // plugin's closure goes stale. This plugin instead reads the current
 // entries and color from chart.options, which react-chartjs-2 propagates
 // on every render.
+// Pure axis sizing (006-003, AC-5): y max = max(21, sr, opp); x slots =
+// max(21 + min(sr, opp), pointCount) — a deuce never clips the final point
+// and sub-21 games still get a full 21-slot axis.
+export function volleyballAxis(
+  sr: number,
+  opp: number,
+  pointCount: number
+): { yMax: number; axisLength: number } {
+  return {
+    yMax: Math.max(21, sr, opp),
+    axisLength: Math.max(21 + Math.min(sr, opp), pointCount),
+  };
+}
+
 const eventMarkerPlugin: Plugin<'line'> = {
   id: 'volleyballEventMarkers',
   afterDatasetsDraw(chart) {
@@ -130,42 +144,29 @@ export default function VolleyballScoreChart({ detail }: VolleyballScoreChartPro
   const srColor = isDark ? '#750530' : '#050C46';
   const oppColor = isDark ? '#9ca3af' : '#6b7280';
 
-  // Pre-drawn horizontal axis (T10, human request 2026-08-31): the axis is 28
-  // sequence slots wide from the first point and only extends past 28 when
-  // more than 28 points are recorded.
-  const axisLength = Math.max(28, points.length);
+  const srScores: number[] = [];
+  const oppScores: number[] = [];
+  let sr = 0;
+  let opponent = 0;
+  const tagged = new Set<number>();
+  const eventMarkers: { index: number; letter: string; srLed: boolean }[] = [];
+  points.forEach((p, i) => {
+    if (p.scoring_team === 'SR') sr += 1; else opponent += 1;
+    srScores.push(sr);
+    oppScores.push(opponent);
+    if (p.event_type) {
+      tagged.add(i);
+      eventMarkers.push({
+        index: i,
+        letter: p.event_type.charAt(0),
+        srLed: sr >= opponent,
+      });
+    }
+  });
+
+  const axis = volleyballAxis(sr, opponent, points.length);
 
   const data: ChartData<'line'> = useMemo(() => {
-    const srScores: number[] = [];
-    const oppScores: number[] = [];
-    let sr = 0;
-    let opponent = 0;
-
-    // 006-002: indices of event-tagged points. Star markers live on the SR
-    // line regardless of which team actually scored the tagged point.
-    const tagged = new Set<number>();
-    const eventMarkers: { index: number; letter: string; srLed: boolean }[] = [];
-    points.forEach((p, i) => {
-      if (p.scoring_team === 'SR') {
-        sr += 1;
-      } else {
-        opponent += 1;
-      }
-      srScores.push(sr);
-      oppScores.push(opponent);
-      if (p.event_type) {
-        tagged.add(i);
-        // Letter + position rule (OQ-3): above the star when SR led or tied
-        // after this point, below when SR trailed. Carried ON the dataset —
-        // the data path is what react-chartjs-2 provably propagates (T08-8).
-        eventMarkers.push({
-          index: i,
-          letter: p.event_type.charAt(0),
-          srLed: sr >= opponent,
-        });
-      }
-    });
-
     const lastIndex = srScores.length - 1;
     // Tagged points get a plugin-drawn 5-point star (Bug T08-5), so their
     // default marker is hidden (radius 0) with an enlarged hit radius so
@@ -182,10 +183,10 @@ export default function VolleyballScoreChart({ detail }: VolleyballScoreChartPro
     const oppPointRadius = oppScores.map((_, i) => (i === lastIndex ? 5 : 0));
     const oppHoverRadius = oppScores.map((_, i) => (i === lastIndex ? 6 : 2));
 
-    // Pad all per-point arrays out to the pre-drawn axis length with null/0
+    // Pad all per-point arrays out to the drawn axis length with null/0
     // values: Chart.js draws nothing for null data, so the lines stop at the
-    // last real point and the empty 28-slot tail stays blank (T10).
-    const pad = <T,>(xs: T[], filler: T) => [...xs, ...Array(axisLength - xs.length).fill(filler)];
+    // last real point and the empty tail stays blank.
+    const pad = <T,>(xs: T[], filler: T) => [...xs, ...Array(axis.axisLength - xs.length).fill(filler)];
     const srPad = pad(srScores, null);
     const oppPad = pad(oppScores, null);
     const srDataset: VolleyballSrDataset = {
@@ -204,7 +205,7 @@ export default function VolleyballScoreChart({ detail }: VolleyballScoreChartPro
     };
 
     return {
-      labels: Array.from({ length: axisLength }, (_, i) => i + 1),
+      labels: Array.from({ length: axis.axisLength }, (_, i) => i + 1),
       datasets: [
         srDataset,
         {
@@ -255,7 +256,7 @@ export default function VolleyballScoreChart({ detail }: VolleyballScoreChartPro
           grid: { display: false },
           border: { display: false },
           beginAtZero: true,
-          suggestedMax: 28,
+          suggestedMax: axis.yMax,
           precision: 0,
         },
       },
@@ -271,7 +272,7 @@ export default function VolleyballScoreChart({ detail }: VolleyballScoreChartPro
         },
       },
     }),
-    [isDark, themeVersion],
+    [isDark, themeVersion, axis.yMax],
   );
 
   if (!detail || !detail.points.length) {
