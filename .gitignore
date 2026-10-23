@@ -247,3 +247,10 @@ prod-latest.dump
 # --- OAuth tokens (removed from tracking; rewritten from history) ---
 garmin_tokens.json
 oauth1_token.json
+
+# --- Additional artifacts (cleanup gaps) ---
+secret-test.txt
+prod-sanitized.dump
+prod-schema-reference.dump
+*.bak
+*.tsbuildinfo

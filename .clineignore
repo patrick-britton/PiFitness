@@ -79,3 +79,10 @@ backend/.env
 # --- OAuth tokens (must never be read by Cline) ---
 garmin_tokens.json
 oauth1_token.json
+
+# --- Large dumps and secrets Cline must never read ---
+prod-sanitized.dump
+prod-schema-reference.dump
+
+# --- Binary assets ---
+*.wasm
