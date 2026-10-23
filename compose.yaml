@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgis/postgis:18-3.6-alpine
+    container_name: pifitness-dev-db
+    environment:
+      POSTGRES_DB: pifitness_dev
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: devpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d pifitness_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
