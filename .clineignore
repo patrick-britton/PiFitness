@@ -1,0 +1,81 @@
+# ─── Cline self-protection ─────────────────────────────
+# Prevents Cline from modifying its own ignore rules.
+.clineignore
+.clinerules/
+
+# ─── Dependencies ─────────────────────────────────────
+node_modules/
+**/node_modules/
+.pnp
+.pnp.js
+.venv/
+venv/
+**/__pycache__/
+
+# ─── Build outputs ────────────────────────────────────
+dist/
+build/
+.next/
+out/
+.nuxt/
+.output/
+.vercel/
+target/
+
+# ─── Test & tooling artifacts ─────────────────────────
+coverage/
+.nyc_output/
+jest-results/
+playwright-report/
+test-results/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# ─── Environment & secrets ────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+secrets/
+
+# ─── Data files (critical for DB-heavy projects) ───────
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.sqlite
+*.sqlite3
+*.db
+*.parquet
+*.dump
+*.sql
+
+# ─── Generated code ───────────────────────────────────
+src/generated/
+*.min.js
+*.min.css
+*.map
+
+# ─── Large lock files (optional—uncomment if needed) ───
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ─── Logs ─────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+
+# ─── Miscellaneous clutter ────────────────────────────
+.DS_Store
+Thumbs.db
+secret-test.txt
+prod-schema-reference.dump
+prod-latest.dump
+backend/.env
+.env
+
+# --- OAuth tokens (must never be read by Cline) ---
+garmin_tokens.json
+oauth1_token.json
