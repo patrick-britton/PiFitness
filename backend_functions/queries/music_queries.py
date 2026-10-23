@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional, Sequence, Union, Callable
 from datetime import datetime
 from backend_functions.database_functions import qec, sql_to_dict, sql_to_list, sql_to_lookup_dict, one_sql_result, get_conn
 from backend_functions.music_functions import elo_update
-from backend.schemas.music_schemas import Track, Playlist, TrackRecommendation
+from backend_functions.schemas.music_schemas import Track, Playlist, TrackRecommendation
 
 def get_rating_eligible_count() -> int:
     """

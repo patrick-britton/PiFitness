@@ -31,7 +31,7 @@ from backend_functions.queries import (
     ExerciseNameConflictError,
     ExerciseValidationError,
 )
-from backend.schemas.exercises_schemas import (
+from backend_functions.schemas.exercises_schemas import (
     ExerciseAttemptCreateRequest,
     ExerciseCreateRequest,
     ExerciseUpdateRequest,

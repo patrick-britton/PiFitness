@@ -23,7 +23,7 @@ import json
 
 import backend_functions.activity_smoothing as sm
 import backend.api.activities as act
-from backend.schemas.activity_schemas import ProcessActivityRequest
+from backend_functions.schemas.activity_schemas import ProcessActivityRequest
 
 
 def _events(req):

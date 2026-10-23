@@ -38,7 +38,7 @@ from backend_functions.music_functions import (
 )
 from backend_functions.ultimate_task_executioner_v2 import ultimate_task_executioner
 
-from backend.schemas.activity_schemas import (
+from backend_functions.schemas.activity_schemas import (
     ProcessActivityRequest,
     ProcessActivityResponse,
     ProcessStepResult,
@@ -55,7 +55,7 @@ from backend.schemas.activity_schemas import (
     ActivityElevationPoint,
     ActivityHeartratePoint,
 )
-from backend.schemas.leaderboard_schemas import (
+from backend_functions.schemas.leaderboard_schemas import (
     Leaderboard,
     LeaderboardEffort,
     LeaderboardVisualsRequest,

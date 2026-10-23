@@ -24,7 +24,7 @@ else:
     print(f"Warning: .env file not found at {env_path}")
 
 from backend_functions.database_functions import sql_to_dict, get_conn
-from backend.schemas import Activity, HeartRate, SleepData, Track, Playlist, TaskExecution
+from backend_functions.schemas import Activity, HeartRate, SleepData, Track, Playlist, TaskExecution
 
 def get_table_columns(schema, table):
     """Get column information for a specific table"""

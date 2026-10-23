@@ -242,7 +242,7 @@ def test_delete_entry(monkeypatch):
 
 
 def test_kcal_for_fda_label_table():
-    from backend.schemas.food_contract_schemas import UNIT_TO_G_OR_ML
+    from backend_functions.schemas.food_contract_schemas import UNIT_TO_G_OR_ML
     k = fq.food_queries._kcal_for
     assert k(100, "g", 160.0, conversions=UNIT_TO_G_OR_ML) == 160.0
     assert k(1, "cup", 100.0, conversions=UNIT_TO_G_OR_ML) == 240.0
@@ -369,7 +369,7 @@ def _food_fixture(**over):
 
 def test_kcal_for_dynamic_recipe_serving_unit():
     """OQ-2: unit == the food's own serving_unit resolves via serving_size."""
-    from backend.schemas.food_contract_schemas import UNIT_TO_G_OR_ML
+    from backend_functions.schemas.food_contract_schemas import UNIT_TO_G_OR_ML
     k = fq.food_queries._kcal_for
     assert k(3, "pancake", 200.0, serving_size=40.0, serving_unit="pancake",
              conversions=UNIT_TO_G_OR_ML) == 240.0

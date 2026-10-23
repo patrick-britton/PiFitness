@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from backend_functions.database_functions import sql_to_dict
-from backend.schemas.segment_schemas import (
+from backend_functions.schemas.segment_schemas import (
     CreateSegmentRequest,
     CreateSegmentResponse,
     ConfirmMatchRequest,

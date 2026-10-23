@@ -39,7 +39,7 @@ from backend_functions.queries import (
     VolleyballStateError,
     VolleyballError,
 )
-from backend.schemas.volleyball_schemas import (
+from backend_functions.schemas.volleyball_schemas import (
     VolleyballCreateGameRequest,
     VolleyballAddPointRequest,
     VolleyballTagEventRequest,

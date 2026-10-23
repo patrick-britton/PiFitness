@@ -36,7 +36,7 @@ from backend_functions.queries import (
     TriTipError,
 )
 from backend_functions.tri_tip_prediction import build_tri_tip_prediction
-from backend.schemas.tri_tip_schemas import (
+from backend_functions.schemas.tri_tip_schemas import (
     TriTipInitiateRequest,
     TriTipPlaceRequest,
     TriTipReadingRequest,

@@ -58,7 +58,7 @@ from backend_functions.queries.food_queries import (
     set_food_deleted,
     update_food,
 )
-from backend.schemas.food_contract_schemas import (
+from backend_functions.schemas.food_contract_schemas import (
     CombinedSearchResult,
     CookState,
     CookStateUpdate,
