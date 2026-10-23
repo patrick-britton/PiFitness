@@ -343,7 +343,7 @@ export default function RecipeCreate({ onBack, onSaved, edit }: {
             )}
             <AmountPicker value={{ qty: confirmQty, unit: confirmUnit }}
               extraUnit={confirm.recipe_serving_unit ?? null}
-              onChange={(a) => { setConfirmQty(a.qty); setConfirmUnit(a.unit); }} />
+              onChange={(a) => { setConfirmQty(a.qty ?? 0); setConfirmUnit(a.unit); }} />
             {persistErr != null && <ErrorBox label="Add ingredient" message={persistErr} />}
             <div className="flex gap-2">
               <button type="button" disabled={persisting}

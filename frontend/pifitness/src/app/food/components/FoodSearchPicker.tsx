@@ -290,8 +290,10 @@ export default function FoodSearchPicker({ onPick, leading, onQueryChange }: Foo
     // 010-005 T10: recipe rows carry their own serving label (e.g. pancake)
     // straight through — feedServing only knows g/ml, so it stays separate.
     const recipeUnit = h.kind === 'db-recipe' ? (h.serving_unit?.trim() || null) : null;
+    // 010-006 T12: title-case the picked name for display
+    const titledName = h.name.replace(/(^\w|\\s\w)/g, c => c.toUpperCase());
     onPick({
-      food_id: h.food_id, name: h.name,
+      food_id: h.food_id, name: titledName,
       mode_qty: h.mode_qty, mode_unit: h.mode_unit,
       kcalPer100g: h.kcal_preview, rank: h.rank, result_source: h.result_source,
       query: q.trim(),
@@ -518,6 +520,7 @@ export default function FoodSearchPicker({ onPick, leading, onQueryChange }: Foo
                       <span className="flex min-w-0 items-center gap-2">
                         <span title={h.kind} className={`rounded-full px-2 py-0.5 text-xs font-medium ${SOURCE_STYLE[h.kind]}`}>{SOURCE_ICON[h.kind]}</span>
                         <span className="truncate text-gray-900 dark:text-white">{h.name}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400"> {h.mode_qty !== undefined && h.mode_unit !== undefined ? h.mode_qty + ' ' + h.mode_unit : ''}</span>
                       </span>
                       <span className="flex shrink-0 items-center gap-2">
                         {qualityPercentLabel(h) != null && (

@@ -18,7 +18,7 @@ if os.path.exists(_load_dotenv_backend):
     load_dotenv(_load_dotenv_backend, override=False)
 
 # Import config for platform-aware DB host detection
-from backend.config import get_settings
+from backend_functions.config import get_settings
 
 
 def start_timer():
@@ -122,6 +122,7 @@ def sql_to_dict(query_str, params=None):
     else:
         cur.execute(query_str)
     rows = cur.fetchall()  # list of dicts if using RealDictCursor
+    conn.commit()  # commit so writes (UPDATE/INSERT/DELETE with RETURNING) persist
     cur.close()
     conn.close()
     return rows

@@ -12,6 +12,8 @@ without reshaping. Nutrient fields are nested under `nutrients` (FoodRow) /
 """
 
 import json
+import math
+from collections import defaultdict
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -153,33 +155,89 @@ def get_usual_foods(
 ) -> Sequence[Dict[str, Any]]:
     """Time-of-day-weighted usuals (serve view; excludes review/NULL-kcal).
 
-    `at` (ISO instant) is accepted per the contract signature; the serve view
-    weights by the current server hour, so it is validated upstream and not
-    threaded into the fixed view expression.
+    Reweighted per OQ-3: each food is scored by summing a time-of-day
+    proximity weight over every log, decayed by log age:
+
+        score(f) = Σ exp(-d_i^2 / (2σ^2)) * 0.5^(age_days_i / 60)
+
+    where d_i is the circular distance (minutes) from the log's time of day
+    to the reference time. Foods with fewer than 2 distinct log days are
+    dropped; results rank by score descending.
+
+    `at` (ISO instant) is the reference "now" for proximity; when omitted the
+    server clock is used.
     """
+    if at is None:
+        ref = datetime.now()
+    elif isinstance(at, str):
+        try:
+            ref = datetime.fromisoformat(at)
+        except ValueError:
+            ref = datetime.now()
+    else:
+        ref = at
+    ref_minute = ref.hour * 60 + ref.minute
+    ref_date = ref.date()
+    sigma = 45.0  # minutes, proximity bandwidth
+    half_life_days = 60.0  # recency half-life in days
+    min_days = 2  # require logs on at least 2 distinct days
+
+    # Per-food logs for proximity + decay scoring.
+    logs: Dict[int, list] = defaultdict(list)
     try:
-        rows = sql_to_dict(
+        rows = sql_to_dict("SELECT food_id, logged_at FROM food.diary_entries")
+        for r in rows:
+            logs[r["food_id"]].append(r["logged_at"])
+    except Exception:
+        logs = {}
+
+    # Food metadata from the serve view (name, mode qty/unit, nutrient gate).
+    try:
+        food_rows = sql_to_dict(
             """SELECT food_id, name, source, kcal_per_100g, quality_score,
                       times_eaten, hour_weight, mode_qty, mode_unit
-               FROM food.vw_usual_foods
-               ORDER BY hour_weight DESC, times_eaten DESC
-               LIMIT %s""",
-            (limit,),
+                 FROM food.vw_usual_foods"""
         )
     except Exception:
         # Pre-T02 DDL view has no mode columns — fall back, NULL them out.
-        rows = sql_to_dict(
+        food_rows = sql_to_dict(
             """SELECT food_id, name, source, kcal_per_100g, quality_score,
                       times_eaten, hour_weight
-               FROM food.vw_usual_foods
-               ORDER BY hour_weight DESC, times_eaten DESC
-               LIMIT %s""",
-            (limit,),
+                 FROM food.vw_usual_foods"""
         )
-        for r in rows:
+        for r in food_rows:
             r["mode_qty"] = None
             r["mode_unit"] = None
-    return rows
+
+    results: List[Dict[str, Any]] = []
+    for f in food_rows:
+        food_logs = logs.get(f["food_id"], [])
+        distinct_days = set()
+        score = 0.0
+        for logged_at in food_logs:
+            lt = (
+                logged_at
+                if isinstance(logged_at, datetime)
+                else datetime.fromisoformat(str(logged_at))
+            )
+            lt_minute = lt.hour * 60 + lt.minute
+            d = abs(lt_minute - ref_minute)
+            d = min(d, 1440 - d)  # circular distance across midnight
+            age_days = max(0, (ref_date - lt.date()).days)
+            score += math.exp(-d * d / (2 * sigma * sigma)) * (
+                0.5 ** (age_days / half_life_days)
+            )
+            distinct_days.add(lt.date())
+        if len(distinct_days) < min_days:
+            continue
+        r = dict(f)
+        r["_score"] = score
+        results.append(r)
+
+    results.sort(key=lambda r: -r["_score"])
+    for r in results:
+        r.pop("_score", None)
+    return results[:limit]
 
 
 def get_diary_entries(day: date, limit: int = 100) -> Sequence[Dict[str, Any]]:
@@ -357,6 +415,9 @@ def log_diary_entry(
     = qty * UNIT_TO_G_OR_ML[unit] ('serving' resolves from serving_size);
     kcal = kcal_per_100g * grams_equiv / 100. Unknown unit -> ValueError.
     """
+    # Reject blank / zero / negative qty before any DB work (Goal 5).
+    if qty is None or isinstance(qty, bool) or not isinstance(qty, (int, float)) or qty <= 0:
+        raise ValueError("qty must be a positive number")
     from backend.schemas.food_contract_schemas import UNIT_TO_G_OR_ML
     if isinstance(logged_at, str) and logged_at:
         try:
@@ -472,6 +533,82 @@ def set_food_deleted(
     if err:
         raise RuntimeError(f"Failed to update food {food_id}: {err}")
     return True
+
+
+def update_food(
+    food_id: int,
+    name: Optional[str] = None,
+    kcal_per_100g: Optional[float] = None,
+    protein_g: Optional[float] = None,
+    fat_g: Optional[float] = None,
+    carbs_g: Optional[float] = None,
+    fiber_g: Optional[float] = None,
+    sugars_g: Optional[float] = None,
+    sodium_mg: Optional[float] = None,
+    caffeine_mg: Optional[float] = None,
+    serving_size: Optional[float] = None,
+    serving_unit: Optional[str] = None,
+    serving_text: Optional[str] = None,
+    quality_score: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Update a food row's fields (T07)."""
+
+    # Build SET clause dynamically from provided fields
+    cols: List[str] = []
+    params: Dict[str, Any] = {"food_id": food_id}
+
+    if name is not None:
+        cols.append("name = %(name)s")
+        params["name"] = name
+    if kcal_per_100g is not None:
+        cols.append("kcal_per_100g = %(kcal_per_100g)s")
+        params["kcal_per_100g"] = kcal_per_100g
+    if protein_g is not None:
+        cols.append("protein_g = %(protein_g)s")
+        params["protein_g"] = protein_g
+    if fat_g is not None:
+        cols.append("fat_g = %(fat_g)s")
+        params["fat_g"] = fat_g
+    if carbs_g is not None:
+        cols.append("carbs_g = %(carbs_g)s")
+        params["carbs_g"] = carbs_g
+    if fiber_g is not None:
+        cols.append("fiber_g = %(fiber_g)s")
+        params["fiber_g"] = fiber_g
+    if sugars_g is not None:
+        cols.append("sugars_g = %(sugars_g)s")
+        params["sugars_g"] = sugars_g
+    if sodium_mg is not None:
+        cols.append("sodium_mg = %(sodium_mg)s")
+        params["sodium_mg"] = sodium_mg
+    if caffeine_mg is not None:
+        cols.append("caffeine_mg = %(caffeine_mg)s")
+        params["caffeine_mg"] = caffeine_mg
+    if serving_size is not None:
+        cols.append("serving_size = %(serving_size)s")
+        params["serving_size"] = serving_size
+    if serving_unit is not None:
+        cols.append("serving_unit = %(serving_unit)s")
+        params["serving_unit"] = serving_unit
+    if serving_text is not None:
+        cols.append("serving_text = %(serving_text)s")
+        params["serving_text"] = serving_text
+    if quality_score is not None:
+        cols.append("quality_score = %(quality_score)s")
+        params["quality_score"] = quality_score
+
+    if not cols:
+        raise ValueError("At least one field must be provided to update")
+
+    set_clause = ", ".join(cols)
+    query = f"""UPDATE food.foods SET {set_clause}
+                WHERE food_id = %(food_id)s
+              RETURNING {FOOD_COLS}"""
+
+    rows = sql_to_dict(query, params)
+    if not rows:
+        raise ValueError(f"Food {food_id} not found.")
+    return _to_food_row(rows[0])
 
 
 def list_foods_page(

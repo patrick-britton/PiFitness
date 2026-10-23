@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / "backend" / ".env")
 
 
 def load_key():

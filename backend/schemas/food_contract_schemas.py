@@ -306,6 +306,25 @@ class LogApiEntryRequest(BaseModel):
     result_source: Optional[str] = None
 
 
+# T07: partial update request for food rows
+class UpdateFoodRequest(BaseModel):
+    """Partial update request for food row fields."""
+
+    name: Optional[str] = None
+    kcal_per_100g: Optional[float] = Field(None, ge=0)
+    protein_g: Optional[float] = Field(None, ge=0)
+    fat_g: Optional[float] = Field(None, ge=0)
+    carbs_g: Optional[float] = Field(None, ge=0)
+    fiber_g: Optional[float] = Field(None, ge=0)
+    sugars_g: Optional[float] = Field(None, ge=0)
+    sodium_mg: Optional[float] = Field(None, ge=0)
+    caffeine_mg: Optional[float] = Field(None, ge=0)
+    serving_size: Optional[float] = Field(None, gt=0)
+    serving_unit: Optional[str] = None
+    serving_text: Optional[str] = None
+    quality_score: Optional[float] = Field(None, ge=0)
+
+
 # ---------------------------------------------------------------------------
 # 010-005 T12 (OQ-3) additions — persist-only pick; mirrors food-contract.ts.
 # ---------------------------------------------------------------------------

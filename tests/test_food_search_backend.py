@@ -182,7 +182,11 @@ def test_search_returns_trimmed_saved_first_results(monkeypatch):
             "serving_text": "0.5 cup",
         }], "fetches": 2, "cached": False}
 
+    async def fake_off(query):
+        return {"results": [], "fetches": 0, "cached": False}
+
     monkeypatch.setattr(fsearch, "fetch_usda_ranked", fake_ranked)
+    monkeypatch.setattr(fsearch, "fetch_off_ranked", fake_off)
 
     client = TestClient(_make_app())
     res = client.get("/api/food/search?q=milk")
@@ -226,7 +230,11 @@ def test_search_suppresses_usda_hit_when_fdcid_saved(monkeypatch):
              "raw": {"fdcId": 999, "description": "Milk alternative"}},
         ], "fetches": 2, "cached": False}
 
+    async def fake_off(query):
+        return {"results": [], "fetches": 0, "cached": False}
+
     monkeypatch.setattr(fsearch, "fetch_usda_ranked", fake_ranked)
+    monkeypatch.setattr(fsearch, "fetch_off_ranked", fake_off)
 
     client = TestClient(_make_app())
     res = client.get("/api/food/search?q=milk")

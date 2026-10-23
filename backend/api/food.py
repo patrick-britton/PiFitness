@@ -29,6 +29,8 @@ Endpoints (contract from T01; shapes served exactly):
 from datetime import date, datetime
 from typing import List, Optional
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Query
 
 from backend_functions.queries.food_queries import (
@@ -54,6 +56,7 @@ from backend_functions.queries.food_queries import (
     save_cook_state,
     clear_cook_state,
     set_food_deleted,
+    update_food,
 )
 from backend.schemas.food_contract_schemas import (
     CombinedSearchResult,
@@ -69,6 +72,7 @@ from backend.schemas.food_contract_schemas import (
     RecipeDetail,
     RecipeSummary,
     SaveRecipeRequest,
+    UpdateFoodRequest,
 )
 
 router = APIRouter(prefix="/api/food", tags=["food-skeleton"])
@@ -203,7 +207,7 @@ async def combined_search(
     fdcId is already saved are suppressed (single saved DB row, ranked
     first). Raw bodies never reach the UI beyond nutrients_raw passthrough.
     """
-    from backend_functions.food_search import _quality_label, fetch_usda_ranked
+    from backend_functions.food_search import _quality_label, fetch_usda_ranked, fetch_off_ranked
     query = (q or "").strip()
     if not query:
         raise HTTPException(status_code=400, detail="q must be non-empty")
@@ -255,10 +259,16 @@ async def combined_search(
             "serving_unit_facet": None,
         })
     try:
-        fetched = await fetch_usda_ranked(query)
+        usda_fetch, off_fetch = await asyncio.gather(
+            fetch_usda_ranked(query),
+            fetch_off_ranked(query),
+            return_exceptions=False,
+        )
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"USDA search failed: {e}")
-    for m in fetched["results"]:
+        raise HTTPException(status_code=502, detail=f"Search failed: {e}")
+    # -- Process USDA results --
+    usda_results = usda_fetch if not isinstance(usda_fetch, Exception) else []
+    for m in usda_results.get("results", []):
         fdc_id = m.get("fdcId")
         if fdc_id is not None and fdc_id in saved_fdc_ids:
             continue
@@ -295,6 +305,45 @@ async def combined_search(
             "food_category": m.get("food_category"),
             "serving_unit_facet": m.get("serving_unit_facet"),
         })
+    # -- Process OFF results --
+    off_results = off_fetch if not isinstance(off_fetch, Exception) else []
+    seen_off_codes: set = set()
+    for m in off_results.get("results", []):
+        code = m.get("code")
+        if code and (code in saved_barcodes or code in seen_off_codes):
+            continue
+        seen_off_codes.add(code) if code else None
+        # Map OFF per-100g nutriments to output columns via normalize_off
+        from backend_functions.food_normalize import normalize_off as _norm_off
+        nutriments = m.get("nutriments") or {}
+        norm = _norm_off(nutriments)
+        out.append({
+            "kind": "off",
+            "food_id": None,
+            "name": m.get("product_name") or m.get("code"),
+            "mode_qty": None, "mode_unit": None,
+            "kcal_preview": norm.get("kcal_per_100g"),
+            "data_quality": "Low",
+            "rank": 0, "result_source": "off",
+            "usda_score": None,
+            "fdcId": None,
+            "barcode": code,
+            # Normalized per-100g nutrient panel
+            "nutrients": norm,
+            "serving_size": m.get("serving_size"),
+            "serving_unit": m.get("serving_unit"),
+            "serving_text": m.get("serving_text"),
+            "quality_percent": None,
+            "match_pct": None,
+            "match_band": None,
+            "is_single_ingredient": None,
+            "ingredient_count": None,
+            "kcal_delta_pct": None,
+            "excluded_kcal_mismatch": None,
+            "food_category": m.get("categories"),
+            "serving_unit_facet": None,
+        })
+
     # Saved-first, then mapped order (already tiered); assign final ranks.
     # Each hit carries `rank` + `result_source`; the confirm endpoints call
     # `log_pick` with the user's chosen rank for tuning (OQ-4).
@@ -620,3 +669,31 @@ async def restore_food(food_id: int):
         return {"success": True, "food_id": food_id, "is_deleted": False}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to restore food: {e}")
+
+
+@router.put("/foods/{food_id}", response_model=FoodRow)
+async def update_food(food_id: int, req: UpdateFoodRequest):
+    """Update a food row's fields (T07)."""
+    from backend_functions.queries.food_queries import update_food as _update_food
+    try:
+        row = _update_food(
+            food_id,
+            name=req.name,
+            kcal_per_100g=req.kcal_per_100g,
+            protein_g=req.protein_g,
+            fat_g=req.fat_g,
+            carbs_g=req.carbs_g,
+            fiber_g=req.fiber_g,
+            sugars_g=req.sugars_g,
+            sodium_mg=req.sodium_mg,
+            caffeine_mg=req.caffeine_mg,
+            serving_size=req.serving_size,
+            serving_unit=req.serving_unit,
+            serving_text=req.serving_text,
+            quality_score=req.quality_score,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update food: {e}")
+    return row

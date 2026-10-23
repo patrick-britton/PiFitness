@@ -143,6 +143,24 @@ export interface FoodRow {
   deleted_at: string | null;
 }
 
+/** Partial update payload for PUT /api/food/foods/{id} — Food Database edit (010-006 T13).
+ *  null = leave the field unchanged; mirrors backend UpdateFoodRequest. */
+export interface UpdateFoodRequest {
+  name?: string | null;
+  kcal_per_100g?: number | null;
+  protein_g?: number | null;
+  fat_g?: number | null;
+  carbs_g?: number | null;
+  fiber_g?: number | null;
+  sugars_g?: number | null;
+  sodium_mg?: number | null;
+  caffeine_mg?: number | null;
+  serving_size?: number | null;
+  serving_unit?: string | null;
+  serving_text?: string | null;
+  quality_score?: number | null;
+}
+
 /** Paginated food list (keyset via cursor, excludes deleted by default). */
 export interface FoodListResponse {
   data: FoodRow[];

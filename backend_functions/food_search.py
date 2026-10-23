@@ -19,6 +19,10 @@ logger = logging.getLogger("food_search")
 _FDC_SEARCH_URL = "https://api.nal.usda.gov/fdc/v1/foods/search"
 _TIMEOUT_S = 12.0
 
+# OFF rate-limits aggressively and blocks default httpx/python user-agents.
+# Identify the backend proxy so repeat dev-tool lookups are attributable.
+_OFF_HEADERS = {"User-Agent": "PiFitness/010-001-dev-diagnostic (contact: local dev tool)"}
+
 # Fetch budget: 2 parallel fetches per search, +1 fallback when branded < 5.
 _GENERICS_PAGE = 25
 _BRANDED_PAGE = 50
@@ -599,7 +603,55 @@ async def fetch_usda_ranked(query: str) -> Dict[str, Any]:
     return out
 
 
-def log_pick(rank: int, result_source: str, query: str) -> None:
+async def fetch_off_ranked(query: str) -> Dict[str, Any]:
+    """Open Food Facts text search; parallel-safe counterpart to fetch_usda_ranked.
+
+    Returns {results: [raw OFF product dicts], fetches: n, cached: False}.
+    OFF *_100g nutriments are already per-100g; the caller normalizes via
+    normalize_off. Fails closed (empty results) when OFF is unreachable so a
+    single source never blocks the blended search.
+    """
+    norm = _norm_query(query)
+    if not norm:
+        return {"results": [], "fetches": 0, "cached": False}
+    hit = _cache_get(f"off:{norm}")
+    if hit is not None:
+        hit["cached"] = True
+        return hit
+    fields = (
+        "product_name,energy-kcal_100g,proteins_100g,fat_100g,"
+        "carbohydrates_100g,fiber_100g,sugars_100g,sodium_100g,"
+        "brands,categories,code"
+    )
+    params = {
+        "search_terms": query,
+        "json": "1",
+        "fields": fields,
+        "page_size": 25,
+    }
+    fetches = 0
+    try:
+        async with httpx.AsyncClient(
+            timeout=_TIMEOUT_S, headers=_OFF_HEADERS
+        ) as client:
+            res = await client.get(
+                "https://world.openfoodfacts.org/cgi/search.pl", params=params
+            )
+            fetches += 1
+    except (httpx.TimeoutException, httpx.HTTPError):
+        return {"results": [], "fetches": 0, "cached": False}
+    try:
+        body = res.json()
+    except Exception:
+        return {"results": [], "fetches": fetches, "cached": False}
+    products = body.get("products") or []
+    out = {"results": products, "fetches": fetches, "cached": False}
+    _cache_put(f"off:{norm}", out)
+    return out
+
+
+def log_pick(rank: Optional[int], result_source: Optional[str],
+             query: Optional[str]) -> None:
     """Tuning log: which rank the user picked + which fetch supplied it."""
     logger.info("food_pick query=%r rank=%s source=%s", _norm_query(query),
                 rank, result_source)

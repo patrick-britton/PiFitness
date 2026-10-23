@@ -100,6 +100,7 @@ import {
   SaveRecipeRequest,
   FoodListResponse,
   FoodRow,
+  UpdateFoodRequest,
 } from './types/food-contract';
 import {
   NowPlayingResponse,
@@ -931,6 +932,12 @@ export const API = {
     },
     /** One alive food row — hydrates suggestion-pick panels (010-003 T10). */
     foodById: (foodId: number) => fetchAPI<FoodRow>(`/api/food/foods/${foodId}`),
+    /** Update any field of a food row — Food Database edit (010-006 T13). */
+    updateFood: (foodId: number, body: UpdateFoodRequest) =>
+      fetchAPI<FoodRow>(`/api/food/foods/${foodId}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
   },
 
   /**
