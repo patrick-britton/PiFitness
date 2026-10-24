@@ -42,7 +42,7 @@ def _extract_log_lines(lines: List[str], max_lines: int = 5) -> List[str]:
 
 def get_runtime_status() -> Dict:
     """
-    Main function you call from Streamlit.
+    Returns runtime status. Callable from any frontend or CLI.
     """
     box = os.getenv("BOX", "unknown")
 

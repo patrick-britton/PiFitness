@@ -3,8 +3,8 @@ Query Functions Package
 ======================
 
 Centralized database query functions extracted from Streamlit frontend.
-These functions return plain Python data structures (dicts, lists, dataclasses)
-with no Streamlit dependencies, making them reusable by both FastAPI and legacy code.
+These functions return plain Python data structures (dicts, lists, dataclasses),
+making them reusable by both FastAPI and legacy code.
 """
 
 # Import query modules
