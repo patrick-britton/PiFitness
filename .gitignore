@@ -255,3 +255,11 @@ prod-sanitized.dump
 prod-schema-reference.dump
 *.bak
 *.tsbuildinfo
+
+# --- HYG-005/006, INV-003: logs, temp, output, cache artifacts ---
+*.out
+.next/
+.local_storage/
+*.dump
+*token*.json
+.spotify_cache
