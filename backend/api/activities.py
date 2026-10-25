@@ -1090,8 +1090,7 @@ def _map_visual_row(row: dict) -> SegmentVisualEffort:
 
     The T02 telemetry helper returns parallel array columns (one sample per
     canonical elapsed second). Zip them into the series point list — pure Python,
-    no pandas (mirrors the legacy viz_factory explode approach). psycopg2 returns
-    PG arrays as Python lists and the json path_coords column as a native list,
+    no pandas. psycopg2 returns PG arrays as Python lists and the json path_coords column as a native list,
     so no per-element coercion is required beyond None-safety.
     """
     x_time = row.get("x_time") or []

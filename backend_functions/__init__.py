@@ -14,4 +14,3 @@ Utility functions and business logic.
 #   - db_wrapper.py
 #   - (other utility modules)
 #   - queries/ (query functions)
-#   - viz_factory/ (visualization)

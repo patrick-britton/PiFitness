@@ -573,7 +573,7 @@ def stage_leaderboard_visuals(segment_id: int, efforts: List[Dict[str, Any]]) ->
     into activities.temp_activity_segment_metas (009-002, T05).
 
     A single parameterized execute_values statement replaces the legacy per-row
-    f-string loop (viz_factory/leaderboards.py::load_segment_selection_data), so the
+    f-string loop, so the
     staging table always contains exactly the N selected efforts and repeated calls
     replace (never append). Wrapped in one transaction so a failure mid-insert
     rolls back both the TRUNCATE and the INSERT.
@@ -1258,10 +1258,6 @@ def reset_match_tables(confirm_reset: bool) -> Dict[str, Any]:
 def rename_segment(segment_id: int, new_name: str) -> Dict[str, Any]:
     """
     Rename a course/segment (009-003, T07/FR-16).
-
-    Same single parameterized UPDATE as the legacy course-review rename
-    (viz_factory/run_list.py::update_course_name). One existence check + one
-    UPDATE; no scans, no pandas.
 
     Args:
         segment_id: The course/segment to rename.
