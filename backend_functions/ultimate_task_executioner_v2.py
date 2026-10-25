@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
 import pytz
-from fastapi import HTTPException
+from backend_functions.domain_exceptions import TaskExecutionError
 from psycopg2.extras import execute_values
 
 from backend_functions.database_functions import sql_to_dict, qec, con_cur, get_table_row_count, one_sql_result, \
@@ -52,9 +52,8 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
                       desc='Failed to fetch task list',
                       err=f'Database error: {str(e)}',
                       data_event='Critical')
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch task list: {str(e)}"
+        raise TaskExecutionError(
+            f"Failed to fetch task list: {str(e)}"
         )
 
     print(f"{len(task_list)} tasks found: {task_list}")

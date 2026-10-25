@@ -157,11 +157,13 @@ Other:
 
 ---
 
-## 11. Dangling `backend.config` import (PY-001, hypothesis H1)
+## 11. Dangling `backend.config` import (PY-001, hypothesis H1) — RESOLVED: no dangling import
 
-`backend_functions/config.py` imports `backend.config`, but no `backend/config.py` exists — only a stale `.pyc`. Need `git log --diff-filter=D -- backend/config.py` to learn intent.
+`git log --diff-filter=D -- backend/config.py` shows commit `37df43e` moved `backend/config.py` → `backend_functions/config.py` ("Fix inversion 3B: move backend.config to backend_functions.config to cut one cycle edge"). Reading `backend_functions/config.py` confirms it does NOT import `backend.config` — the docstring line 9 (`from backend.config import get_settings`) is just an outdated usage example, not an actual import. Actual imports are `os`, `platform`, `dataclasses`, `typing`, `dotenv`.
 
-**Default:** Record in this file; if intent is ambiguous after checking git log, stop and ask before any change.
+`py.dangling_imports = 0` confirms no dangling import exists.
+
+**Decision:** No code change needed for the import itself. Optionally update the docstring usage example to `from backend_functions.config import get_settings` as a documentation fix (does not affect behavior or metrics).
 
 ---
 
