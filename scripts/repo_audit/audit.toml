@@ -1,0 +1,68 @@
+# repo_audit configuration for PiFitness.  Copy next to the package or into the repo root.
+# After each reorg phase, update [domains]/[[forbid]] and re-run `python scripts/repo_audit check`.
+
+out_dir = ".audit"
+data_dirs = ["local_storage"]
+
+[python]
+script_dirs = ["scripts"]
+db_modules = ["database_functions", "db_wrapper", "db"]
+entrypoint_globs = [
+  "**/main.py", "**/__main__.py", "setup.py", "**/conftest.py",
+  "agents/*.py", "deployment/**/*.py", "validate_endpoints.py",
+]
+
+[frontend]
+roots = ["frontend/pifitness"]      # leave empty to auto-detect
+
+# Domain keywords (matched against the deepest path segment first). First domain in file order wins ties.
+[domains]
+volleyball   = ["volleyball", "beach"]
+music        = ["music", "isrc", "spotify", "playlist", "shuffle"]
+food         = ["food", "tri_tip", "tri-tip", "tritip", "barcode", "recipe", "diary"]
+exercises    = ["exercise", "workout"]
+health       = ["health"]
+admin        = ["admin", "backup"]
+integrations = ["garmin", "service_login", "credential"]
+activities   = ["activit", "segment", "leaderboard", "smoothing", "running", "effort", "report", "route-direction"]
+worker       = ["task_exec", "executioner", "backend_tasks", "background_task"]
+core         = ["database_functions", "db_wrapper", "db_schema", "config.py", "logging_functions", "helper_functions",
+                "data_helpers", "file_handlers", "json_extractors", "image_creation"]
+
+# ---- CURRENT layering rules (should reach zero violations after Phase 1) ---------------------
+[[forbid]]
+name = "library-must-not-import-web-layer"
+from = ["backend_functions/**"]
+to = ["backend/**"]
+severity = "high"
+
+[[forbid]]
+name = "worker-and-library-no-web-framework"
+from = ["backend_functions/**", "agents/**"]
+to_external = ["fastapi", "starlette", "uvicorn"]
+severity = "high"
+
+[[forbid]]
+name = "no-streamlit-anywhere"
+from = ["**"]
+to_external = ["streamlit"]
+severity = "high"
+
+# ---- TARGET layering rules (flip enabled = true when Phase 3 lands) --------------------------
+[[forbid]]
+name = "core-is-the-bottom-layer"
+enabled = false
+from = ["backend/pifitness/core/**"]
+to = ["backend/pifitness/domains/**", "backend/pifitness/api/**", "backend/pifitness/worker/**", "backend/pifitness/integrations/**"]
+
+[[forbid]]
+name = "domains-do-not-import-api"
+enabled = false
+from = ["backend/pifitness/domains/**"]
+to = ["backend/pifitness/api/**"]
+
+[[forbid]]
+name = "worker-does-not-import-api"
+enabled = false
+from = ["backend/pifitness/worker/**"]
+to = ["backend/pifitness/api/**"]

@@ -243,6 +243,7 @@ frontend/DEPLOYMENT_GUIDE.md
 frontend/pifitness/public/wasm/prod-schema-reference.dump
 prod-latest.dump
 .audit/
+!.audit/baseline.json
 
 # --- OAuth tokens (removed from tracking; rewritten from history) ---
 garmin_tokens.json

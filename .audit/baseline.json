@@ -1,0 +1,793 @@
+{
+ "meta": {
+  "when": "2026-10-25 07:38",
+  "root": "C:\\Users\\rickb\\vsProjects\\PiFitness",
+  "version": "1.0",
+  "commit": "fcdcb14",
+  "dirty": true
+ },
+ "metrics": {
+  "inventory.files": 372,
+  "inventory.code_lines": 76590,
+  "inventory.duplicate_groups": 0,
+  "inventory.clutter_files": 15,
+  "inventory.root_files": 15,
+  "inventory.npm_manifests": 2,
+  "inventory.stray_path_files": 0,
+  "py.files": 126,
+  "py.dangling_imports": 0,
+  "py.pkg_cycles": 0,
+  "py.module_cycles": 0,
+  "py.layer_violations": 1,
+  "py.private_cross_imports": 16,
+  "py.orphans_likely_dead": 0,
+  "py.orphans_total": 6,
+  "py.nonliteral_dynamic_imports": 6,
+  "py.router_direct_db_handlers": 11,
+  "py.fat_functions": 73,
+  "py.near_duplicate_pairs": 1,
+  "py.parse_errors": 0,
+  "py.untested_modules": 38,
+  "ts.files": 184,
+  "ts.unreachable_files": 4,
+  "ts.unresolved_imports": 1,
+  "ts.npm_unused": 5,
+  "ts.npm_undeclared": 0,
+  "ts.cross_route_imports": 1,
+  "ts.single_consumer_modules": 24,
+  "contracts.routes": 158,
+  "contracts.routes_no_caller": 35,
+  "contracts.frontend_ghost_paths": 1,
+  "domains.unassigned_files": 38,
+  "domains.cross_edges": 26,
+  "hygiene.sensitive_exposed": 0,
+  "hygiene.sensitive_in_history": 0,
+  "hygiene.secret_hits": 1,
+  "hygiene.tracked_junk": 8,
+  "hygiene.pyc_husks": 24,
+  "hygiene.legacy_py_imports": 0,
+  "hygiene.legacy_code_refs": 19,
+  "hygiene.legacy_leftover_dirs": 2,
+  "sql.files": 0,
+  "sql.migrations": 0,
+  "sql.migrations_unpaired": 0,
+  "sql.migrations_outside_db_dir": 0,
+  "scripts.total": 17,
+  "scripts.oneoff": 0,
+  "scripts.keep": 6,
+  "scripts.misplaced_tests": 5,
+  "git.avg_code_dirs_per_commit": 2.52,
+  "git.avg_domains_per_commit": 1.69
+ },
+ "findings": [
+  {
+   "id": "CON-002",
+   "severity": "high",
+   "title": "Frontend API paths with no matching backend route",
+   "detail": "",
+   "hint": "",
+   "count": 1,
+   "evidence": [
+    "/api/admin/tasks/{}/logs{}  <- frontend/pifitness/src/lib/api-client.ts"
+   ],
+   "section": "contracts"
+  },
+  {
+   "id": "HYG-004",
+   "severity": "high",
+   "title": "Possible secrets in source/config (values redacted)",
+   "detail": "",
+   "hint": "",
+   "count": 1,
+   "evidence": [
+    "backend_functions/database_functions.py:50 [url-with-password]"
+   ],
+   "section": "hygiene"
+  },
+  {
+   "id": "INV-003",
+   "severity": "high",
+   "title": "Logs/temp/backup/copy files in the repo",
+   "detail": "15 are tracked by git.",
+   "hint": "Delete and add patterns to .gitignore.",
+   "count": 15,
+   "evidence": [
+    "_task07.txt",
+    "_task07_bak.txt",
+    "frontend/build2.txt",
+    "frontend/pifitness/_bars.out",
+    "frontend/pifitness/_t08.out",
+    "frontend/pifitness/_t08b.out",
+    "frontend/pifitness/_t08b_build.out",
+    "frontend/pifitness/_t08c.out",
+    "frontend/pifitness/_t08d.out",
+    "frontend/pifitness/build.out",
+    "frontend/pifitness/build_output.txt",
+    "frontend/pifitness/buildlog.txt",
+    "frontend/pifitness/tipo.out",
+    "frontend/tsc2.txt",
+    "frontend/vit2.txt"
+   ],
+   "section": "inventory"
+  },
+  {
+   "id": "PY-004",
+   "severity": "high",
+   "title": "Layer-rule violations (audit.toml [[forbid]])",
+   "detail": "worker-and-library-no-web-framework: 1",
+   "hint": "",
+   "count": 1,
+   "evidence": [
+    "[worker-and-library-no-web-framework] backend_functions/ultimate_task_executioner_v2.py:8 -> <fastapi>"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "TS-003",
+   "severity": "high",
+   "title": "[frontend/pifitness] Relative/alias imports that do not resolve",
+   "detail": "",
+   "hint": "",
+   "count": 1,
+   "evidence": [
+    "frontend/pifitness/next-env.d.ts -> ./.next/dev/types/routes.d.ts"
+   ],
+   "section": "frontend"
+  },
+  {
+   "id": "DOM-001",
+   "severity": "medium",
+   "title": "Files that match no domain keyword (need a human decision)",
+   "detail": "",
+   "hint": "Add keywords to [domains] in audit.toml or classify as core/shared/integration.",
+   "count": 38,
+   "evidence": [
+    "backend/api/auth.py",
+    "backend/main.py",
+    "deployment/pathfinder.py",
+    "frontend/pifitness/next-env.d.ts",
+    "frontend/pifitness/src/app/components/DebugPanel.tsx",
+    "frontend/pifitness/src/app/components/Header.tsx",
+    "frontend/pifitness/src/app/components/Layout.tsx",
+    "frontend/pifitness/src/app/components/MapView.tsx",
+    "frontend/pifitness/src/app/components/NavBar.tsx",
+    "frontend/pifitness/src/app/components/Sidebar.tsx",
+    "frontend/pifitness/src/app/components/ThemeToggle.tsx",
+    "frontend/pifitness/src/app/layout.tsx",
+    "frontend/pifitness/src/app/page.tsx",
+    "frontend/pifitness/src/app/providers.tsx",
+    "frontend/pifitness/src/hooks/useAuth.ts"
+   ],
+   "section": "domains"
+  },
+  {
+   "id": "HYG-005",
+   "severity": "medium",
+   "title": "Build/cache artifacts tracked by git",
+   "detail": "",
+   "hint": "",
+   "count": 8,
+   "evidence": [
+    "frontend/pifitness/_bars.out",
+    "frontend/pifitness/_t08.out",
+    "frontend/pifitness/_t08b.out",
+    "frontend/pifitness/_t08b_build.out",
+    "frontend/pifitness/_t08c.out",
+    "frontend/pifitness/_t08d.out",
+    "frontend/pifitness/build.out",
+    "frontend/pifitness/tipo.out"
+   ],
+   "section": "hygiene"
+  },
+  {
+   "id": "INV-004",
+   "severity": "medium",
+   "title": "Multiple package.json manifests",
+   "detail": "",
+   "hint": "One manifest per app; root manifest + nested app manifest usually means a stale root install.",
+   "count": 2,
+   "evidence": [
+    "frontend/pifitness/package.json (deps=20, dev=12)",
+    "package.json (deps=17, dev=4)"
+   ],
+   "section": "inventory"
+  },
+  {
+   "id": "INV-005",
+   "severity": "medium",
+   "title": "Python dependencies declared in many places",
+   "detail": "",
+   "hint": "Consolidate into one pyproject.toml.",
+   "count": 7,
+   "evidence": [
+    "deployment/library_requirements.txt",
+    "deployment/npm_requirements.txt",
+    "deployment/requirements-react.txt",
+    "frontend/npm_requirements.txt",
+    "npm_requirements.txt",
+    "pirate-garmin_clone/pyproject.toml",
+    "setup.py"
+   ],
+   "section": "inventory"
+  },
+  {
+   "id": "PY-005",
+   "severity": "medium",
+   "title": "Private (_underscore) names used across module/package boundaries",
+   "detail": "",
+   "hint": "Logic in routers/helpers that others depend on belongs in a public service module.",
+   "count": 16,
+   "evidence": [
+    "backend/api/food.py -> backend_functions/food_search.py._quality_label",
+    "tests/test_admin_failure_message.py -> backend/api/admin.py._failed_run_message",
+    "tests/test_failure_propagation.py -> backend/api/activities.py._run_step",
+    "tests/test_failure_propagation.py -> backend/api/activities.py._task_failure_message",
+    "tests/test_food_search_backend.py -> backend_functions/food_search.py._cache",
+    "tests/test_food_search_backend.py -> backend_functions/food_search.py._cache_order",
+    "tests/test_food_search_backend.py -> backend_functions/food_search.py._ingredient_stats",
+    "tests/test_food_search_backend.py -> backend_functions/food_search.py._kcal_gate",
+    "tests/test_food_search_backend.py -> backend_functions/food_search.py._map_usda_food",
+    "tests/test_food_search_backend.py -> backend_functions/food_search.py._match_band",
+    "tests/test_food_search_backend.py -> backend_functions/food_search.py._match_pct",
+    "tests/test_food_search_backend.py -> backend_functions/food_search.py._name_bonus",
+    "tests/test_food_search_backend.py -> backend_functions/food_search.py._quality_label",
+    "tests/test_food_search_backend.py -> backend_functions/food_search.py._quality_percent",
+    "tests/test_process_generator_events.py -> backend/api/activities.py._process_generator"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "PY-006",
+   "severity": "medium",
+   "title": "Route handlers calling the DB layer directly (no service layer)",
+   "detail": "",
+   "hint": "",
+   "count": 11,
+   "evidence": [
+    "backend/api/admin.py:182 POST /api/admin/tasks/v2/{task_name}/execute -> one_sql_result, sql_insert_returning",
+    "backend/api/music.py:61 GET /api/music/playlists -> sql_to_dict",
+    "backend/api/music.py:441 GET /api/music/service-status -> one_sql_result",
+    "backend/api/music.py:645 POST /api/music/now-playing/remove -> one_sql_result, qec, sql_to_dict, sql_to_list",
+    "backend/api/music.py:1012 POST /api/music/shuffle/config -> qec",
+    "backend/api/music.py:1045 POST /api/music/shuffle/flags -> qec",
+    "backend/api/music.py:1078 POST /api/music/shuffle/send -> qec",
+    "backend/api/segments.py:366 GET /api/segments -> sql_to_dict",
+    "backend/api/segments.py:429 GET /api/segments/{segment_id}/matches/candidates -> sql_to_dict",
+    "backend/api/segments.py:581 GET /api/segments/{segment_id}/matches -> sql_to_dict",
+    "backend/main.py:135 GET /api/health -> get_conn"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "PY-010",
+   "severity": "medium",
+   "title": "Non-literal dynamic imports (importlib with computed names)",
+   "detail": "",
+   "hint": "Static tools cannot see these targets. List the real targets (DB task config?) before moving modules.",
+   "count": 6,
+   "evidence": [
+    "backend_functions/service_logins.py:720 prefix=''",
+    "backend_functions/task_execution.py:108 prefix=''",
+    "backend_functions/task_execution.py:146 prefix=''",
+    "backend_functions/ultimate_task_executioner_v2.py:137 prefix=''",
+    "backend_functions/ultimate_task_executioner_v2.py:275 prefix=''",
+    "backend_functions/ultimate_task_executioner_v2.py:453 prefix=''"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "PY-013",
+   "severity": "medium",
+   "title": "Near-duplicate Python files (possible vendored copies)",
+   "detail": "",
+   "hint": "",
+   "count": 1,
+   "evidence": [
+    "0.93 backend_functions/pirate_garmin_endpoints.py ~ pirate-garmin_clone/src/pirate_garmin/endpoints.py"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "TS-001",
+   "severity": "medium",
+   "title": "[frontend/pifitness] Source files unreachable from any Next.js entry point or test",
+   "detail": "",
+   "hint": "Real dead-code candidates (unlike knip run from the wrong dir). Verify no dynamic import()/next/dynamic with computed paths.",
+   "count": 4,
+   "evidence": [
+    "frontend/pifitness/src/app/admin/components/DBSessions.tsx",
+    "frontend/pifitness/src/app/admin/components/index.ts",
+    "frontend/pifitness/src/app/components/MapView.tsx",
+    "frontend/pifitness/src/hooks/useViewport.ts"
+   ],
+   "section": "frontend"
+  },
+  {
+   "id": "TS-004",
+   "severity": "medium",
+   "title": "[frontend/pifitness] npm packages declared but never imported or referenced by config",
+   "detail": "",
+   "hint": "",
+   "count": 5,
+   "evidence": [
+    "@emotion/react",
+    "@emotion/styled",
+    "@headlessui/react",
+    "@testing-library/dom",
+    "@types/node"
+   ],
+   "section": "frontend"
+  },
+  {
+   "id": "TS-009",
+   "severity": "medium",
+   "title": "package.json duplicates 17 dependencies of the real frontend manifest",
+   "detail": "",
+   "hint": "Run knip/npm from the app dir; remove the stray manifest + node_modules once confirmed unused.",
+   "count": 17,
+   "evidence": [
+    "@emotion/react",
+    "@emotion/styled",
+    "@headlessui/react",
+    "@mui/icons-material",
+    "@mui/material",
+    "@tailwindcss/postcss",
+    "@tanstack/react-query",
+    "autoprefixer",
+    "chart.js",
+    "maplibre-gl",
+    "next",
+    "postcss",
+    "react",
+    "react-chartjs-2",
+    "react-dom"
+   ],
+   "section": "frontend"
+  },
+  {
+   "id": "HYG-007",
+   "severity": "low",
+   "title": "Stale __pycache__ entries whose source .py no longer exists",
+   "detail": "",
+   "hint": "Deleted-module husks (e.g. viz_factory, frontend_functions). Safe to delete; they can also mask ImportErrors.",
+   "count": 24,
+   "evidence": [
+    "dir with only .pyc: backend_functions/viz_factory",
+    "dir with only .pyc: frontend_functions",
+    "backend/_tmp_t06_verify.py",
+    "backend/config.py",
+    "backend_functions/elevation_tiles.py",
+    "backend_functions/ultimate_task_executioner.py",
+    "backend_functions/viz_factory/__init__.py",
+    "backend_functions/viz_factory/body_comp.py",
+    "backend_functions/viz_factory/db_size.py",
+    "backend_functions/viz_factory/leaderboards.py",
+    "backend_functions/viz_factory/run_list.py",
+    "backend_functions/viz_factory/segment_compare.py",
+    "backend_functions/viz_factory/task_summary.py",
+    "backend_functions/viz_factory/topographics.py",
+    "frontend_functions/homepage.py"
+   ],
+   "section": "hygiene"
+  },
+  {
+   "id": "HYG-008",
+   "severity": "low",
+   "title": "Legacy framework residue (streamlit)",
+   "detail": "4 markdown docs mention it (see data.legacy.doc_refs).",
+   "hint": "",
+   "count": 22,
+   "evidence": [
+    "code/config ref: backend/api/segments.py x1",
+    "code/config ref: backend_functions/helper_functions.py x1",
+    "code/config ref: backend_functions/queries/__init__.py x1",
+    "code/config ref: backend_functions/queries/activities_queries.py x3",
+    "code/config ref: backend_functions/queries/admin_queries.py x1",
+    "code/config ref: backend_functions/queries/health_queries.py x1",
+    "code/config ref: backend_functions/queries/music_queries.py x1",
+    "code/config ref: deployment/library_requirements.txt x1",
+    "code/config ref: deployment/pi5_deploy.sh x20",
+    "code/config ref: frontend/pifitness/src/app/activities/segment-management/components/MatchSession.tsx x1",
+    "code/config ref: frontend/pifitness/src/hooks/useViewport.ts x1",
+    "code/config ref: frontend/pifitness/src/lib/segment-trim.ts x1",
+    "code/config ref: local_clinerules.txt x1",
+    "code/config ref: scripts/audit_db_investigation.py x3",
+    "code/config ref: scripts/generate_data_flow_diagrams.py x8"
+   ],
+   "section": "hygiene"
+  },
+  {
+   "id": "INV-007",
+   "severity": "low",
+   "title": "15 loose files at repo root",
+   "detail": "",
+   "hint": "Root should hold only manifests, README and top-level config.",
+   "count": 15,
+   "evidence": [
+    ".clineignore",
+    ".gitattributes",
+    ".gitignore",
+    "README.md",
+    "_task07.txt",
+    "_task07_bak.txt",
+    "compose.yaml",
+    "local_clinerules.txt",
+    "npm_requirements.txt",
+    "package-lock.json",
+    "package.json",
+    "pytest.ini",
+    "sample_env_file.txt",
+    "setup.py",
+    "validate_endpoints.py"
+   ],
+   "section": "inventory"
+  },
+  {
+   "id": "PY-007",
+   "severity": "low",
+   "title": "Routers that import threading (orchestration inside the web layer)",
+   "detail": "",
+   "hint": "",
+   "count": 2,
+   "evidence": [
+    "backend/api/activities.py",
+    "backend/api/admin.py"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "PY-008",
+   "severity": "low",
+   "title": "Routers importing from another domain's modules",
+   "detail": "",
+   "hint": "",
+   "count": 6,
+   "evidence": [
+    "backend/api/activities.py -> music:backend_functions/music_functions.py, worker:backend_functions/ultimate_task_executioner_v2.py",
+    "backend/api/admin.py -> integrations:backend_functions/credential_management.py, worker:backend_functions/task_execution.py, worker:backend_functions/ultimate_task_executioner_v2.py",
+    "backend/api/config.py -> integrations:backend_functions/service_logins.py",
+    "backend/api/food_lookup.py -> integrations:backend_functions/service_logins.py",
+    "backend/api/music.py -> integrations:backend_functions/service_logins.py",
+    "backend/api/segments.py -> integrations:backend_functions/service_logins.py"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "PY-011",
+   "severity": "low",
+   "title": "Functions >= 80 LOC or complexity >= 15",
+   "detail": "",
+   "hint": "",
+   "count": 73,
+   "evidence": [
+    "scripts/repo_audit/pyanalysis.py:389 analyze loc=292 cc=216",
+    "scripts/repo_audit/tsanalysis.py:111 analyze loc=173 cc=107",
+    "scripts/repo_audit/hygiene.py:26 analyze loc=150 cc=106",
+    "backend/api/activities.py:235 _process_generator loc=274 cc=42",
+    "backend_functions/task_execution.py:15 task_executioner loc=282 cc=39",
+    "scripts/repo_audit/inventory.py:27 analyze loc=138 cc=68",
+    "backend_functions/music_functions.py:449 resolve_now_playing loc=198 cc=33",
+    "backend_functions/image_creation.py:156 render_db_size_summary loc=235 cc=19",
+    "backend_functions/running_functions.py:4 leaderboard_update loc=279 cc=4",
+    "backend_functions/ultimate_task_executioner_v2.py:18 ultimate_task_executioner loc=209 cc=26"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "PY-012",
+   "severity": "low",
+   "title": "Python files >= 600 LOC",
+   "detail": "",
+   "hint": "",
+   "count": 18,
+   "evidence": [
+    "backend_functions/queries/activities_queries.py (1486)",
+    "backend/api/activities.py (1288)",
+    "backend/api/music.py (1184)",
+    "backend_functions/queries/food_queries.py (1147)",
+    "backend_functions/pirate_garmin_auth.py (1144)",
+    "backend/api/admin.py (1086)",
+    "backend_functions/music_functions.py (928)",
+    "backend_functions/queries/music_queries.py (893)",
+    "backend_functions/service_logins.py (824)",
+    "backend_functions/ultimate_task_executioner_v2.py (761)",
+    "backend_functions/data_helpers.py (756)",
+    "backend_functions/queries/admin_queries.py (741)",
+    "scripts/repo_audit/pyanalysis.py (733)",
+    "backend/api/food.py (699)",
+    "pirate-garmin_clone/src/pirate_garmin/auth.py (678)"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "PY-014",
+   "severity": "low",
+   "title": "Imported third-party packages not declared in any manifest (heuristic)",
+   "detail": "",
+   "hint": "",
+   "count": 2,
+   "evidence": [
+    "main",
+    "setuptools"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "PY-015",
+   "severity": "low",
+   "title": "Declared requirements never imported (heuristic; tools/plugins may be legit)",
+   "detail": "",
+   "hint": "",
+   "count": 25,
+   "evidence": [
+    "autoprefixer",
+    "barcode-detector",
+    "chart-js",
+    "chartjs-adapter-date-fns",
+    "elevation",
+    "httpx2",
+    "maplibre-gl",
+    "matplotlib",
+    "next",
+    "next-themes",
+    "pathlib",
+    "plotly",
+    "postcss",
+    "pytest-asyncio",
+    "pytest-httpx"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "PY-016",
+   "severity": "low",
+   "title": "test_*.py files living in scripts/",
+   "detail": "",
+   "hint": "",
+   "count": 5,
+   "evidence": [
+    "scripts/test_db_connectivity.py",
+    "scripts/test_dotenv.py",
+    "scripts/test_garmin_login.py",
+    "scripts/test_logins.py",
+    "scripts/test_queries.py"
+   ],
+   "section": "python"
+  },
+  {
+   "id": "TRI-001",
+   "severity": "low",
+   "title": "0 of 17 scripts look like ticket-specific one-offs",
+   "detail": "",
+   "hint": "Delete (git keeps history) or move to an `archive/` branch; keep only durable tools in tools/.",
+   "count": 0,
+   "evidence": [],
+   "section": "triage"
+  },
+  {
+   "id": "TRI-003",
+   "severity": "low",
+   "title": "Test files inside scripts/",
+   "detail": "",
+   "hint": "",
+   "count": 5,
+   "evidence": [
+    "scripts/test_db_connectivity.py",
+    "scripts/test_dotenv.py",
+    "scripts/test_garmin_login.py",
+    "scripts/test_logins.py",
+    "scripts/test_queries.py"
+   ],
+   "section": "triage"
+  },
+  {
+   "id": "TRI-004",
+   "severity": "low",
+   "title": "Scripts needing a human decision",
+   "detail": "",
+   "hint": "",
+   "count": 6,
+   "evidence": [
+    "scripts/audit_db_investigation.py",
+    "scripts/audit_view_columns.py",
+    "scripts/document_stored_procedures.py",
+    "scripts/generate_data_flow_diagrams.py",
+    "scripts/generate_schema_documentation.py",
+    "scripts/smoke_test.py"
+   ],
+   "section": "triage"
+  },
+  {
+   "id": "TS-002",
+   "severity": "low",
+   "title": "[frontend/pifitness] Modules reachable only from tests",
+   "detail": "",
+   "hint": "",
+   "count": 1,
+   "evidence": [
+    "frontend/pifitness/src/app/admin/components/TaskSummary.tsx"
+   ],
+   "section": "frontend"
+  },
+  {
+   "id": "TS-006",
+   "severity": "low",
+   "title": "[frontend/pifitness] Route folders importing from other route folders",
+   "detail": "",
+   "hint": "Shared code should live in features/ or components/, not inside another route.",
+   "count": 1,
+   "evidence": [
+    "app/beachchanger -> app/activities (4)"
+   ],
+   "section": "frontend"
+  },
+  {
+   "id": "TS-007",
+   "severity": "low",
+   "title": "[frontend/pifitness] lib/hooks/shared modules used by exactly one area (colocate them)",
+   "detail": "",
+   "hint": "",
+   "count": 24,
+   "evidence": [
+    "frontend/pifitness/src/app/components/DebugPanel.tsx <- app/components",
+    "frontend/pifitness/src/app/components/Header.tsx <- app/components",
+    "frontend/pifitness/src/app/components/IsrcDupeHomeBanner.tsx <- app/(root)",
+    "frontend/pifitness/src/app/components/Layout.tsx <- app/(root)",
+    "frontend/pifitness/src/app/components/NavBar.tsx <- app/components",
+    "frontend/pifitness/src/app/components/Sidebar.tsx <- app/components",
+    "frontend/pifitness/src/app/components/ThemeToggle.tsx <- app/components",
+    "frontend/pifitness/src/hooks/useAdmin.ts <- app/admin",
+    "frontend/pifitness/src/hooks/useAuth.ts <- app/admin",
+    "frontend/pifitness/src/hooks/useBarcodeScanner.ts <- app/food",
+    "frontend/pifitness/src/hooks/useExercises.ts <- app/exercises",
+    "frontend/pifitness/src/hooks/useTriTip.ts <- app/food",
+    "frontend/pifitness/src/lib/barcode/ean13.ts <- app/food",
+    "frontend/pifitness/src/lib/barcode/zxing.ts <- lib",
+    "frontend/pifitness/src/lib/date-format.ts <- app/activities"
+   ],
+   "section": "frontend"
+  },
+  {
+   "id": "TS-008",
+   "severity": "low",
+   "title": "[frontend/pifitness] Near-duplicate TS files",
+   "detail": "",
+   "hint": "",
+   "count": 3,
+   "evidence": [
+    "0.94 frontend/pifitness/src/app/admin/components/ActiveQueriesView.tsx ~ frontend/pifitness/src/app/admin/components/DBSessions.tsx",
+    "0.78 frontend/pifitness/src/app/exercises/page.tsx ~ frontend/pifitness/src/app/health/page.tsx",
+    "0.75 frontend/pifitness/src/app/food/page.tsx ~ frontend/pifitness/src/app/health/page.tsx"
+   ],
+   "section": "frontend"
+  },
+  {
+   "id": "CON-001",
+   "severity": "info",
+   "title": "Backend routes no frontend source references (candidates only)",
+   "detail": "",
+   "hint": "Check scripts, the agent/worker and external callers before deleting. Dynamic URL building hides callers.",
+   "count": 35,
+   "evidence": [
+    "POST /api/activities/process",
+    "GET /api/activities/report",
+    "GET /api/activities/leaderboard/segments",
+    "GET /api/activities/{activity_id}/telemetry",
+    "GET /api/activities/{activity_id}/segments",
+    "POST /api/admin/tasks/{task_name}/execute",
+    "POST /api/admin/tasks/v2/{task_name}/execute",
+    "GET /api/admin/events",
+    "PUT /api/admin/services/{service_name}",
+    "DELETE /api/admin/services/{service_name}",
+    "PUT /api/admin/functions/{friendly_name}",
+    "DELETE /api/admin/functions/{friendly_name}",
+    "GET /api/admin/tasks/{task_id}/logs",
+    "GET /api/admin/logs/data/{table_name}",
+    "POST /api/auth/garmin/login"
+   ],
+   "section": "contracts"
+  },
+  {
+   "id": "DOM-002",
+   "severity": "info",
+   "title": "Cross-domain import edges (coupling between slices)",
+   "detail": "",
+   "hint": "",
+   "count": 26,
+   "evidence": [
+    "music -> integrations: 4",
+    "admin -> integrations: 3",
+    "admin -> worker: 3",
+    "core -> integrations: 3",
+    "food -> integrations: 2",
+    "worker -> integrations: 2",
+    "music -> activities: 2",
+    "activities -> music: 1",
+    "activities -> worker: 1",
+    "activities -> integrations: 1",
+    "core -> music: 1",
+    "music -> worker: 1"
+   ],
+   "section": "domains"
+  },
+  {
+   "id": "GIT-001",
+   "severity": "info",
+   "title": "File pairs in different folders that change together most (candidate same-slice files)",
+   "detail": "",
+   "hint": "Strong coupling across folders is the signal to colocate by domain.",
+   "count": 30,
+   "evidence": [
+    "14x backend_functions/queries/__init__.py + frontend/pifitness/src/lib/api-client.ts",
+    "8x frontend/pifitness/src/lib/api-client.ts + scripts/schema_cache.json",
+    "7x backend/main.py + frontend/pifitness/src/lib/api-client.ts",
+    "7x backend/api/activities.py + backend_functions/queries/__init__.py",
+    "7x backend/api/activities.py + frontend/pifitness/src/lib/api-client.ts",
+    "7x backend/api/admin.py + backend_functions/queries/__init__.py",
+    "7x backend/api/admin.py + backend_functions/queries/admin_queries.py",
+    "6x backend_functions/queries/__init__.py + scripts/schema_cache.json",
+    "6x backend_functions/queries/activities_queries.py + tests/test_activities.py",
+    "6x backend/api/admin.py + frontend/pifitness/src/app/admin/components/TaskList.tsx",
+    "6x backend_functions/queries/__init__.py + frontend/pifitness/next-env.d.ts",
+    "6x backend/api/admin.py + frontend/pifitness/src/hooks/useAdmin.ts"
+   ],
+   "section": "git"
+  },
+  {
+   "id": "GIT-002",
+   "severity": "info",
+   "title": "A typical code commit touches 2.52 directories and 1.69 domains",
+   "detail": "Baseline for the reorg: the first number should drop after domain-sliced folders.",
+   "hint": "",
+   "count": 0,
+   "evidence": [],
+   "section": "git"
+  },
+  {
+   "id": "HYG-002",
+   "severity": "info",
+   "title": "Sensitive-looking files present on disk but correctly git-ignored",
+   "detail": "",
+   "hint": "Keep them out of the repo tree long-term (e.g. ~/.config/pifitness or a data dir).",
+   "count": 7,
+   "evidence": [
+    ".spotify_cache",
+    "backend/.env",
+    "garmin_tokens.json",
+    "oauth1_token.json",
+    "prod-latest.dump",
+    "prod-sanitized.dump",
+    "prod-schema-reference.dump"
+   ],
+   "section": "hygiene"
+  },
+  {
+   "id": "INV-001",
+   "severity": "info",
+   "title": "20.3% of all lines are not code/tests/SQL (data, docs, generated, config)",
+   "detail": "Raw cloc-style totals overstate code size; use `code_lines` for reorg sizing.",
+   "hint": "",
+   "count": 0,
+   "evidence": [],
+   "section": "inventory"
+  },
+  {
+   "id": "PY-009",
+   "severity": "info",
+   "title": "Modules with no importers",
+   "detail": "dynamic-possible: 3, string-referenced: 3",
+   "hint": "`likely-dead` = no import, string, config or doc reference anywhere. `dynamic-possible` = a non-literal importlib call could load it.",
+   "count": 6,
+   "evidence": [
+    "dynamic-possible: backend_functions/admin_functions.py (81 loc)",
+    "dynamic-possible: backend_functions/running_functions.py (282 loc)",
+    "dynamic-possible: backend_functions/schemas/admin_schemas.py (215 loc)",
+    "string-referenced: backend_functions/data_helpers.py (756 loc)",
+    "string-referenced: backend_functions/db_wrapper.py (103 loc)",
+    "string-referenced: backend_functions/image_creation.py (390 loc)"
+   ],
+   "section": "python"
+  }
+ ],
+ "errors": {}
+}
