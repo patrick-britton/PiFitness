@@ -15,7 +15,7 @@ This was caused by the nginx template file containing bash heredoc syntax (`cat 
 
 ## Files Modified
 
-### 1. `deployment/pi5_deploy.sh` - Enhanced Deployment Script
+### 1. `deploy/scripts/pi5_deploy.sh` - Enhanced Deployment Script
 
 **Changes Made:**
 - Added explicit logging for nginx configuration updates
@@ -88,7 +88,7 @@ info "Verifying nginx configuration..."
 sudo nginx -T 2>/dev/null | grep -A5 "server_name pifitness.duckdns.org" | grep "proxy_pass" | grep -q ":${TARGET_PORT};" || warn "Nginx may not be using the expected port ${TARGET_PORT}"
 ```
 
-### 2. `deployment/nginx-template.conf` - Enhanced Nginx Template
+### 2. `deploy/nginx/nginx-template.conf` - Enhanced Nginx Template
 
 **Changes Made:**
 - Added security headers (X-Frame-Options, X-Content-Type-Options, X-XSS-Protection)
@@ -124,12 +124,12 @@ location /api/health {
 ### Streamlit (Branch: streamlit-prd)
 - **Service Port**: 8501 (defined in `pifitness-streamlit.service`)
 - **Nginx Proxy**: http://127.0.0.1:8501
-- **Service File**: `deployment/pifitness-streamlit.service`
+- **Service File**: `deploy/systemd/pifitness-streamlit.service` → removed (streamlit removed in refactor)
 
 ### FastAPI (Branch: react-ui)
 - **Service Port**: 8000 (defined in `pifitness-fastapi.service`)
 - **Nginx Proxy**: http://127.0.0.1:8000
-- **Service File**: `deployment/pifitness-fastapi.service`
+- **Service File**: `deploy/systemd/pifitness-fastapi.service`
 
 ## How the Deployment Script Handles Ports
 

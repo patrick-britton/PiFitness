@@ -9,7 +9,7 @@ script_dirs = ["scripts"]
 db_modules = ["database_functions", "db_wrapper", "db"]
 entrypoint_globs = [
   "**/main.py", "**/__main__.py", "setup.py", "**/conftest.py",
-  "agents/*.py", "deployment/**/*.py", "validate_endpoints.py",
+  "agents/*.py", "deploy/**/*.py", "validate_endpoints.py",
 ]
 
 [frontend]

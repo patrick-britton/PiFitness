@@ -6,14 +6,14 @@
 #   1) Full deploy          --install-packages   (or run with no flags + menu option 1)
 #   2) Fast deploy          --fast
 #   3) Nuclear              --nuclear
-#   4) Update bootstrap     --update-bootstrap   (pull deployment/ from repo,
+#   4) Update bootstrap     --update-bootstrap   (pull deploy/ from repo,
 #                                                 copy bootstrap.sh + deploy_react.sh
 #                                                 to /home/god/Documents/, no deploy)
 #
 # Flow:
 #   1. (Modes 1-3) Validates environment, fetches deployment scripts from
 #      origin/deployment_script, runs deploy_react.sh
-#   2. (Mode 4) Fetches deployment/ from origin/deployment_script and updates
+#   2. (Mode 4) Fetches deploy/ from origin/deploy_merge and updates
 #      the copies in /home/god/Documents/
 
 set -e
@@ -22,7 +22,7 @@ set -e
 PROJECT_DIR="/home/god/PiFitness"
 TARGET="react-ui"                    # Only one deployment target now
 BOOTSTRAP_DIR="/home/god/Documents"  # Where the user keeps their bootstrap copy
-DEPLOY_BRANCH="deployment_script"    # Branch that holds deployment/ in the repo
+DEPLOY_BRANCH="deploy_merge"    # Branch that holds deploy/ in the repo
 
 # --- Colours ---
 RED='\033[0;31m'
@@ -87,7 +87,7 @@ if [[ -z "$FAST" && -z "$NUCLEAR" && -z "$UPDATE_BOOTSTRAP" ]]; then
     echo "  1) Full deploy (pull code, tests, install packages, rebuild, restart services)"
     echo "  2) Fast deploy (pull code, skip tests/packages, restart services only)"
     echo "  3) Nuclear (wipe everything, re-clone, rebuild from scratch)"
-    echo "  4) Update bootstrap (pull latest deployment/ files from repo)"
+    echo "  4) Update bootstrap (pull latest deploy/ files from repo)"
     read -rp "Enter 1, 2, 3, or 4: " mode_choice
 
     case $mode_choice in
@@ -149,10 +149,10 @@ if [[ "$UPDATE_BOOTSTRAP" == "true" ]]; then
         if ! git -C "$PROJECT_DIR" fetch origin "$DEPLOY_BRANCH"; then
             error_exit "Failed to fetch origin/$DEPLOY_BRANCH"
         fi
-        info "Extracting deployment/ from origin/$DEPLOY_BRANCH..."
-        if ! git -C "$PROJECT_DIR" archive "origin/$DEPLOY_BRANCH" deployment/ \
+        info "Extracting deploy/ from origin/$DEPLOY_BRANCH..."
+        if ! git -C "$PROJECT_DIR" archive "origin/$DEPLOY_BRANCH" deploy/ \
              | tar -x -C "$EXTRACT_DIR" --strip-components=1 2>/dev/null; then
-            error_exit "Failed to extract deployment/ from origin/$DEPLOY_BRANCH"
+            error_exit "Failed to extract deploy/ from origin/$DEPLOY_BRANCH"
         fi
     else
         warn "$PROJECT_DIR is not a git repo; using a temporary clone"
@@ -162,12 +162,12 @@ if [[ "$UPDATE_BOOTSTRAP" == "true" ]]; then
              https://github.com/patrick-britton/PiFitness.git "$TEMP_CLONE"; then
             error_exit "Failed to clone $DEPLOY_BRANCH from origin"
         fi
-        cp -r "$TEMP_CLONE/deployment/." "$EXTRACT_DIR/"
+        cp -r "$TEMP_CLONE/deploy/." "$EXTRACT_DIR/"
         rm -rf "$TEMP_CLONE"
     fi
 
     if [[ ! -f "$EXTRACT_DIR/bootstrap.sh" ]]; then
-        error_exit "bootstrap.sh not found in extracted deployment/ — aborting"
+        error_exit "bootstrap.sh not found in extracted deploy/ — aborting"
     fi
 
     info "Updating bootstrap files in $BOOTSTRAP_DIR/..."
@@ -237,16 +237,16 @@ mkdir -p "$DEPLOY_DIR"
 info "Fetching latest deployment scripts from origin/$DEPLOY_BRANCH..."
 if ! git -C "$PROJECT_DIR" fetch origin "$DEPLOY_BRANCH" 2>/dev/null; then
     info "Using local deployment scripts (could not fetch $DEPLOY_BRANCH)"
-    SCRIPT_DIR="$PROJECT_DIR/deployment"
+    SCRIPT_DIR="$PROJECT_DIR/deploy/scripts"
 else
     SCRIPT_DIR="$DEPLOY_DIR"
     info "Extracting deployment scripts from origin/$DEPLOY_BRANCH..."
-    if git -C "$PROJECT_DIR" archive "origin/$DEPLOY_BRANCH" deployment/ \
+    if git -C "$PROJECT_DIR" archive "origin/$DEPLOY_BRANCH" deploy/ \
          | tar -x -C "$DEPLOY_DIR" --strip-components=1 2>/dev/null; then
         chmod +x "$DEPLOY_DIR"/*.sh 2>/dev/null || true
     else
         warn "Failed to extract deployment scripts. Falling back to local scripts."
-        SCRIPT_DIR="$PROJECT_DIR/deployment"
+        SCRIPT_DIR="$PROJECT_DIR/deploy/scripts"
     fi
 fi
 

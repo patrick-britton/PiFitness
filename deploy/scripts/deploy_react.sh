@@ -109,24 +109,24 @@ if [[ "$NUCLEAR" == "true" ]]; then
     source "$VENV_DIR/bin/activate"
 
     info "Installing Python dependencies..."
-    pip install -r "$PROJECT_DIR/deployment/$REQUIREMENTS_FILE"
+    pip install -r "$PROJECT_DIR/deploy/scripts/$REQUIREMENTS_FILE"
 
     info "Installing npm packages..."
     cd "$FRONTEND_DIR"
     npm install --no-save 2>/dev/null || true
-    if [[ -f "$PROJECT_DIR/deployment/$NPM_REQUIREMENTS_FILE" ]]; then
+    if [[ -f "$PROJECT_DIR/deploy/scripts/$NPM_REQUIREMENTS_FILE" ]]; then
         while IFS= read -r package || [[ -n "$package" ]]; do
             if [[ -n "$package" && "$package" != \#* ]]; then
                 npm install --no-save "$package" 2>/dev/null || true
             fi
-        done < "$PROJECT_DIR/deployment/$NPM_REQUIREMENTS_FILE"
+        done < "$PROJECT_DIR/deploy/scripts/$NPM_REQUIREMENTS_FILE"
     fi
 
     info "Building Next.js application..."
     npm run build
 
     info "Installing FastAPI service file..."
-    sudo cp "$PROJECT_DIR/deployment/pifitness-fastapi.service" /etc/systemd/system/
+    sudo cp "$PROJECT_DIR/deploy/systemd/pifitness-fastapi.service" /etc/systemd/system/
     sudo systemctl daemon-reload
 
     # [AUX] Install auxiliary systemd units (health helper + background task runner)
@@ -170,7 +170,7 @@ if [[ "$NUCLEAR" == "true" ]]; then
     pm2 start npm --name pifitness-next -- run start -- --port 3000
     pm2 save --force
 
-    NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
+    NGINX_TEMPLATE="$PROJECT_DIR/deploy/nginx/nginx-react.conf"
     NGINX_SITE="/etc/nginx/sites-available/pifitness"
     sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE"
     if [[ ! -f "/etc/nginx/sites-enabled/pifitness" ]]; then
@@ -228,7 +228,7 @@ if [[ "$FAST" == "true" ]]; then
         pm2 save --force
         cd "$PROJECT_DIR"
 
-        NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
+        NGINX_TEMPLATE="$PROJECT_DIR/deploy/nginx/nginx-react.conf"
         NGINX_SITE="/etc/nginx/sites-available/pifitness"
         if [[ -f "$NGINX_TEMPLATE" ]]; then
             sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE"
@@ -285,7 +285,7 @@ if [[ "$FAST" == "true" ]]; then
             NGINX_SITE="/etc/nginx/sites-available/pifitness"
             if [[ -f "$NGINX_SITE" ]] && ! grep -q ":8000;" "$NGINX_SITE"; then
                 info "Correcting Nginx routing to port 8000..."
-                NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
+                NGINX_TEMPLATE="$PROJECT_DIR/deploy/nginx/nginx-react.conf"
                 sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE"
                 if ! sudo nginx -t; then
                     error_exit "Nginx configuration test failed!"
@@ -307,7 +307,7 @@ if [[ "$FAST" == "true" ]]; then
                 pm2 save --force
                 cd "$PROJECT_DIR"
             fi
-            NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
+            NGINX_TEMPLATE="$PROJECT_DIR/deploy/nginx/nginx-react.conf"
             NGINX_SITE="/etc/nginx/sites-available/pifitness"
             if [[ -f "$NGINX_TEMPLATE" ]]; then
                 sudo cp "$NGINX_TEMPLATE" "$NGINX_SITE" 2>/dev/null || true
@@ -354,7 +354,7 @@ if [[ "$FAST" == "true" ]]; then
     FRONTEND_CHANGED=false
     for f in $CHANGED_FILES; do
         case "$f" in
-            deployment/*|scripts/*|tests/*|README*|.gitignore|*.md)
+            deploy/*|scripts/*|tests/*|README*|.gitignore|*.md)
                 ;;
             backend/*|backend_functions/*)
                 BACKEND_CHANGED=true
@@ -514,7 +514,7 @@ source "$VENV_DIR/bin/activate"
 
 if [[ "$INSTALL_PACKAGES" == "true" ]]; then
     info "Installing/updating Python dependencies..."
-    pip install -r "$PROJECT_DIR/deployment/$REQUIREMENTS_FILE"
+    pip install -r "$PROJECT_DIR/deploy/scripts/$REQUIREMENTS_FILE"
 else
     info "Skipping Python package checks"
 fi
@@ -522,14 +522,14 @@ fi
 if [[ "$INSTALL_PACKAGES" == "true" ]]; then
     info "Installing npm packages..."
     cd "$FRONTEND_DIR"
-    if [[ -f "$PROJECT_DIR/deployment/$NPM_REQUIREMENTS_FILE" ]]; then
+    if [[ -f "$PROJECT_DIR/deploy/scripts/$NPM_REQUIREMENTS_FILE" ]]; then
         info "Installing npm packages from requirements file..."
         while IFS= read -r package || [[ -n "$package" ]]; do
             if [[ -n "$package" && "$package" != \#* ]]; then
                 info "Installing/updating package: $package"
                 npm install --no-save "$package" 2>/dev/null || warn "Failed to install $package"
             fi
-        done < "$PROJECT_DIR/deployment/$NPM_REQUIREMENTS_FILE"
+        done < "$PROJECT_DIR/deploy/scripts/$NPM_REQUIREMENTS_FILE"
     else
         warn "npm_requirements.txt not found, running standard npm install..."
         npm install --no-save 2>/dev/null || warn "npm install had issues"
@@ -546,7 +546,7 @@ fi
 info "All tests passed."
 
 info "Installing FastAPI service file..."
-sudo cp "$PROJECT_DIR/deployment/pifitness-fastapi.service" /etc/systemd/system/
+sudo cp "$PROJECT_DIR/deploy/systemd/pifitness-fastapi.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable pifitness-fastapi.service
 
@@ -611,7 +611,7 @@ sudo systemctl start pifitness-fastapi.service
 TARGET_PORT=8000
 
 info "Updating nginx configuration..."
-NGINX_TEMPLATE="$PROJECT_DIR/deployment/nginx-react.conf"
+NGINX_TEMPLATE="$PROJECT_DIR/deploy/nginx/nginx-react.conf"
 NGINX_SITE="/etc/nginx/sites-available/pifitness"
 
 if [[ ! -f "$NGINX_TEMPLATE" ]]; then

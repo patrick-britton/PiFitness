@@ -142,7 +142,7 @@ Other:
 
 ## 8. Meaning of the three `npm_requirements.txt` files, `compose.yaml`, `validate_endpoints.py`, `setup.py`
 
-- `npm_requirements.txt` (root), `deployment/npm_requirements.txt`, `frontend/npm_requirements.txt` — three manifests; TS-009 says root duplicates 17 deps of frontend manifest. Hypothesis H9: root manifest is a stale install.
+- `npm_requirements.txt` (root), `deploy/scripts/npm_requirements.txt`, `frontend/npm_requirements.txt` — three manifests; TS-009 says root duplicates 17 deps of frontend manifest. Hypothesis H9: root manifest is a stale install.
 - `compose.yaml` (root, 15 loose files) — Docker compose; deployment-related.
 - `validate_endpoints.py` (root) — unassigned; proposed `tools/diagnostics/`.
 - `setup.py` (root) — Python packaging; to be replaced by `backend/pyproject.toml` in Phase 3.0.

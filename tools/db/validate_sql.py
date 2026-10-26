@@ -25,7 +25,7 @@ CACHE_FILE = PROJECT_ROOT / 'scripts' / 'schema_cache.json'
 
 def load_cache():
     if not CACHE_FILE.exists():
-        print("❌ Schema cache not found. Run `python scripts/schema_cache.py` first.")
+        print("❌ Schema cache not found. Run `python tools/diagnostics/schema_cache.py` first.")
         sys.exit(1)
     with open(CACHE_FILE) as f:
         return json.load(f)

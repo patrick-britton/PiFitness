@@ -1,6 +1,6 @@
 #!/bin/bash
 # PiFitness Deployment Script
-# Usage: ./deployment/pi5_deploy.sh
+# Usage: ./deploy/scripts/pi5_deploy.sh
 
 set -e
 
@@ -149,7 +149,7 @@ read -rp "Enter 1 or 2: " package_choice
 
 if [[ "$package_choice" == "1" ]]; then
     info "Installing/updating Python dependencies..."
-    pip install -r deployment/library_requirements.txt
+    pip install -r deploy/scripts/library_requirements.txt
     
     # Install pirate-garmin from local source (native Android auth flow)
     info "Installing pirate-garmin (native Garmin auth)..."
@@ -196,8 +196,8 @@ if [[ "$BRANCH" == "react-ui" && "$package_choice" == "1" ]]; then
 fi
 
 # Install/update systemd service files
-sudo cp /home/god/PiFitness/deployment/pifitness-streamlit.service /etc/systemd/system/
-sudo cp /home/god/PiFitness/deployment/pifitness-fastapi.service /etc/systemd/system/
+sudo cp /home/god/PiFitness/deploy/systemd/pifitness-hw-health.service /etc/systemd/system/
+sudo cp /home/god/PiFitness/deploy/systemd/pifitness-fastapi.service /etc/systemd/system/
 sudo systemctl daemon-reload
 
 # --- 6. Branch-specific actions ---
@@ -246,7 +246,7 @@ fi
 
 # --- 8. Update nginx configuration ---
 NGINX_SITE="/etc/nginx/sites-available/pifitness"
-NGINX_TEMPLATE="/home/god/PiFitness/deployment/nginx-template.conf"
+NGINX_TEMPLATE="/home/god/PiFitness/deploy/nginx/nginx-template.conf"
 
 if [[ ! -f "$NGINX_TEMPLATE" ]]; then
     error_exit "Nginx template not found at $NGINX_TEMPLATE"
