@@ -20,15 +20,16 @@ from backend_functions.queries import (
     get_activity_by_id,
     get_activity_telemetry,
     get_segment_matches,
+    get_recent_activities,
+    get_activity_stats,
     get_activity_report_target,
     get_activity_report_efforts,
     get_activity_report_charts,
     get_activity_course_path,
+    # 009-002 Leaderboards
     get_leaderboard_segments,
     get_segment_leaderboard,
     get_segment_visuals_telemetry,
-    stage_leaderboard_visuals,
-    get_segment_name,
 )
 from backend_functions.database_functions import sql_to_dict, get_conn, qec, one_sql_result, sql_to_list
 from backend_functions.music_functions import (

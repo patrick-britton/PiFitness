@@ -8,15 +8,6 @@ making them reusable by both FastAPI and legacy code.
 """
 
 # Import query modules
-from .health_queries import (
-    get_weight_targets,
-    add_weight_target,
-    get_weight_viz_data,
-    add_photo_metadata,
-    add_body_dimensions,
-    get_heart_rate_timeseries,
-    get_sleep_data,
-)
 from .music_queries import (
     get_rating_eligible_count,
     get_isrc_dupe_count,
