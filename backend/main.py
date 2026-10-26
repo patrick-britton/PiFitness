@@ -25,11 +25,12 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend_functions.config import get_settings
-from backend.api import activities, music, segments, auth, tri_tip, config, food_lookup, food
+from backend.api import activities, music, segments, auth, tri_tip, config, food_lookup
 from pifitness.health import router as health
 from pifitness.exercises import router as exercises
 from pifitness.volleyball import router as volleyball
 from pifitness.admin import router as admin
+from pifitness.food import router as food
 
 # ---------------------------------------------------------------------------
 # Application Initialization
@@ -133,7 +134,7 @@ app.include_router(exercises)
 app.include_router(food_lookup.router)
 
 # 010-002: food skeleton routes (Option B stubs, contract shapes)
-app.include_router(food.router)
+app.include_router(food)
 
 @app.get("/api/health")
 async def health():
