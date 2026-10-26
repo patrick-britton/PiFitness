@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
-from backend_functions.queries import (
+from pifitness.tri_tip.queries import (
     get_tri_tip_event,
     list_tri_tip_events,
     get_event_readings,
@@ -34,14 +34,6 @@ from backend_functions.queries import (
     TriTipNotFoundError,
     TriTipStateError,
     TriTipError,
-)
-from backend_functions.tri_tip_prediction import build_tri_tip_prediction
-from backend_functions.schemas.tri_tip_schemas import (
-    TriTipInitiateRequest,
-    TriTipPlaceRequest,
-    TriTipReadingRequest,
-    TriTipActiveResponse,
-    TriTipReferenceEvent,
 )
 
 router = APIRouter(prefix="/api/food/tri-tip", tags=["tri-tip"])
