@@ -25,10 +25,11 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend_functions.config import get_settings
-from backend.api import activities, admin, music, segments, auth, tri_tip, config, food_lookup, food
+from backend.api import activities, music, segments, auth, tri_tip, config, food_lookup, food
 from pifitness.health import router as health
 from pifitness.exercises import router as exercises
 from pifitness.volleyball import router as volleyball
+from pifitness.admin import router as admin
 
 # ---------------------------------------------------------------------------
 # Application Initialization
@@ -120,7 +121,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(activities.router)
 app.include_router(config.router)
 app.include_router(health)
-app.include_router(admin.router)
+app.include_router(admin)
 app.include_router(music.router)
 app.include_router(segments.router)
 app.include_router(auth.router)

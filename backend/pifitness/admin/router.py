@@ -1,0 +1,1075 @@
+"""
+Admin API Endpoints
+=================
+
+FastAPI endpoints for administrative functions (task monitoring, DB stats, etc.).
+"""
+
+from fastapi import APIRouter, HTTPException, Body
+from typing import Optional, Dict, Any
+from pydantic import BaseModel
+
+from backend_functions.credential_management import encrypt_dict
+from backend_functions.queries import (
+    get_task_execution_view,
+    get_task_scheduling_view,
+    get_distinct_task_names,
+    get_event_history,
+    get_active_db_sessions,
+    get_api_service_list,
+    get_function_library,
+    insert_function_library_entry,
+    update_function_library_entry,
+    delete_function_library_entry,
+    get_credential_requirements,
+    upsert_credentials,
+    delete_credentials,
+    get_log_tables_simple,
+    get_log_data_simple,
+    insert_api_service,
+    update_api_service,
+    delete_api_service,
+    delete_task_configuration,
+    delete_fact_configuration,
+    upsert_fact_configuration,
+    update_task_configuration,
+    kill_db_session,
+    get_task_summary_chart,
+    get_db_size_chart,
+    get_db_size_breakdown,
+    get_task_logs,
+    insert_task_configuration,
+    get_task_performance_data,
+    create_task_execution,
+    update_task_execution,
+    get_task_execution,
+)
+
+from pifitness.admin.services import failed_run_message
+
+
+router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+# Pydantic models for request bodies
+class TaskConfigEdit(BaseModel):
+    task_frequency: str
+    description: Optional[str] = None
+    display_icon: Optional[str] = None
+    priority: Optional[int] = None
+    hours: Optional[int] = None
+    interval_minutes: Optional[int] = None
+    stop_hour: Optional[int] = None
+    api_function: Optional[str] = None
+    python_function: Optional[str] = None
+
+class FactConfigUpsert(BaseModel):
+    fact_id: Optional[int] = None
+    task_id: int
+    staging_id: int
+    is_active: bool
+    custom_params: Optional[Dict[str, Any]] = None
+
+class CredentialUpsert(BaseModel):
+    api_service_name: str
+    raw_credentials_json_string: str
+
+class APIServiceCreate(BaseModel):
+    service_name: str
+    credential_requirements: Optional[str] = None
+
+class APIServiceUpdate(BaseModel):
+    credential_requirements: str
+
+class FunctionLibraryEntry(BaseModel):
+    friendly_name: str
+    api_service_name: str
+    python_extraction_function: str
+    description: Optional[str] = None
+
+
+@router.get("/tasks")
+async def list_tasks():
+    """
+    List all tasks with execution history.
+
+    Returns:
+        List of task execution records
+    """
+    try:
+        tasks = get_task_execution_view()
+        return {"data": tasks, "count": len(tasks)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch tasks: {str(e)}",
+        )
+
+
+@router.get("/tasks/schedule")
+async def get_task_schedule():
+    """
+    Get task scheduling configuration.
+
+    Returns:
+        List of task configuration records
+    """
+    try:
+        schedule = get_task_scheduling_view()
+        return {"data": schedule, "count": len(schedule)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task schedule: {str(e)}",
+        )
+
+
+@router.get("/tasks/names")
+async def get_task_names():
+    """
+    Get distinct task names.
+
+    Returns:
+        List of task names
+    """
+    try:
+        names = get_distinct_task_names()
+        return {"data": names, "count": len(names)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task names: {str(e)}",
+        )
+
+
+@router.post("/tasks/{task_name}/execute")
+async def execute_task(task_name: str):
+    """
+    Trigger execution of a background task.
+
+    Args:
+        task_name: The name of the task to execute
+
+    Returns:
+        Execution result or error
+    """
+    try:
+        from backend_functions.task_execution import execute_task_by_name
+        result = execute_task_by_name(task_name)
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to execute task: {str(e)}",
+        )
+
+class TaskExecuteRequest(BaseModel):
+    task_id: Optional[int] = None
+
+
+@router.post("/tasks/v2/{task_name}/execute")
+def execute_task_v2_async(task_name: str, request: Optional[TaskExecuteRequest] = Body(default=None)):
+    """
+    Trigger execution of a background task using the enhanced v2 execution engine.
+    Uses async pattern: returns immediately with execution_id, runs in background.
+
+    Args:
+        task_name: The name of the task to execute
+        request: Optional request body containing task_id
+
+    Returns:
+        execution_id and status for polling
+    """
+    try:
+        task_id = None
+        
+        # Prefer task_id from request body if provided
+        if request and request.task_id is not None:
+            task_id = request.task_id
+        else:
+            # Fallback: look up by name
+            from backend_functions.queries import get_task_scheduling_view, get_task_execution_view
+            
+            # First try scheduling view
+            for task in get_task_scheduling_view():
+                if task.get('task_name') == task_name:
+                    task_id = task.get('task_id')
+                    break
+            
+            # If not found, try execution view
+            if task_id is None:
+                for task in get_task_execution_view():
+                    if task.get('task_name') == task_name:
+                        task_id = task.get('task_id')
+                        break
+            
+            # If still not found, try querying task_configuration directly
+            if task_id is None:
+                from backend_functions.database_functions import one_sql_result
+                sql = "SELECT task_id FROM tasks.task_configuration WHERE task_name = %s LIMIT 1"
+                result = one_sql_result(sql, (task_name,))
+                if result:
+                    task_id = result
+
+        if task_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not find task_id for task_name: {task_name}"
+            )
+
+        # Create execution record
+        from backend_functions.database_functions import sql_insert_returning
+        sql = """
+            INSERT INTO tasks.task_executions (task_id, task_name, status, started_at)
+            VALUES (%s, %s, 'running', CURRENT_TIMESTAMP)
+            RETURNING execution_id
+        """
+        params = [task_id, task_name]
+        result = sql_insert_returning(sql, params)
+        
+        if not result or not result[0].get('execution_id'):
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to create task execution record"
+            )
+        
+        execution_id = result[0]['execution_id']
+
+        # Start background execution in a thread
+        import threading
+        def run_async():
+            try:
+                from backend_functions.ultimate_task_executioner_v2 import ultimate_task_executioner
+                result = ultimate_task_executioner(force_task_name=task_name)
+                
+                # Determine success/failure
+                failed = []
+                if result and isinstance(result, dict):
+                    results = result.get('results', [])
+                    failed = [r for r in results if not r.get('success')]
+                
+                if failed:
+                    update_task_execution(
+                        execution_id,
+                        status='failed',
+                        result=result,
+                        error_message=failed_run_message(failed)
+                    )
+                else:
+                    update_task_execution(
+                        execution_id,
+                        status='success',
+                        result=result
+                    )
+            except Exception as e:
+                update_task_execution(
+                    execution_id,
+                    status='failed',
+                    error_message=str(e)
+                )
+
+        thread = threading.Thread(target=run_async, daemon=True)
+        thread.start()
+
+        # Return immediately with execution_id
+        return {
+            "execution_id": execution_id,
+            "status": "started",
+            "message": f"Task {task_name} execution started"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start task execution: {str(e)}",
+        )
+
+@router.get("/tasks/executions/{execution_id}")
+def get_task_execution_status(execution_id: int):
+    """
+    Get the status of an async task execution.
+
+    Args:
+        execution_id: The execution ID to check
+
+    Returns:
+        Execution record with current status
+    """
+    try:
+        execution = get_task_execution(execution_id)
+        if not execution:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Execution {execution_id} not found"
+            )
+        return execution
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch execution status: {str(e)}",
+        )
+
+
+@router.put("/tasks/{task_id}")
+async def update_task_configuration_endpoint(task_id: int, task_config: TaskConfigEdit):
+    """
+    Update task schedule configuration.
+
+    Args:
+        task_id: The ID of the task to update
+        task_config: The updated task configuration
+
+    Returns:
+        Success message or error
+    """
+    try:
+        # Build kwargs dict with only provided (non-None) optional fields
+        kwargs = {}
+        if task_config.description is not None:
+            kwargs['description'] = task_config.description
+        if task_config.display_icon is not None:
+            kwargs['display_icon'] = task_config.display_icon
+        if task_config.priority is not None:
+            kwargs['priority'] = task_config.priority
+        if task_config.hours is not None:
+            kwargs['hours'] = task_config.hours
+        if task_config.interval_minutes is not None:
+            kwargs['interval_minutes'] = task_config.interval_minutes
+        if task_config.stop_hour is not None:
+            kwargs['stop_hour'] = task_config.stop_hour
+        if task_config.api_function is not None:
+            kwargs['api_function'] = task_config.api_function
+        if task_config.python_function is not None:
+            kwargs['python_function'] = task_config.python_function
+        
+        result = update_task_configuration(
+            task_id=task_id,
+            task_frequency=task_config.task_frequency,
+            **kwargs
+        )
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update task configuration: {result}"
+            )
+        return {"status": "ok", "message": f"Task {task_id} updated successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update task configuration: {str(e)}",
+        )
+
+
+@router.delete("/tasks/schedule/{task_id}")
+async def delete_task_configuration_endpoint(task_id: int):
+    """
+    Delete a task configuration entry.
+
+    Args:
+        task_id: The ID of the task configuration to delete
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = delete_task_configuration(task_id)
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete task configuration: {result}"
+            )
+        return {"status": "ok", "message": f"Task configuration {task_id} deleted successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete task configuration: {str(e)}",
+        )
+
+
+@router.post("/tasks/facts")
+async def upsert_fact_configuration_endpoint(fact_config: FactConfigUpsert):
+    """
+    Add or update a fact configuration record.
+
+    Args:
+        fact_config: The fact configuration to insert or update
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = upsert_fact_configuration(
+            fields=fact_config.dict(exclude={'fact_id'}),
+            is_insert=fact_config.fact_id is None,
+            fact_id=fact_config.fact_id
+        )
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to upsert fact configuration: {result}"
+            )
+        return {"status": "ok", "message": "Fact configuration saved successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upsert fact configuration: {str(e)}",
+        )
+
+
+@router.delete("/tasks/facts/{fact_id}")
+async def delete_fact_configuration_endpoint(fact_id: int):
+    """
+    Delete a fact configuration entry.
+
+    Args:
+        fact_id: The ID of the fact configuration to delete
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = delete_fact_configuration(fact_id)
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete fact configuration: {result}"
+            )
+        return {"status": "ok", "message": f"Fact configuration {fact_id} deleted successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete fact configuration: {str(e)}",
+        )
+
+
+@router.get("/events")
+async def get_events(
+    search: Optional[str] = None,
+    errors_only: bool = False,
+    ignore_skips: bool = False,
+    event_type: Optional[str] = None,
+    limit: int = 250
+):
+    """
+    Get event history with optional filtering.
+
+    Args:
+        search: Text search across event_type, description, error_text
+        errors_only: If True, show only error events
+        ignore_skips: If True, filter out skipped rows
+        event_type: Filter by specific event type
+        limit: Maximum number of rows to return (default: 250)
+
+    Returns:
+        List of filtered event history records
+    """
+    try:
+        events = get_event_history(
+            search_val=search,
+            errors_only=errors_only,
+            ignore_skips=ignore_skips,
+            event_type=event_type,
+            limit=limit
+        )
+        return {"data": events, "count": len(events)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch events: {str(e)}",
+        )
+
+
+@router.get("/db-sessions")
+async def get_db_sessions():
+    """
+    Get active database sessions.
+
+    Returns:
+        List of active database session records
+    """
+    try:
+        sessions = get_active_db_sessions()
+        return {"data": sessions, "count": len(sessions)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch DB sessions: {str(e)}",
+        )
+
+
+@router.delete("/db-sessions/{pid}")
+async def kill_db_session_endpoint(pid: int):
+    """
+    Terminate a database session by PID.
+
+    Args:
+        pid: The process ID to terminate
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = kill_db_session(pid)
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to kill database session: {result}"
+            )
+        return {"status": "ok", "message": f"Database session {pid} terminated successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to kill database session: {str(e)}",
+        )
+
+
+@router.get("/services")
+async def get_services():
+    """
+    Get API services list.
+
+    Returns:
+        List of API service records
+    """
+    try:
+        services = get_api_service_list()
+        return {"data": services, "count": len(services)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch services: {str(e)}",
+        )
+
+
+@router.post("/services")
+async def add_service_endpoint(service: APIServiceCreate):
+    """
+    Add a new API service.
+
+    Args:
+        service: The service to add (includes credential_requirements optional)
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = insert_api_service(
+            service_name=service.service_name,
+            credential_requirements=service.credential_requirements
+        )
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to add service: {result}"
+            )
+        return {"status": "ok", "message": f"Service '{service.service_name}' added successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to add service: {str(e)}",
+        )
+
+
+@router.put("/services/{service_name}")
+async def update_service_endpoint(service_name: str, service_update: APIServiceUpdate):
+    """
+    Update an API service's credential requirements.
+
+    Args:
+        service_name: The name of the service to update
+        service_update: The updated credential requirements
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = update_api_service(
+            service_name=service_name,
+            credential_requirements=service_update.credential_requirements
+        )
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update service: {result}"
+            )
+        return {"status": "ok", "message": f"Service '{service_name}' updated successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update service: {str(e)}",
+        )
+
+
+@router.delete("/services/{service_name}")
+async def delete_service_endpoint(service_name: str):
+    """
+    Delete an API service by name.
+
+    Args:
+        service_name: The name of the service to delete
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = delete_api_service(service_name)
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete service: {result}"
+            )
+        return {"status": "ok", "message": f"Service '{service_name}' deleted successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete service: {str(e)}",
+        )
+
+
+@router.get("/functions")
+async def get_function_library_endpoint():
+    """
+    Get API function library.
+
+    Returns:
+        List of function library records
+    """
+    try:
+        functions = get_function_library()
+        return {"data": functions, "count": len(functions)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch function library: {str(e)}",
+        )
+
+
+@router.post("/functions")
+async def add_function_library_entry_endpoint(function_entry: FunctionLibraryEntry):
+    """
+    Add a new function library entry.
+
+    Args:
+        function_entry: The function library entry to add
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = insert_function_library_entry(function_entry.dict())
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to add function library entry: {result}"
+            )
+        return {"status": "ok", "message": "Function library entry added successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to add function library entry: {str(e)}",
+        )
+
+
+@router.put("/functions/{friendly_name}")
+async def update_function_library_entry_endpoint(friendly_name: str, function_entry: FunctionLibraryEntry):
+    """
+    Update an existing function library entry.
+
+    Args:
+        friendly_name: The friendly_name identifying the row to update
+        function_entry: The updated function library entry
+
+    Returns:
+        Success message or error
+    """
+    try:
+        # Remove friendly_name from updates since it's used as the WHERE clause
+        updates = function_entry.dict()
+        updates.pop('friendly_name', None)
+        
+        result = update_function_library_entry(friendly_name, updates)
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to update function library entry: {result}"
+            )
+        return {"status": "ok", "message": f"Function library entry '{friendly_name}' updated successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update function library entry: {str(e)}",
+        )
+
+
+@router.delete("/functions/{friendly_name}")
+async def delete_function_library_entry_endpoint(friendly_name: str):
+    """
+    Delete a function library entry by friendly_name.
+
+    Args:
+        friendly_name: The friendly_name of the entry to delete
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = delete_function_library_entry(friendly_name)
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete function library entry: {result}"
+            )
+        return {"status": "ok", "message": f"Function library entry '{friendly_name}' deleted successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete function library entry: {str(e)}",
+        )
+
+
+@router.get("/credentials/requirements")
+async def get_credential_requirements_endpoint():
+    """
+    Get credential requirements for all API services.
+
+    Returns:
+        List of records with api_service_name and api_credential_requirements
+    """
+    try:
+        requirements = get_credential_requirements()
+        return {"data": requirements, "count": len(requirements)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch credential requirements: {str(e)}",
+        )
+
+
+@router.post("/credentials")
+async def upsert_credentials_endpoint(credential: CredentialUpsert):
+    """
+    Encrypt and upsert credentials for a service.
+
+    Args:
+        credential: The service name and raw credentials JSON to encrypt and store
+
+    Returns:
+        Success message or error
+    """
+    try:
+        # Parse JSON string into dict, then encrypt
+        import json
+        credentials_dict = json.loads(credential.raw_credentials_json_string)
+        encrypted_credentials = encrypt_dict(credentials_dict)
+        
+        result = upsert_credentials(
+            service_name=credential.api_service_name,
+            encrypted_credentials=encrypted_credentials
+        )
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to upsert credentials: {result}"
+            )
+        return {"status": "ok", "message": f"Credentials for '{credential.api_service_name}' updated successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upsert credentials: {str(e)}",
+        )
+
+
+@router.delete("/credentials/{service_name}")
+async def delete_credentials_endpoint(service_name: str):
+    """
+    Delete credentials for a service.
+
+    Args:
+        service_name: The name of the service whose credentials to delete
+
+    Returns:
+        Success message or error
+    """
+    try:
+        result = delete_credentials(service_name)
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete credentials: {result}"
+            )
+        return {"status": "ok", "message": f"Credentials for '{service_name}' deleted successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete credentials: {str(e)}",
+        )
+
+
+@router.get("/logs/tables")
+async def get_log_tables_endpoint():
+    """
+    Get list of log table names from the logging schema.
+
+    Returns:
+        List of log table names
+    """
+    try:
+        tables = get_log_tables_simple()
+        return {"data": tables, "count": len(tables)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch log tables: {str(e)}",
+        )
+
+
+@router.get("/tasks/{task_id}/logs")
+async def get_task_logs_endpoint(task_id: int, limit: int = 100):
+    """
+    Retrieve execution log entries for a specific task.
+
+    Args:
+        task_id: The task ID to filter logs by
+        limit: Maximum number of rows to return (default: 100)
+
+    Returns:
+        List of task execution log records
+    """
+    try:
+        logs = get_task_logs(task_id, limit)
+        return {"data": logs, "count": len(logs)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task logs: {str(e)}",
+        )
+
+
+@router.get("/tasks/{task_id}/performance")
+async def get_task_performance_endpoint(task_id: int):
+    """
+    Get task performance data for a specific task.
+
+    This endpoint retrieves aggregated timing data from tasks.vw_task_performance
+    view, which provides execution metrics grouped by 30-minute intervals.
+
+    Args:
+        task_id: The task ID to fetch performance data for
+
+    Returns:
+        List of task performance records with timing metrics for different
+        execution phases and event_date timestamps
+    """
+    try:
+        performance_data = get_task_performance_data(task_id)
+        return {"data": performance_data, "count": len(performance_data)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task performance data: {str(e)}",
+        )
+
+@router.get("/tasks/{task_id}/config")
+async def get_task_config_endpoint(task_id: int):
+    """
+    Get full task configuration for a specific task.
+    Fetches ALL columns from tasks.task_configuration for the edit dialog.
+
+    Args:
+        task_id: The task ID to fetch config for
+
+    Returns:
+        Single task configuration record with mapped frontend field names
+    """
+    try:
+        from backend_functions.queries import get_task_config_by_id
+        config = get_task_config_by_id(task_id)
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task configuration {task_id} not found"
+            )
+        # Map DB column names back to frontend field names for the edit dialog
+        db_to_frontend = {
+            'task_id': 'task_id',
+            'task_name': 'task_name',
+            'task_description': 'description',
+            'display_icon': 'display_icon',
+            'task_frequency': 'task_frequency',
+            'task_priority': 'priority',
+            'task_start_hour': 'hours',
+            'task_interval': 'interval_minutes',
+            'task_stop_hour': 'stop_hour',
+            'api_function_name': 'api_function',
+            'python_execution_function': 'python_function',
+        }
+        mapped = {}
+        for db_key, frontend_key in db_to_frontend.items():
+            if db_key in config:
+                mapped[frontend_key] = config[db_key]
+        # is_active field has been removed - task_frequency alone determines active state
+        return {"data": mapped}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task configuration: {str(e)}",
+        )
+
+
+class TaskCreate(BaseModel):
+    task_name: str
+    description: Optional[str] = None
+    task_frequency: Optional[str] = "daily"
+    display_icon: Optional[str] = "⚙️"
+    priority: Optional[int] = 0
+    hours: Optional[int] = 0
+    interval_minutes: Optional[int] = 0
+    api_function: Optional[str] = None
+    python_function: Optional[str] = None
+
+
+# Mapping from React/API frontend field names to actual database column names
+# The task_configuration table uses legacy column names different from what the React UI sends
+TASK_CONFIG_FIELD_MAPPING = {
+    'task_name': 'task_name',
+    'description': 'task_description',
+    'task_frequency': 'task_frequency',
+    'display_icon': 'display_icon',
+    'priority': 'task_priority',
+    'hours': 'task_start_hour',
+    'interval_minutes': 'task_interval',
+    'stop_hour': 'task_stop_hour',
+    'api_function': 'api_function_name',
+    'python_function': 'python_execution_function',
+}
+
+
+def map_task_fields(fields: Dict[str, Any]) -> Dict[str, Any]:
+    """Map React frontend field names to database column names."""
+    mapped = {}
+    for frontend_key, db_key in TASK_CONFIG_FIELD_MAPPING.items():
+        if frontend_key in fields:
+            mapped[db_key] = fields[frontend_key]
+    # task_stop_hour defaults to 23 if task_start_hour is set
+    if 'hours' in fields and 'task_start_hour' in mapped:
+        mapped.setdefault('task_stop_hour', 23)
+    return mapped
+
+
+@router.post("/tasks")
+async def create_task_endpoint(task: TaskCreate):
+    """
+    Create a new task configuration entry.
+
+    Args:
+        task: The task configuration to create
+
+    Returns:
+        Success message or error
+    """
+    try:
+        fields = task.dict(exclude_none=True)
+        if not fields.get("task_frequency"):
+            fields["task_frequency"] = "daily"
+        # Map frontend field names to database column names
+        db_fields = map_task_fields(fields)
+        result = insert_task_configuration(db_fields)
+        if result:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create task: {result}"
+            )
+        return {"status": "ok", "message": f"Task '{task.task_name}' created successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create task: {str(e)}",
+        )
+
+
+@router.get("/db-info/task-summary")
+async def get_task_summary():
+    """
+    Get task summary chart data.
+
+    Returns:
+        List of task summary records with timing, execution count, and recency details
+    """
+    try:
+        data = get_task_summary_chart()
+        return {"data": data, "count": len(data)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch task summary chart: {str(e)}",
+        )
+
+
+@router.get("/db-info/db-size-chart")
+async def get_db_size_history():
+    """
+    Get historical database size growth data.
+
+    Returns:
+        List of records with date_utc, table_size_mb, index_size_mb, other_size_mb
+    """
+    try:
+        data = get_db_size_chart()
+        return {"data": data, "count": len(data)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch DB size chart: {str(e)}",
+        )
+
+
+@router.get("/db-info/db-size-breakdown")
+async def get_db_size_breakdown_endpoint():
+    """
+    Get current database size breakdown by table.
+
+    Returns:
+        List of records with table_name, table_size_mb, index_size_mb, other_size_mb
+    """
+    try:
+        data = get_db_size_breakdown()
+        return {"data": data, "count": len(data)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch DB size breakdown: {str(e)}",
+        )
+
+
+@router.get("/logs/data/{table_name}")
+async def get_log_data_endpoint(table_name: str, limit: int = 100):
+    """
+    Get log data from a specific log table.
+
+    Args:
+        table_name: The name of the log table to query
+        limit: Maximum number of rows to return (default: 100)
+
+    Returns:
+        List of log records
+    """
+    try:
+        # Basic validation to prevent SQL injection - in a real app, use an allowlist
+        if not table_name.isalnum() and '_' not in table_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid table name"
+            )
+        
+        logs = get_log_data_simple(table_name, limit)
+        return {"data": logs, "count": len(logs)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch log data: {str(e)}",
+        )
