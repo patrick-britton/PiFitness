@@ -64,78 +64,10 @@ from backend_functions.schemas.leaderboard_schemas import (
     SegmentVisualSeriesPoint,
 )
 
+from backend_functions.activities_service import run_step, task_failure_message, verify_spotify
+
+
 router = APIRouter(prefix="/api/activities", tags=["activities"])
-
-
-# ---------------------------------------------------------------------------
-# Helper: run a step with timing, return a ProcessStepResult
-# ---------------------------------------------------------------------------
-
-def _task_failure_message(ret) -> Optional[str]:
-    """Aggregate failed entries from an ultimate_task_executioner results dict.
-
-    OQ-2 option (a): the executioner already returns
-    `{tasks_processed, results: [{task_id, task_name, success, error}], status}`;
-    any entry with success=False is aggregated into one message so a forced
-    task failure can mark the step `error` and halt the pipeline instead of
-    passing silently (Bug 004-005-2 / Chain A2).
-
-    Returns None unless `ret` is that summary dict — unrelated step functions
-    returning other shapes (or nothing) are unaffected. Entries without an
-    explicit `success` key are not treated as failures (conservative).
-    """
-    if not isinstance(ret, dict):
-        return None
-    results = ret.get('results')
-    if not isinstance(results, list):
-        return None
-    failed = [r for r in results if isinstance(r, dict) and r.get('success') is False]
-    if not failed:
-        return None
-    parts = []
-    for r in failed:
-        name = r.get('task_name') or f"task {r.get('task_id')}"
-        parts.append(f"{name}: {r.get('error') or 'failed'}")
-    return "; ".join(parts)
-
-
-def _run_step(step_id: str, fn, *args, **kwargs) -> ProcessStepResult:
-    """Execute a step function, measure elapsed time, do not return internal result data.
-
-    Task-runner results dicts are inspected via `_task_failure_message`
-    (OQ-2a): a forced task that reports failure makes the step `error` with
-    the aggregated messages, driving the normal halt + terminal
-    `{complete:true, success:false, error}` flow (AC-2).
-    """
-    t0 = time.perf_counter()
-    try:
-        ret = fn(*args, **kwargs)
-        elapsed = int((time.perf_counter() - t0) * 1000)
-        failure = _task_failure_message(ret)
-        if failure:
-            return ProcessStepResult(
-                step_id=step_id,
-                status="error",
-                elapsed_ms=elapsed,
-                error=failure,
-                result=None,
-            )
-        return ProcessStepResult(
-            step_id=step_id,
-            status="complete",
-            elapsed_ms=elapsed,
-            error=None,
-            result=None,
-        )
-    except Exception as e:
-        elapsed = int((time.perf_counter() - t0) * 1000)
-        return ProcessStepResult(
-            step_id=step_id,
-            status="error",
-            elapsed_ms=elapsed,
-            error=str(e),
-            result=None,
-        )
 
 
 def _skip_step(step_id: str) -> ProcessStepResult:
@@ -149,17 +81,21 @@ def _skip_step(step_id: str) -> ProcessStepResult:
     )
 
 
-def _start_event(step_id: str) -> dict:
-    """Return a JSON-safe dict for a step start (running) event."""
-    return ProcessStepStartEvent(step_id=step_id).model_dump(mode="json")
-
-
 # ---------------------------------------------------------------------------
 # In-process concurrency guard (FR-1, OQ-4): one processing run at a time.
 # A second concurrent run is rejected immediately.
 # ---------------------------------------------------------------------------
 _process_lock = threading.Lock()
 
+
+def _start_event(step_id: str) -> dict:
+    """Return a JSON-safe dict for a step start (running) event."""
+    return ProcessStepStartEvent(step_id=step_id).model_dump(mode="json")
+
+
+# ---------------------------------------------------------------------------
+# Helper: run a step with timing, return a ProcessStepResult
+# ---------------------------------------------------------------------------
 
 def _run_step_data(step_id: str, fn, *args, **kwargs) -> ProcessStepResult:
     """Execute a step function that returns ProcessStepResultData; measure elapsed time."""
@@ -232,7 +168,7 @@ def _step_to_dict(step: ProcessStepResult) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _process_generator(req: ProcessActivityRequest):
+def process_generator(req: ProcessActivityRequest):
     """
     Generator that yields one NDJSON line per step (start + terminal) and a
     final terminal event with `complete: true`.
@@ -264,7 +200,7 @@ def _process_generator(req: ProcessActivityRequest):
         # Step 1: Sync Activities (always first — Bug #1 invariant, OQ-3)
         # -------------------------------------------------------------------
         yield json.dumps(_start_event("sync_activities")) + "\n"
-        result = _run_step("sync_activities", ultimate_task_executioner, force_task_id=4)
+        result = run_step("sync_activities", ultimate_task_executioner, force_task_id=4)
         yield json.dumps(_step_to_dict(result)) + "\n"
         if result.status == "error":
             has_error = True
@@ -274,7 +210,7 @@ def _process_generator(req: ProcessActivityRequest):
         # -------------------------------------------------------------------
         if not has_error:
             yield json.dumps(_start_event("sync_details")) + "\n"
-            result = _run_step("sync_details", ultimate_task_executioner, force_task_id=19)
+            result = run_step("sync_details", ultimate_task_executioner, force_task_id=19)
             yield json.dumps(_step_to_dict(result)) + "\n"
             if result.status == "error":
                 has_error = True
@@ -361,7 +297,7 @@ def _process_generator(req: ProcessActivityRequest):
                 # FR-8.2: insert listening history from the heard songs.
                 if not has_error:
                     yield json.dumps(_start_event("insert_history")) + "\n"
-                    result = _run_step("insert_history", _insert_listening_history, playlist_name)
+                    result = run_step("insert_history", _insert_listening_history, playlist_name)
                     yield json.dumps(_step_to_dict(result)) + "\n"
                     if result.status == "error":
                         has_error = True
@@ -395,7 +331,7 @@ def _process_generator(req: ProcessActivityRequest):
                 # never report success unverified, FR-10).
                 if not has_error:
                     yield json.dumps(_start_event("send_to_spotify")) + "\n"
-                    result = _run_step("send_to_spotify", _send_to_spotify, playlist_id, track_ids)
+                    result = run_step("send_to_spotify", _send_to_spotify, playlist_id, track_ids)
                     yield json.dumps(_step_to_dict(result)) + "\n"
                     if result.status == "error":
                         has_error = True
@@ -404,7 +340,7 @@ def _process_generator(req: ProcessActivityRequest):
                 # stored order so future vw_watch_music_heard runs are correct.
                 if not has_error:
                     yield json.dumps(_start_event("verify_spotify")) + "\n"
-                    result = _run_step("verify_spotify", _verify_spotify, playlist_id)
+                    result = run_step("verify_spotify", verify_spotify, playlist_id)
                     yield json.dumps(_step_to_dict(result)) + "\n"
                     if result.status == "error":
                         has_error = True
@@ -523,7 +459,7 @@ async def process_activity(req: ProcessActivityRequest):
     complete/error event (Bug #2 / FR-12). One run at a time (FR-1).
     """
     return StreamingResponse(
-        _process_generator(req),
+        process_generator(req),
         media_type="application/x-ndjson",
     )
 
@@ -626,7 +562,7 @@ def _send_to_spotify(playlist_id: str, track_ids: list) -> None:
     playlist_upload(client, list_id=playlist_id, track_list=track_ids)
 
 
-def _verify_spotify(playlist_id: str) -> None:
+def verify_spotify(playlist_id: str) -> None:
     """FR-8.6 (Bug #1 fix): after a successful send, re-pull the target playlist
     from Spotify and refresh the stored track order in music.playlist_isrcs.
 

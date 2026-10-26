@@ -3,7 +3,7 @@ Live integration test — 004-004 Bug T10-6 fix (FR-8.6 / FR-10).
 
 Validates the exact methodology the rebuilt pipeline uses to refresh
 music.playlist_isrcs by querying Spotify, via the feature's own step function
-`backend.api.activities._verify_spotify`, against the Running target playlist
+`backend_functions.activities_service.verify_spotify`, against the Running target playlist
 '7LPPIzdYgJZgj2QTSXCCNy'.
 
 Methodology under test (matches the pipeline's verify_spotify step):
@@ -18,7 +18,7 @@ Side effect (same as a live pipeline run): the target playlist's rows in
 music.playlist_isrcs are refreshed. No schema is created or altered.
 
 Run from the repository root:
-    python -m pytest tests/test_verify_spotify_isrc_refresh.py -v
+    python -m pytest tests/testverify_spotify_isrc_refresh.py -v
 """
 from pathlib import Path
 
@@ -26,12 +26,13 @@ import pytest
 
 from backend_functions.database_functions import one_sql_result, sql_to_list
 from backend_functions.service_logins import get_spotify_client
-from backend.api.activities import _verify_spotify
+from backend_functions.activities_service import verify_spotify
 
 TARGET_PLAYLIST_ID = '7LPPIzdYgJZgj2QTSXCCNy'
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACTIVITIES_PY = REPO_ROOT / 'backend' / 'api' / 'activities.py'
+SERVICE_PY = REPO_ROOT / 'backend_functions' / 'activities_service.py'
 TYPES_TS = REPO_ROOT / 'frontend' / 'pifitness' / 'src' / 'lib' / 'types' / 'activity-processing.ts'
 
 
@@ -57,21 +58,24 @@ def test_verify_spotify_step_exists_in_pipeline():
     """The verify_spotify re-read step must be wired into the pipeline between
     send_to_spotify and report_shuffle (FR-8.6), with the frontend contract
     including the id and a label."""
-    src = ACTIVITIES_PY.read_text(encoding='utf-8')
+    src = SERVICE_PY.read_text(encoding='utf-8')
 
-    # Step function exists and is executed as a pipeline step.
-    assert 'def _verify_spotify(' in src
-    assert '_run_step("verify_spotify", _verify_spotify, playlist_id)' in src
-
-    # Sequence order: send → verify → report.
-    i_send = src.index('_run_step("send_to_spotify"')
-    i_verify = src.index('_run_step("verify_spotify"')
-    i_report = src.index('_run_step_data("report_shuffle"')
-    assert i_send < i_verify < i_report
+    # Step function exists in the service module.
+    assert 'def verify_spotify(' in src
 
     # FR-10 guard present: client pre-check + DB freshness verification.
     assert 'could not obtain a usable Spotify client' in src
     assert "max(updated_at_utc) >= (CURRENT_TIMESTAMP - interval '5 minutes')" in src
+
+    # Pipeline wiring: activities.py calls run_step with verify_spotify.
+    acts_src = ACTIVITIES_PY.read_text(encoding='utf-8')
+    assert 'run_step("verify_spotify", verify_spotify, playlist_id)' in acts_src
+
+    # Sequence order: send → verify → report.
+    i_send = acts_src.index('run_step("send_to_spotify"')
+    i_verify = acts_src.index('run_step("verify_spotify"')
+    i_report = acts_src.index('run_step_data("report_shuffle"')
+    assert i_send < i_verify < i_report
 
     # Frontend contract: step id in STEP_ORDER and a human label present.
     ts = TYPES_TS.read_text(encoding='utf-8')
@@ -100,12 +104,12 @@ def test_spotify_client_is_usable():
 def test_verify_spotify_fails_without_client(monkeypatch):
     """With no usable client the step must raise instead of soft-succeeding
     (the original T10-6 bug silently no-oped)."""
-    from backend.api import activities as acts
+    from backend_functions.activities_service import verify_spotify
 
     for broken in (None, {"token": "x", "token_age": 0, "client": None}):
-        monkeypatch.setattr(acts, "get_spotify_client", lambda b=broken: b)
+        monkeypatch.setattr("backend_functions.activities_service.get_spotify_client", lambda b=broken: b)
         with pytest.raises(RuntimeError, match="could not obtain a usable Spotify client"):
-            acts._verify_spotify(TARGET_PLAYLIST_ID)
+            verify_spotify(TARGET_PLAYLIST_ID)
 
 
 # ---------------------------------------------------------------------------
@@ -113,14 +117,14 @@ def test_verify_spotify_fails_without_client(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_verify_spotify_refreshes_playlist_isrcs():
-    """Run _verify_spotify(TARGET) live: it must not raise (client usable +
+    """Run verify_spotify(TARGET) live: it must not raise (client usable +
     music.playlist_isrcs refreshed within 5 minutes) and the table state must
     be sane afterwards."""
     pre_ts = _max_updated_at(TARGET_PLAYLIST_ID)
     pre_count = _row_count(TARGET_PLAYLIST_ID)
 
     # Raises RuntimeError on any failure (client unusable or DB not refreshed).
-    _verify_spotify(TARGET_PLAYLIST_ID)
+    verify_spotify(TARGET_PLAYLIST_ID)
 
     post_ts = _max_updated_at(TARGET_PLAYLIST_ID)
     post_count = _row_count(TARGET_PLAYLIST_ID)

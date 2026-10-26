@@ -31,32 +31,32 @@ _FALLBACK_PAGE = 25
 # Normalized-query cache (~1 day TTL, in-process, bounded).
 _CACHE_TTL_S = 24 * 3600
 _CACHE_MAX = 200
-_cache: Dict[str, Any] = {}
-_cache_order: List[str] = []
+cache: Dict[str, Any] = {}
+cache_order: List[str] = []
 
 
 def _norm_query(q: str) -> str:
     return re.sub(r"\s+", " ", (q or "").strip().lower())
 
 
-def _cache_get(key: str) -> Optional[Any]:
-    hit = _cache.get(key)
+def cache_get(key: str) -> Optional[Any]:
+    hit = cache.get(key)
     if not hit:
         return None
     if time.time() - hit["at"] > _CACHE_TTL_S:
-        _cache.pop(key, None)
+        cache.pop(key, None)
         return None
     return hit["value"]
 
 
-def _cache_put(key: str, value: Any) -> None:
-    if key in _cache:
-        _cache[key] = {"at": time.time(), "value": value}
+def cache_put(key: str, value: Any) -> None:
+    if key in cache:
+        cache[key] = {"at": time.time(), "value": value}
         return
-    if len(_cache_order) >= _CACHE_MAX:
-        _cache.pop(_cache_order.pop(0), None)
-    _cache[key] = {"at": time.time(), "value": value}
-    _cache_order.append(key)
+    if len(cache_order) >= _CACHE_MAX:
+        cache.pop(cache_order.pop(0), None)
+    cache[key] = {"at": time.time(), "value": value}
+    cache_order.append(key)
 
 
 def _usda_key() -> Optional[str]:
@@ -115,7 +115,7 @@ def _relevance_tier(name: str, query_words: List[str]) -> int:
     return 2
 
 
-def _name_bonus(name: str, query: str) -> int:
+def name_bonus(name: str, query: str) -> int:
     """T09 (OQ-7): exact/word-boundary/start bonus for USDA ranking.
 
     0 = name equals query (case-insensitive); 1 = name starts with the
@@ -298,7 +298,7 @@ _PANEL_EXTRA = ("satfat", "transfat", "cholesterol", "sodium", "fiber",
                 "potassium")
 
 
-def _quality_label(extra_present: int) -> str:
+def quality_label(extra_present: int) -> str:
     # T09 (OQ-7): survey/SR-Legacy rows top out at 6/11 extras, so High
     # starts at 6 — the old 8/4 made High unattainable for the best dtypes.
     if extra_present >= 6:
@@ -340,7 +340,7 @@ def _norm_text(s: Any) -> str:
                   else str(s or "")).strip().lower()
 
 
-def _match_pct(name: str, query: str) -> int:
+def match_pct(name: str, query: str) -> int:
     """Hybrid match percent 0-100 (anchors + token overlap, stdlib only)."""
     n = _norm_text(name)
     q = _norm_text(query)
@@ -359,11 +359,11 @@ def _match_pct(name: str, query: str) -> int:
     return int(79 * hit / len(qw)) if qw else 0
 
 
-def _match_band(pct: int) -> int:
+def match_band(pct: int) -> int:
     return max(0, min(10, int(pct) // 10))
 
 
-def _ingredient_stats(ingredients: Any, query: str) -> tuple:
+def ingredient_stats(ingredients: Any, query: str) -> tuple:
     """(is_single_ingredient bool, ingredient_count int|None)."""
     toks = _words(str(ingredients or ""))
     if not toks:
@@ -371,7 +371,7 @@ def _ingredient_stats(ingredients: Any, query: str) -> tuple:
     return _norm_text(ingredients) == _norm_text(query), len(toks)
 
 
-def _quality_percent(nuts: Dict[str, Any],
+def quality_percent(nuts: Dict[str, Any],
                      serving_size: Any, serving_unit: Any) -> int:
     present = sum(1 for k in (
         "kcal_per_100g", "protein_g", "fat_g", "carbs_g", "fiber_g",
@@ -389,7 +389,7 @@ def _quality_percent(nuts: Dict[str, Any],
     return int(round(100 * present / 10))
 
 
-def _kcal_gate(nuts: Dict[str, Any],
+def kcal_gate(nuts: Dict[str, Any],
                alcohol_g: Optional[float] = None) -> tuple:
     """(excluded bool, kcal_delta_pct float|None).
 
@@ -417,7 +417,7 @@ def _kcal_gate(nuts: Dict[str, Any],
     return excluded, delta_pct
 
 
-def _map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
+def map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
     from backend_functions.food_normalize import (
         normalize_usda_branded, normalize_usda_survey, serving_fields)
     dtype = fd.get("dataType") or ""
@@ -470,10 +470,10 @@ def _map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
         alcohol_g = float(alcohol) if alcohol is not None else None
     except (TypeError, ValueError):
         alcohol_g = None
-    excluded, delta_pct = _kcal_gate(nuts, alcohol_g)
-    quality_percent = _quality_percent(nuts, fd.get("servingSize"),
-                                       fd.get("servingSizeUnit"))
-    is_single, ing_count = _ingredient_stats(fd.get("ingredients"), "")
+    excluded, delta_pct = kcal_gate(nuts, alcohol_g)
+    qp = quality_percent(nuts, fd.get("servingSize"),
+                           fd.get("servingSizeUnit"))
+    is_single, ing_count = ingredient_stats(fd.get("ingredients"), "")
     return {"dtype": dtype or "Unknown",
             "fdcId": fd.get("fdcId"),
             "name": fd.get("description") or "Unknown food",
@@ -489,7 +489,7 @@ def _map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
             "serving_size": sv_size, "serving_unit": sv_unit,
             "serving_text": sv_text,
             "raw": fd,
-            "quality_percent": quality_percent,
+            "quality_percent": qp,
             "is_single_ingredient": is_single,
             "ingredient_count": ing_count,
             "kcal_delta_pct": delta_pct,
@@ -516,13 +516,13 @@ def rank_usda_hits(hits: Sequence[Dict[str, Any]],
     annotation only, never a block.
     """
     qw = _words(query)
-    mapped = [_map_usda_food(h) for h in hits]
+    mapped = [map_usda_food(h) for h in hits]
     for m in mapped:
-        pct = _match_pct(m["name"], query)
+        pct = match_pct(m["name"], query)
         m["match_pct"] = pct
-        m["match_band"] = _match_band(pct)
+        m["match_band"] = match_band(pct)
         # Query-aware single-ingredient flag (mapper runs query-blind).
-        is_single, _ = _ingredient_stats((m.get("raw") or {}).get(
+        is_single, _ = ingredient_stats((m.get("raw") or {}).get(
             "ingredients"), query)
         m["is_single_ingredient"] = is_single
     # 010-004 kcal gate: hard filter (drop), never a sink.
@@ -555,7 +555,7 @@ def rank_usda_hits(hits: Sequence[Dict[str, Any]],
         -m["quality_percent"],
         (m["ingredient_count"] if m["ingredient_count"] is not None
          else 10**9),
-        _name_bonus(m["name"], query),
+        name_bonus(m["name"], query),
         (_relevance_tier(m["name"], qw),
          _DATA_TYPE_PRIOR.get(m["dtype"], 4)),
         -m["present"],
@@ -575,7 +575,7 @@ async def fetch_usda_ranked(query: str) -> Dict[str, Any]:
     norm = _norm_query(query)
     if not norm:
         return {"results": [], "fetches": 0, "cached": False}
-    hit = _cache_get(f"usda:{norm}")
+    hit = cache_get(f"usda:{norm}")
     if hit is not None:
         hit["cached"] = True
         return hit
@@ -599,7 +599,7 @@ async def fetch_usda_ranked(query: str) -> Dict[str, Any]:
                                  if x.get("fdcId") not in seen]
     ranked = rank_usda_hits(generics + branded, query)
     out = {"results": ranked, "fetches": fetches, "cached": False}
-    _cache_put(f"usda:{norm}", out)
+    cache_put(f"usda:{norm}", out)
     return out
 
 
@@ -614,7 +614,7 @@ async def fetch_off_ranked(query: str) -> Dict[str, Any]:
     norm = _norm_query(query)
     if not norm:
         return {"results": [], "fetches": 0, "cached": False}
-    hit = _cache_get(f"off:{norm}")
+    hit = cache_get(f"off:{norm}")
     if hit is not None:
         hit["cached"] = True
         return hit
@@ -646,7 +646,7 @@ async def fetch_off_ranked(query: str) -> Dict[str, Any]:
         return {"results": [], "fetches": fetches, "cached": False}
     products = body.get("products") or []
     out = {"results": products, "fetches": fetches, "cached": False}
-    _cache_put(f"off:{norm}", out)
+    cache_put(f"off:{norm}", out)
     return out
 
 

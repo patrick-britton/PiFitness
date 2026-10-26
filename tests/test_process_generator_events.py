@@ -9,7 +9,7 @@ Two verified mechanisms were fixed; each gets a test here:
      terminal (step_id, ms, error) after — marker-before-execution is
      asserted against the REAL generator with a recording sub-step.
 
-  2. `_process_generator` maps each marker to an NDJSON 'running' event and
+  2. `process_generator` maps each marker to an NDJSON 'running' event and
      emits it while the sub-step has NOT yet run (asserted by interleaving
      the stream pull with a fake generator that executes on resume), then
      emits the terminal event afterwards.
@@ -17,7 +17,7 @@ Two verified mechanisms were fixed; each gets a test here:
 Everything is mocked — no DB writes, no network, no pandas.
 
 Run from the repository root:
-    python -m pytest tests/test_process_generator_events.py -v
+    python -m pytest tests/testprocess_generator_events.py -v
 """
 import json
 
@@ -27,8 +27,8 @@ from backend_functions.schemas.activity_schemas import ProcessActivityRequest
 
 
 def _events(req):
-    """Drain _process_generator, returning parsed NDJSON events in order."""
-    return [json.loads(line) for line in act._process_generator(req)]
+    """Drain process_generator, returning parsed NDJSON events in order."""
+    return [json.loads(line) for line in act.process_generator(req)]
 
 
 def _ok_executioner(**kwargs):
@@ -84,10 +84,10 @@ def test_post_processing_steps_marker_terminal_interleaved(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 2. _process_generator: running event emitted before the sub-step executes
+# 2. process_generator: running event emitted before the sub-step executes
 # ---------------------------------------------------------------------------
 
-def test_process_generator_running_event_precedes_substep_execution(monkeypatch):
+def testprocess_generator_running_event_precedes_substep_execution(monkeypatch):
     executed = []
 
     def fake_steps(aid):
@@ -108,7 +108,7 @@ def test_process_generator_running_event_precedes_substep_execution(monkeypatch)
 
     req = ProcessActivityRequest(mode='last_walk')
     seen = []
-    for line in act._process_generator(req):
+    for line in act.process_generator(req):
         ev = json.loads(line)
         seen.append(ev)
         # The 'running' event must leave the stream while the sub-step it
@@ -132,7 +132,7 @@ def test_process_generator_running_event_precedes_substep_execution(monkeypatch)
     assert seen[-1].get('success') is True
 
 
-def test_process_generator_error_terminal_still_emits_running_first(monkeypatch):
+def testprocess_generator_error_terminal_still_emits_running_first(monkeypatch):
     """Halt-on-error path: running marker is streamed, then the error terminal."""
     def failing_steps(aid):
         yield ('insert_heartrate', None, None)

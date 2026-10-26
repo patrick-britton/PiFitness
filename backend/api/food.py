@@ -207,7 +207,7 @@ async def combined_search(
     fdcId is already saved are suppressed (single saved DB row, ranked
     first). Raw bodies never reach the UI beyond nutrients_raw passthrough.
     """
-    from backend_functions.food_search import _quality_label, fetch_usda_ranked, fetch_off_ranked
+    from backend_functions.food_search import quality_label, fetch_usda_ranked, fetch_off_ranked
     query = (q or "").strip()
     if not query:
         raise HTTPException(status_code=400, detail="q must be non-empty")
@@ -236,7 +236,7 @@ async def combined_search(
             "name": row.get("name"),
             "mode_qty": None, "mode_unit": None,
             "kcal_preview": nuts.get("kcal_per_100g"),
-            "data_quality": _quality_label(present) if gate_ok else "Low",
+            "data_quality": quality_label(present) if gate_ok else "Low",
             "rank": 0, "result_source": "saved",
             "usda_score": None,
             "fdcId": row.get("fdc_id"),
@@ -278,7 +278,7 @@ async def combined_search(
             "name": m["name"],
             "mode_qty": None, "mode_unit": None,
             "kcal_preview": m["nuts"].get("kcal_per_100g"),
-            "data_quality": _quality_label(m["present"])
+            "data_quality": quality_label(m["present"])
             if m["gate_ok"] else "Low",
             "rank": 0, "result_source": f"usda:{m['dtype']}",
             "usda_score": m.get("score"),

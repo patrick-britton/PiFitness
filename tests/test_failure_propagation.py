@@ -1,7 +1,7 @@
 """
 Failure-propagation tests — 004-005 T02 (OQ-1 / OQ-2 option (a)).
 
-Covers Bug 004-005-2 (silent false-success) and Chain A2 (`_run_step`
+Covers Bug 004-005-2 (silent false-success) and Chain A2 (`run_step`
 discarding the executioner's results dict):
 
   1. `activity_post_processing` processes ALL queued activities, then raises
@@ -12,8 +12,8 @@ discarding the executioner's results dict):
      consecutive_failures increment, detailed message preserved).
   3. `ultimate_task_executioner` reconciles the task run as failed exactly
      once with the failed ids in the message (→ last_failure_message) and
-     reports the failure in `results[]` (consumed by admin.py / _run_step).
-  4. `_run_step` marks the step `error` with the aggregated failure messages
+     reports the failure in `results[]` (consumed by admin.py / run_step).
+  4. `run_step` marks the step `error` with the aggregated failure messages
      when a forced task reports failure; unrelated return shapes unaffected.
 
 Everything is mocked — no DB writes, no network, no pandas.
@@ -28,7 +28,7 @@ import pytest
 
 import backend_functions.activity_smoothing as sm
 import backend_functions.ultimate_task_executioner_v2 as ute
-from backend.api.activities import _run_step, _task_failure_message
+from backend_functions.activities_service import run_step, task_failure_message
 
 
 def _noop(*args, **kwargs):
@@ -175,7 +175,7 @@ def _run_single_task(monkeypatch, fn):
 def test_executioner_reconciles_failed_with_ids_in_message(monkeypatch):
     """Failed sub-step → task reconciled failed exactly once, failed activity
     ids in the message written to last_failure_message (AC-1), and the
-    returned results[] carries success=False for admin.py / _run_step."""
+    returned results[] carries success=False for admin.py / run_step."""
     def boom():
         raise RuntimeError(AGGREGATE)
 
@@ -205,10 +205,10 @@ def test_executioner_reports_success_when_all_pass(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 4. _run_step: forced-task failure marks the step error (OQ-2a, AC-2)
+# 4. run_step: forced-task failure marks the step error (OQ-2a, AC-2)
 # ---------------------------------------------------------------------------
 
-def test_run_step_marks_error_on_failed_results():
+def testrun_step_marks_error_on_failed_results():
     def failed_runner(force_task_id=None):
         return {
             'tasks_processed': 1,
@@ -221,14 +221,14 @@ def test_run_step_marks_error_on_failed_results():
             'status': 'complete',
         }
 
-    result = _run_step('sync_activities', failed_runner, force_task_id=4)
+    result = run_step('sync_activities', failed_runner, force_task_id=4)
 
     assert result.status == 'error'
     assert 'Sync Activities' in result.error
     assert 'extraction error: 401 unauthorized' in result.error
 
 
-def test_run_step_complete_on_all_success_results():
+def testrun_step_complete_on_all_success_results():
     def ok_runner(force_task_id=None):
         return {
             'tasks_processed': 1,
@@ -237,37 +237,37 @@ def test_run_step_complete_on_all_success_results():
             'status': 'complete',
         }
 
-    result = _run_step('sync_activities', ok_runner, force_task_id=4)
+    result = run_step('sync_activities', ok_runner, force_task_id=4)
     assert result.status == 'complete'
     assert result.error is None
 
 
-def test_run_step_complete_on_non_task_return_shapes():
+def testrun_step_complete_on_non_task_return_shapes():
     # No return value.
-    assert _run_step('x', lambda: None).status == 'complete'
+    assert run_step('x', lambda: None).status == 'complete'
     # Unrelated dict without a results list.
-    assert _run_step('x', lambda: {'status': 'ok'}).status == 'complete'
+    assert run_step('x', lambda: {'status': 'ok'}).status == 'complete'
     # results entries without an explicit success flag are not failures.
-    assert _run_step('x', lambda: {'results': [{'task_id': 1}]}).status == 'complete'
+    assert run_step('x', lambda: {'results': [{'task_id': 1}]}).status == 'complete'
 
 
-def test_run_step_error_on_exception_unchanged():
+def testrun_step_error_on_exception_unchanged():
     def boom():
         raise ValueError('kaput')
 
-    result = _run_step('x', boom)
+    result = run_step('x', boom)
     assert result.status == 'error'
     assert result.error == 'kaput'
 
 
-def test_task_failure_message_is_conservative():
-    assert _task_failure_message(None) is None
-    assert _task_failure_message([{'results': []}]) is None
-    assert _task_failure_message({'results': 'nope'}) is None
-    assert _task_failure_message(
+def testtask_failure_message_is_conservative():
+    assert task_failure_message(None) is None
+    assert task_failure_message([{'results': []}]) is None
+    assert task_failure_message({'results': 'nope'}) is None
+    assert task_failure_message(
         {'results': [{'success': True}, {'success': None}]}
     ) is None
-    assert _task_failure_message(
+    assert task_failure_message(
         {'results': [{'success': False, 'task_name': 'T', 'error': 'e'}]}
     ) == 'T: e'
 

@@ -78,14 +78,14 @@ def test_rank_sinks_partial_and_orders_by_relevance_tier():
     assert ranked[0]["gate_ok"] and ranked[1]["gate_ok"]
 
 
-def test_quality_label_thresholds():
+def testquality_label_thresholds():
     # T09 (OQ-7): High >= 6 (survey rows max 6), Medium >= 3.
-    assert fsearch._quality_label(11) == "High"
-    assert fsearch._quality_label(6) == "High"
-    assert fsearch._quality_label(5) == "Medium"
-    assert fsearch._quality_label(3) == "Medium"
-    assert fsearch._quality_label(2) == "Low"
-    assert fsearch._quality_label(0) == "Low"
+    assert fsearch.quality_label(11) == "High"
+    assert fsearch.quality_label(6) == "High"
+    assert fsearch.quality_label(5) == "Medium"
+    assert fsearch.quality_label(3) == "Medium"
+    assert fsearch.quality_label(2) == "Low"
+    assert fsearch.quality_label(0) == "Low"
 
 
 def test_name_bonus_orders_exact_first():
@@ -94,10 +94,10 @@ def test_name_bonus_orders_exact_first():
     Mirrors the live 'milk' report: "Milk, whole"-class hits must outrank
     "Crackers, milk"-class hits deterministically, not by fetch luck.
     """
-    assert fsearch._name_bonus("milk", "milk") == 0
-    assert fsearch._name_bonus("milk, whole", "milk") == 1
-    assert fsearch._name_bonus("crackers, milk", "milk") == 2
-    assert fsearch._name_bonus("buttermilk", "milk") == 3
+    assert fsearch.name_bonus("milk", "milk") == 0
+    assert fsearch.name_bonus("milk, whole", "milk") == 1
+    assert fsearch.name_bonus("crackers, milk", "milk") == 2
+    assert fsearch.name_bonus("buttermilk", "milk") == 3
 
     hits = [
         _survey("crackers, milk", "SR Legacy", _complete(), _EXTRA_ALL, fdc=1),
@@ -110,10 +110,10 @@ def test_name_bonus_orders_exact_first():
         "milk", "milk, whole", "crackers, milk", "buttermilk"]
 
 
-def test_quality_label_counts_extras():
-    full = fsearch._map_usda_food(
+def testquality_label_counts_extras():
+    full = fsearch.map_usda_food(
         _survey("whole milk", "Foundation", _complete(), _EXTRA_ALL))
-    assert fsearch._quality_label(full["present"]) == "High"
+    assert fsearch.quality_label(full["present"]) == "High"
     assert full["present"] == 11
 
 
@@ -122,8 +122,8 @@ def test_quality_label_counts_extras():
 # ---------------------------------------------------------------------------
 
 def test_fetch_budget_and_cache(monkeypatch):
-    fsearch._cache.clear()
-    fsearch._cache_order.clear()
+    fsearch.cache.clear()
+    fsearch.cache_order.clear()
     calls = []
 
     async def fake_fetch(client, query, page_size, data_types=None,
@@ -267,33 +267,33 @@ def _branded(name, nutrients, ingredients, category="Beverages", fdc=1,
 
 
 def test_match_pct_anchors_then_overlap():
-    assert fsearch._match_pct("coffee", "coffee") == 100
-    assert fsearch._match_pct("coffee ice cream", "coffee") == 90
-    assert fsearch._match_pct("drip coffee", "coffee") == 80
-    assert fsearch._match_pct("crackers, milk", "coffee") == 0
-    assert fsearch._match_band(100) == 10
-    assert fsearch._match_band(85) == 8
-    assert fsearch._match_band(0) == 0
+    assert fsearch.match_pct("coffee", "coffee") == 100
+    assert fsearch.match_pct("coffee ice cream", "coffee") == 90
+    assert fsearch.match_pct("drip coffee", "coffee") == 80
+    assert fsearch.match_pct("crackers, milk", "coffee") == 0
+    assert fsearch.match_band(100) == 10
+    assert fsearch.match_band(85) == 8
+    assert fsearch.match_band(0) == 0
 
 
 def test_kcal_gate_hard_filter_with_floor_and_alcohol():
     # Black-coffee class: huge relative error, tiny absolute -> kept.
-    excluded, _ = fsearch._kcal_gate(
+    excluded, _ = fsearch.kcal_gate(
         {"kcal_per_100g": 2.0, "protein_g": 0.3, "fat_g": 0.0,
          "carbs_g": 0.0})
     assert excluded is False
     # Wildly misreported macros -> dropped.
-    excluded, delta = fsearch._kcal_gate(
+    excluded, delta = fsearch.kcal_gate(
         {"kcal_per_100g": 500.0, "protein_g": 3.0, "fat_g": 3.0,
          "carbs_g": 5.0})
     assert excluded is True and delta is not None and delta > 15
     # Alcohol-aware: 7A closes the gap when present.
-    kept, _ = fsearch._kcal_gate(
+    kept, _ = fsearch.kcal_gate(
         {"kcal_per_100g": 100.0, "protein_g": 1.0, "fat_g": 0.5,
          "carbs_g": 5.0}, alcohol_g=10.0)
     assert kept is False
     # Missing macro -> gate does not apply (no drop).
-    kept, delta = fsearch._kcal_gate({"kcal_per_100g": 50.0})
+    kept, delta = fsearch.kcal_gate({"kcal_per_100g": 50.0})
     assert kept is False and delta is None
 
 
@@ -301,17 +301,17 @@ def test_quality_percent_presence_and_single_ingredient():
     nuts = {"kcal_per_100g": 2.0, "protein_g": 0.3, "fat_g": 0.0,
             "carbs_g": 0.0, "fiber_g": 0.0, "sugars_g": 0.0,
             "sodium_mg": 5.0, "caffeine_mg": 40.0}
-    assert fsearch._quality_percent(nuts, 240, "ml") == 100
+    assert fsearch.quality_percent(nuts, 240, "ml") == 100
     # Caffeine null always penalizes (9/10 -> 90).
     nuts["caffeine_mg"] = None
-    assert fsearch._quality_percent(nuts, 240, "ml") == 90
+    assert fsearch.quality_percent(nuts, 240, "ml") == 90
     # Serving presence counts even when unparseable; multi-word query works.
-    assert fsearch._quality_percent(nuts, None, None) == 70
-    assert fsearch._ingredient_stats("drip coffee", "drip coffee") == (
+    assert fsearch.quality_percent(nuts, None, None) == 70
+    assert fsearch.ingredient_stats("drip coffee", "drip coffee") == (
         True, 2)
-    assert fsearch._ingredient_stats("cream, sugar, coffee",
+    assert fsearch.ingredient_stats("cream, sugar, coffee",
                                      "coffee") == (False, 3)
-    assert fsearch._ingredient_stats(None, "coffee") == (False, None)
+    assert fsearch.ingredient_stats(None, "coffee") == (False, None)
 
 
 def test_rank_coffee_single_ingredient_first_mismatch_dropped():
