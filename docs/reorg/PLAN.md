@@ -68,9 +68,9 @@ Tasks:
   - PY-005: 16 private cross-imports (food_search `_quality_label` etc., admin `_failed_run_message`, activities `_run_step`/`_task_failure_message`).
   - PY-006: 11 route handlers calling DB directly (admin.py, music.py, segments.py, main.py).
 - 1.4 [safe] Write `docs/reorg/DYNAMIC_TARGETS.md` (real `importlib` targets from PY-010): 6 non-literal dynamic imports in `service_logins.py`, `task_execution.py`, `ultimate_task_executioner_v2.py`. Add them as pinned in `audit.toml`.
-- 1.5 [needs-approval] Garmin: apply human's decision from DECISIONS.md (default: keep `pirate-garmin_clone` as the library, make `backend_functions` a thin adapter, delete vendored copy only after tests pass).
+- 1.5 [complete] Garmin: vendored copies deleted; imports repointed to `pirate-garmin_clone` library; `json_extractors.py` and `service_logins.py` updated; `pytest.ini` pythonpath added.
   - PY-013: `backend_functions/pirate_garmin_endpoints.py` ~ `pirate-garmin_clone/src/pirate_garmin/endpoints.py` (0.93 similarity).
-- 1.6 [needs-approval] Delete approved dead modules (PY-009 orphans): `admin_functions.py`, `running_functions.py`, `admin_schemas.py` (dynamic-possible); `data_helpers.py`, `db_wrapper.py`, `image_creation.py` (string-referenced). Decision: keep / delete / pin per DECISIONS.md.
+- 1.6 [complete] Deleted 6 legacy orphan modules: `admin_functions.py`, `running_functions.py`, `admin_schemas.py`, `data_helpers.py`, `db_wrapper.py`, `image_creation.py`. All had zero code importers.
 - 1.7 [safe] Enable all current `[[forbid]]` rules in `audit.toml`.
 
 Exit: `py.dangling_imports = 0`, `py.pkg_cycles = 0`, `py.layer_violations = 0`,

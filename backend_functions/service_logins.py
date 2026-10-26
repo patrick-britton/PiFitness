@@ -734,13 +734,9 @@ def get_service_list(append_option=None):
     return service_list
 
 
-# Import Garmin auth classes from the inlined local module
-# (replaces the previously broken pip package import)
-from backend_functions.pirate_garmin_auth import (
-    GarminAuthError,
-    MissingCredentialsError,
-    GarminClient,
-)
+# Import Garmin auth classes from the pirate-garmin_clone library
+from pirate_garmin.auth import GarminAuthError, MissingCredentialsError
+from pirate_garmin.client import GarminClient
 
 
 def pirate_garmin_login(headless=False):

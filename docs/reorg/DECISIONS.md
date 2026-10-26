@@ -22,32 +22,40 @@ Sensitive files present on disk (all git-ignored, `sensitive_exposed = 0`, `sens
 
 ---
 
-## 2. Garmin duplicate (PY-013)
+## 2. Garmin duplicate (PY-013) — RESOLVED
 
 Near-duplicate pair (0.93 similarity):
-- `backend_functions/pirate_garmin_endpoints.py`
-- `pirate-garmin_clone/src/pirate_garmin/endpoints.py`
+- `backend_functions/pirate_garmin_endpoints.py` → DELETED
+- `pirate-garmin_clone/src/pirate_garmin/endpoints.py` → KEPT (canonical)
 
-**Recommendation:** Keep `pirate-garmin_clone/src/pirate_garmin/` as the canonical library (it has tests, pyproject, clients). Make `backend_functions/pirate_garmin_endpoints.py` a thin adapter. Delete the vendored copy only after tests pass.
-**Default:** Keep `pirate-garmin_clone` as canonical; adapt `backend_functions`; delete vendored copy after green tests.
+**Actions taken:**
+- `backend_functions/json_extractors.py` line 485: repointed import from `backend_functions.pirate_garmin_endpoints` to `pirate_garmin.endpoints`
+- `backend_functions/service_logins.py` line 739: repointed imports from `backend_functions.pirate_garmin_auth` to `pirate_garmin.auth` (GarminAuthError, MissingCredentialsError) and `pirate_garmin.client` (GarminClient)
+- Added `pythonpath = pirate-garmin_clone/src` to `pytest.ini`
+- `git rm` deleted `backend_functions/pirate_garmin_endpoints.py` and `backend_functions/pirate_garmin_auth.py`
+- All 210 tests pass; gate OK
 
-Diff size: not yet computed (requires byte-compare). Add to this file once `INV-002` comparison runs.
+Diff size: not computed (INV-002 byte-compare not run).
 
-## 3. Orphan modules (PY-009) — keep / delete / pin
+## 3. Orphan modules (PY-009) — RESOLVED: all 6 deleted
 
-`py.orphans_total = 6` (0 likely-dead, 3 dynamic-possible, 3 string-referenced):
+`py.orphans_total = 6` (0 likely-dead, 3 dynamic-possible, 3 string-referenced).
+All 6 had zero code importers — references existed only in documentation,
+diagram labels (`.features/designs_complete/*.md`), and streamlit mapping
+docs (`docs/archive/streamlit_backend_mapping.json`). Streamlit is legacy
+(HYG-008) and no longer part of the app.
 
-Dynamic-possible (non-literal `importlib` could load):
-- `backend_functions/admin_functions.py` (81 loc) → **PIN** (add to DYNAMIC_TARGETS.md)
-- `backend_functions/running_functions.py` (282 loc) → **PIN** (add to DYNAMIC_TARGETS.md)
-- `backend_functions/schemas/admin_schemas.py` (215 loc) → **PIN** (add to DYNAMIC_TARGETS.md)
+**Actions taken (all `git rm`):**
+- `backend_functions/admin_functions.py` (81 loc) — `get_runtime_status()` systemctl checker; no code importers
+- `backend_functions/running_functions.py` (282 loc) — `leaderboard_update()` SQL generator; no code importers
+- `backend_functions/schemas/admin_schemas.py` (215 loc) — Pydantic admin models; models are redefined inline in `backend/api/admin.py`
+- `backend_functions/data_helpers.py` (756 loc) — pandas-replacement helpers; no code importers
+- `backend_functions/db_wrapper.py` (103 loc) — async DB wrappers; no code importers (self-docstring reference only)
+- `backend_functions/image_creation.py` (390 loc) — SVG chart rendering with pandas; no code importers
 
-String-referenced (named in SQL/JSON/systemd/py strings):
-- `backend_functions/data_helpers.py` (756 loc) → **KEEP** (referenced, no static importer)
-- `backend_functions/db_wrapper.py` (103 loc) → **KEEP** (referenced)
-- `backend_functions/image_creation.py` (390 loc) → **KEEP** (referenced)
+All 210 tests pass; gate OK. `py.orphans_total` reduced to 0.
 
-**Default:** Pin dynamic-possible in `audit.toml`; keep string-referenced; no deletions without explicit `impact` = 0 + human approval.
+**Default:** All 6 deleted with human approval (this decision recorded).
 
 ---
 
@@ -172,8 +180,8 @@ Other:
 | Area | Default action |
 |---|---|
 | Secrets | Untrack + gitignore; report paths; rotate externally |
-| Garmin | `pirate-garmin_clone` canonical; adapter in `backend_functions`; delete vendored after tests |
-| Orphans | Pin dynamic-possible; keep string-referenced |
+| Garmin | `pirate-garmin_clone` canonical; vendored copies deleted; imports repointed |
+| Orphans | All 6 deleted (admin_functions, running_functions, admin_schemas, data_helpers, db_wrapper, image_creation) |
 | importlib targets | List in DYNAMIC_TARGETS.md; pin in audit.toml |
 | Scripts | keep-tool → tools/; misplaced-tests → tests/ or delete; review → pending |
 | unassigned | Map per §6; unclear → core / components/ |

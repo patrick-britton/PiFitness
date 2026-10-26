@@ -482,7 +482,7 @@ def get_pirate_data(client, endpoint, path_params=None, query_params=None):
     Returns:
         tuple: (response_json, None) on success, (None, error_msg) on failure
     """
-    from backend_functions.pirate_garmin_endpoints import resolve_endpoint, render_endpoint
+    from pirate_garmin.endpoints import resolve_endpoint, render_endpoint
 
     try:
         endpoint_def = resolve_endpoint(endpoint)

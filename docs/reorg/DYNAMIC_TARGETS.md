@@ -26,17 +26,14 @@ moved or renamed without updating this file:
 
 | Module | Reason | Decision |
 |--------|--------|----------|
-| `backend_functions/admin_functions.py` | Dynamic-possible orphan (PY-009) | PIN |
-| `backend_functions/running_functions.py` | Dynamic-possible orphan (PY-009) | PIN |
-| `backend_functions/schemas/admin_schemas.py` | Dynamic-possible orphan (PY-009) | PIN |
-| `backend_functions/data_helpers.py` | String-referenced orphan (PY-009) | KEEP |
-| `backend_functions/db_wrapper.py` | String-referenced orphan (PY-009) | KEEP |
-| `backend_functions/image_creation.py` | String-referenced orphan (PY-009) | KEEP |
+| (none — all previously pinned orphan modules were deleted in Phase 1.6) | — | — |
 
 ## audit.toml pins
 
-Add these to `[pinned_modules]` in `audit.toml` (or equivalent
-`[[forbid]]` exemption list) so `repo_audit` does not flag them as dead
-when they have no static importers.
-
-**Default:** Pin all 6 modules above; no movement without human approval.
+No pinned modules remain. All previously pinned orphan modules
+(`admin_functions`, `running_functions`, `admin_schemas`, `data_helpers`,
+`db_wrapper`, `image_creation`) were deleted in Phase 1.6 after verifying
+zero code importers. The two Garmin vendored modules
+(`pirate_garmin_endpoints`, `pirate_garmin_auth`) were deleted in Phase 1.5
+after repointing `json_extractors.py` and `service_logins.py` to the
+`pirate-garmin_clone` library.
