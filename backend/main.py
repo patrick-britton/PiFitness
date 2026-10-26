@@ -25,8 +25,9 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend_functions.config import get_settings
-from backend.api import activities, admin, music, segments, auth, tri_tip, volleyball, exercises, config, food_lookup, food
+from backend.api import activities, admin, music, segments, auth, tri_tip, volleyball, config, food_lookup, food
 from pifitness.health import router as health
+from pifitness.exercises import router as exercises
 
 # ---------------------------------------------------------------------------
 # Application Initialization
@@ -124,7 +125,7 @@ app.include_router(segments.router)
 app.include_router(auth.router)
 app.include_router(tri_tip.router)
 app.include_router(volleyball.router)
-app.include_router(exercises.router)
+app.include_router(exercises)
 
 # 010-001: food API raw-JSON diagnostic proxy (dev-only viewer backend)
 app.include_router(food_lookup.router)
