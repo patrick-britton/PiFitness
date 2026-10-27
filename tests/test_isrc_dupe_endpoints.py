@@ -34,7 +34,7 @@ MATCH_ROW = {
 
 def test_count_returns_pair_count():
     with patch(
-        'backend.api.music.get_isrc_dupe_count', return_value=4
+        'pifitness.music.router.get_isrc_dupe_count', return_value=4
     ):
         response = client.get("/api/music/isrc-dupes/count")
         assert response.status_code == 200
@@ -43,7 +43,7 @@ def test_count_returns_pair_count():
 
 def test_match_shapes_row_to_camel_case():
     with patch(
-        'backend.api.music.get_isrc_dupe_match', return_value=[MATCH_ROW]
+        'pifitness.music.router.get_isrc_dupe_match', return_value=[MATCH_ROW]
     ):
         response = client.get("/api/music/isrc-dupes/match")
         assert response.status_code == 200
@@ -60,7 +60,7 @@ def test_match_shapes_row_to_camel_case():
 
 def test_match_empty_queue_returns_null():
     with patch(
-        'backend.api.music.get_isrc_dupe_match', return_value=[]
+        'pifitness.music.router.get_isrc_dupe_match', return_value=[]
     ):
         response = client.get("/api/music/isrc-dupes/match")
         assert response.status_code == 200
@@ -69,7 +69,7 @@ def test_match_empty_queue_returns_null():
 
 def test_decision_accept_calls_helper_and_confirms():
     with patch(
-        'backend.api.music.process_isrc_dupe_decision'
+        'pifitness.music.router.process_isrc_dupe_decision'
     ) as mock_decide:
         response = client.post("/api/music/isrc-dupes/decision", json={
             "isrc1": "ISRC-A",
@@ -88,7 +88,7 @@ def test_decision_accept_calls_helper_and_confirms():
 
 def test_decision_reject_calls_helper_and_confirms():
     with patch(
-        'backend.api.music.process_isrc_dupe_decision'
+        'pifitness.music.router.process_isrc_dupe_decision'
     ) as mock_decide:
         response = client.post("/api/music/isrc-dupes/decision", json={
             "isrc1": "ISRC-A",
@@ -116,9 +116,9 @@ def test_decision_missing_field_returns_422():
 
 def test_rescan_runs_finder_and_reports_count():
     with patch(
-        'backend.api.music.run_isrc_duplicate_finder'
+        'pifitness.music.router.run_isrc_duplicate_finder'
     ) as mock_run, patch(
-        'backend.api.music.get_isrc_dupe_count', return_value=3
+        'pifitness.music.router.get_isrc_dupe_count', return_value=3
     ):
         response = client.post("/api/music/isrc-dupes/rescan")
         assert response.status_code == 200
@@ -130,9 +130,9 @@ def test_rescan_runs_finder_and_reports_count():
 
 def test_rescan_empty_reports_no_dupes():
     with patch(
-        'backend.api.music.run_isrc_duplicate_finder'
+        'pifitness.music.router.run_isrc_duplicate_finder'
     ), patch(
-        'backend.api.music.get_isrc_dupe_count', return_value=0
+        'pifitness.music.router.get_isrc_dupe_count', return_value=0
     ):
         response = client.post("/api/music/isrc-dupes/rescan")
         assert response.status_code == 200
@@ -144,7 +144,7 @@ def test_rescan_empty_reports_no_dupes():
 def test_decision_write_failure_returns_500():
     # T08 / Bug 008-005-T03-1: a failed write must not be reported as {ok: true}.
     with patch(
-        'backend.api.music.process_isrc_dupe_decision',
+        'pifitness.music.router.process_isrc_dupe_decision',
         side_effect=RuntimeError('write failed'),
     ):
         response = client.post("/api/music/isrc-dupes/decision", json={
@@ -160,7 +160,7 @@ def test_decision_write_failure_returns_500():
 def test_rescan_failure_returns_500():
     # T08 / Bug 008-005-T03-1: a failed CALL must not be reported as a success.
     with patch(
-        'backend.api.music.run_isrc_duplicate_finder',
+        'pifitness.music.router.run_isrc_duplicate_finder',
         side_effect=RuntimeError('call failed'),
     ):
         response = client.post("/api/music/isrc-dupes/rescan")
@@ -176,7 +176,7 @@ def test_rescan_route_runs_off_the_event_loop():
     # included routers as lazy `_IncludedRouter` wrappers with no reachable
     # routes. So the music router itself is checked; the URL contract is covered
     # separately by the TestClient tests above (200/500 on this same path).
-    from backend.api.music import router as music_router
+    from pifitness.music.router import router as music_router
 
     paths = [getattr(r, "path", None) for r in music_router.routes]
     route = next(
