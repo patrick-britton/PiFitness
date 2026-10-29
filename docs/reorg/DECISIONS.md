@@ -99,6 +99,9 @@ Review → human decision (6):
 
 **Default:** Move keep-tool to `tools/`; move trivial misplaced-tests to `tests/` else delete; leave review scripts in place pending human decision; record all in PLAN.md.
 
+Phase 3 Debt:
+- `tests/integration/test_dotenv.py` deleted (Phase 3). Phase 2.2 moved it from `scripts/test_dotenv.py` without updating its from backend_functions.database_functions import .... Phase 2.2 policy was "move only if trivial, else delete." Content tests only that backend/.env exists, not application behavior. No test imports it. Replaced by nothing — startup .env validation, if desired, belongs in pifitness.core.config (a future slice), not a test.
+
 ---
 
 ## 6. `domains.unassigned` files (38 files, DOM-001) — proposed domain or `core`
@@ -174,6 +177,76 @@ Other:
 **Decision:** No code change needed for the import itself. Optionally update the docstring usage example to `from backend_functions.config import get_settings` as a documentation fix (does not affect behavior or metrics).
 
 ---
+
+
+## 12. Deployment scripts and requirements manifests — KEEP, not delete
+**Decision (final, per human review):** The deployment scripts under `deploy/scripts/` are required for installing Python and npm packages on the Pi during deployment. They are **NOT** candidates for deletion.
+
+| File | Action | Rationale / usage |
+|---|---|---|
+| `deploy/scripts/pi5_deploy.sh` | **KEEP** | Unified deployment script for `streamlit-prd` and `react-ui` branches. References `deploy/scripts/library_requirements.txt`, `deploy/nginx/nginx-template.conf`, `deploy/systemd/pifitness-fastapi.service`, `deploy/systemd/pifitness-hw-health.service`, `deploy/systemd/pifitness_agent.service`, `frontend/pifitness`, `npm_requirements.txt`. 20 refs in repo (audit); documented in `CUTOVER.md`; invoked from `frontend/DEPLOYMENT_GUIDE.md`. |
+| `deploy/scripts/bootstrap.sh` | **KEEP** | Bootstrap launcher for `react-ui`. Validates environment, fetches deployment scripts from origin, then invokes `deploy_react.sh`. Documented in `CUTOVER.md`. |
+| `deploy/scripts/deploy_react.sh` | **KEEP** | React UI branch deployment script. Called by `bootstrap.sh`. Requires `deploy/scripts/requirements-react.txt` and `deploy/scripts/npm_requirements.txt` for package install. |
+| `deploy/scripts/npm_requirements.txt` | **KEEP** | Global npm package manifest used by both `pi5_deploy.sh` and `deploy_react.sh`. Restored from commit `bb90e2c^` after being inadvertently removed during reorganization. |
+| `deploy/scripts/library_requirements.txt` | **KEEP** | Python dependency manifest used by `pi5_deploy.sh`. |
+| `deploy/scripts/requirements-react.txt` | **KEEP** | Python requirements manifest (React UI frontend) used by `deploy_react.sh`. Restored from commit `bb90e2c^` after being inadvertently removed during reorganization. |
+
+**Relationship:** `bootstrap.sh` (launcher) → calls → `deploy_react.sh` (React worker). `pi5_deploy.sh` is a standalone unified script supporting both `streamlit-prd` and `react-ui` branches; it does **not** call `deploy_react.sh`. They are parallel entry points with overlapping react-ui logic.
+
+**Evidence from `deploy_react.sh` content:** contains `REQUIREMENTS_FILE="requirements-react.txt"`, `NPM_REQUIREMENTS_FILE="npm_requirements.txt"`, `pip install -r "$PROJECT_DIR/deploy/scripts/$REQUIREMENTS_FILE"`, `done < "$PROJECT_DIR/deploy/scripts/$NPM_REQUIREMENTS_FILE"` (npm packages). Requires both requirements manifests.
+
+**Note on `deployment/pi5_deploy.sh`:** that path does not exist. Per `CUTOVER.md`, deployment orchestration was consolidated from `deployment/` → `deploy/`; `deployment/` is now a historical snapshot containing only `agent/` and `health/` subdirs. The active file is `deploy/scripts/pi5_deploy.sh`.
+
+**Bottom line:** these files are NOT "junk" — they are the bootstrap that ensures new packages are installed on the Pi correctly. "delete after proof" applies only to files with no dependencies or usage, not to active deployment scripts.
+
+---
+
+## Defaults summary (if human says "use defaults")
+
+| Area | Default action |
+|---|---|
+| Secrets | Untrack + gitignore; report paths; rotate externally |
+| Garmin | `pirate-garmin_clone` canonical; vendored copies deleted; imports repointed |
+| Orphans | All 6 deleted (admin_functions, running_functions, admin_schemas, data_helpers, db_wrapper, image_creation) |
+| importlib targets | List in DYNAMIC_TARGETS.md; pin in audit.toml |
+| Scripts | keep-tool → tools/; misplaced-tests → tests/ or delete; review → pending |
+| unassigned | Map per §6; unclear → core / components/ |
+| `.features/` paths | Keep intact; don't break workflows |
+| Manifest consolidation | Python: canonical `backend/pyproject.toml`, bootstrap copy `deploy/scripts/library_requirements.txt`. npm: canonical `frontend/pifitness/package.json`, bootstrap copy `deploy/scripts/npm_requirements.txt`. Two categories, not one file. |
+| npm manifests | Delete root `npm_requirements.txt` after proof + approval; keep `deploy/scripts/npm_requirements.txt` |
+| openapi-typescript | Do not add (recommendation only) |
+| Root package.json/node_modules | Delete after proof + approval |
+| PY-001 dangling import | Check git log; stop if ambiguous |
+| Deployment scripts & requirements manifests | KEEP (`deploy/scripts/pi5_deploy.sh`, `deploy/scripts/bootstrap.sh`, `deploy/scripts/deploy_react.sh`, `deploy/scripts/library_requirements.txt`, `deploy/scripts/npm_requirements.txt`) — required by bootstrap |
+
+## 13. Dependency manifest consolidation — two categories, not one file
+**Decision (approved for Phases 2–4):** Python (pip) and npm packages cannot share one file — they are different package managers with different formats and installers. Maintain **two manifest categories**, each with a single canonical source plus a bootstrap copy read by the deployment scripts.
+
+| Category | Canonical source | Bootstrap copy (read by deploy scripts) |
+|---|---|---|
+| Python (pip) | `backend/pyproject.toml` | `deploy/scripts/library_requirements.txt` |
+| npm | `frontend/pifitness/package.json` | `deploy/scripts/npm_requirements.txt` |
+
+**Files to consolidate / eliminate:**
+- `deploy/scripts/requirements-react.txt` → merge into `deploy/scripts/library_requirements.txt`, then delete. Repoint `deploy_react.sh:54` (`REQUIREMENTS_FILE`) to `library_requirements.txt`.
+- Root `npm_requirements.txt` → delete after proof + approval. Repoint `pi5_deploy.sh:183` (`../../npm_requirements.txt`) to `deploy/scripts/npm_requirements.txt`.
+- `setup.py` → replaced by `backend/pyproject.toml` in Phase 3.0 (already planned).
+
+**Version integration:**
+- `backend/pyproject.toml` is the single source for Python dependency versions.
+- `deploy/scripts/library_requirements.txt` is a frozen `pip install -r`-format copy of `pyproject.toml` dependencies; keep in sync (preferably generated, or manually identical).
+- `frontend/pifitness/package.json` is the single source for npm dependency versions.
+- `deploy/scripts/npm_requirements.txt` mirrors `package.json` dependencies (one `pkg@version` per line, `npm install --no-save` format).
+- Prefer pinned versions in bootstrap manifests for reproducible Pi deployments.
+
+**Deployment script integration:**
+- `pi5_deploy.sh:152` (`pip install -r deploy/scripts/library_requirements.txt`) — keep reading the bootstrap copy; ensure it stays in sync with `pyproject.toml`.
+- `deploy_react.sh:112` + lines 117–122 — repoint Python requirements from `requirements-react.txt` to `library_requirements.txt`.
+- `pi5_deploy.sh:183` (`../../npm_requirements.txt`) — repoint to `deploy/scripts/npm_requirements.txt`.
+
+**Proof gate (before any deletion):** `pip install -e backend` + `pytest -q` green; `npm ci` + `next build` in `frontend/pifitness/` green; `bash -n` on both shell scripts after repointing.
+
+**Related:** Decision #5 confirmed separately — `.features/` paths kept as-is (no docs move in Phase 2.3).
 
 ## Defaults summary (if human says "use defaults")
 

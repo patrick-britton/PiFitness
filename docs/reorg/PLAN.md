@@ -81,6 +81,7 @@ Estimated commits: 5–7.
 ## Phase 2 — Mechanical moves that do not change Python import paths (branch `reorg/02-moves`)
 
 Tasks:
+- 2.0 [safe] Pre-flight: prove/restore bootstrap manifests required by `deploy_react.sh`. `requirements-react.txt` and `npm_requirements.txt` were restored to `deploy/scripts/` from commit `bb90e2c^` after being inadvertently removed during reorganization. Verify both files exist at the paths `deploy_react.sh` references (lines 54–55, 112, 117–122) and that `bash -n deploy_react.sh` passes. Do not proceed to 2.4/2.5 until this gate passes.
 - 2.1 [needs-approval] `db/`: move `.features/migrations/*` to `db/migrations/` using `sql.proposed_order` after human confirms numbering against prod. Rollbacks become `NNNN_*.down.sql`; `schema_reference.sql` → `db/schema/`; dumps → `db/dumps/` (gitignored). Update scripts via `impact`.
   - Audit shows `sql.files = 0`, `sql.migrations = 0` — migrations live in `.features/migrations/` outside `db/`.
 - 2.2 [safe] `scripts/` triage per approved list: durable tools → `tools/{db,diagnostics,audit,features,codemod}/`; approved one-offs → delete; test-like scripts → `backend/tests/integration/` only if trivial else delete; misplaced `test_*.py` → `tests/`. Update `pytest.ini`, `.clinerules`, docs.
@@ -89,7 +90,13 @@ Tasks:
   - review (6, human decision): `audit_db_investigation.py`, `audit_view_columns.py`, `document_stored_procedures.py`, `generate_data_flow_diagrams.py`, `generate_schema_documentation.py`, `smoke_test.py`
 - 2.3 [needs-approval] Docs: `.features/designs_complete` → `docs/features/done/`; `designs_active` + `descriptions` → `docs/features/active/`; `memory-bank/` → `docs/` (hand-written) and `docs/generated/` (reports; gitignore or regenerate). **Update `.clinerules/workflows/*`, `.agents/skills/*`, `local_clinerules.txt`, and `tools/features/fd.py` path constants in the same commit.** Skip if human chose to keep `.features/`.
 - 2.4 [safe] Merge `deploy/` + `deployment/` → `deploy/{systemd,nginx,scripts}`; update units/bootstrap in same commit; append to `CUTOVER.md`.
-- 2.5 [needs-approval] Consolidate dependency manifests only as far as approved (npm/requirements duplicates). 7 Python dep declaration sites; 2 npm manifests.
+- 2.5 [needs-approval] Consolidate dependency manifests per DECISIONS.md §13 (two categories, not one file):
+  - Canonical Python source: `backend/pyproject.toml`; bootstrap copy: `deploy/scripts/library_requirements.txt` (read by `pi5_deploy.sh:152`).
+  - Canonical npm source: `frontend/pifitness/package.json`; bootstrap copy: `deploy/scripts/npm_requirements.txt` (read by `deploy_react.sh` lines 117–122).
+  - Merge `deploy/scripts/requirements-react.txt` into `library_requirements.txt`, then delete; repoint `deploy_react.sh:54` (`REQUIREMENTS_FILE`) to `library_requirements.txt`.
+  - Delete root `npm_requirements.txt` only after proof; repoint `pi5_deploy.sh:183` (`../../npm_requirements.txt`) to `deploy/scripts/npm_requirements.txt`.
+  - `setup.py` replaced by `backend/pyproject.toml` in Phase 3.0.
+  - Proof gate before any deletion: `pip install -e backend` + `pytest -q` green; `npm ci` + `next build` in `frontend/pifitness/` green; `bash -n` on both shell scripts after repointing.
 
 Exit: `sql.migrations_outside_db_dir = 0`, `scripts.oneoff = 0`, `scripts.misplaced_tests = 0`,
 `inventory.duplicate_groups = 0`; `impact` on every old path = 0 references.
