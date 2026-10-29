@@ -24,7 +24,8 @@ from backend_functions.music_functions import (
     playlist_upload,
     playlist_to_db,
 )
-from backend_functions.service_logins import get_spotify_client, check_rate_limit_cached, sql_rate_limited
+from backend_functions.service_logins import check_rate_limit_cached, sql_rate_limited
+from backend_functions.music_service import get_spotify_client_for_music
 from pifitness.music.queries import (
     add_isrc_to_local_playlist,
     add_into_current_ratings,
@@ -498,16 +499,6 @@ async def get_now_playing():
 # ---------------------------------------------------------------------------
 
 
-def _get_spotify_client():
-    """Return the spotify client or None (rate-limited / unauthenticated)."""
-    rate_limited = bool(check_rate_limit_cached())
-    if rate_limited:
-        return None
-    client = get_spotify_client(None)
-    sp = client.get("client") if client else None
-    return sp
-
-
 @router.post("/now-playing/skip")
 async def now_playing_skip():
     """
@@ -515,7 +506,7 @@ async def now_playing_skip():
 
     The view re-fetches on the next GET /now-playing poll.
     """
-    sp = _get_spotify_client()
+    sp = get_spotify_client_for_music()
     if sp is None:
         raise HTTPException(status_code=503, detail="Spotify not available")
     try:
@@ -556,7 +547,7 @@ async def now_playing_promote():
     except Exception:
         pass
 
-    sp = _get_spotify_client()
+    sp = get_spotify_client_for_music()
     if sp:
         try:
             sp.playlist_add_items(parent_id, [track_id])
@@ -631,7 +622,7 @@ async def now_playing_hard_reject():
     record_recommendation_decision(parent_id, isrc, was_promoted=False)
     remove_recommendation(parent_id, isrc)
 
-    sp = _get_spotify_client()
+    sp = get_spotify_client_for_music()
     if sp:
         try:
             sp.next_track()
@@ -723,7 +714,7 @@ async def now_playing_remove():
         (isrc,),
     )
     if track_list:
-        sp = _get_spotify_client()
+        sp = get_spotify_client_for_music()
         if sp:
             for sid in spotify_playlist_ids:
                 try:
@@ -827,7 +818,7 @@ async def now_playing_add_to_playlist(playlist_id: str):
     except Exception:
         pass
 
-    sp = _get_spotify_client()
+    sp = get_spotify_client_for_music()
     if sp:
         try:
             sp.playlist_add_items(playlist_id, [track_id])
@@ -1109,7 +1100,7 @@ async def shuffle_send(body: ShuffleSendRequest):
 
     track_list = [r["track_id"] for r in rows]
 
-    sp = _get_spotify_client()
+    sp = get_spotify_client_for_music()
     if sp is None:
         return {"ok": False, "message": "Spotify client unavailable or rate-limited"}
 

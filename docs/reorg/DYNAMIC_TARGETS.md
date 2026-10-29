@@ -10,14 +10,14 @@ seed SQL/JSON).
 All use `prefix=''` — the module name is computed at runtime, invisible to
 static analysis.
 
-| # | Location | Line | Loader |
-|---|----------|------|--------|
-| 1 | `backend_functions/service_logins.py` | 720 | `importlib.import_module(...)` |
-| 2 | `backend_functions/task_execution.py` | 108 | `importlib.import_module(...)` |
-| 3 | `backend_functions/task_execution.py` | 146 | `importlib.import_module(...)` |
-| 4 | `backend_functions/ultimate_task_executioner_v2.py` | 137 | `importlib.import_module(...)` |
-| 5 | `backend_functions/ultimate_task_executioner_v2.py` | 275 | `importlib.import_module(...)` |
-| 6 | `backend_functions/ultimate_task_executioner_v2.py` | 453 | `importlib.import_module(...)` |
+| # | Location | Line | Loader | Module name source | Notes |
+|---|----------|------|--------|-------------------|-------|
+| 1 | `backend_functions/service_logins.py` | 720 | `importlib.import_module(module_name)` | `test_str.rsplit('.', 1)` — `test_str` from `one_sql_result(test_sql)` querying `api_services.api_service_list.api_service_function` | Runtime-resolved login test function |
+| 2 | `backend_functions/task_execution.py` | 108 | `importlib.import_module(module_name)` | `task.get("python_function").rsplit('.', 1)` — from task table `python_function` column | Runtime-resolved local task function |
+| 3 | `backend_functions/task_execution.py` | 146 | `importlib.import_module(module_name)` | `raw_api_function.rsplit('.', 1)` — `raw_api_function` from task table `api_service_function` column | Runtime-resolved API service client function |
+| 4 | `backend_functions/ultimate_task_executioner_v2.py` | 137 | `importlib.import_module(module_name)` | `module_function.rsplit('.', 1)` — `module_function` from task execution context | Runtime-resolved login function |
+| 5 | `backend_functions/ultimate_task_executioner_v2.py` | 275 | `importlib.import_module(module_name)` | `module_name = 'backend_functions.json_extractors'` (literal) | JSON extractor function; literal module name |
+| 6 | `backend_functions/ultimate_task_executioner_v2.py` | 453 | `importlib.import_module(module_name)` | `module_function.rsplit('.', 1)` — `module_function` from task execution context | Runtime-resolved Python execution function |
 
 ## Pinned modules
 
@@ -30,10 +30,18 @@ moved or renamed without updating this file:
 
 ## audit.toml pins
 
-No pinned modules remain. All previously pinned orphan modules
-(`admin_functions`, `running_functions`, `admin_schemas`, `data_helpers`,
-`db_wrapper`, `image_creation`) were deleted in Phase 1.6 after verifying
-zero code importers. The two Garmin vendored modules
-(`pirate_garmin_endpoints`, `pirate_garmin_auth`) were deleted in Phase 1.5
-after repointing `json_extractors.py` and `service_logins.py` to the
-`pirate-garmin_clone` library.
+The following `[[dynamic_import]]` entries are pinned in
+`scripts/repo_audit/audit.toml`:
+
+| # | File | Line |
+|---|------|------|
+| 1 | `backend_functions/service_logins.py` | 720 |
+| 2 | `backend_functions/task_execution.py` | 108 |
+| 3 | `backend_functions/task_execution.py` | 146 |
+| 4 | `backend_functions/ultimate_task_executioner_v2.py` | 137 |
+| 5 | `backend_functions/ultimate_task_executioner_v2.py` | 275 |
+| 6 | `backend_functions/ultimate_task_executioner_v2.py` | 453 |
+
+These modules are targets of dynamic loading and must not be moved or renamed
+without updating this file, `audit.toml`, and every location where the module
+name is stored (e.g. DB task registry, seed SQL/JSON).

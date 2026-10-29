@@ -82,8 +82,8 @@ Estimated commits: 5–7.
 
 Tasks:
 - 2.0 [safe] Pre-flight: prove/restore bootstrap manifests required by `deploy_react.sh`. `requirements-react.txt` and `npm_requirements.txt` were restored to `deploy/scripts/` from commit `bb90e2c^` after being inadvertently removed during reorganization. Verify both files exist at the paths `deploy_react.sh` references (lines 54–55, 112, 117–122) and that `bash -n deploy_react.sh` passes. Do not proceed to 2.4/2.5 until this gate passes.
-- 2.1 [needs-approval] `db/`: move `.features/migrations/*` to `db/migrations/` using `sql.proposed_order` after human confirms numbering against prod. Rollbacks become `NNNN_*.down.sql`; `schema_reference.sql` → `db/schema/`; dumps → `db/dumps/` (gitignored). Update scripts via `impact`.
-  - Audit shows `sql.files = 0`, `sql.migrations = 0` — migrations live in `.features/migrations/` outside `db/`.
+- 2.1 [needs-approval] `db/`: No migration files on disk (`sql.migrations = 0`). Any future SQL scripts land in `.features/migration_ddl/` (outside git) and are applied one-by-one by humans on PRD/DEV. No `sql.proposed_order`; no global ordering; no `db/migrations/` move.
+  - Audit shows `sql.files = 0`, `sql.migrations = 0` — no migration files on disk.
 - 2.2 [safe] `scripts/` triage per approved list: durable tools → `tools/{db,diagnostics,audit,features,codemod}/`; approved one-offs → delete; test-like scripts → `backend/tests/integration/` only if trivial else delete; misplaced `test_*.py` → `tests/`. Update `pytest.ini`, `.clinerules`, docs.
   - keep-tool (6): `schema_cache.py`, `sync-prod-to-dev.ps1`, `validate_pydantic_models.py`, `validate_queries.py`, `validate_sql.py`, `regenerate-audit.ps1`
   - misplaced-test (5): `test_db_connectivity.py`, `test_dotenv.py`, `test_garmin_login.py`, `test_logins.py`, `test_queries.py`
@@ -98,7 +98,7 @@ Tasks:
   - `setup.py` replaced by `backend/pyproject.toml` in Phase 3.0.
   - Proof gate before any deletion: `pip install -e backend` + `pytest -q` green; `npm ci` + `next build` in `frontend/pifitness/` green; `bash -n` on both shell scripts after repointing.
 
-Exit: `sql.migrations_outside_db_dir = 0`, `scripts.oneoff = 0`, `scripts.misplaced_tests = 0`,
+Exit: `scripts.oneoff = 0`, `scripts.misplaced_tests = 0`,
 `inventory.duplicate_groups = 0`; `impact` on every old path = 0 references.
 
 Estimated commits: 6–9.

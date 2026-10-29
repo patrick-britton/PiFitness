@@ -123,7 +123,7 @@ a metric.
    `.streamlit/config.toml`, `scripts/map_streamlit_to_backend.py`, docs, and the package in `.venv`. (`HYG-007/008`)
 7. ~31 of 49 `scripts/*.py` are ticket-specific one-offs; 7 behave like integration tests; several `test_*.py` live in
    `scripts/`. (`TRI-*`)
-8. DB migration history lives in `.features/migrations/` with no global order. (`SQL-001`)
+8. DB migration scripts land in `.features/migration_ddl/` (outside git), applied one-by-one by humans. No global ordering.
 9. Two `package.json`/lockfile/`node_modules` pairs (root + `frontend/pifitness`); the earlier knip report (all 187
    files "unused") was a false positive caused by running from the root. (`INV-004`, `TS-009`)
 10. Secrets-adjacent files at the repo root (`garmin_tokens.json`, `oauth1_token.json`, `.spotify_cache`,
@@ -192,7 +192,7 @@ a domain's public `service.py` only; never private (`_x`) names.
    - Whether to add `openapi-typescript` for generated API types (new devDependency).
    - Root `package.json` + `node_modules`: delete after proof, or keep?
 6. Draft `docs/reorg/moves/phase2.json … phase4.json` as `{ "old/path": "new/path" }` generated from
-   `domains.assignment` and the proposed numbering in `sql.proposed_order`. Drafts only; run `repo_audit impact`
+   `domains.assignment`. Drafts only; run `repo_audit impact`
    on them and record reference counts in `PLAN.md`.
 7. Capture behavior baselines (read-only commands):
    ```powershell
@@ -255,9 +255,7 @@ Per task: state intent → `impact` on what you will touch → change → run ga
   OpenAPI snapshot identical, tests green.
 
 ### Phase 2 — Mechanical moves that do not change Python import paths (branch `reorg/02-moves`)
-- 2.1 `db/`: move `.features/migrations/*` to `db/migrations/` using `sql.proposed_order` **after the human confirms the
-  numbering against what prod applied**; rollbacks become `NNNN_*.down.sql`; `schema_reference.sql` → `db/schema/`; dumps
-  → `db/dumps/` (gitignored). Update scripts via `impact`.
+- 2.1 `db/`: No migration files on disk. Future SQL scripts land in `.features/migration_ddl/` (outside git) and are applied one-by-one by humans on PRD/DEV. No global ordering.
 - 2.2 `scripts/` triage per the approved list: durable tools → `tools/{db,diagnostics,audit,features,codemod}/`;
   approved one-offs → delete; test-like scripts → `backend/tests/integration/` only if trivial, else delete; misplaced
   `test_*.py` → `tests/`. Update `pytest.ini`, `.clinerules`, and docs that mention moved scripts.
@@ -268,7 +266,7 @@ Per task: state intent → `impact` on what you will touch → change → run ga
 - 2.4 Merge `deploy/` + `deployment/` → `deploy/{systemd,nginx,scripts}`; update units/bootstrap in the same commit;
   append to `CUTOVER.md`.
 - 2.5 Consolidate dependency manifests only as far as approved (npm/requirements duplicates).
-- **Exit:** `sql.migrations_outside_db_dir = 0`, `scripts.oneoff = 0`, `scripts.misplaced_tests = 0`,
+- **Exit:** `scripts.oneoff = 0`, `scripts.misplaced_tests = 0`,
   `inventory.duplicate_groups = 0`; `impact` on every old path = 0 references.
 
 ### Phase 3 — Python package by domain (branch per slice: `reorg/03-<domain>`)
