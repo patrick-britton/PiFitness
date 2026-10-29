@@ -180,7 +180,7 @@ fi
 if [[ "$BRANCH" == "react-ui" && "$package_choice" == "1" ]]; then
     info "Installing frontend dependencies..."
     cd frontend/pifitness
-    if [[ -f "../../npm_requirements.txt" ]]; then
+    if [[ -f "../../deployment/npm_requirements.txt" ]]; then
         info "Installing npm packages from requirements file..."
         while IFS= read -r package || [[ -n "$package" ]]; do
             if [[ -n "$package" && "$package" != \#* ]]; then

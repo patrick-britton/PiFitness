@@ -81,8 +81,8 @@ Estimated commits: 5–7.
 ## Phase 2 — Mechanical moves that do not change Python import paths (branch `reorg/02-moves`)
 
 Tasks:
-- 2.1 [needs-approval] `db/`: move `.features/migrations/*` to `db/migrations/` using `sql.proposed_order` after human confirms numbering against prod. Rollbacks become `NNNN_*.down.sql`; `schema_reference.sql` → `db/schema/`; dumps → `db/dumps/` (gitignored). Update scripts via `impact`.
-  - Audit shows `sql.files = 0`, `sql.migrations = 0` — migrations live in `.features/migrations/` outside `db/`.
+- 2.1 [needs-approval] `db/`: No migration files on disk (`sql.migrations = 0`). Any future SQL scripts land in `.features/migration_ddl/` (outside git) and are applied one-by-one by humans on PRD/DEV. No `sql.proposed_order`; no global ordering; no `db/migrations/` move.
+  - Audit shows `sql.files = 0`, `sql.migrations = 0` — no migration files on disk.
 - 2.2 [safe] `scripts/` triage per approved list: durable tools → `tools/{db,diagnostics,audit,features,codemod}/`; approved one-offs → delete; test-like scripts → `backend/tests/integration/` only if trivial else delete; misplaced `test_*.py` → `tests/`. Update `pytest.ini`, `.clinerules`, docs.
   - keep-tool (6): `schema_cache.py`, `sync-prod-to-dev.ps1`, `validate_pydantic_models.py`, `validate_queries.py`, `validate_sql.py`, `regenerate-audit.ps1`
   - misplaced-test (5): `test_db_connectivity.py`, `test_dotenv.py`, `test_garmin_login.py`, `test_logins.py`, `test_queries.py`
@@ -91,7 +91,7 @@ Tasks:
 - 2.4 [safe] Merge `deploy/` + `deployment/` → `deploy/{systemd,nginx,scripts}`; update units/bootstrap in same commit; append to `CUTOVER.md`.
 - 2.5 [needs-approval] Consolidate dependency manifests only as far as approved (npm/requirements duplicates). 7 Python dep declaration sites; 2 npm manifests.
 
-Exit: `sql.migrations_outside_db_dir = 0`, `scripts.oneoff = 0`, `scripts.misplaced_tests = 0`,
+Exit: `scripts.oneoff = 0`, `scripts.misplaced_tests = 0`,
 `inventory.duplicate_groups = 0`; `impact` on every old path = 0 references.
 
 Estimated commits: 6–9.
