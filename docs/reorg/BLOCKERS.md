@@ -8,10 +8,14 @@ Scope: `tests/test_food_api_contract.py` after the approved Phase 3 fixes.
   `include_router(food_api.router)`.
 - `tests/test_food_api_contract.py:246,373` — stale
   `backend_functions.schemas.food_contract_schemas` → `pifitness.food.schemas`.
-- `backend_functions/queries/food_queries.py` (3 sites) — stale schema import →
-  `pifitness.food.schemas` (CASE A; `router.py` imports
-  `backend_functions.queries.food_queries`, so this is the canonical food_queries
-  module for the router).
+- `backend_functions/queries/food_queries.py` — **Deleted** (Phase 3); near-duplicate
+  of `pifitness/food/queries.py` (1 trailing newline difference). All 4 import sites
+  repapered to `pifitness.food.queries`:
+  - `backend/pifitness/food/router.py:36` (import block)
+  - `backend/pifitness/food/router.py:677` (lazy `update_food` import)
+  - `tests/test_food_search_backend.py:420` (local `as fq`)
+  - `tests/test_food_search_backend.py:450` (local `as fq`)
+  - `tests/test_food_api_contract.py:17-18` (36 `fq.food_queries` refs → `food_queries`)
 
 ## Schema-import failures (resolved, did not block)
 

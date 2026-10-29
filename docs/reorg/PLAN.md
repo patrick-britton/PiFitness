@@ -98,6 +98,7 @@ Tasks:
   - Delete root `npm_requirements.txt` only after proof; repoint `pi5_deploy.sh:183` (`../../npm_requirements.txt`) to `deploy/scripts/npm_requirements.txt`.
   - `setup.py` replaced by `backend/pyproject.toml` in Phase 3.0.
   - Proof gate before any deletion: `pip install -e backend` + `pytest -q` green; `npm ci` + `next build` in `frontend/pifitness/` green; `bash -n` on both shell scripts after repointing.
+- 2.6 [safe, completed 2026-10-29] Consolidate byte-identical duplicate query/schema files. 7 duplicates in `backend_functions/queries/` and `backend_functions/schemas/` mirrored canonical modules now in `pifitness.<domain>.queries`. Deleted all 7; rewrote `backend_functions/queries/__init__.py` with backward-compat note for `food_queries`. Post-cleanup correction: `health_queries` was also already deleted (pre-Phase 2, renamed to `.bak`); `__init__.py` docstring corrected to only reference `food_queries` remaining. Note that `pifitness/food/queries.py` and `backend_functions/queries/food_queries.py` are near-duplicates (1 trailing newline difference), NOT eliminated by Phase 2.
 
 Exit: `scripts.oneoff = 0`, `scripts.misplaced_tests = 0`,
 `inventory.duplicate_groups = 0`; `impact` on every old path = 0 references.

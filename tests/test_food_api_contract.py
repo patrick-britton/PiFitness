@@ -15,7 +15,6 @@ import importlib
 import pifitness.food.router as food_api
 food_api_module = importlib.import_module('pifitness.food.router')
 import pifitness.food.queries as food_queries
-from backend_functions import queries as fq
 
 
 def _make_app():
@@ -246,7 +245,7 @@ def test_delete_entry(monkeypatch):
 
 def test_kcal_for_fda_label_table():
     from pifitness.food.schemas import UNIT_TO_G_OR_ML
-    k = fq.food_queries._kcal_for
+    k = food_queries._kcal_for
     assert k(100, "g", 160.0, conversions=UNIT_TO_G_OR_ML) == 160.0
     assert k(1, "cup", 100.0, conversions=UNIT_TO_G_OR_ML) == 240.0
     assert k(1, "oz", 100.0, conversions=UNIT_TO_G_OR_ML) == 28.0
@@ -277,7 +276,7 @@ def _flat_food_row():
 
 
 def test_to_food_row_nests_nutrients():
-    row = fq.food_queries._to_food_row(_flat_food_row())
+    row = food_queries._to_food_row(_flat_food_row())
     assert row["food_id"] == 1 and row["name"] == "Avocado"
     assert row["nutrients"] == {
         "kcal_per_100g": 160.0, "protein_g": 2.0, "fat_g": 14.7,
@@ -294,7 +293,7 @@ def test_to_day_entry_nests_snapshot_and_iso_time():
         "qty": 100.0, "unit": "g", "kcal": 160.0,
         "logged_at": datetime(2026, 10, 4, 12, 0, 0),
     })
-    entry = fq.food_queries._to_day_entry(flat)
+    entry = food_queries._to_day_entry(flat)
     assert entry["logged_at"] == "2026-10-04T12:00:00"
     assert entry["nutrients_snapshot"]["kcal_per_100g"] == 160.0
     assert entry["name_snapshot"] == "Avocado"
@@ -303,7 +302,7 @@ def test_to_day_entry_nests_snapshot_and_iso_time():
 def test_to_recipe_summary_preserves_exact_fields():
     row = {"recipe_id": 3, "title": "Guacamole", "category": "Side",
            "times_prepared": 0, "is_deleted": False, "created_at": None}
-    out = fq.food_queries._to_recipe_summary(row)
+    out = food_queries._to_recipe_summary(row)
     assert out == {"recipe_id": 3, "title": "Guacamole",
                    "category": "Side", "times_prepared": 0}
 
@@ -315,7 +314,7 @@ def test_food_by_id_returns_row_or_404(monkeypatch):
                 "serving_text": "1/2 cup"})
 
     def fake_get(food_id):
-        return fq.food_queries._to_food_row(row) if food_id == 1 else None
+        return food_queries._to_food_row(row) if food_id == 1 else None
 
     monkeypatch.setattr(food_api_module, "get_food_by_id", fake_get)
     client = TestClient(_make_app())
@@ -373,7 +372,7 @@ def _food_fixture(**over):
 def test_kcal_for_dynamic_recipe_serving_unit():
     """OQ-2: unit == the food's own serving_unit resolves via serving_size."""
     from pifitness.food.schemas import UNIT_TO_G_OR_ML
-    k = fq.food_queries._kcal_for
+    k = food_queries._kcal_for
     assert k(3, "pancake", 200.0, serving_size=40.0, serving_unit="pancake",
              conversions=UNIT_TO_G_OR_ML) == 240.0
     assert k(3, "PANCAKE", 200.0, serving_size=40.0, serving_unit="pancake",
@@ -401,8 +400,8 @@ def test_fetch_foods_single_batched_query(monkeypatch):
         seen["sql"], seen["params"] = sql, params
         return []
 
-    monkeypatch.setattr(fq.food_queries, "sql_to_dict", fake)
-    out = fq.food_queries._fetch_foods([3, 1, 3, None, 2])
+    monkeypatch.setattr(food_queries, "sql_to_dict", fake)
+    out = food_queries._fetch_foods([3, 1, 3, None, 2])
     assert out == {}
     assert "food_id = ANY" in seen["sql"]
     assert seen["params"] == ([1, 2, 3],)
@@ -416,10 +415,10 @@ def test_combine_ingredients_gram_weighted_math(monkeypatch):
         2: _food_fixture(food_id=2, name="Milk", kcal_per_100g=60.0,
                          protein_g=3.2),
     }
-    monkeypatch.setattr(fq.food_queries, "_fetch_foods", lambda ids: dict(foods))
+    monkeypatch.setattr(food_queries, "_fetch_foods", lambda ids: dict(foods))
     ings = [{"food_id": 1, "qty": 100.0, "unit": "g"},
             {"food_id": 2, "qty": 1.0, "unit": "cup"}]
-    snap, needs_review, reason, total_g = fq.food_queries._combine_ingredients(
+    snap, needs_review, reason, total_g = food_queries._combine_ingredients(
         ings)
     # 100 g + 1 cup (240 g) = 340 g; per-100g = sum(snap*g) / sum(g)
     assert total_g == 340.0
@@ -436,17 +435,17 @@ def test_combine_ingredients_recipe_as_ingredient(monkeypatch):
                          kcal_per_100g=250.0, serving_size=40.0,
                          serving_unit="pancake"),
     }
-    monkeypatch.setattr(fq.food_queries, "_fetch_foods", lambda ids: dict(foods))
+    monkeypatch.setattr(food_queries, "_fetch_foods", lambda ids: dict(foods))
     ings = [{"food_id": 1, "qty": 100.0, "unit": "g"},
             {"food_id": 3, "qty": 2.0, "unit": "pancake"}]
-    snap, needs_review, reason, total_g = fq.food_queries._combine_ingredients(
+    snap, needs_review, reason, total_g = food_queries._combine_ingredients(
         ings)
     assert total_g == 180.0  # 100 g + 2 x 40 g-per-unit
     assert abs(snap["kcal_per_100g"] - (200.0 * 100 + 250.0 * 80) / 180.0) < 1e-6
     assert needs_review is False
 
     # unconvertible amount drops out, flags partial, contributes no grams
-    snap2, nr2, reason2, total2 = fq.food_queries._combine_ingredients(
+    snap2, nr2, reason2, total2 = food_queries._combine_ingredients(
         [{"food_id": 1, "qty": 1.0, "unit": "pinch"}])
     assert total2 is None and nr2 is True
     assert all(v is None for v in snap2.values())
@@ -463,10 +462,10 @@ def test_save_recipe_batches_fetch_and_ingredient_insert(monkeypatch):
             2: _food_fixture(food_id=2, name="Milk", kcal_per_100g=60.0),
         }
 
-    monkeypatch.setattr(fq.food_queries, "_fetch_foods", fake_fetch)
+    monkeypatch.setattr(food_queries, "_fetch_foods", fake_fetch)
     qec_calls = []
     monkeypatch.setattr(
-        fq.food_queries, "qec",
+        food_queries, "qec",
         lambda sql, params=None: qec_calls.append((sql, params)))
     insert_calls = []
 
@@ -481,9 +480,9 @@ def test_save_recipe_batches_fetch_and_ingredient_insert(monkeypatch):
             return [{"step_id": 99}]
         return [{}]
 
-    monkeypatch.setattr(fq.food_queries, "sql_insert_returning", fake_insert)
+    monkeypatch.setattr(food_queries, "sql_insert_returning", fake_insert)
 
-    out = fq.food_queries.save_recipe(
+    out = food_queries.save_recipe(
         title="Taco Night", category="Side",
         ingredients=[{"food_id": 1, "qty": 100.0, "unit": "g"},
                      {"food_id": 2, "qty": 1.0, "unit": "cup"}],
@@ -513,7 +512,7 @@ def test_save_recipe_batches_fetch_and_ingredient_insert(monkeypatch):
 def test_save_recipe_unconvertible_yields_null_serving_size(monkeypatch):
     """OQ-2 fallback: no convertible grams -> serving_size NULL + review."""
     monkeypatch.setattr(
-        fq.food_queries, "_fetch_foods",
+        food_queries, "_fetch_foods",
         lambda ids: {1: _food_fixture(food_id=1, kcal_per_100g=160.0)})
     inserts = []
 
@@ -524,9 +523,9 @@ def test_save_recipe_unconvertible_yields_null_serving_size(monkeypatch):
         return [{"recipe_id": 7, "title": "Odd", "category": "Dessert",
                  "times_prepared": 0}]
 
-    monkeypatch.setattr(fq.food_queries, "sql_insert_returning", fake_insert)
-    monkeypatch.setattr(fq.food_queries, "qec", lambda *a, **k: None)
-    fq.food_queries.save_recipe(
+    monkeypatch.setattr(food_queries, "sql_insert_returning", fake_insert)
+    monkeypatch.setattr(food_queries, "qec", lambda *a, **k: None)
+    food_queries.save_recipe(
         title="Odd", category="Dessert",
         ingredients=[{"food_id": 1, "qty": 1.0, "unit": "pinch"}],
         servings_count=2, serving_unit="slice", steps=[])
@@ -539,7 +538,7 @@ def test_save_recipe_unconvertible_yields_null_serving_size(monkeypatch):
 def test_save_recipe_rejects_step_food_outside_ingredient_list():
     """AC-3: step portions must be drawn from the recipe ingredient list."""
     try:
-        fq.food_queries.save_recipe(
+        food_queries.save_recipe(
             title="X", category="Dessert",
             ingredients=[{"food_id": 1, "qty": 1.0, "unit": "g"}],
             servings_count=2, serving_unit="slice",
@@ -636,20 +635,20 @@ def test_complete_recipe_query_increments_and_clears_session(monkeypatch):
         return [{"recipe_id": 3, "title": "Guacamole", "category": "Side",
                  "times_prepared": 1}]
 
-    monkeypatch.setattr(fq.food_queries, "sql_insert_returning", fake_insert)
+    monkeypatch.setattr(food_queries, "sql_insert_returning", fake_insert)
     monkeypatch.setattr(
-        fq.food_queries, "qec",
+        food_queries, "qec",
         lambda sql, params=None: calls["qec"].append((sql, params)))
-    out = fq.food_queries.complete_recipe(3)
+    out = food_queries.complete_recipe(3)
     assert out == {"recipe_id": 3, "title": "Guacamole", "category": "Side",
                    "times_prepared": 1}
     assert "times_prepared = times_prepared + 1" in calls["ret"][0][0]
     assert "NOT is_deleted" in calls["ret"][0][0]
     assert any("recipe_cook_states" in s for s, _ in calls["qec"])
 
-    monkeypatch.setattr(fq.food_queries, "sql_insert_returning",
+    monkeypatch.setattr(food_queries, "sql_insert_returning",
                         lambda *a, **k: None)
-    assert fq.food_queries.complete_recipe(99) is None
+    assert food_queries.complete_recipe(99) is None
 
 
 def test_delete_recipe_query_soft_deletes_both_rows(monkeypatch):
@@ -660,19 +659,19 @@ def test_delete_recipe_query_soft_deletes_both_rows(monkeypatch):
         calls["reads"].append(sql)
         return [{"recipe_id": 3, "food_id": 42}]
 
-    monkeypatch.setattr(fq.food_queries, "sql_to_dict", fake_read)
+    monkeypatch.setattr(food_queries, "sql_to_dict", fake_read)
     monkeypatch.setattr(
-        fq.food_queries, "qec",
+        food_queries, "qec",
         lambda sql, params=None: calls["qec"].append((sql, params)))
-    out = fq.food_queries.delete_recipe(3)
+    out = food_queries.delete_recipe(3)
     assert out == {"success": True, "recipe_id": 3, "food_id": 42}
     stmts = [s for s, _ in calls["qec"]]
     assert any("food.recipes" in s and "is_deleted = TRUE" in s for s in stmts)
     assert any("food.foods" in s and "is_deleted = TRUE" in s for s in stmts)
     assert any("recipe_cook_states" in s for s in stmts)
 
-    monkeypatch.setattr(fq.food_queries, "sql_to_dict", lambda *a, **k: [])
-    assert fq.food_queries.delete_recipe(99) is None
+    monkeypatch.setattr(food_queries, "sql_to_dict", lambda *a, **k: [])
+    assert food_queries.delete_recipe(99) is None
 
 
 def test_get_recipes_orders_most_made_first(monkeypatch):
@@ -683,8 +682,8 @@ def test_get_recipes_orders_most_made_first(monkeypatch):
         captured["sql"] = sql
         return []
 
-    monkeypatch.setattr(fq.food_queries, "sql_to_dict", fake)
-    fq.food_queries.get_recipes()
+    monkeypatch.setattr(food_queries, "sql_to_dict", fake)
+    food_queries.get_recipes()
     assert "times_prepared DESC, title ASC" in captured["sql"]
 
 
@@ -704,8 +703,8 @@ def test_get_recipe_query_layer_shape(monkeypatch):
                  "times_prepared": 2, "food_id": 42, "servings_count": 4,
                  "serving_unit": "serving"}]
 
-    monkeypatch.setattr(fq.food_queries, "sql_to_dict", fake)
-    out = fq.food_queries.get_recipe(3)
+    monkeypatch.setattr(food_queries, "sql_to_dict", fake)
+    out = food_queries.get_recipe(3)
     assert set(out.keys()) == {
         "recipe_id", "title", "category", "times_prepared", "food_id",
         "servings_count", "serving_unit", "ingredients", "steps"}
@@ -713,8 +712,8 @@ def test_get_recipe_query_layer_shape(monkeypatch):
         {"food_id": 1, "qty": 100.0, "unit": "g", "name": "Avocado"}]
     assert out["steps"][0]["foods"][0]["name"] == "Avocado"
 
-    monkeypatch.setattr(fq.food_queries, "sql_to_dict", lambda *a, **k: [])
-    assert fq.food_queries.get_recipe(99) is None
+    monkeypatch.setattr(food_queries, "sql_to_dict", lambda *a, **k: [])
+    assert food_queries.get_recipe(99) is None
 
 
 # ---------------------------------------------------------------------------
@@ -743,10 +742,10 @@ def test_cook_state_round_trip_preserves_deadlines(monkeypatch):
                  "checked_foods": stored["foods"], "timers": stored["timers"],
                  "updated_at": datetime(2026, 10, 6, 12, 0, 0)}]
 
-    monkeypatch.setattr(fq.food_queries, "sql_insert_returning", fake_upsert)
-    monkeypatch.setattr(fq.food_queries, "sql_to_dict",
+    monkeypatch.setattr(food_queries, "sql_insert_returning", fake_upsert)
+    monkeypatch.setattr(food_queries, "sql_to_dict",
                         lambda sql, params=None: [{"recipe_id": 3}])
-    saved = fq.food_queries.save_cook_state(
+    saved = food_queries.save_cook_state(
         3, checked_steps=[1, 2], checked_foods=COOK_FOODS, timers=COOK_TIMERS)
     assert saved["timers"] == COOK_TIMERS               # verbatim deadlines
     assert saved["checked_steps"] == [1, 2]
@@ -754,14 +753,14 @@ def test_cook_state_round_trip_preserves_deadlines(monkeypatch):
 
     # GET reads the stored row back (jsonb -> Python, as psycopg2 delivers)
     monkeypatch.setattr(
-        fq.food_queries, "sql_to_dict",
+        food_queries, "sql_to_dict",
         lambda sql, params=None: [{"recipe_id": 3,
                                    "checked_steps": stored["steps"],
                                    "checked_foods": stored["foods"],
                                    "timers": stored["timers"],
                                    "updated_at":
                                        datetime(2026, 10, 6, 12, 0, 0)}])
-    got = fq.food_queries.get_cook_state(3)
+    got = food_queries.get_cook_state(3)
     assert got["timers"] == COOK_TIMERS                 # round-trip identical
     assert len(got["timers"]) == 2                       # concurrent timers intact
     assert got["checked_foods"] == COOK_FOODS
@@ -771,24 +770,24 @@ def test_cook_state_round_trip_preserves_deadlines(monkeypatch):
 
 def test_get_cook_state_empty_session(monkeypatch):
     """No row = empty lists + null updated_at (contract: no active session)."""
-    monkeypatch.setattr(fq.food_queries, "sql_to_dict", lambda *a, **k: [])
-    assert fq.food_queries.get_cook_state(3) == {
+    monkeypatch.setattr(food_queries, "sql_to_dict", lambda *a, **k: [])
+    assert food_queries.get_cook_state(3) == {
         "recipe_id": 3, "checked_steps": [], "checked_foods": [],
         "timers": [], "updated_at": None}
 
 
 def test_save_cook_state_missing_recipe_404_path(monkeypatch):
     """Missing/soft-deleted recipe -> None (route 404s, no FK 500)."""
-    monkeypatch.setattr(fq.food_queries, "sql_to_dict", lambda *a, **k: [])
-    assert fq.food_queries.save_cook_state(99, [], [], []) is None
+    monkeypatch.setattr(food_queries, "sql_to_dict", lambda *a, **k: [])
+    assert food_queries.save_cook_state(99, [], [], []) is None
 
 
 def test_clear_cook_state_idempotent(monkeypatch):
     """DELETE clears the session; no row is not an error."""
     calls = []
-    monkeypatch.setattr(fq.food_queries, "qec",
+    monkeypatch.setattr(food_queries, "qec",
                         lambda sql, params=None: calls.append((sql, params)))
-    assert fq.food_queries.clear_cook_state(3) is True
+    assert food_queries.clear_cook_state(3) is True
     assert "DELETE FROM food.recipe_cook_states" in calls[0][0]
     assert calls[0][1] == (3,)
 

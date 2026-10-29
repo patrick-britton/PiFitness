@@ -294,7 +294,7 @@ def test_segment_bulk_reject_full_and_threshold():
     """
     import unittest.mock as mock
 
-    import backend_functions.queries.activities_queries as aq
+    import pifitness.activities.queries as aq
 
     rows = [
         {"activity_id": 11, "best_start_dist": 0, "best_end_dist": 100, "confidence": 50.0},
@@ -306,7 +306,7 @@ def test_segment_bulk_reject_full_and_threshold():
     mock_conn.cursor.return_value = mock_cur
 
     with mock.patch(
-        "backend_functions.queries.activities_queries.sql_to_dict",
+        "pifitness.activities.queries.sql_to_dict",
         side_effect=[[{"segment_id": 9}], rows],
     ), mock.patch.object(aq, "get_conn", return_value=mock_conn) as conn_mock:
         response = client.post("/api/segments/9/matches/bulk-reject", json={})
@@ -330,7 +330,7 @@ def test_segment_bulk_reject_full_and_threshold():
     mock_cur2 = mock.MagicMock()
     mock_conn2.cursor.return_value = mock_cur2
     with mock.patch(
-        "backend_functions.queries.activities_queries.sql_to_dict",
+        "pifitness.activities.queries.sql_to_dict",
         side_effect=[[{"segment_id": 9}], [rows[2]]],
     ) as read_mock, mock.patch.object(aq, "get_conn", return_value=mock_conn2) as conn_mock:
         response = client.post("/api/segments/9/matches/bulk-reject", json={"confidence_over": 200})
@@ -351,7 +351,7 @@ def test_segment_bulk_reject_failure_rolls_back():
     through the endpoint with the unchanged 422 mapping."""
     import unittest.mock as mock
 
-    import backend_functions.queries.activities_queries as aq
+    import pifitness.activities.queries as aq
 
     rows = [
         {"activity_id": 11, "best_start_dist": 0, "best_end_dist": 100, "confidence": 50.0},
@@ -365,7 +365,7 @@ def test_segment_bulk_reject_failure_rolls_back():
     mock_cur.execute.side_effect = [None, Exception("deadlock detected"), None]
 
     with mock.patch(
-        "backend_functions.queries.activities_queries.sql_to_dict",
+        "pifitness.activities.queries.sql_to_dict",
         side_effect=[[{"segment_id": 9}], rows],
     ), mock.patch.object(aq, "get_conn", return_value=mock_conn):
         response = client.post("/api/segments/9/matches/bulk-reject", json={})
@@ -382,10 +382,10 @@ def test_segment_bulk_reject_empty_404_422():
     connection (T37); unknown segment -> 404; bad body -> 422."""
     import unittest.mock as mock
 
-    import backend_functions.queries.activities_queries as aq
+    import pifitness.activities.queries as aq
 
     with mock.patch(
-        "backend_functions.queries.activities_queries.sql_to_dict",
+        "pifitness.activities.queries.sql_to_dict",
         side_effect=[[{"segment_id": 9}], []],
     ), mock.patch.object(aq, "get_conn") as conn_mock:
         response = client.post("/api/segments/9/matches/bulk-reject", json={})
@@ -394,7 +394,7 @@ def test_segment_bulk_reject_empty_404_422():
         conn_mock.assert_not_called()
 
     with mock.patch(
-        "backend_functions.queries.activities_queries.sql_to_dict",
+        "pifitness.activities.queries.sql_to_dict",
         return_value=[],
     ):
         response = client.post("/api/segments/99/matches/bulk-reject", json={})
@@ -716,7 +716,7 @@ def test_stage_leaderboard_visuals_bulk_insert():
     in a single parameterized execute_values statement (009-002 T05) and commits."""
     import unittest.mock as mock
 
-    import backend_functions.queries.activities_queries as aq
+    import pifitness.activities.queries as aq
 
     efforts = [
         {"activity_id": 111, "start_point": 100, "end_point": 900},

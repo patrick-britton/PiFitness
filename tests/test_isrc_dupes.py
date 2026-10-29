@@ -14,7 +14,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from backend_functions.queries.music_queries import (
+from pifitness.music.queries import (
     get_isrc_dupe_count,
     process_isrc_dupe_decision,
     run_isrc_duplicate_finder,
@@ -69,7 +69,7 @@ class FakeConn:
 
 def test_dupe_count_halves_rows_to_pairs():
     with patch(
-        'backend_functions.queries.music_queries.one_sql_result',
+        'pifitness.music.queries.one_sql_result',
         return_value=7,
     ):
         assert get_isrc_dupe_count() == 3
@@ -77,7 +77,7 @@ def test_dupe_count_halves_rows_to_pairs():
 
 def test_dupe_count_empty_is_zero():
     with patch(
-        'backend_functions.queries.music_queries.one_sql_result',
+        'pifitness.music.queries.one_sql_result',
         return_value=None,
     ):
         assert get_isrc_dupe_count() == 0
@@ -86,7 +86,7 @@ def test_dupe_count_empty_is_zero():
 def test_accept_writes_swaps_and_deletes_pair_in_one_transaction():
     fake = FakeConn()
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ) as mock_get_conn:
         process_isrc_dupe_decision('ISRC-A', 'ISRC-B', 'ISRC-A', True)
@@ -115,7 +115,7 @@ def test_accept_writes_swaps_and_deletes_pair_in_one_transaction():
 def test_reject_writes_non_swaps_and_deletes_pair_in_one_transaction():
     fake = FakeConn()
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ):
         process_isrc_dupe_decision('ISRC-A', 'ISRC-B', 'ISRC-A', False)
@@ -139,7 +139,7 @@ def test_reject_writes_non_swaps_and_deletes_pair_in_one_transaction():
 def test_decision_insert_failure_rolls_back_and_raises():
     fake = FakeConn(fail_on='executemany')
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ):
         with pytest.raises(RuntimeError):
@@ -154,7 +154,7 @@ def test_decision_delete_failure_rolls_back_and_raises():
     # Inserts succeed, the pool delete fails -> the whole decision is rolled back.
     fake = FakeConn(fail_on='execute')
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ):
         with pytest.raises(RuntimeError):
@@ -169,7 +169,7 @@ def test_decision_delete_failure_rolls_back_and_raises():
 def test_rescan_issues_call_in_one_transaction():
     fake = FakeConn()
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ) as mock_get_conn:
         run_isrc_duplicate_finder()
@@ -187,7 +187,7 @@ def test_rescan_failure_rolls_back_and_raises():
     # T08: a failed CALL must not look like a successful re-scan.
     fake = FakeConn(fail_on='execute')
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ):
         with pytest.raises(RuntimeError):

@@ -5,18 +5,18 @@ creation → finalize → scoped update_segment_details(activity_id).
 """
 import unittest.mock as mock
 
-import backend_functions.queries.activities_queries as aq
+import pifitness.activities.queries as aq
 
 
 def _run_create(qec_calls, new_id=96):
     with mock.patch(
-        "backend_functions.queries.activities_queries.sql_to_dict",
+        "pifitness.activities.queries.sql_to_dict",
         return_value=[{"activity_id": 24652871872, "distance_m": 7500.0}],
     ), mock.patch(
-        "backend_functions.queries.activities_queries.one_sql_result",
+        "pifitness.activities.queries.one_sql_result",
         return_value=new_id,
     ), mock.patch(
-        "backend_functions.queries.activities_queries.qec",
+        "pifitness.activities.queries.qec",
         side_effect=qec_calls,
     ) as qec_mock:
         result = aq.create_segment(

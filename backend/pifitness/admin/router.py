@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel
 
 from backend_functions.credential_management import encrypt_dict
-from backend_functions.queries import (
+from pifitness.admin.queries import (
     get_task_execution_view,
     get_task_scheduling_view,
     get_distinct_task_names,
@@ -188,7 +188,7 @@ def execute_task_v2_async(task_name: str, request: Optional[TaskExecuteRequest] 
             task_id = request.task_id
         else:
             # Fallback: look up by name
-            from backend_functions.queries import get_task_scheduling_view, get_task_execution_view
+            from pifitness.admin.queries import get_task_scheduling_view, get_task_execution_view
             
             # First try scheduling view
             for task in get_task_scheduling_view():
@@ -885,7 +885,7 @@ async def get_task_config_endpoint(task_id: int):
         Single task configuration record with mapped frontend field names
     """
     try:
-        from backend_functions.queries import get_task_config_by_id
+        from pifitness.admin.queries import get_task_config_by_id
         config = get_task_config_by_id(task_id)
         if not config:
             raise HTTPException(

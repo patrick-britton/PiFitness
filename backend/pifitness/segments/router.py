@@ -28,7 +28,7 @@ from backend_functions.schemas.segment_schemas import (
     RenameSegmentRequest,
     RenameResponse,
 )
-from backend_functions.queries import (
+from pifitness.activities.queries import (
     get_leaderboard_segments,
     get_segment_reference_windows,
     get_segment_activities,

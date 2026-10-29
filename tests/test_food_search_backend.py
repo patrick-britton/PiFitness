@@ -417,7 +417,7 @@ def test_persist_on_log_creates_food_then_entry(monkeypatch):
 
 def test_persist_api_food_uses_check_valid_normalized_from(monkeypatch):
     """Bug T08-1: INSERT normalized_from must satisfy the foods CHECK."""
-    import backend_functions.queries.food_queries as fq
+    import pifitness.food.queries as fq
     seen = {}
     CHECKED = {'usda_branded', 'usda_survey', 'usda_legacy',
                'off', 'manual', 'recipe'}
@@ -447,7 +447,7 @@ def test_persist_api_food_uses_check_valid_normalized_from(monkeypatch):
 def test_persist_clears_review_on_insert(monkeypatch):
     """T09 (OQ-7): confirming a pick IS the review — fresh INSERT clears
     needs_review + review_reason; duplicate key returns row untouched."""
-    import backend_functions.queries.food_queries as fq
+    import pifitness.food.queries as fq
     seen = {"inserts": 0}
     per100 = {"kcal_per_100g": 0.0, "protein_g": None, "fat_g": None,
               "carbs_g": None, "fiber_g": None, "sugars_g": None,

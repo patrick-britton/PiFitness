@@ -290,3 +290,42 @@ tree) and `package-lock.json` (just deleted) are confirmed unused — all npm ac
 in `frontend/pifitness/` with `frontend/pifitness/package.json` as the canonical manifest.
 `inventory.npm_manifests` dropped from 2 → 1, matching the Phase 4 target ahead of schedule.
 
+---
+
+## 16. Phase 2 — Duplicate query/schema file consolidation — RESOLVED
+
+**Status:** Complete. All exit criteria met.
+
+**Problem:** 7 byte-identical duplicate files in `backend_functions/queries/`
+and `backend_functions/schemas/` mirrored canonical modules now living in
+`pifitness.<domain>.queries`.
+
+**Actions taken:**
+- Deleted:
+  - `backend_functions/queries/activities_queries.py`
+  - `backend_functions/queries/admin_queries.py`
+  - `backend_functions/queries/exercise_queries.py`
+  - `backend_functions/queries/music_queries.py`
+  - `backend_functions/queries/tri_tip_queries.py`
+  - `backend_functions/queries/volleyball_queries.py`
+  - `backend_functions/schemas/tri_tip_schemas.py`
+- Rewrote `backend_functions/queries/__init__.py` with minimal docstring noting
+  that `food_queries` remains for backward compatibility (it is NOT byte-identical
+  to its canonical counterpart and is still imported by production code). Note:
+  `health_queries` was already deleted (renamed to `.bak` pre-Phase 2); its
+  functions now live in `pifitness.health.queries`. The Phase 2.6 docstring
+  incorrectly listed `health_queries` as remaining — corrected in post-Phase-2
+  cleanup (2026-10-29).
+- Updated stale doc references in `tools/diagnostics/NEEDS_ATTENTION.md`,
+  `.agents/skills/sql-expert/SKILL.md`, and
+  `memory-bank/references/auth_patterns_and_rules.md` (script path moves and
+  deleted-file notes).
+
+**Verification:**
+- `python -m pytest -q` → 210 passed
+- `python -m scripts.repo_audit baseline` → gate OK
+- `inventory.duplicate_groups` = 0 (was 7)
+- `scripts.oneoff` = 0, `scripts.misplaced_tests` = 0
+- Impact on all 7 deleted paths = 0 refs (stale doc entries removed)
+
+**Default:** All deletions accepted per human-approved reorg plan.

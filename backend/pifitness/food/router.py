@@ -33,7 +33,7 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend_functions.queries.food_queries import (
+from pifitness.food.queries import (
     get_food_by_barcode,
     get_food_by_id,
     get_usual_foods,
@@ -674,7 +674,7 @@ async def restore_food(food_id: int):
 @router.put("/foods/{food_id}", response_model=FoodRow)
 async def update_food(food_id: int, req: UpdateFoodRequest):
     """Update a food row's fields (T07)."""
-    from backend_functions.queries.food_queries import update_food as _update_food
+    from pifitness.food.queries import update_food as _update_food
     try:
         row = _update_food(
             food_id,

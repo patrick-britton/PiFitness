@@ -1,17 +1,19 @@
 # Needs attention (autofix could not prove these safe)
 
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_activities.py:310: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_activities.py:313: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_activities.py:334: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_activities.py:337: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_activities.py:369: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_activities.py:372: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_activities.py:389: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_activities.py:392: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_activities.py:398: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_create_segment_details_write.py:12: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_create_segment_details_write.py:15: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_create_segment_details_write.py:18: cannot import 'backend_functions.queries.activities_queries': ModuleNotFoundError: No module named 'backend_functions'
+Resolved (Phase 2 — byte-identical duplicate query/schema files removed):
+- ~~backend_functions/queries/activities_queries.py~~ → deleted; canonical lives in
+  `pifitness.activities.queries`; all test imports repointed.
+- ~~backend_functions/queries/music_queries.py~~ → deleted; canonical lives in
+  `pifitness.music.queries`; all test imports repointed.
+- ~~backend_functions/queries/food_queries.py~~ → deleted; canonical lives in
+  `pifitness.food.queries`; all 4 import sites repapered (router.py x2,
+  test_food_search_backend.py x2, test_food_api_contract.py x36).
+- admin_queries.py, exercise_queries.py, tri_tip_queries.py, volleyball_queries.py,
+  schemas/tri_tip_schemas.py → 0 references; safely deleted.
+
+---
+
+Remaining items (pre-existing Phase 3 debt — not addressed in Phase 2):
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_empty_queue_noop.py:60: cannot import 'backend_functions.json_extractors': ModuleNotFoundError: No module named 'backend_functions'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_empty_queue_noop.py:65: cannot import 'backend_functions.json_extractors': ModuleNotFoundError: No module named 'backend_functions'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_empty_queue_noop.py:80: cannot import 'backend_functions.json_extractors': ModuleNotFoundError: No module named 'backend_functions'
@@ -27,14 +29,6 @@
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupe_endpoints.py:134: cannot import 'pifitness.music.router': ModuleNotFoundError: No module named 'backend_functions'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupe_endpoints.py:146: cannot import 'pifitness.music.router': ModuleNotFoundError: No module named 'backend_functions'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupe_endpoints.py:162: cannot import 'pifitness.music.router': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupes.py:71: cannot import 'backend_functions.queries.music_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupes.py:79: cannot import 'backend_functions.queries.music_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupes.py:88: cannot import 'backend_functions.queries.music_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupes.py:117: cannot import 'backend_functions.queries.music_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupes.py:141: cannot import 'backend_functions.queries.music_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupes.py:156: cannot import 'backend_functions.queries.music_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupes.py:171: cannot import 'backend_functions.queries.music_queries': ModuleNotFoundError: No module named 'backend_functions'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupes.py:189: cannot import 'backend_functions.queries.music_queries': ModuleNotFoundError: No module named 'backend_functions'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_music_actions.py:18: cannot import 'pifitness.music.router': ModuleNotFoundError: No module named 'backend_functions'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_music_actions.py:24: cannot import 'pifitness.music.router': ModuleNotFoundError: No module named 'backend_functions'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_music_actions.py:42: cannot import 'pifitness.music.router': ModuleNotFoundError: No module named 'backend_functions'
@@ -114,7 +108,6 @@
 - C:\Users\rickb\vsProjects\PiFitness\tests\integration\test_dotenv.py:20: stale import-from 'backend_functions.database_functions'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_auto_shuffle_pandas_free.py:8: stale import 'backend_functions.music_functions'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_backup.py:1: stale import-from 'backend_functions.backend_tasks'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_create_segment_details_write.py:8: stale import 'backend_functions.queries.activities_queries'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_empty_queue_noop.py:18: stale import 'backend_functions.json_extractors'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_empty_queue_noop.py:19: stale import 'backend_functions.ultimate_task_executioner_v2'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_empty_queue_noop.py:52: stale import 'backend_functions.ultimate_task_executioner_v2'
@@ -128,10 +121,7 @@
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_food_api_contract.py:373: stale import-from 'backend_functions.schemas.food_contract_schemas'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_food_search_backend.py:18: stale import 'backend_functions.food_search'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_food_search_backend.py:19: stale import-from 'backend_functions.food_normalize'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_food_search_backend.py:418: stale import 'backend_functions.queries.food_queries'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_food_search_backend.py:448: stale import 'backend_functions.queries.food_queries'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_food_search_backend.py:654: stale import-from 'backend_functions.food_normalize'
-- C:\Users\rickb\vsProjects\PiFitness\tests\test_isrc_dupes.py:17: stale import-from 'backend_functions.queries.music_queries'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_music_actions.py:11: stale import-from 'backend_functions.music_functions'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_music_actions.py:12: stale import-from 'backend_functions.file_handlers'
 - C:\Users\rickb\vsProjects\PiFitness\tests\test_music_actions.py:501: stale import-from 'backend_functions.database_functions'

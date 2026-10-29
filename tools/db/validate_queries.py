@@ -72,12 +72,10 @@ def validate_query_function(func) -> Dict[str, any]:
 
 def validate_all_queries() -> Dict[str, List[Dict]]:
     """Validate all query functions in all query modules."""
-    from backend_functions.queries import (
-        activities_queries,
-        health_queries,
-        music_queries,
-        admin_queries
-    )
+    from pifitness.activities import queries as activities_queries
+    from pifitness.health import queries as health_queries
+    from pifitness.music import queries as music_queries
+    from pifitness.admin import queries as admin_queries
 
     results = {
         "activities": [],

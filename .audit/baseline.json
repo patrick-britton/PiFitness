@@ -1,33 +1,33 @@
 {
  "meta": {
-  "when": "2026-10-29 14:36",
+  "when": "2026-10-29 15:23",
   "root": "C:\\Users\\rickb\\vsProjects\\PiFitness",
   "version": "1.0",
-  "commit": "5755492",
+  "commit": "c131550",
   "dirty": true
  },
  "metrics": {
-  "inventory.files": 379,
-  "inventory.code_lines": 77434,
-  "inventory.duplicate_groups": 7,
+  "inventory.files": 372,
+  "inventory.code_lines": 72655,
+  "inventory.duplicate_groups": 0,
   "inventory.clutter_files": 0,
   "inventory.root_files": 11,
   "inventory.npm_manifests": 1,
   "inventory.stray_path_files": 0,
-  "py.files": 137,
+  "py.files": 130,
   "py.dangling_imports": 0,
   "py.pkg_cycles": 0,
   "py.module_cycles": 0,
   "py.layer_violations": 0,
   "py.private_cross_imports": 0,
   "py.orphans_likely_dead": 0,
-  "py.orphans_total": 36,
+  "py.orphans_total": 35,
   "py.nonliteral_dynamic_imports": 9,
   "py.router_direct_db_handlers": 11,
-  "py.fat_functions": 79,
-  "py.near_duplicate_pairs": 9,
+  "py.fat_functions": 74,
+  "py.near_duplicate_pairs": 2,
   "py.parse_errors": 0,
-  "py.untested_modules": 59,
+  "py.untested_modules": 54,
   "ts.files": 184,
   "ts.unreachable_files": 4,
   "ts.unresolved_imports": 1,
@@ -46,7 +46,7 @@
   "hygiene.tracked_junk": 0,
   "hygiene.pyc_husks": 0,
   "hygiene.legacy_py_imports": 0,
-  "hygiene.legacy_code_refs": 21,
+  "hygiene.legacy_code_refs": 17,
   "hygiene.legacy_leftover_dirs": 0,
   "sql.files": 0,
   "sql.migrations": 0,
@@ -56,8 +56,8 @@
   "scripts.oneoff": 0,
   "scripts.keep": 0,
   "scripts.misplaced_tests": 0,
-  "git.avg_code_dirs_per_commit": 2.38,
-  "git.avg_domains_per_commit": 1.68
+  "git.avg_code_dirs_per_commit": 2.35,
+  "git.avg_domains_per_commit": 1.66
  },
  "findings": [
   {
@@ -123,24 +123,6 @@
    "section": "domains"
   },
   {
-   "id": "INV-002",
-   "severity": "medium",
-   "title": "Byte-identical duplicate files",
-   "detail": "",
-   "hint": "Keep one canonical copy; delete the other or turn it into a reference.",
-   "count": 7,
-   "evidence": [
-    "backend/pifitness/activities/queries.py == backend_functions/queries/activities_queries.py",
-    "backend/pifitness/admin/queries.py == backend_functions/queries/admin_queries.py",
-    "backend/pifitness/exercises/queries.py == backend_functions/queries/exercise_queries.py",
-    "backend/pifitness/music/queries.py == backend_functions/queries/music_queries.py",
-    "backend/pifitness/tri_tip/queries.py == backend_functions/queries/tri_tip_queries.py",
-    "backend/pifitness/tri_tip/schemas.py == backend_functions/schemas/tri_tip_schemas.py",
-    "backend/pifitness/volleyball/queries.py == backend_functions/queries/volleyball_queries.py"
-   ],
-   "section": "inventory"
-  },
-  {
    "id": "INV-005",
    "severity": "medium",
    "title": "Python dependencies declared in many places",
@@ -203,16 +185,9 @@
    "title": "Near-duplicate Python files (possible vendored copies)",
    "detail": "",
    "hint": "",
-   "count": 9,
+   "count": 2,
    "evidence": [
-    "1.00 backend/pifitness/activities/queries.py ~ backend_functions/queries/activities_queries.py",
-    "1.00 backend/pifitness/admin/queries.py ~ backend_functions/queries/admin_queries.py",
-    "1.00 backend/pifitness/exercises/queries.py ~ backend_functions/queries/exercise_queries.py",
     "1.00 backend/pifitness/food/queries.py ~ backend_functions/queries/food_queries.py",
-    "1.00 backend/pifitness/music/queries.py ~ backend_functions/queries/music_queries.py",
-    "1.00 backend/pifitness/tri_tip/queries.py ~ backend_functions/queries/tri_tip_queries.py",
-    "1.00 backend/pifitness/tri_tip/schemas.py ~ backend_functions/schemas/tri_tip_schemas.py",
-    "1.00 backend/pifitness/volleyball/queries.py ~ backend_functions/queries/volleyball_queries.py",
     "0.92 backend/pifitness/config/queries.py ~ backend/pifitness/config/router.py"
    ],
    "section": "python"
@@ -254,7 +229,7 @@
    "title": "Legacy framework residue (streamlit)",
    "detail": "9 markdown docs mention it (see data.legacy.doc_refs).",
    "hint": "",
-   "count": 25,
+   "count": 21,
    "evidence": [
     "code/config ref: backend/pifitness/activities/queries.py x3",
     "code/config ref: backend/pifitness/admin/queries.py x1",
@@ -262,15 +237,15 @@
     "code/config ref: backend/pifitness/music/queries.py x1",
     "code/config ref: backend/pifitness/segments/router.py x1",
     "code/config ref: backend_functions/helper_functions.py x1",
-    "code/config ref: backend_functions/queries/__init__.py x1",
-    "code/config ref: backend_functions/queries/activities_queries.py x3",
-    "code/config ref: backend_functions/queries/admin_queries.py x1",
-    "code/config ref: backend_functions/queries/music_queries.py x1",
     "code/config ref: deploy/scripts/library_requirements.txt x1",
     "code/config ref: deploy/scripts/pi5_deploy.sh x19",
     "code/config ref: docs/archive/streamlit_backend_mapping.json x6",
     "code/config ref: docs/reorg/openapi.before.json x1",
-    "code/config ref: frontend/pifitness/src/app/activities/segment-management/components/MatchSession.tsx x1"
+    "code/config ref: frontend/pifitness/src/app/activities/segment-management/components/MatchSession.tsx x1",
+    "code/config ref: frontend/pifitness/src/hooks/useViewport.ts x1",
+    "code/config ref: frontend/pifitness/src/lib/segment-trim.ts x1",
+    "code/config ref: local_clinerules.txt x1",
+    "code/config ref: scripts/repo_audit/audit.toml x2"
    ],
    "section": "hygiene"
   },
@@ -321,7 +296,7 @@
    "title": "Functions >= 80 LOC or complexity >= 15",
    "detail": "",
    "hint": "",
-   "count": 79,
+   "count": 74,
    "evidence": [
     "scripts/repo_audit/pyanalysis.py:389 analyze loc=292 cc=216",
     "scripts/repo_audit/tsanalysis.py:111 analyze loc=173 cc=107",
@@ -342,10 +317,9 @@
    "title": "Python files >= 600 LOC",
    "detail": "",
    "hint": "",
-   "count": 19,
+   "count": 16,
    "evidence": [
     "backend/pifitness/activities/queries.py (1486)",
-    "backend_functions/queries/activities_queries.py (1486)",
     "backend/pifitness/activities/router.py (1226)",
     "backend/pifitness/music/router.py (1175)",
     "backend_functions/queries/food_queries.py (1148)",
@@ -353,12 +327,13 @@
     "backend/pifitness/admin/router.py (1075)",
     "backend_functions/music_functions.py (928)",
     "backend/pifitness/music/queries.py (893)",
-    "backend_functions/queries/music_queries.py (893)",
     "backend_functions/service_logins.py (820)",
     "backend_functions/ultimate_task_executioner_v2.py (760)",
     "backend/pifitness/admin/queries.py (741)",
-    "backend_functions/queries/admin_queries.py (741)",
-    "scripts/repo_audit/pyanalysis.py (733)"
+    "scripts/repo_audit/pyanalysis.py (733)",
+    "backend/pifitness/food/router.py (699)",
+    "pirate-garmin_clone/src/pirate_garmin/auth.py (678)",
+    "backend_functions/food_search.py (657)"
    ],
    "section": "python"
   },
@@ -524,23 +499,23 @@
    "evidence": [
     "15x backend_functions/queries/__init__.py + frontend/pifitness/src/lib/api-client.ts",
     "8x frontend/pifitness/src/lib/api-client.ts + scripts/schema_cache.json",
-    "8x backend_functions/queries/activities_queries.py + tests/test_activities.py",
     "7x backend/main.py + frontend/pifitness/src/lib/api-client.ts",
     "7x backend_functions/queries/__init__.py + frontend/pifitness/next-env.d.ts",
     "6x backend/main.py + backend_functions/queries/__init__.py",
     "6x backend_functions/queries/__init__.py + scripts/schema_cache.json",
     "6x backend_functions/queries/__init__.py + tests/test_activities.py",
-    "6x backend_functions/queries/admin_queries.py + frontend/pifitness/src/hooks/useAdmin.ts",
     "5x backend/main.py + frontend/pifitness/package.json",
     "5x backend/main.py + frontend/pifitness/src/stores/uiStore.ts",
-    "5x backend_functions/queries/__init__.py + frontend/pifitness/src/hooks/useAdmin.ts"
+    "5x backend_functions/queries/__init__.py + frontend/pifitness/src/hooks/useAdmin.ts",
+    "4x backend_functions/queries/food_queries.py + tests/test_food_api_contract.py",
+    "4x backend/main.py + frontend/pifitness/src/app/food/page.tsx"
    ],
    "section": "git"
   },
   {
    "id": "GIT-002",
    "severity": "info",
-   "title": "A typical code commit touches 2.38 directories and 1.68 domains",
+   "title": "A typical code commit touches 2.35 directories and 1.66 domains",
    "detail": "Baseline for the reorg: the first number should drop after domain-sliced folders.",
    "hint": "",
    "count": 0,
@@ -568,7 +543,7 @@
   {
    "id": "INV-001",
    "severity": "info",
-   "title": "27.0% of all lines are not code/tests/SQL (data, docs, generated, config)",
+   "title": "28.2% of all lines are not code/tests/SQL (data, docs, generated, config)",
    "detail": "Raw cloc-style totals overstate code size; use `code_lines` for reorg sizing.",
    "hint": "",
    "count": 0,
@@ -579,14 +554,13 @@
    "id": "PY-009",
    "severity": "info",
    "title": "Modules with no importers",
-   "detail": "dynamic-possible: 7, string-referenced: 29",
+   "detail": "dynamic-possible: 6, string-referenced: 29",
    "hint": "`likely-dead` = no import, string, config or doc reference anywhere. `dynamic-possible` = a non-literal importlib call could load it.",
-   "count": 36,
+   "count": 35,
    "evidence": [
     "dynamic-possible: backend/pifitness/food/food_lookup.py (130 loc)",
-    "dynamic-possible: backend_functions/schemas/tri_tip_schemas.py (63 loc)",
     "dynamic-possible: backend_functions/tri_tip_prediction.py (191 loc)",
-    "dynamic-possible: tools/db/validate_queries.py (174 loc)",
+    "dynamic-possible: tools/db/validate_queries.py (172 loc)",
     "dynamic-possible: tools/diagnostics/autofix_phase3.py (451 loc)",
     "dynamic-possible: tools/diagnostics/schema_cache.py (72 loc)",
     "dynamic-possible: tools/diagnostics/validate_pydantic_models.py (249 loc)",
@@ -597,7 +571,8 @@
     "string-referenced: backend/pifitness/admin/router.py (1075 loc)",
     "string-referenced: backend/pifitness/auth/queries.py (2 loc)",
     "string-referenced: backend/pifitness/auth/router.py (432 loc)",
-    "string-referenced: backend/pifitness/config/queries.py (38 loc)"
+    "string-referenced: backend/pifitness/config/queries.py (38 loc)",
+    "string-referenced: backend/pifitness/config/router.py (38 loc)"
    ],
    "section": "python"
   }
