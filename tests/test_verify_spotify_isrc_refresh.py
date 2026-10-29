@@ -3,7 +3,7 @@ Live integration test — 004-004 Bug T10-6 fix (FR-8.6 / FR-10).
 
 Validates the exact methodology the rebuilt pipeline uses to refresh
 music.playlist_isrcs by querying Spotify, via the feature's own step function
-`backend_functions.activities_service.verify_spotify`, against the Running target playlist
+`backend.pifitness.activities.services.verify_spotify`, against the Running target playlist
 '7LPPIzdYgJZgj2QTSXCCNy'.
 
 Methodology under test (matches the pipeline's verify_spotify step):
@@ -26,13 +26,13 @@ import pytest
 
 from backend_functions.database_functions import one_sql_result, sql_to_list
 from backend_functions.service_logins import get_spotify_client
-from backend_functions.activities_service import verify_spotify
+from backend.pifitness.activities.services import verify_spotify
 
 TARGET_PLAYLIST_ID = '7LPPIzdYgJZgj2QTSXCCNy'
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ACTIVITIES_PY = REPO_ROOT / 'backend' / 'api' / 'activities.py'
-SERVICE_PY = REPO_ROOT / 'backend_functions' / 'activities_service.py'
+ACTIVITIES_PY = REPO_ROOT / 'backend' / 'pifitness' / 'activities' / 'router.py'
+SERVICE_PY = REPO_ROOT / 'backend' / 'pifitness' / 'activities' / 'services.py'
 TYPES_TS = REPO_ROOT / 'frontend' / 'pifitness' / 'src' / 'lib' / 'types' / 'activity-processing.ts'
 
 
@@ -104,10 +104,10 @@ def test_spotify_client_is_usable():
 def test_verify_spotify_fails_without_client(monkeypatch):
     """With no usable client the step must raise instead of soft-succeeding
     (the original T10-6 bug silently no-oped)."""
-    from backend_functions.activities_service import verify_spotify
+    from backend.pifitness.activities.services import verify_spotify
 
     for broken in (None, {"token": "x", "token_age": 0, "client": None}):
-        monkeypatch.setattr("backend_functions.activities_service.get_spotify_client", lambda b=broken: b)
+        monkeypatch.setattr("backend.pifitness.activities.services.get_spotify_client", lambda b=broken: b)
         with pytest.raises(RuntimeError, match="could not obtain a usable Spotify client"):
             verify_spotify(TARGET_PLAYLIST_ID)
 

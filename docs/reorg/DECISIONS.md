@@ -263,3 +263,30 @@ Other:
 | openapi-typescript | Do not add (recommendation only) |
 | Root package.json/node_modules | Delete after proof + approval |
 | PY-001 dangling import | Check git log; stop if ambiguous |
+## 14. Phase 2.3 docs move — REJECTED (keep `.features/` in place)
+
+**Decision (2026-10-29, human):** Phase 2.3 is rejected. `.features/` is retained as-is
+as a legacy feature-management workspace. The directory contains design documents,
+feature descriptions, and migration drafts that are referenced by `.agents/skills/*`,
+`local_clinerules.txt`, `tools/features/fd.py`, and `.clinerules/workflows/*`.
+
+**Actions taken:**
+- Added `/.features/` to `.gitignore` (new files in this tree will not be tracked by git).
+- Documented in `docs/reorg/PLAN.md` that Phase 2.3 is [rejected].
+- No path constant updates performed — all existing `.features/` references remain valid.
+
+**Rationale:** Moving `.features/` contents to `docs/features/` would require updating
+hundreds of cross-references across `.features/designs_complete/*.md` (each design doc
+contains backlinks to sibling `.features/` paths), `.agents/skills/*`, `local_clinerules.txt`,
+and `.clinerules/workflows/*`. The human determined the cost/benefit is not justified
+for Phase 2; deferred to a future Phase 5 (guardrails) task if still desired.
+
+---
+
+## 15. Root package.json / package-lock.json deletion — APPROVED
+
+**Decision (2026-10-29, human):** Approved. Root `package.json` (already deleted in working
+tree) and `package-lock.json` (just deleted) are confirmed unused — all npm activity lives
+in `frontend/pifitness/` with `frontend/pifitness/package.json` as the canonical manifest.
+`inventory.npm_manifests` dropped from 2 → 1, matching the Phase 4 target ahead of schedule.
+

@@ -1,50 +1,50 @@
 {
  "meta": {
-  "when": "2026-10-29 09:16",
+  "when": "2026-10-29 14:36",
   "root": "C:\\Users\\rickb\\vsProjects\\PiFitness",
   "version": "1.0",
-  "commit": "7e78a61",
+  "commit": "5755492",
   "dirty": true
  },
  "metrics": {
-  "inventory.files": 416,
-  "inventory.code_lines": 77677,
+  "inventory.files": 379,
+  "inventory.code_lines": 77434,
   "inventory.duplicate_groups": 7,
-  "inventory.clutter_files": 2,
-  "inventory.root_files": 48,
+  "inventory.clutter_files": 0,
+  "inventory.root_files": 11,
   "inventory.npm_manifests": 1,
   "inventory.stray_path_files": 0,
-  "py.files": 154,
-  "py.dangling_imports": 3,
+  "py.files": 137,
+  "py.dangling_imports": 0,
   "py.pkg_cycles": 0,
   "py.module_cycles": 0,
   "py.layer_violations": 0,
   "py.private_cross_imports": 0,
   "py.orphans_likely_dead": 0,
-  "py.orphans_total": 58,
+  "py.orphans_total": 36,
   "py.nonliteral_dynamic_imports": 9,
   "py.router_direct_db_handlers": 11,
   "py.fat_functions": 79,
   "py.near_duplicate_pairs": 9,
   "py.parse_errors": 0,
-  "py.untested_modules": 79,
+  "py.untested_modules": 59,
   "ts.files": 184,
   "ts.unreachable_files": 4,
   "ts.unresolved_imports": 1,
-  "ts.npm_unused": 0,
-  "ts.npm_undeclared": 18,
+  "ts.npm_unused": 5,
+  "ts.npm_undeclared": 0,
   "ts.cross_route_imports": 1,
   "ts.single_consumer_modules": 24,
   "contracts.routes": 159,
   "contracts.routes_no_caller": 35,
   "contracts.frontend_ghost_paths": 1,
-  "domains.unassigned_files": 56,
-  "domains.cross_edges": 24,
+  "domains.unassigned_files": 48,
+  "domains.cross_edges": 27,
   "hygiene.sensitive_exposed": 0,
   "hygiene.sensitive_in_history": 0,
   "hygiene.secret_hits": 1,
   "hygiene.tracked_junk": 0,
-  "hygiene.pyc_husks": 14,
+  "hygiene.pyc_husks": 0,
   "hygiene.legacy_py_imports": 0,
   "hygiene.legacy_code_refs": 21,
   "hygiene.legacy_leftover_dirs": 0,
@@ -56,8 +56,8 @@
   "scripts.oneoff": 0,
   "scripts.keep": 0,
   "scripts.misplaced_tests": 0,
-  "git.avg_code_dirs_per_commit": 2.34,
-  "git.avg_domains_per_commit": 1.67
+  "git.avg_code_dirs_per_commit": 2.38,
+  "git.avg_domains_per_commit": 1.68
  },
  "findings": [
   {
@@ -85,33 +85,6 @@
    "section": "hygiene"
   },
   {
-   "id": "INV-003",
-   "severity": "high",
-   "title": "Logs/temp/backup/copy files in the repo",
-   "detail": "2 are tracked by git.",
-   "hint": "Delete and add patterns to .gitignore.",
-   "count": 2,
-   "evidence": [
-    "frontend/tsc2.txt",
-    "frontend/vit2.txt"
-   ],
-   "section": "inventory"
-  },
-  {
-   "id": "PY-001",
-   "severity": "high",
-   "title": "Imports of internal modules that do not exist in the tree",
-   "detail": "",
-   "hint": "Either the module was deleted (fix/remove the import) or it is guarded/lazy; confirm before moving anything.",
-   "count": 3,
-   "evidence": [
-    "backend/pifitness/food/queries.py:421 imports backend_functions.schemas.food_contract_schemas [lazy] (stale .pyc present)",
-    "backend/pifitness/food/queries.py:473 imports backend_functions.schemas.food_contract_schemas [lazy] (stale .pyc present)",
-    "backend/pifitness/food/queries.py:662 imports backend_functions.schemas.food_contract_schemas [lazy] (stale .pyc present)"
-   ],
-   "section": "python"
-  },
-  {
    "id": "TS-003",
    "severity": "high",
    "title": "[frontend/pifitness] Relative/alias imports that do not resolve",
@@ -119,7 +92,7 @@
    "hint": "",
    "count": 1,
    "evidence": [
-    "frontend/pifitness/next-env.d.ts -> ./.next/dev/types/routes.d.ts"
+    "frontend/pifitness/next-env.d.ts -> ./.next/types/routes.d.ts"
    ],
    "section": "frontend"
   },
@@ -129,7 +102,7 @@
    "title": "Files that match no domain keyword (need a human decision)",
    "detail": "",
    "hint": "Add keywords to [domains] in audit.toml or classify as core/shared/integration.",
-   "count": 56,
+   "count": 48,
    "evidence": [
     "backend/main.py",
     "backend/pifitness/auth/queries.py",
@@ -138,14 +111,14 @@
     "backend/pifitness/config/router.py",
     "backend_functions/domain_exceptions.py",
     "deploy/scripts/pathfinder.py",
-    "fix_config_init.py",
-    "fix_test_config2.py",
-    "fix_test_config3.py",
-    "fix_test_config4.py",
-    "fix_test_config5.py",
-    "fix_test_config6.py",
-    "fix_test_config7.py",
-    "fix_test_config8.py"
+    "frontend/pifitness/next-env.d.ts",
+    "frontend/pifitness/src/app/components/DebugPanel.tsx",
+    "frontend/pifitness/src/app/components/Header.tsx",
+    "frontend/pifitness/src/app/components/Layout.tsx",
+    "frontend/pifitness/src/app/components/MapView.tsx",
+    "frontend/pifitness/src/app/components/NavBar.tsx",
+    "frontend/pifitness/src/app/components/Sidebar.tsx",
+    "frontend/pifitness/src/app/components/ThemeToggle.tsx"
    ],
    "section": "domains"
   },
@@ -173,14 +146,12 @@
    "title": "Python dependencies declared in many places",
    "detail": "",
    "hint": "Consolidate into one pyproject.toml.",
-   "count": 6,
+   "count": 4,
    "evidence": [
     "backend/pyproject.toml",
     "deploy/scripts/library_requirements.txt",
     "deploy/scripts/npm_requirements.txt",
-    "deploy/scripts/requirements-react.txt",
-    "pirate-garmin_clone/pyproject.toml",
-    "setup.py"
+    "pirate-garmin_clone/pyproject.toml"
    ],
    "section": "inventory"
   },
@@ -192,17 +163,17 @@
    "hint": "",
    "count": 11,
    "evidence": [
-    "backend/main.py:142 GET /api/health -> get_conn",
+    "backend/main.py:146 GET /api/health -> get_conn",
     "backend/pifitness/admin/router.py:171 POST /api/admin/tasks/v2/{task_name}/execute -> one_sql_result, sql_insert_returning",
-    "backend/pifitness/music/router.py:61 GET /api/music/playlists -> sql_to_dict",
-    "backend/pifitness/music/router.py:441 GET /api/music/service-status -> one_sql_result",
-    "backend/pifitness/music/router.py:645 POST /api/music/now-playing/remove -> one_sql_result, qec, sql_to_dict, sql_to_list",
-    "backend/pifitness/music/router.py:1012 POST /api/music/shuffle/config -> qec",
-    "backend/pifitness/music/router.py:1045 POST /api/music/shuffle/flags -> qec",
-    "backend/pifitness/music/router.py:1078 POST /api/music/shuffle/send -> qec",
-    "backend/pifitness/segments/router.py:366 GET /api/segments -> sql_to_dict",
-    "backend/pifitness/segments/router.py:429 GET /api/segments/{segment_id}/matches/candidates -> sql_to_dict",
-    "backend/pifitness/segments/router.py:581 GET /api/segments/{segment_id}/matches -> sql_to_dict"
+    "backend/pifitness/music/router.py:62 GET /api/music/playlists -> sql_to_dict",
+    "backend/pifitness/music/router.py:442 GET /api/music/service-status -> one_sql_result",
+    "backend/pifitness/music/router.py:636 POST /api/music/now-playing/remove -> one_sql_result, qec, sql_to_dict, sql_to_list",
+    "backend/pifitness/music/router.py:1003 POST /api/music/shuffle/config -> qec",
+    "backend/pifitness/music/router.py:1036 POST /api/music/shuffle/flags -> qec",
+    "backend/pifitness/music/router.py:1069 POST /api/music/shuffle/send -> qec",
+    "backend/pifitness/segments/router.py:334 GET /api/segments -> sql_to_dict",
+    "backend/pifitness/segments/router.py:397 GET /api/segments/{segment_id}/matches/candidates -> sql_to_dict",
+    "backend/pifitness/segments/router.py:549 GET /api/segments/{segment_id}/matches -> sql_to_dict"
    ],
    "section": "python"
   },
@@ -262,55 +233,20 @@
    "section": "frontend"
   },
   {
-   "id": "TS-005",
+   "id": "TS-004",
    "severity": "medium",
-   "title": "[frontend/pifitness] Imported npm packages not in this package.json",
+   "title": "[frontend/pifitness] npm packages declared but never imported or referenced by config",
    "detail": "",
-   "hint": "Often resolved from a parent/root node_modules \u2014 a sign of a stray root manifest.",
-   "count": 18,
+   "hint": "",
+   "count": 5,
    "evidence": [
-    "@mui/icons-material",
-    "@mui/material",
-    "@tanstack/react-query",
-    "@testing-library/jest-dom",
-    "@testing-library/react",
-    "@testing-library/user-event",
-    "@vitejs/plugin-react",
-    "barcode-detector",
-    "chart.js",
-    "chartjs-adapter-date-fns",
-    "maplibre-gl",
-    "next-themes",
-    "react",
-    "react-chartjs-2",
-    "react-dom"
+    "@emotion/react",
+    "@emotion/styled",
+    "@headlessui/react",
+    "@testing-library/dom",
+    "@types/node"
    ],
    "section": "frontend"
-  },
-  {
-   "id": "HYG-007",
-   "severity": "low",
-   "title": "Stale __pycache__ entries whose source .py no longer exists",
-   "detail": "",
-   "hint": "Deleted-module husks (e.g. viz_factory, frontend_functions). Safe to delete; they can also mask ImportErrors.",
-   "count": 14,
-   "evidence": [
-    "backend/api/activities.py",
-    "backend/api/admin.py",
-    "backend/api/auth.py",
-    "backend/api/config.py",
-    "backend/api/food.py",
-    "backend/api/food_lookup.py",
-    "backend/api/music.py",
-    "backend/api/segments.py",
-    "backend/api/tri_tip.py",
-    "backend/api/volleyball.py",
-    "backend_functions/activities_service.py",
-    "backend_functions/schemas/activity_schemas.py",
-    "backend_functions/schemas/food_contract_schemas.py",
-    "backend_functions/schemas/volleyball_schemas.py"
-   ],
-   "section": "hygiene"
   },
   {
    "id": "HYG-008",
@@ -337,32 +273,6 @@
     "code/config ref: frontend/pifitness/src/app/activities/segment-management/components/MatchSession.tsx x1"
    ],
    "section": "hygiene"
-  },
-  {
-   "id": "INV-007",
-   "severity": "low",
-   "title": "48 loose files at repo root",
-   "detail": "",
-   "hint": "Root should hold only manifests, README and top-level config.",
-   "count": 48,
-   "evidence": [
-    ".clineignore",
-    ".gitattributes",
-    ".gitignore",
-    "CUTOVER.md",
-    "README.md",
-    "compose.yaml",
-    "fix_config_init.py",
-    "fix_test_activities.py",
-    "fix_test_activities2.py",
-    "fix_test_activities3.py",
-    "fix_test_activities4.py",
-    "fix_test_activities5.py",
-    "fix_test_activities6.py",
-    "fix_test_config.py",
-    "fix_test_config2.py"
-   ],
-   "section": "inventory"
   },
   {
    "id": "INV-009",
@@ -432,12 +342,12 @@
    "title": "Python files >= 600 LOC",
    "detail": "",
    "hint": "",
-   "count": 20,
+   "count": 19,
    "evidence": [
     "backend/pifitness/activities/queries.py (1486)",
     "backend_functions/queries/activities_queries.py (1486)",
     "backend/pifitness/activities/router.py (1226)",
-    "backend/pifitness/music/router.py (1184)",
+    "backend/pifitness/music/router.py (1175)",
     "backend_functions/queries/food_queries.py (1148)",
     "backend/pifitness/food/queries.py (1147)",
     "backend/pifitness/admin/router.py (1075)",
@@ -458,11 +368,10 @@
    "title": "Imported third-party packages not declared in any manifest (heuristic)",
    "detail": "",
    "hint": "",
-   "count": 3,
+   "count": 2,
    "evidence": [
     "main",
-    "pifitness",
-    "setuptools"
+    "pifitness"
    ],
    "section": "python"
   },
@@ -588,20 +497,20 @@
    "title": "Cross-domain import edges (coupling between slices)",
    "detail": "",
    "hint": "",
-   "count": 24,
+   "count": 27,
    "evidence": [
-    "music -> integrations: 4",
+    "music -> integrations: 5",
     "admin -> integrations: 3",
     "admin -> worker: 3",
     "activities -> music: 2",
     "food -> integrations: 2",
     "core -> integrations: 2",
     "worker -> integrations: 2",
+    "music -> activities: 2",
     "activities -> worker: 1",
     "activities -> integrations: 1",
     "core -> music: 1",
-    "music -> worker: 1",
-    "activities -> volleyball: 1"
+    "music -> worker: 1"
    ],
    "section": "domains"
   },
@@ -613,25 +522,25 @@
    "hint": "Strong coupling across folders is the signal to colocate by domain.",
    "count": 30,
    "evidence": [
-    "14x backend_functions/queries/__init__.py + frontend/pifitness/src/lib/api-client.ts",
+    "15x backend_functions/queries/__init__.py + frontend/pifitness/src/lib/api-client.ts",
     "8x frontend/pifitness/src/lib/api-client.ts + scripts/schema_cache.json",
+    "8x backend_functions/queries/activities_queries.py + tests/test_activities.py",
     "7x backend/main.py + frontend/pifitness/src/lib/api-client.ts",
-    "7x backend_functions/queries/activities_queries.py + tests/test_activities.py",
     "7x backend_functions/queries/__init__.py + frontend/pifitness/next-env.d.ts",
     "6x backend/main.py + backend_functions/queries/__init__.py",
     "6x backend_functions/queries/__init__.py + scripts/schema_cache.json",
+    "6x backend_functions/queries/__init__.py + tests/test_activities.py",
     "6x backend_functions/queries/admin_queries.py + frontend/pifitness/src/hooks/useAdmin.ts",
+    "5x backend/main.py + frontend/pifitness/package.json",
     "5x backend/main.py + frontend/pifitness/src/stores/uiStore.ts",
-    "5x backend_functions/queries/__init__.py + tests/test_activities.py",
-    "5x backend_functions/queries/__init__.py + frontend/pifitness/src/hooks/useAdmin.ts",
-    "5x backend_functions/queries/admin_queries.py + frontend/pifitness/src/lib/api-client.ts"
+    "5x backend_functions/queries/__init__.py + frontend/pifitness/src/hooks/useAdmin.ts"
    ],
    "section": "git"
   },
   {
    "id": "GIT-002",
    "severity": "info",
-   "title": "A typical code commit touches 2.34 directories and 1.67 domains",
+   "title": "A typical code commit touches 2.38 directories and 1.68 domains",
    "detail": "Baseline for the reorg: the first number should drop after domain-sliced folders.",
    "hint": "",
    "count": 0,
@@ -659,7 +568,7 @@
   {
    "id": "INV-001",
    "severity": "info",
-   "title": "33.9% of all lines are not code/tests/SQL (data, docs, generated, config)",
+   "title": "27.0% of all lines are not code/tests/SQL (data, docs, generated, config)",
    "detail": "Raw cloc-style totals overstate code size; use `code_lines` for reorg sizing.",
    "hint": "",
    "count": 0,
@@ -670,25 +579,25 @@
    "id": "PY-009",
    "severity": "info",
    "title": "Modules with no importers",
-   "detail": "dynamic-possible: 26, string-referenced: 32",
+   "detail": "dynamic-possible: 7, string-referenced: 29",
    "hint": "`likely-dead` = no import, string, config or doc reference anywhere. `dynamic-possible` = a non-literal importlib call could load it.",
-   "count": 58,
+   "count": 36,
    "evidence": [
     "dynamic-possible: backend/pifitness/food/food_lookup.py (130 loc)",
-    "dynamic-possible: backend_functions/admin_service.py (18 loc)",
     "dynamic-possible: backend_functions/schemas/tri_tip_schemas.py (63 loc)",
     "dynamic-possible: backend_functions/tri_tip_prediction.py (191 loc)",
-    "dynamic-possible: fix_config_init.py (7 loc)",
-    "dynamic-possible: fix_test_activities.py (67 loc)",
-    "dynamic-possible: fix_test_activities2.py (13 loc)",
-    "dynamic-possible: fix_test_activities3.py (13 loc)",
-    "dynamic-possible: fix_test_activities4.py (22 loc)",
-    "dynamic-possible: fix_test_activities5.py (15 loc)",
-    "dynamic-possible: fix_test_activities6.py (13 loc)",
-    "dynamic-possible: fix_test_config.py (13 loc)",
-    "dynamic-possible: fix_test_config2.py (13 loc)",
-    "dynamic-possible: fix_test_config3.py (13 loc)",
-    "dynamic-possible: fix_test_config4.py (19 loc)"
+    "dynamic-possible: tools/db/validate_queries.py (174 loc)",
+    "dynamic-possible: tools/diagnostics/autofix_phase3.py (451 loc)",
+    "dynamic-possible: tools/diagnostics/schema_cache.py (72 loc)",
+    "dynamic-possible: tools/diagnostics/validate_pydantic_models.py (249 loc)",
+    "string-referenced: backend/pifitness/activities/queries.py (1486 loc)",
+    "string-referenced: backend/pifitness/activities/router.py (1226 loc)",
+    "string-referenced: backend/pifitness/activities/schemas.py (228 loc)",
+    "string-referenced: backend/pifitness/admin/queries.py (741 loc)",
+    "string-referenced: backend/pifitness/admin/router.py (1075 loc)",
+    "string-referenced: backend/pifitness/auth/queries.py (2 loc)",
+    "string-referenced: backend/pifitness/auth/router.py (432 loc)",
+    "string-referenced: backend/pifitness/config/queries.py (38 loc)"
    ],
    "section": "python"
   }

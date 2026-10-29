@@ -15,7 +15,9 @@ from fastapi.testclient import TestClient
 load_dotenv(Path(__file__).resolve().parents[1] / "backend" / ".env",
             override=False)
 
-import backend.api.food as food_api  # noqa: E402
+import importlib  # noqa: E402
+import pifitness.food.router as food_api  # noqa: E402
+food_api_module = importlib.import_module('pifitness.food.router')  # noqa: E402
 import backend_functions.food_search as fsearch  # noqa: E402
 from backend_functions.food_normalize import (  # noqa: E402
     normalize_off, normalize_usda_branded,
@@ -24,7 +26,7 @@ from backend_functions.food_normalize import (  # noqa: E402
 
 def _make_app():
     app = FastAPI()
-    app.include_router(food_api.router)
+    app.include_router(food_api)
     return app
 
 
@@ -170,7 +172,7 @@ _SAVED_ROW = {
 
 
 def test_search_returns_trimmed_saved_first_results(monkeypatch):
-    monkeypatch.setattr(food_api, "search_saved_foods",
+    monkeypatch.setattr(food_api_module, "search_saved_foods",
                         lambda q, limit: [dict(_SAVED_ROW)])
 
     async def fake_ranked(query):
@@ -215,7 +217,7 @@ def test_search_returns_trimmed_saved_first_results(monkeypatch):
 def test_search_suppresses_usda_hit_when_fdcid_saved(monkeypatch):
     saved = dict(_SAVED_ROW)
     saved["fdc_id"] = 12345
-    monkeypatch.setattr(food_api, "search_saved_foods",
+    monkeypatch.setattr(food_api_module, "search_saved_foods",
                         lambda q, limit: [saved])
 
     async def fake_ranked(query):
@@ -350,8 +352,8 @@ def test_rename_persisted_then_duplicate_routes_to_existing(monkeypatch):
         saved_name["normalized_from"] = normalized_from
         return {"food_id": 42}
 
-    monkeypatch.setattr(food_api, "persist_api_food", fake_persist)
-    monkeypatch.setattr(food_api, "log_diary_entry",
+    monkeypatch.setattr(food_api_module, "persist_api_food", fake_persist)
+    monkeypatch.setattr(food_api_module, "log_diary_entry",
                         lambda **kw: dict(SAMPLE_ENTRY))
 
     client = TestClient(_make_app())
@@ -393,13 +395,13 @@ def test_persist_on_log_creates_food_then_entry(monkeypatch):
         order.append("persist")
         return {"food_id": 42}
 
-    monkeypatch.setattr(food_api, "persist_api_food", fake_persist)
+    monkeypatch.setattr(food_api_module, "persist_api_food", fake_persist)
 
     def fake_log(**kw):
         order.append("log")
         assert kw["food_id"] == 42
         return dict(SAMPLE_ENTRY)
-    monkeypatch.setattr(food_api, "log_diary_entry", fake_log)
+    monkeypatch.setattr(food_api_module, "log_diary_entry", fake_log)
 
     client = TestClient(_make_app())
     res = client.post("/api/food/diary/from-api", json={
@@ -490,8 +492,8 @@ def test_log_api_entry_persists_feed_serving(monkeypatch):
         seen.update(kw)
         return {"food_id": 42}
 
-    monkeypatch.setattr(food_api, "persist_api_food", fake_persist)
-    monkeypatch.setattr(food_api, "log_diary_entry",
+    monkeypatch.setattr(food_api_module, "persist_api_food", fake_persist)
+    monkeypatch.setattr(food_api_module, "log_diary_entry",
                         lambda **kw: dict(SAMPLE_ENTRY))
     client = TestClient(_make_app())
 
@@ -552,7 +554,7 @@ def test_confirm_logs_picked_rank(monkeypatch):
     seen = []
     monkeypatch.setattr(fsearch, "log_pick",
                         lambda rank, src, q: seen.append((rank, src, q)))
-    monkeypatch.setattr(food_api, "log_diary_entry",
+    monkeypatch.setattr(food_api_module, "log_diary_entry",
                         lambda **kw: dict(SAMPLE_ENTRY))
 
     client = TestClient(_make_app())
@@ -567,7 +569,7 @@ def test_confirm_logs_picked_rank(monkeypatch):
 def test_confirm_without_pick_does_not_log(monkeypatch):
     seen = []
     monkeypatch.setattr(fsearch, "log_pick", lambda *a: seen.append(a))
-    monkeypatch.setattr(food_api, "log_diary_entry",
+    monkeypatch.setattr(food_api_module, "log_diary_entry",
                         lambda **kw: dict(SAMPLE_ENTRY))
 
     client = TestClient(_make_app())

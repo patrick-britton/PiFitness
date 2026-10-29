@@ -418,7 +418,7 @@ def log_diary_entry(
     # Reject blank / zero / negative qty before any DB work (Goal 5).
     if qty is None or isinstance(qty, bool) or not isinstance(qty, (int, float)) or qty <= 0:
         raise ValueError("qty must be a positive number")
-    from backend_functions.schemas.food_contract_schemas import UNIT_TO_G_OR_ML
+    from pifitness.food.schemas import UNIT_TO_G_OR_ML
     if isinstance(logged_at, str) and logged_at:
         try:
             logged_at = datetime.fromisoformat(logged_at)
@@ -470,7 +470,7 @@ def update_diary_entry(
     Snapshot nutrients stay frozen; only qty/unit/kcal/logged_at change
     (kcal recomputed via the FDA-label table when qty/unit change).
     """
-    from backend_functions.schemas.food_contract_schemas import UNIT_TO_G_OR_ML
+    from pifitness.food.schemas import UNIT_TO_G_OR_ML
     if isinstance(logged_at, str) and logged_at:
         try:
             logged_at = datetime.fromisoformat(logged_at)
@@ -659,7 +659,7 @@ def _grams_for(qty: float, unit: str, food: Dict[str, Any]) -> Optional[float]:
     """
     if food is None or food.get("is_deleted"):
         return None
-    from backend_functions.schemas.food_contract_schemas import UNIT_TO_G_OR_ML
+    from pifitness.food.schemas import UNIT_TO_G_OR_ML
     key = _norm_unit(unit)
     if key in _GRAM_UNITS:
         return qty

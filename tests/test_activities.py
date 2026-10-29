@@ -5,6 +5,8 @@ Test Activities API Endpoints
 Basic smoke tests for activities API endpoints.
 """
 
+import importlib
+
 import pytest
 from fastapi.testclient import TestClient
 from backend.main import app
@@ -87,7 +89,7 @@ def test_activity_segments():
 def test_activity_report_contract_shape():
     """Test GET /api/activities/report returns the T01 cross-surface ActivityReport
     shape (004-006 T03), with query helpers mocked so no DB is required."""
-    import backend.api.activities as api_activities
+    api_activities = importlib.import_module('pifitness.activities.router')
 
     target = {
         "activity_id": 1234,
@@ -184,7 +186,7 @@ def test_activity_report_contract_shape():
 
 def test_activity_report_invalid_type():
     """Test GET /api/activities/report 404s on an unknown/non-qualifying id (004-006 T03)."""
-    import backend.api.activities as api_activities
+    api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
     with mock.patch.object(api_activities, "get_activity_report_target", return_value=None):
         response = client.get("/api/activities/report?activity_id=999999999")
@@ -195,7 +197,7 @@ def test_leaderboard_segments_contract_shape():
     """Test GET /api/activities/leaderboard/segments returns the bare
     SegmentListRow[] contract (009-002 T03), with the query helper mocked
     so no DB is required."""
-    import backend.api.activities as api_activities
+    api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
     rows = [
@@ -248,7 +250,7 @@ def test_leaderboard_segments_contract_shape():
 def test_leaderboard_segments_filters_forwarded():
     """Filters (name/kind/min_distance/activity_type) reach the SQL helper;
     an empty name degrades to None (no filter)."""
-    import backend.api.activities as api_activities
+    api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
     with mock.patch.object(api_activities, "get_leaderboard_segments", return_value=[]) as helper:
@@ -470,7 +472,7 @@ def test_activity_route_elapsed_s():
 def test_leaderboard_contract_shape():
     """Test GET /api/activities/leaderboard/{id} returns the Leaderboard
     contract (009-002 T04), with the query helper mocked so no DB is required."""
-    import backend.api.activities as api_activities
+    api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
     rows = [
@@ -587,7 +589,7 @@ def test_leaderboard_contract_shape():
 
 def test_leaderboard_not_found():
     """A segment with no leaderboard rows returns 404."""
-    import backend.api.activities as api_activities
+    api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
     with mock.patch.object(api_activities, "get_segment_leaderboard", return_value=[]):
@@ -604,7 +606,7 @@ def test_leaderboard_visuals_contract_shape():
     """POST /api/activities/leaderboard/visuals returns the SegmentVisuals
     contract (009-002 T05): staging invoked, telemetry arrays zipped into the
     per-effort series, path_coords preserved, segment_name resolved."""
-    import backend.api.activities as api_activities
+    api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
     request_body = {
@@ -697,7 +699,7 @@ def test_leaderboard_visuals_contract_shape():
 
 def test_leaderboard_visuals_not_found():
     """A visuals request whose telemetry helper returns no rows yields 404."""
-    import backend.api.activities as api_activities
+    api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
     with mock.patch.object(api_activities, "stage_leaderboard_visuals"), \
@@ -747,7 +749,7 @@ def test_stage_leaderboard_visuals_bulk_insert():
 def test_activity_report_walk_no_placeholder():
     """Test a Walk report has null efficiency (004-006 T03; the deprecated
     activity_type/show_efficiency_placeholder fields were dropped in T09)."""
-    import backend.api.activities as api_activities
+    api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
     target = {

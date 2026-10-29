@@ -185,7 +185,7 @@ def _find_dirs(repo, name: str) -> list[str]:
             found.append(f"{rel}/{name}" if rel != "." else name)
             dns.remove(name)
         # do not descend into heavy trees
-        dns[:] = [d for d in dns if d not in ("node_modules", ".venv", "venv", ".next")]
+        dns[:] = [d for d in dns if d not in ("node_modules", ".venv", "venv", ".next", ".features")]
     return found
 
 

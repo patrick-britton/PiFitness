@@ -88,7 +88,8 @@ Tasks:
   - keep-tool (6): `schema_cache.py`, `sync-prod-to-dev.ps1`, `validate_pydantic_models.py`, `validate_queries.py`, `validate_sql.py`, `regenerate-audit.ps1`
   - misplaced-test (5): `test_db_connectivity.py`, `test_dotenv.py`, `test_garmin_login.py`, `test_logins.py`, `test_queries.py`
   - review (6, human decision): `audit_db_investigation.py`, `audit_view_columns.py`, `document_stored_procedures.py`, `generate_data_flow_diagrams.py`, `generate_schema_documentation.py`, `smoke_test.py`
-- 2.3 [needs-approval] Docs: `.features/designs_complete` → `docs/features/done/`; `designs_active` + `descriptions` → `docs/features/active/`; `memory-bank/` → `docs/` (hand-written) and `docs/generated/` (reports; gitignore or regenerate). **Update `.clinerules/workflows/*`, `.agents/skills/*`, `local_clinerules.txt`, and `tools/features/fd.py` path constants in the same commit.** Skip if human chose to keep `.features/`.
+- ~~2.3 [rejected] Docs: `.features/designs_complete` → `docs/features/done/`; `designs_active` + `descriptions` → `docs/features/active/`; `memory-bank/` → `docs/` (hand-written) and `docs/generated/` (reports; gitignore or regenerate). **Update `.clinerules/workflows/*`, `.agents/skills/*`, `local_clinerules.txt`, and `tools/features/fd.py` path constants in the same commit.** Skip if human chose to keep `.features/`.~~
+  - **Decision (2026-10-29):** Phase 2.3 is REJECTED. `.features/` is retained as-is as a legacy feature-management workspace. Added `/.features/` to `.gitignore` (new files will not be tracked; existing tracked files remain). Audit tools should skip this tree. No path constant updates in `.clinerules/`, `.agents/skills/*`, `local_clinerules.txt`, or `tools/features/fd.py` — all existing `.features/` references remain valid and unchanged.
 - 2.4 [safe] Merge `deploy/` + `deployment/` → `deploy/{systemd,nginx,scripts}`; update units/bootstrap in same commit; append to `CUTOVER.md`.
 - 2.5 [needs-approval] Consolidate dependency manifests per DECISIONS.md §13 (two categories, not one file):
   - Canonical Python source: `backend/pyproject.toml`; bootstrap copy: `deploy/scripts/library_requirements.txt` (read by `pi5_deploy.sh:152`).
@@ -120,11 +121,11 @@ Estimated commits: 10–14 (one per slice + wiring).
 ## Phase 4 — Frontend (branch `reorg/04-frontend`, slices `reorg/04-<domain>`)
 
 Tasks:
-- 4.1 [needs-approval] Flatten `frontend/pifitness` → `frontend`; update every reference (`deploy/`, nginx-react.conf, scripts, `.clineignore`, docs, `package.json` scripts). Delete root `package.json`/lockfile/`node_modules` only after `ts` audit (TS-009) and clean `npm ci` + build prove unused + human approved.
+- 4.1 [approved] Flatten `frontend/pifitness` → `frontend`; update every reference (`deploy/`, nginx-react.conf, scripts, `.clineignore`, docs, `package.json` scripts). Delete root `package.json`/lockfile/`node_modules` only after `ts` audit (TS-009) and clean `npm ci` + build prove unused + human approved.
   - TS-009: root `package.json` duplicates 17 deps of frontend manifest.
 - 4.2 [safe] Introduce `features/<domain>/` per `domains.assignment`: move route-local components, `hooks/use<Domain>.ts`, `lib/types/<domain>.ts`, single-consumer `lib/*` (TS-007) into their feature; keep `app/<route>/page.tsx` thin; move `app/components` → `components/`. Eliminate route → route imports (TS-006: `app/beachchanger -> app/activities`).
-- 4.3 [needs-approval] Only if approved: generate API types from FastAPI OpenAPI schema (`openapi-typescript`) into `src/lib/api/generated.ts`; replace hand-written `lib/types/*` incrementally.
-- 4.4 [needs-approval] Remove modules import graph proves unreachable (TS-001: 4 unreachable files — `DBSessions.tsx`, `index.ts`, `MapView.tsx`, `useViewport.ts`) with approval; remove unused npm packages (TS-004: 5 unused) only if approved (lockfile changes need sign-off).
+- 4.3 [approved] Only if approved: generate API types from FastAPI OpenAPI schema (`openapi-typescript`) into `src/lib/api/generated.ts`; replace hand-written `lib/types/*` incrementally.
+- 4.4 [approved] Remove modules import graph proves unreachable (TS-001: 4 unreachable files — `DBSessions.tsx`, `index.ts`, `MapView.tsx`, `useViewport.ts`) with approval; remove unused npm packages (TS-004: 5 unused) only if approved (lockfile changes need sign-off).
 
 Exit: `ts.unresolved_imports = 0`, `ts.cross_route_imports = 0`, `ts.npm_undeclared = 0`,
 `ts.unreachable_files` ≤ baseline (target 0 after approvals), `inventory.npm_manifests = 1`,

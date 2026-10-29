@@ -12,7 +12,7 @@
 #
 # Flow:
 #   1. (Modes 1-3) Validates environment, fetches deployment scripts from
-#      origin/deployment_script, runs deploy_react.sh
+#      origin/deploy_merge, runs deploy_react.sh
 #   2. (Mode 4) Fetches deploy/ from origin/deploy_merge and updates
 #      the copies in /home/god/Documents/
 

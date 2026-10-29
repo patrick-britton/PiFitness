@@ -11,14 +11,16 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+import importlib
 import pifitness.food.router as food_api
+food_api_module = importlib.import_module('pifitness.food.router')
 import pifitness.food.queries as food_queries
 from backend_functions import queries as fq
 
 
 def _make_app():
     app = FastAPI()
-    app.include_router(food_api.router)
+    app.include_router(food_api)
     return app
 
 
@@ -58,22 +60,22 @@ SAMPLE_PAGE = {"data": [SAMPLE_FOOD_ROW], "next_cursor": 1}
 
 
 def _patch_reads(monkeypatch):
-    monkeypatch.setattr(food_queries, "get_usual_foods",
+    monkeypatch.setattr(food_api_module, "get_usual_foods",
                         lambda **kw: [SAMPLE_USUAL])
-    monkeypatch.setattr(food_queries, "get_diary_entries",
+    monkeypatch.setattr(food_api_module, "get_diary_entries",
                         lambda *a, **kw: [SAMPLE_ENTRY])
-    monkeypatch.setattr(food_queries, "get_recipes",
+    monkeypatch.setattr(food_api_module, "get_recipes",
                         lambda *a, **kw: [SAMPLE_RECIPE])
-    monkeypatch.setattr(food_queries, "search_foods",
+    monkeypatch.setattr(food_api_module, "search_foods",
                         lambda **kw: dict(SAMPLE_PAGE))
-    monkeypatch.setattr(food_queries, "list_foods_page",
+    monkeypatch.setattr(food_api_module, "list_foods_page",
                         lambda **kw: dict(SAMPLE_PAGE))
 
 
 def test_route_table_matches_contract_exactly():
     """The contract endpoints + soft-delete helpers are present."""
     paths = {(r.path, tuple(sorted(getattr(r, "methods", []) or [])))
-             for r in food_api.router.routes}
+             for r in food_api.routes}
     for expected in [
         ("/api/food/usuals", ("GET",)),
         ("/api/food/diary", ("GET",)),
@@ -158,7 +160,7 @@ def test_get_foods_returns_food_list_response(monkeypatch):
         "fiber_g", "sugars_g", "sodium_mg", "caffeine_mg",
     }
 def test_post_diary_returns_day_entry(monkeypatch):
-    monkeypatch.setattr(food_queries, "log_diary_entry",
+    monkeypatch.setattr(food_api_module, "log_diary_entry",
                         lambda **kw: dict(SAMPLE_ENTRY))
     client = TestClient(_make_app())
     res = client.post("/api/food/diary", json={
@@ -170,7 +172,7 @@ def test_post_diary_returns_day_entry(monkeypatch):
 
 
 def test_post_recipes_returns_recipe_summary(monkeypatch):
-    monkeypatch.setattr(food_queries, "save_recipe", lambda **kw: dict(SAMPLE_RECIPE))
+    monkeypatch.setattr(food_api_module, "save_recipe", lambda **kw: dict(SAMPLE_RECIPE))
     client = TestClient(_make_app())
     res = client.post("/api/food/recipes", json={
         "title": "Guacamole", "category": "Side",
@@ -193,7 +195,7 @@ def test_post_recipes_returns_recipe_summary(monkeypatch):
 def test_post_diary_rejects_deleted_food(monkeypatch):
     def _raise(**kw):
         raise ValueError("is soft-deleted and cannot be re-logged")
-    monkeypatch.setattr(food_queries, "log_diary_entry", _raise)
+    monkeypatch.setattr(food_api_module, "log_diary_entry", _raise)
     client = TestClient(_make_app())
     res = client.post("/api/food/diary",
                       json={"food_id": 9, "qty": 100.0, "unit": "g"})
@@ -201,7 +203,7 @@ def test_post_diary_rejects_deleted_food(monkeypatch):
 
 
 def test_diary_stats_shape(monkeypatch):
-    monkeypatch.setattr(food_queries, "get_diary_stats",
+    monkeypatch.setattr(food_api_module, "get_diary_stats",
                         lambda *a, **kw: {"today_kcal": 500.0,
                                           "last_24h_kcal": 600.0,
                                           "avg_7d_kcal": 550.0,
@@ -219,7 +221,7 @@ def test_patch_entry_moves_day(monkeypatch):
     def _upd(**kw):
         seen.update(kw)
         return dict(SAMPLE_ENTRY, logged_at=kw.get("logged_at"))
-    monkeypatch.setattr(food_queries, "update_diary_entry", _upd)
+    monkeypatch.setattr(food_api_module, "update_diary_entry", _upd)
     client = TestClient(_make_app())
     res = client.patch("/api/food/diary/10",
                        json={"qty": 200.0, "logged_at": "2026-10-03T18:00:00"})
@@ -235,7 +237,7 @@ def test_patch_entry_empty_rejected():
 
 
 def test_delete_entry(monkeypatch):
-    monkeypatch.setattr(food_queries, "delete_diary_entry", lambda *a, **kw: True)
+    monkeypatch.setattr(food_api_module, "delete_diary_entry", lambda *a, **kw: True)
     client = TestClient(_make_app())
     res = client.delete("/api/food/diary/10")
     assert res.status_code == 200
@@ -315,7 +317,7 @@ def test_food_by_id_returns_row_or_404(monkeypatch):
     def fake_get(food_id):
         return fq.food_queries._to_food_row(row) if food_id == 1 else None
 
-    monkeypatch.setattr(food_queries, "get_food_by_id", fake_get)
+    monkeypatch.setattr(food_api_module, "get_food_by_id", fake_get)
     client = TestClient(_make_app())
     res = client.get("/api/food/foods/1")
     assert res.status_code == 200
@@ -553,7 +555,7 @@ def test_save_recipe_rejects_step_food_outside_ingredient_list():
 
 def test_get_recipe_detail_contract_shape(monkeypatch):
     """GET /recipes/{id} -> RecipeDetail (exact wire shape), 404s when None."""
-    monkeypatch.setattr(food_queries, "get_recipe",
+    monkeypatch.setattr(food_api_module, "get_recipe",
                         lambda rid: dict(SAMPLE_RECIPE_DETAIL))
     client = TestClient(_make_app())
     res = client.get("/api/food/recipes/3")
@@ -566,7 +568,7 @@ def test_get_recipe_detail_contract_shape(monkeypatch):
     assert body["ingredients"][0]["name"] == "Avocado"
     assert body["steps"][0]["foods"][0]["food_id"] == 1
 
-    monkeypatch.setattr(food_queries, "get_recipe", lambda rid: None)
+    monkeypatch.setattr(food_api_module, "get_recipe", lambda rid: None)
     assert client.get("/api/food/recipes/99").status_code == 404
 
 
@@ -579,7 +581,7 @@ def test_put_recipe_passes_payload_and_404s(monkeypatch):
         seen.update(kw)
         return dict(SAMPLE_RECIPE)
 
-    monkeypatch.setattr(food_queries, "update_recipe", _upd)
+    monkeypatch.setattr(food_api_module, "update_recipe", _upd)
     client = TestClient(_make_app())
     res = client.put("/api/food/recipes/3", json=SAVE_PAYLOAD)
     assert res.status_code == 200
@@ -591,27 +593,27 @@ def test_put_recipe_passes_payload_and_404s(monkeypatch):
     assert set(res.json().keys()) == {"recipe_id", "title", "category",
                                       "times_prepared"}
 
-    monkeypatch.setattr(food_queries, "update_recipe", lambda *a, **k: None)
+    monkeypatch.setattr(food_api_module, "update_recipe", lambda *a, **k: None)
     assert client.put("/api/food/recipes/9", json=SAVE_PAYLOAD).status_code == 404
 
 
 def test_delete_recipe_route_soft_delete_payload(monkeypatch):
     """DELETE /recipes/{id} -> { success, recipe_id, food_id }; 404s."""
     monkeypatch.setattr(
-        food_api, "delete_recipe",
+        food_api_module, "delete_recipe",
         lambda rid: {"success": True, "recipe_id": rid, "food_id": 42})
     client = TestClient(_make_app())
     res = client.delete("/api/food/recipes/3")
     assert res.status_code == 200
     assert res.json() == {"success": True, "recipe_id": 3, "food_id": 42}
 
-    monkeypatch.setattr(food_queries, "delete_recipe", lambda rid: None)
+    monkeypatch.setattr(food_api_module, "delete_recipe", lambda rid: None)
     assert client.delete("/api/food/recipes/9").status_code == 404
 
 
 def test_complete_recipe_route_increments(monkeypatch):
     """POST /recipes/{id}/complete -> RecipeSummary; 404s when missing."""
-    monkeypatch.setattr(food_queries, "complete_recipe",
+    monkeypatch.setattr(food_api_module, "complete_recipe",
                         lambda rid: dict(SAMPLE_RECIPE, times_prepared=3))
     client = TestClient(_make_app())
     res = client.post("/api/food/recipes/3/complete")
@@ -621,7 +623,7 @@ def test_complete_recipe_route_increments(monkeypatch):
                                 "times_prepared"}
     assert body["times_prepared"] == 3
 
-    monkeypatch.setattr(food_queries, "complete_recipe", lambda rid: None)
+    monkeypatch.setattr(food_api_module, "complete_recipe", lambda rid: None)
     assert client.post("/api/food/recipes/9/complete").status_code == 404
 
 
@@ -804,8 +806,8 @@ def test_cook_routes_round_trip_and_validation(monkeypatch):
         state["timers"] = kw["timers"]
         return dict(state)
 
-    monkeypatch.setattr(food_queries, "save_cook_state", fake_save)
-    monkeypatch.setattr(food_queries, "get_cook_state",
+    monkeypatch.setattr(food_api_module, "save_cook_state", fake_save)
+    monkeypatch.setattr(food_api_module, "get_cook_state",
                         lambda rid: dict(state, recipe_id=rid))
     client = TestClient(_make_app())
 
@@ -826,7 +828,7 @@ def test_cook_routes_round_trip_and_validation(monkeypatch):
 
     # bad instant -> 400 before any DB touch
     monkeypatch.setattr(
-        food_api, "save_cook_state",
+        food_api_module, "save_cook_state",
         lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not hit DB")))
     res = client.put("/api/food/recipes/3/cook", json={
         "checked_steps": [], "checked_foods": [],
@@ -835,7 +837,7 @@ def test_cook_routes_round_trip_and_validation(monkeypatch):
     assert "ISO-8601" in res.json()["detail"]
 
     # missing recipe -> 404
-    monkeypatch.setattr(food_queries, "save_cook_state", lambda *a, **k: None)
+    monkeypatch.setattr(food_api_module, "save_cook_state", lambda *a, **k: None)
     res = client.put("/api/food/recipes/9/cook", json={
         "checked_steps": [], "checked_foods": [], "timers": []})
     assert res.status_code == 404
@@ -844,7 +846,7 @@ def test_cook_routes_round_trip_and_validation(monkeypatch):
 def test_delete_cook_route_clears_session(monkeypatch):
     """DELETE cook -> { success: true } and the clear is invoked."""
     calls = []
-    monkeypatch.setattr(food_queries, "clear_cook_state",
+    monkeypatch.setattr(food_api_module, "clear_cook_state",
                         lambda rid: calls.append(rid) or True)
     client = TestClient(_make_app())
     res = client.delete("/api/food/recipes/3/cook")
@@ -855,7 +857,7 @@ def test_delete_cook_route_clears_session(monkeypatch):
 
 def test_get_cook_route_empty_session_shape(monkeypatch):
     """GET cook with no session -> empty lists + null updated_at."""
-    monkeypatch.setattr(food_queries, "get_cook_state",
+    monkeypatch.setattr(food_api_module, "get_cook_state",
                         lambda rid: {"recipe_id": rid, "checked_steps": [],
                                      "checked_foods": [], "timers": [],
                                      "updated_at": None})
@@ -887,9 +889,9 @@ def test_persist_route_returns_food_id_and_never_writes_diary(monkeypatch):
         seen["kwargs"] = kwargs
         return {"food_id": 42}
 
-    monkeypatch.setattr(food_queries, "persist_api_food", fake_persist)
+    monkeypatch.setattr(food_api_module, "persist_api_food", fake_persist)
     monkeypatch.setattr(
-        food_api, "log_diary_entry",
+        food_api_module, "log_diary_entry",
         lambda *a, **k: (_ for _ in ()).throw(
             AssertionError("persist-only must not write a diary entry")))
     client = TestClient(_make_app())
@@ -914,7 +916,7 @@ def test_persist_route_off_payload_carries_serving_and_dedupe_id(monkeypatch):
         # persist_api_food returns the EXISTING row when the barcode matches.
         return {"food_id": 7}
 
-    monkeypatch.setattr(food_queries, "persist_api_food", fake_persist)
+    monkeypatch.setattr(food_api_module, "persist_api_food", fake_persist)
     client = TestClient(_make_app())
     res = client.post("/api/food/persist", json={"off_payload": {
         "provider": "off", "barcode": "12345", "name": "Bar",

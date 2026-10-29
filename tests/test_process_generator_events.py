@@ -22,8 +22,8 @@ Run from the repository root:
 import json
 
 import backend_functions.activity_smoothing as sm
-import backend.api.activities as act
-from backend_functions.schemas.activity_schemas import ProcessActivityRequest
+import pifitness.activities.router as act
+from pifitness.activities.schemas import ProcessActivityRequest
 
 
 def _events(req):

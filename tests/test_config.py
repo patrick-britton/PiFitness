@@ -14,7 +14,8 @@ from fastapi.testclient import TestClient
 # are imported, matching how the app boots. Importing `backend.api.config`
 # directly first would break because credential_management needs KEY_PATH.
 from backend.main import app
-import backend.api.config as config_module
+import importlib
+config_module = importlib.import_module('pifitness.config.router')
 
 client = TestClient(app)
 

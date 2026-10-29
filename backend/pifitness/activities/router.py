@@ -30,6 +30,8 @@ from pifitness.activities.queries import (
     get_leaderboard_segments,
     get_segment_leaderboard,
     get_segment_visuals_telemetry,
+    stage_leaderboard_visuals,
+    get_segment_name,
 )
 from backend_functions.database_functions import sql_to_dict, get_conn, qec, one_sql_result, sql_to_list
 from backend_functions.music_functions import (

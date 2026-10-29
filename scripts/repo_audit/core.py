@@ -26,6 +26,7 @@ DEFAULTS: dict = {
         ".git", ".venv", "venv", "env", "node_modules", ".next", "__pycache__",
         ".pytest_cache", ".mypy_cache", ".ruff_cache", ".turbo", "dist", "build",
         "coverage", ".cache", "*.egg-info", ".idea", ".audit",
+        ".features",
     ],
     # Runtime-data directories: summarised (count/bytes) but never parsed.
     "data_dirs": ["local_storage"],
@@ -338,7 +339,7 @@ class Repo:
             if prune:
                 dns[:] = [d for d in dns if not any(fnmatch.fnmatch(d, p) for p in ex)]
             else:  # still skip the truly huge/irrelevant trees
-                dns[:] = [d for d in dns if d not in (".git", "node_modules", ".venv", "venv", ".next")]
+                dns[:] = [d for d in dns if d not in (".git", "node_modules", ".venv", "venv", ".next", ".features")]
             for fn in fns:
                 yield os.path.relpath(os.path.join(dp, fn), self.root).replace("\\", "/")
 

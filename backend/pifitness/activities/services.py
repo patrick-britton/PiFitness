@@ -8,7 +8,7 @@ from typing import Optional
 
 from backend_functions.database_functions import one_sql_result
 from backend_functions.music_functions import get_spotify_client, playlist_to_db
-from backend_functions.schemas.activity_schemas import ProcessStepResult
+from pifitness.activities.schemas import ProcessStepResult
 
 
 def task_failure_message(ret) -> Optional[str]:

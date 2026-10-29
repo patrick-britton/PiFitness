@@ -15,13 +15,13 @@ client = TestClient(app)
 
 
 def test_now_playing_skip_route_exists():
-    with patch('backend.api.music.get_spotify_client_for_music', return_value=None):
+    with patch('pifitness.music.router.get_spotify_client_for_music', return_value=None):
         response = client.post("/api/music/now-playing/skip")
         assert response.status_code == 503
 
 
 def test_now_playing_promote_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
+    with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/promote")
         assert response.status_code == 200
         data = response.json()
@@ -39,7 +39,7 @@ def test_now_playing_promote_wrong_context():
             "context": {"relationshipType": "regular", "parentPlaylistId": None}
         }
     }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state):
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state):
         response = client.post("/api/music/now-playing/promote")
         assert response.status_code == 200
         data = response.json()
@@ -48,7 +48,7 @@ def test_now_playing_promote_wrong_context():
 
 
 def test_now_playing_soft_reject_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
+    with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/soft-reject")
         assert response.status_code == 200
         data = response.json()
@@ -56,7 +56,7 @@ def test_now_playing_soft_reject_no_track():
 
 
 def test_now_playing_hard_reject_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
+    with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/hard-reject")
         assert response.status_code == 200
         data = response.json()
@@ -64,7 +64,7 @@ def test_now_playing_hard_reject_no_track():
 
 
 def test_now_playing_remove_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
+    with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/remove")
         assert response.status_code == 200
         data = response.json()
@@ -80,8 +80,8 @@ def test_now_playing_remove_family_miss():
             "context": {"relationshipType": "regular", "playlistId": "pl123"}
         }
     }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.sql_to_dict', return_value=[]):
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
+         patch('pifitness.music.router.sql_to_dict', return_value=[]):
         response = client.post("/api/music/now-playing/remove")
         assert response.status_code == 200
         data = response.json()
@@ -112,12 +112,12 @@ def test_now_playing_remove_full_flow():
         {"playlist_id": "plParent", "playlist_name": "Parent Playlist"},
     ]
     mock_spotify = MagicMock()
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.sql_to_dict', side_effect=[family_rows, name_rows]), \
-         patch('backend.api.music.one_sql_result', return_value=1), \
-         patch('backend.api.music.qec'), \
-         patch('backend.api.music.sql_to_list', return_value=["tid1"]) as mock_sql_to_list, \
-         patch('backend.api.music.get_spotify_client_for_music', return_value=mock_spotify):
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
+         patch('pifitness.music.router.sql_to_dict', side_effect=[family_rows, name_rows]), \
+         patch('pifitness.music.router.one_sql_result', return_value=1), \
+         patch('pifitness.music.router.qec'), \
+         patch('pifitness.music.router.sql_to_list', return_value=["tid1"]) as mock_sql_to_list, \
+         patch('pifitness.music.router.get_spotify_client_for_music', return_value=mock_spotify):
         response = client.post("/api/music/now-playing/remove")
         assert response.status_code == 200
         data = response.json()
@@ -145,7 +145,7 @@ def test_now_playing_rank_up_wrong_context():
             "context": {"relationshipType": "recommendation", "playlistId": "pl123"}
         }
     }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state):
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state):
         response = client.post("/api/music/now-playing/rank-up")
         assert response.status_code == 200
         data = response.json()
@@ -154,7 +154,7 @@ def test_now_playing_rank_up_wrong_context():
 
 
 def test_now_playing_rank_down_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
+    with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/rank-down")
         assert response.status_code == 200
         data = response.json()
@@ -162,7 +162,7 @@ def test_now_playing_rank_down_no_track():
 
 
 def test_now_playing_add_to_playlist_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
+    with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/add-to-playlist?playlist_id=pl123")
         assert response.status_code == 200
         data = response.json()
@@ -170,7 +170,7 @@ def test_now_playing_add_to_playlist_no_track():
 
 
 def test_now_playing_add_targets_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
+    with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.get("/api/music/now-playing/add-targets")
         assert response.status_code == 200
         data = response.json()
@@ -178,7 +178,7 @@ def test_now_playing_add_targets_no_track():
         assert data["playlists"] == []
 
 def test_now_playing_add_targets_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
+    with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.get("/api/music/now-playing/add-targets")
         assert response.status_code == 200
         data = response.json()
@@ -195,8 +195,8 @@ def test_now_playing_add_targets_with_track():
         {"playlist_id": "pl1", "playlist_name": "Playlist One"},
         {"playlist_id": "pl2", "playlist_name": "Playlist Two"},
     ]
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.get_playlists_not_containing_isrc', return_value=mock_playlists):
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
+         patch('pifitness.music.router.get_playlists_not_containing_isrc', return_value=mock_playlists):
         response = client.get("/api/music/now-playing/add-targets")
         assert response.status_code == 200
         data = response.json()
@@ -216,12 +216,12 @@ def test_now_playing_promote_full_flow():
             "context": {"relationshipType": "recommendation", "parentPlaylistId": "parent1"}
         }
     }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.add_isrc_to_local_playlist') as mock_add, \
-         patch('backend.api.music.get_spotify_client_for_music', return_value=MagicMock()), \
-         patch('backend.api.music.record_recommendation_decision') as mock_record, \
-         patch('backend.api.music.remove_recommendation') as mock_remove, \
-         patch('backend.api.music.add_into_current_ratings') as mock_seed:
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
+         patch('pifitness.music.router.add_isrc_to_local_playlist') as mock_add, \
+         patch('pifitness.music.router.get_spotify_client_for_music', return_value=MagicMock()), \
+         patch('pifitness.music.router.record_recommendation_decision') as mock_record, \
+         patch('pifitness.music.router.remove_recommendation') as mock_remove, \
+         patch('pifitness.music.router.add_into_current_ratings') as mock_seed:
         response = client.post("/api/music/now-playing/promote")
         assert response.status_code == 200
         data = response.json()
@@ -243,8 +243,8 @@ def test_now_playing_rank_up_full_flow():
             "context": {"relationshipType": "regular", "playlistId": "pl123"}
         }
     }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.save_matchup_results') as mock_save:
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
+         patch('pifitness.music.router.save_matchup_results') as mock_save:
         response = client.post("/api/music/now-playing/rank-up")
         assert response.status_code == 200
         data = response.json()
@@ -267,8 +267,8 @@ def test_now_playing_rank_down_full_flow():
             "context": {"relationshipType": "regular", "playlistId": "pl123"}
         }
     }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.save_matchup_results') as mock_save:
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
+         patch('pifitness.music.router.save_matchup_results') as mock_save:
         response = client.post("/api/music/now-playing/rank-down")
         assert response.status_code == 200
         data = response.json()
@@ -289,8 +289,8 @@ def test_now_playing_rank_down_full_flow():
             "context": {"relationshipType": "regular", "playlistId": "pl123"}
         }
     }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.save_matchup_results') as mock_save:
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
+         patch('pifitness.music.router.save_matchup_results') as mock_save:
         response = client.post("/api/music/now-playing/rank-down")
         assert response.status_code == 200
         data = response.json()
@@ -326,7 +326,7 @@ def test_recent_plays_default_limit():
             "maxPlaycountTotal": 50,
         },
     ]
-    with patch('backend.api.music.get_recent_plays', return_value=mock_rows):
+    with patch('pifitness.music.router.get_recent_plays', return_value=mock_rows):
         response = client.get("/api/music/recent-plays")
         assert response.status_code == 200
         data = response.json()
@@ -340,7 +340,7 @@ def test_recent_plays_default_limit():
 
 def test_recent_plays_custom_limit():
     """Recent plays accepts custom limit within range."""
-    with patch('backend.api.music.get_recent_plays', return_value=[]) as mock_get:
+    with patch('pifitness.music.router.get_recent_plays', return_value=[]) as mock_get:
         response = client.get("/api/music/recent-plays?limit=50")
         assert response.status_code == 200
         mock_get.assert_called_once_with(limit=50)
@@ -366,7 +366,7 @@ def test_recent_plays_rejects_not_step():
 
 def test_recent_plays_empty():
     """Recent plays returns empty plays with baseline scale."""
-    with patch('backend.api.music.get_recent_plays', return_value=[]):
+    with patch('pifitness.music.router.get_recent_plays', return_value=[]):
         response = client.get("/api/music/recent-plays")
         assert response.status_code == 200
         data = response.json()
@@ -379,7 +379,7 @@ def test_recent_plays_empty():
 
 def test_service_status_not_limited():
     """Service status reports not rate-limited."""
-    with patch('backend.api.music.sql_rate_limited', return_value=False):
+    with patch('pifitness.music.router.sql_rate_limited', return_value=False):
         response = client.get("/api/music/service-status")
         assert response.status_code == 200
         data = response.json()
@@ -389,8 +389,8 @@ def test_service_status_not_limited():
 
 def test_service_status_limited():
     """Service status reports rate-limited with clearance time."""
-    with patch('backend.api.music.sql_rate_limited', return_value=True), \
-         patch('backend.api.music.one_sql_result', return_value="2026-09-02T00:00:00"):
+    with patch('pifitness.music.router.sql_rate_limited', return_value=True), \
+         patch('pifitness.music.router.one_sql_result', return_value="2026-09-02T00:00:00"):
         response = client.get("/api/music/service-status")
         assert response.status_code == 200
         data = response.json()
@@ -408,7 +408,7 @@ def test_album_art_cached():
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
         f.write(b"fake_jpeg_data")
         tmp_path = Path(f.name)
-    with patch('backend.api.music.album_image_retrieval', return_value=str(tmp_path)):
+    with patch('pifitness.music.router.album_image_retrieval', return_value=str(tmp_path)):
         response = client.get(f"/api/music/album-art/test_album_id")
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/jpeg"
@@ -417,7 +417,7 @@ def test_album_art_cached():
 
 def test_album_art_not_found():
     """Album art returns 404 when image cannot be obtained."""
-    with patch('backend.api.music.album_image_retrieval', return_value=None):
+    with patch('pifitness.music.router.album_image_retrieval', return_value=None):
         response = client.get("/api/music/album-art/nonexistent_id")
         assert response.status_code == 404
 
@@ -446,7 +446,7 @@ def test_album_image_retrieval_no_client():
 
 def test_shuffle_flags_updates_playlist_config():
     """POST /api/music/shuffle/flags reconciles boolean flags to the source playlist."""
-    with patch('backend.api.music.qec') as mock_qec:
+    with patch('pifitness.music.router.qec') as mock_qec:
         response = client.post(
             "/api/music/shuffle/flags?playlist_id=pl123",
             json={
@@ -474,7 +474,7 @@ def test_shuffle_flags_updates_playlist_config():
 
 def test_shuffle_flags_defaults_to_false():
     """POST /api/music/shuffle/flags accepts missing flags as False."""
-    with patch('backend.api.music.qec') as mock_qec:
+    with patch('pifitness.music.router.qec') as mock_qec:
         response = client.post(
             "/api/music/shuffle/flags?playlist_id=pl123",
             json={},

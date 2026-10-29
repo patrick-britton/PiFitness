@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / "backend" / ".env",
             override=False)
 
-from backend_functions.admin_service import failed_run_message
+from backend.pifitness.admin.services import failed_run_message
 
 
 def testfailed_run_message_carries_underlying_error():
