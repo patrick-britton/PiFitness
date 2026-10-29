@@ -51,7 +51,7 @@ done
 PROJECT_DIR="/home/god/PiFitness"
 VENV_DIR="$PROJECT_DIR/venv"
 FRONTEND_DIR="$PROJECT_DIR/frontend/pifitness"
-REQUIREMENTS_FILE="requirements-react.txt"
+REQUIREMENTS_FILE="library_requirements.txt"
 NPM_REQUIREMENTS_FILE="npm_requirements.txt"
 
 # ======================================================================
