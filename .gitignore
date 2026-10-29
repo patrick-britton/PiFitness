@@ -263,3 +263,11 @@ prod-schema-reference.dump
 *.dump
 *token*.json
 .spotify_cache
+
+# --- INV-003: tracked clutter files to delete ---
+frontend/tsc2.txt
+frontend/vit2.txt
+
+# --- Reorg scratch files (fix scripts, result logs) ---
+result*.txt
+fix_test_*.py
