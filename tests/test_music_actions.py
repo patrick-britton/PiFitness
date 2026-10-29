@@ -15,7 +15,7 @@ client = TestClient(app)
 
 
 def test_now_playing_skip_route_exists():
-    with patch('backend.api.music._get_spotify_client', return_value=None):
+    with patch('backend.api.music.get_spotify_client_for_music', return_value=None):
         response = client.post("/api/music/now-playing/skip")
         assert response.status_code == 503
 
@@ -117,7 +117,7 @@ def test_now_playing_remove_full_flow():
          patch('backend.api.music.one_sql_result', return_value=1), \
          patch('backend.api.music.qec'), \
          patch('backend.api.music.sql_to_list', return_value=["tid1"]) as mock_sql_to_list, \
-         patch('backend.api.music._get_spotify_client', return_value=mock_spotify):
+         patch('backend.api.music.get_spotify_client_for_music', return_value=mock_spotify):
         response = client.post("/api/music/now-playing/remove")
         assert response.status_code == 200
         data = response.json()
@@ -218,7 +218,7 @@ def test_now_playing_promote_full_flow():
     }
     with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
          patch('backend.api.music.add_isrc_to_local_playlist') as mock_add, \
-         patch('backend.api.music._get_spotify_client', return_value=MagicMock()), \
+         patch('backend.api.music.get_spotify_client_for_music', return_value=MagicMock()), \
          patch('backend.api.music.record_recommendation_decision') as mock_record, \
          patch('backend.api.music.remove_recommendation') as mock_remove, \
          patch('backend.api.music.add_into_current_ratings') as mock_seed:

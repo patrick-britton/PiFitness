@@ -47,41 +47,9 @@ from backend_functions.queries import (
     rename_segment,
 )
 from backend_functions.service_logins import mapbox_token
+from backend_functions.segments_service import json_safe, safe_row, with_reference_window
 
 router = APIRouter(prefix="/api", tags=["segments"])
-
-
-def _json_safe(value):
-    """Coerce Decimal/date/datetime to JSON-safe primitives."""
-    if isinstance(value, Decimal):
-        return float(value)
-    if isinstance(value, (datetime, date)):
-        return value.isoformat()
-    return value
-
-
-def _safe_row(row: dict) -> dict:
-    return {k: _json_safe(v) for k, v in row.items()}
-
-
-def _with_reference_window(rows, refs, id_key="segment_id") -> list:
-    """Add a segment's reference-geometry pointers to picker/course rows (009-003, T02b/OQ-3, T02c/OQ-4).
-
-    Keeps the existing columns exactly as they are and appends the
-    three reference scalars so the Match Activities / Course Review modes can
-    request the segment's own GPS path. Missing refs (unknown id) become nulls.
-    `id_key` selects the row's segment-id column ('segment_id' for the
-    /segments/list picker, 'course_id' for the /segments/courses page).
-    """
-    data = []
-    for row in rows:
-        enriched = _safe_row(row)
-        info = refs.get(int(row[id_key])) or {}
-        enriched["activity_reference_id"] = _json_safe(info.get("activity_reference_id"))
-        enriched["reference_start_point"] = _json_safe(info.get("reference_start_point"))
-        enriched["reference_end_point"] = _json_safe(info.get("reference_end_point"))
-        data.append(enriched)
-    return data
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +85,7 @@ async def get_segment_activities_route(
             limit=limit,
             offset=offset,
         ) or []
-        data = [_safe_row(r) for r in rows]
+        data = [safe_row(r) for r in rows]
         return {"data": data, "count": len(data)}
     except HTTPException:
         raise
@@ -171,7 +139,7 @@ async def get_segment_list_route(
             activity_type=activity_type,
         ) or []
         refs = get_segment_reference_windows([r["segment_id"] for r in rows])
-        data = _with_reference_window(rows, refs)
+        data = with_reference_window(rows, refs)
         return {"data": data, "count": len(data)}
     except HTTPException:
         raise
@@ -227,7 +195,7 @@ async def get_segment_courses_route(
             page_size=page_size,
         )
         refs = get_segment_reference_windows([int(r["course_id"]) for r in result["data"]])
-        result["data"] = _with_reference_window(result["data"], refs, id_key="course_id")
+        result["data"] = with_reference_window(result["data"], refs, id_key="course_id")
         return result
     except HTTPException:
         raise

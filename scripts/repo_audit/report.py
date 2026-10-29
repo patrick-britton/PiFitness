@@ -155,9 +155,9 @@ def diff_metrics(old: dict, new: dict) -> list[str]:
             arrow = "↓" if (b or 0) < (a or 0) else "↑"
             good = (k in GATED and (b or 0) < (a or 0))
             bad = (k in GATED and (b or 0) > (a or 0))
-            rows.append(f"{'✔' if good else '✘' if bad else ' '} {k:42} {a!s:>8} → {b!s:<8} {arrow}")
+            rows.append(f"{'✔' if good else '✘' if bad else ' '} {k:42} {a!s:>8} -> {b!s:<8} {arrow}")
     return rows
 
 
 def check_gate(old: dict, new: dict) -> list[str]:
-    return [f"{k}: {old[k]} → {new.get(k, 0)}" for k in GATED if k in old and (new.get(k, 0) or 0) > (old[k] or 0)]
+    return [f"{k}: {old[k]} -> {new.get(k, 0)}" for k in GATED if k in old and (new.get(k, 0) or 0) > (old[k] or 0)]
