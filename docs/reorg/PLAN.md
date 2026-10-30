@@ -39,10 +39,13 @@ DONE = verified by probe at HEAD `287c9dff` (see `.audit/discovery/ledger.tsv`).
 | 3 | 3.music | ✅ DONE | dir present |
 | 3 | 3.segments | ✅ DONE | dir present |
 | 3 | 3.activities | ✅ DONE | dir present |
-| 3 | 3.integrations | ❌ TODO | `backend/pifitness/integrations/` missing |
-| 3 | 3.worker | ❌ TODO | `backend/pifitness/worker/` missing |
-| 3 | 3.core | ❌ TODO | `backend/pifitness/core/` missing |
-| 3 | 3.api | ❌ TODO | `backend/pifitness/api/main.py` missing → import fails |
+| 3 | 3.auth | ✅ DONE | `backend/pifitness/auth/` (was `backend/api/auth.py`) |
+| 3 | 3.config | ✅ DONE | `backend/pifitness/config/` router only; settings still in `backend_functions/config.py` |
+| 3 | 3.tri_tip | ✅ DONE | `backend/pifitness/tri_tip/` — discovered 2026-10-29, not in original scope |
+| 3 | 3.integrations | ⛔ SUPERSEDED | split into 3.auth + 3.config; Garmin/Spotify logic in `service_logins.py` |
+| 3 | 3.worker | ❌ TODO | `backend/pifitness/worker/` missing; source `backend_functions/backend_tasks.py` |
+| 3 | 3.core | ❌ TODO | `backend/pifitness/core/` missing; sources `backend_functions/{config,domain_exceptions,logging_functions}.py` (last two need rename) |
+| 3 | 3.api | ❌ TODO | `backend/pifitness/api/main.py` missing; source `backend/main.py`; note: `pifitness` importable as top-level, not `backend.pifitness` |
 | 3 | 3.2 systemd entrypoints | ⚠️ UNVERIFIED | see Task 3.2.verify |
 | 3 | 3.3 TARGET forbid rules | ⚠️ UNVERIFIED | see Task 3.3.verify |
 | 3 | 3.4 clean-room | ⚠️ UNVERIFIED | blocked on 3.api |
@@ -157,10 +160,10 @@ DONE = verified by probe at HEAD `287c9dff` (see `.audit/discovery/ledger.tsv`).
 
 ### Deferred — expand after 0.5 is green
 
-- **3.integrations** — move `backend/api/auth.py`, `backend/api/config.py` → `backend/pifitness/integrations/`. Uses `rope` (Task 0.5). Spec written after 0.5 verified.
-- **3.worker** — move `backend_functions/backend_tasks.py` → `backend/pifitness/worker/worker.py`. Spec written after 3.integrations passes.
-- **3.core** — move `backend_functions/{config,domain_exceptions,logging_functions}.py` → `backend/pifitness/core/`. Must precede 3.api.
-- **3.api** — move `backend/main.py` → `backend/pifitness/api/main.py`; then `from pifitness.api.main import app` must pass. This is the final Phase-3 gate.
+- ~~**3.integrations**~~ — SUPERSEDED 2026-10-29. Reality: `pifitness/auth/` and `pifitness/config/` landed as separate slices. Garmin/Spotify login logic remains in `backend_functions/service_logins.py`.
+- **3.worker** — move + rename `backend_functions/backend_tasks.py` → `backend/pifitness/worker/worker.py`. Spec written after T0.5.1 (rename support) is green.
+- **3.core** — move + rename `backend_functions/{config,domain_exceptions,logging_functions}.py` → `backend/pifitness/core/{config,exceptions,logging}.py`. Spec written after T0.5.1 green. Must precede 3.api.
+- **3.api** — move `backend/main.py` → `backend/pifitness/api/main.py`; then `from pifitness.api.main import app` must pass. Note: `pifitness` is importable as top-level, not `backend.pifitness` — investigate sys.path before this task. Spec written after 3.core green.
 - **3.0.verify, 3.2.verify, 3.3.verify** — probe tasks for the unverified rows in §1.
 - **3.4** — clean-room check, blocked on 3.api.
 - **4.1–4.4** — frontend flatten + features/ restructure.
