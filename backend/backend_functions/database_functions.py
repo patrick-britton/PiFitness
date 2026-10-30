@@ -18,7 +18,7 @@ if os.path.exists(_load_dotenv_backend):
     load_dotenv(_load_dotenv_backend, override=False)
 
 # Import config for platform-aware DB host detection
-from backend_functions.config import get_settings
+from pifitness.core.config import get_settings
 
 
 def start_timer():

@@ -45,7 +45,9 @@ DONE = verified by probe at HEAD `287c9dff` (see `.audit/discovery/ledger.tsv`).
 | 3 | 3.tri_tip | ✅ DONE | `backend/pifitness/tri_tip/` — discovered 2026-10-29, not in original scope |
 | 3 | 3.integrations | ⛔ SUPERSEDED | split into 3.auth + 3.config; Garmin/Spotify logic in `service_logins.py` |
 | 3 | 3.worker | ❌ TODO | `backend/pifitness/worker/` missing; source `backend_functions/backend_tasks.py` |
-| 3 | 3.core | ❌ TODO | `backend/pifitness/core/` missing; sources `backend_functions/{config,domain_exceptions,logging_functions}.py` (last two need rename) |
+| 3 | 3.core.1 | ✅ DONE | `backend/pifitness/core/config.py` (was `backend_functions/config.py`); libcst move, 2 importers rewritten |
+| 3 | 3.core.2 | ❌ TODO | rename `domain_exceptions.py` -> `exceptions.py`, `logging_functions.py` -> `logging.py` into `pifitness.core` |
+| 3 | 3.config-env-fix | ❌ TODO | `config.py:93` `.env` path: currently `__file__`-relative (silent no-op); should use `backend/.env` |
 | 3 | 3.api | ❌ TODO | `backend/pifitness/api/main.py` missing; source `backend/main.py`; note: `pifitness` importable as top-level, not `backend.pifitness` |
 | 3 | 3.2 systemd entrypoints | ⚠️ UNVERIFIED | see Task 3.2.verify |
 | 3 | 3.3 TARGET forbid rules | ⚠️ UNVERIFIED | see Task 3.3.verify |
