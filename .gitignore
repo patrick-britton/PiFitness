@@ -274,3 +274,4 @@ frontend/vit2.txt
 # --- Reorg scratch files (fix scripts, result logs) ---
 result*.txt
 fix_test_*.py
+docs/reorg/blocks/
