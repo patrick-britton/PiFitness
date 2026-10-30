@@ -20,26 +20,11 @@ from backend_functions.logging_functions import log_api_event, log_app_event, st
 
 load_dotenv()
 
-
-
-
-def load_api_credentials(service=None):
-    # loads and decrypts credentials for a specific service
-    if not service:
-        print('No service provided')
-        return None
-
-    t_sql = f"""
-        SELECT api_credentials FROM api_services.credentials 
-        WHERE api_service_name = '{service}';"""
-
-    result = one_sql_result(t_sql)
-
-    if result:
-        return decrypt_dict(result)
-    else:
-        print(f'No results returned for service: {service}')
-        return None
+from pifitness.integrations._common import (
+    load_api_credentials,
+    load_token_from_db,
+    save_token_to_db,
+)
 
 
 def spotify_creds():
@@ -399,93 +384,6 @@ def get_spotify_token_expiry():
     from backend_functions.database_functions import one_sql_result
     sql = "SELECT MAX(expires_at_utc) FROM _migration.spotify_auth_metadata WHERE is_active = true"
     return one_sql_result(sql)
-
-
-def load_token_from_db(service_name):
-    """Load a stored token from the database for the given service.
-
-    This is the Pi fallback path — when no local cache file exists (e.g. on
-    a headless Pi), the token can be retrieved from the database where it
-    was saved by the Windows dev machine.
-
-    Args:
-        service_name: 'Spotify' or other service name.
-
-    Returns:
-        dict | None: The deserialized token dict, or None if no token found.
-    """
-    from backend_functions.database_functions import one_sql_result
-    import json
-
-    sql = f"""SELECT token_data FROM _migration.api_tokens
-             WHERE service_name = '{service_name}' AND is_active = true
-             ORDER BY updated_at_utc DESC LIMIT 1"""
-    result = one_sql_result(sql)
-    if result:
-        try:
-            return json.loads(result)
-        except (json.JSONDecodeError, TypeError):
-            log_api_event(service=service_name, event='Failed to decode stored token from DB')
-            return None
-    return None
-
-
-def save_token_to_db(service_name, token_info):
-    """Save a token dict to the database for cross-device sync.
-
-    After a successful OAuth flow, the token is stored in the DB so that
-    other devices (e.g. the headless Pi) can retrieve it.
-
-    Extracts and stores refresh token expiry when available:
-    - Spotify: Uses store_spotify_auth_metadata() for 6-month tracking
-    - Garmin: Extracts refresh_token_expires_at from di/it token slots
-
-    Args:
-        service_name: 'Spotify' or other service name.
-        token_info: The token dict from Spotipy (or similar).
-    """
-    from backend_functions.database_functions import qec
-    import json
-    from datetime import datetime, timezone
-    from psycopg2.extras import Json
-
-    # Extract refresh token expiry timestamp for Garmin (from native-oauth2 session)
-    refresh_expires_ts = None
-    if service_name == 'Garmin':
-        # Garmin session has 'di' and 'it' token slots, each with refresh_token_expires_at
-        try:
-            di_expires = token_info.get('di', {}).get('token', {}).get('refresh_token_expires_at')
-            it_expires = token_info.get('it', {}).get('token', {}).get('refresh_token_expires_at')
-            # Use the earlier expiry (most conservative)
-            if di_expires and it_expires:
-                refresh_expires_ts = min(di_expires, it_expires)
-            elif di_expires:
-                refresh_expires_ts = di_expires
-            elif it_expires:
-                refresh_expires_ts = it_expires
-        except (AttributeError, TypeError):
-            pass
-    
-    # Deactivate old tokens, then insert new (using parameterized queries)
-    deactivate_sql = """UPDATE _migration.api_tokens
-                        SET is_active = false
-                        WHERE service_name = %s AND is_active = true"""
-    qec(deactivate_sql, [service_name])
-    
-    if refresh_expires_ts:
-        # Convert Unix timestamp to PostgreSQL timestamp
-        expires_dt = datetime.fromtimestamp(refresh_expires_ts, tz=timezone.utc)
-        insert_sql = """INSERT INTO _migration.api_tokens 
-                          (service_name, token_data, updated_at_utc, refresh_token_expires_at_utc)
-                          VALUES (%s, %s, CURRENT_TIMESTAMP, %s)"""
-        qec(insert_sql, [service_name, Json(token_info), expires_dt])
-    else:
-        insert_sql = """INSERT INTO _migration.api_tokens 
-                        (service_name, token_data, updated_at_utc)
-                        VALUES (%s, %s, CURRENT_TIMESTAMP)"""
-        qec(insert_sql, [service_name, Json(token_info)])
-    
-    log_api_event(service=service_name, event=f'Token saved to DB for {service_name}')
 
 
 def garmin_login():
