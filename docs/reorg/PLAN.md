@@ -53,6 +53,8 @@ DONE = verified by probe at HEAD `287c9dff` (see `.audit/discovery/ledger.tsv`).
 | 3 | 3.4 clean-room | ⚠️ UNVERIFIED | blocked on 3.api |
 | 4 | 4.1 frontend flatten | ❌ TODO | `frontend/pifitness/` still exists |
 | 4 | 4.2 features/ | ❌ TODO | not started |
+| 3 | 3.prep-root | ✅ DONE | `backend_functions/` moved to `backend/backend_functions/`; root unified |
+| 3 | 3.credential-fix | ✅ DONE | `credential_management.py`: lazy `load_key()`, correct `.env` path |
 | 5 | 5.* guardrails | ❌ TODO | not started |
 
 ## §2 Policy (applies to every task in §4)
@@ -188,5 +190,13 @@ After every task-commit:
 & ".venv\Scripts\python.exe" scripts\repo_audit all
 & ".venv\Scripts\python.exe" scripts\repo_audit check
 ```
+
+## §6 Phase 6 — Python 3.15 Upgrade (queued, spec deferred)
+
+Runs after `3.finalize`. Placeholder only — full task spec at that time.
+
+Scope: upgrade `.venv` to 3.15; verify FastAPI/libcst/cryptography; audit `open()` for `encoding=`; update `requires-python`; verify Pi 5 install path; regression test suite.
+
+---
 
 Both must exit 0.
