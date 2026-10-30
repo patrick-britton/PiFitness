@@ -1,158 +1,186 @@
-# PiFitness Reorg — PLAN.md
+# PiFitness Reorg — PLAN.md (v2)
 
-Generated from `repo_audit baseline` + `all` (2026-10-25, commit `fcdcb14`).
-Baseline frozen at `.audit/baseline.json`. Full report at `.audit/REPORT.md`.
+**HEAD:** `287c9dff` (wip checkpoint, 2026-10-29)
+**Rollback point:** `c1315503` (pre-checkpoint, exact dirty state before reconciliation)
+**Baseline:** `.audit/discovery/report-now.json` (371 files, `pytest 210 passed`)
+**State:** Phase 0 ✅ · Phase 1 ✅ (except 1.3 unverified) · Phase 2 partial · Phase 3 partial · Phase 4 not started
 
-Scope: reorganize from technical-layer layout to domain-sliced layout, remove dead weight,
-make structure enforceable by tooling. No runtime behavior changes. No new features.
-No dependency upgrades. No DB object renames.
+This file is the single source of truth. Every task is here — no external decision docs, no moves JSON read by humans, no "see DECISIONS.md." When a decision is made, it becomes the *actions of a task* in §4. When a task is done, it moves to `[DONE <sha>]` in the ledger (§1).
 
-## Baseline metrics (from audit scoreboard)
+## §1 Task Status Ledger
 
-| metric | value | target |
-|---|---:|---:|
-| hygiene.secret_hits | 1 | 0 (Phase 0) |
-| hygiene.tracked_junk | 8 | 0 (Phase 0) |
-| hygiene.pyc_husks | 24 | 0 (Phase 0) |
-| hygiene.sensitive_exposed | 0 | 0 |
-| inventory.clutter_files | 15 | 0 (Phase 0) |
-| inventory.npm_manifests | 2 | 1 (Phase 4) |
-| py.dangling_imports | 0 | 0 |
-| py.layer_violations | 1 | 0 (Phase 1) |
-| py.module_cycles | 0 | 0 |
-| py.private_cross_imports | 16 | 0 (Phase 1/3) |
-| py.router_direct_db_handlers | 11 | 0 (Phase 3) |
-| py.nonliteral_dynamic_imports | 6 | pinned in audit.toml (Phase 1) |
-| py.orphans_likely_dead | 0 | 0 |
-| py.orphans_total | 6 | keep/pin decision (Phase 1) |
-| py.near_duplicate_pairs | 1 | 0 after Garmin decision (Phase 1) |
-| domains.unassigned_files | 38 | 0 after DECISIONS.md (Phase 2) |
-| domains.cross_edges | 26 | reduced (Phase 3) |
-| scripts.oneoff | 0 | 0 |
-| scripts.misplaced_tests | 5 | 0 (Phase 2) |
-| scripts.keep | 6 | moved to tools/ (Phase 2) |
-| ts.unreachable_files | 4 | 0 after approvals (Phase 4) |
-| ts.unresolved_imports | 1 | 0 (Phase 4) |
-| ts.npm_unused | 5 | 0 after approvals (Phase 4) |
-| contracts.frontend_ghost_paths | 1 | investigate (Phase 4) |
-| git.avg_code_dirs_per_commit | 2.52 | expected to fall |
-| git.avg_domains_per_commit | 1.69 | expected to fall |
+DONE = verified by probe at HEAD `287c9dff` (see `.audit/discovery/ledger.tsv`). Commit-level attribution deferred; rollback target is `c1315503` for anything unexpected.
 
-Repo size: 372 files, 96,066 lines (76,590 code). Python 126 files, TS 180 files.
+| Ph | Task | Status | Evidence |
+|---|---|---|---|
+| 0 | 0.1 audit tool | ✅ DONE | `scripts/repo_audit` present |
+| 0 | 0.2 secrets handled | ✅ DONE | `.gitignore` covers tokens |
+| 0 | 0.3 gitignore logs/caches | ✅ DONE | `.gitignore` covers `.next`, `*.dump` |
+| 0 | 0.5 streamlit residue | ✅ DONE | `.streamlit` absent |
+| 0 | 0.6 regenerate-audit | ✅ DONE | wrapper present |
+| 1 | 1.1 dangling config | ✅ DONE | docstring only, no real import (Task 0.3.5) |
+| 1 | 1.2 fastapi removed from exec | ✅ DONE | no `import fastapi` in exec |
+| 1 | 1.3 router logic extracted | ⚠️ UNVERIFIED | not probed — see Task 1.3.verify |
+| 1 | 1.4 DYNAMIC_TARGETS | ✅ DONE | `docs/reorg/DYNAMIC_TARGETS.md` |
+| 1 | 1.5 Garmin vendored deleted | ✅ DONE | both absent |
+| 1 | 1.6 6 orphans deleted | ✅ DONE | all 6 absent |
+| 1 | 1.7 forbid rules | ✅ DONE | `audit.toml` has `[[forbid]]` |
+| 2 | 2.0 bootstrap manifests | ❌ **TODO** | `requirements-react.txt` MISSING → Task 2.5.dep |
+| 2 | 2.2 scripts triaged | ✅ DONE | `tools/db/` populated |
+| 2 | 2.4 deploy merged | ✅ DONE | `deploy/systemd` present, `deployment/` absent |
+| 2 | 2.5 root pkg.json removed | ✅ DONE | root absent, frontend present |
+| 3 | 3.0 pyproject.toml | ⚠️ UNVERIFIED | see Task 3.0.verify |
+| 3 | 3.health | ✅ DONE | `backend/pifitness/health/` |
+| 3 | 3.exercises | ✅ DONE | dir present |
+| 3 | 3.volleyball | ✅ DONE | dir present |
+| 3 | 3.admin | ✅ DONE | dir present |
+| 3 | 3.food | ✅ DONE | dir present |
+| 3 | 3.music | ✅ DONE | dir present |
+| 3 | 3.segments | ✅ DONE | dir present |
+| 3 | 3.activities | ✅ DONE | dir present |
+| 3 | 3.integrations | ❌ TODO | `backend/pifitness/integrations/` missing |
+| 3 | 3.worker | ❌ TODO | `backend/pifitness/worker/` missing |
+| 3 | 3.core | ❌ TODO | `backend/pifitness/core/` missing |
+| 3 | 3.api | ❌ TODO | `backend/pifitness/api/main.py` missing → import fails |
+| 3 | 3.2 systemd entrypoints | ⚠️ UNVERIFIED | see Task 3.2.verify |
+| 3 | 3.3 TARGET forbid rules | ⚠️ UNVERIFIED | see Task 3.3.verify |
+| 3 | 3.4 clean-room | ⚠️ UNVERIFIED | blocked on 3.api |
+| 4 | 4.1 frontend flatten | ❌ TODO | `frontend/pifitness/` still exists |
+| 4 | 4.2 features/ | ❌ TODO | not started |
+| 5 | 5.* guardrails | ❌ TODO | not started |
 
-## Phase 0 — Safety net and hygiene (branch `reorg/00-safety`; current branch)
+## §2 Policy (applies to every task in §4)
 
-No source-file moves. Only cleanup + audit tooling.
+1. **Export-preservation on moves.** A move changes the module path; it does not rename the symbols inside. If `health.py` exported `health_router`, `pifitness/health/router.py` still exports `health_router`. Renames are separate tasks.
+2. **Commits-per-task.** One task = one commit. Message format: `reorg(<scope>): <task-slug> [<task-id>]`. `wip(...)` commits are for checkpoints only.
+3. **Verification-per-task.** Every task's `Success criteria` table must pass before `[DONE]`. A failed check → task is `[BLOCKED]`, not `[DONE]`.
+4. **Rollback-by-reset.** Every task has an explicit rollback command. For non-commit tasks, rollback is "delete these files." For commit tasks, rollback is `git reset --hard <sha>` where `<sha>` is HEAD before the task.
+5. **Decisions become actions.** No §3 to hold decisions. When a decision is needed, it becomes a sub-task's `Actions`. The ledger records the resulting commit as `DONE`. There is no `DECISIONS.md`.
 
-Tasks:
-- 0.1 [safe] Commit audit tool + `audit.toml`; gitignore `.audit/*` with `!.audit/baseline.json`; commit baseline.
-- 0.2 [safe] Handle every HYG-001 item: untrack + gitignore tracked secrets. Report HYG-003/004 to human; do not open files.
-  - HYG-004 evidence: `backend_functions/database_functions.py:50` [url-with-password] — do NOT open; report path only.
-- 0.3 [safe] `.gitignore` additions for HYG-005/006 and INV-003 items (logs, `*.out`, `*.tsbuildinfo`, `.next`, caches, `local_storage/`, dumps, tokens). `git rm --cached` anything already tracked (8 tracked junk files listed in hygiene.json).
-- 0.4 [needs-approval] Delete confirmed junk: root `_task07*.txt`, `vitest-t11.log`, other INV-003 items (15 clutter files listed in inventory.json), pyc husks (HYG-007).
-  - Diff before deleting duplicates: `.codes/…/010-006_design.md` vs `.features/designs_active/010-006_design.md`; `"004-006 copy.md"` vs `004-006.md`; `.features/zz_workfow_archive/` vs `.clinerules/workflows/` (byte-compare via INV-002).
-- 0.5 [needs-approval] Streamlit residue (HYG-008): remove `.streamlit/`; `scripts/map_streamlit_to_backend.py` only if `impact` = 0; move `memory-bank/streamlit_*` docs to `docs/archive/`; propose (do not run) venv uninstall + requirements edit.
-- 0.6 [safe] Replace `scripts/regenerate-audit.ps1` with a 3-line wrapper around `repo_audit all --with-external`; delete superseded `.audit/` outputs (tree.txt, tree-filtered.txt, js-imports.txt, knip-report.txt, culler-report.txt).
+## §3 Decisions Needed
 
-Exit: `hygiene.sensitive_exposed = 0`, `hygiene.tracked_junk = 0`, `hygiene.pyc_husks = 0`,
-`inventory.clutter_files = 0`, `inventory.stray_path_files = 0`, tests green.
+*(Empty. All prior decisions have been folded into task bodies in §4. Any new decision that surfaces will be inserted as a task Action, not written here.)*
 
-Estimated commits: 3–4.
+## §4 Tasks
 
-## Phase 1 — Fix boundaries in place (branch `reorg/01-boundaries`; behavior-preserving code edits)
+### Next batch — run in order
 
-Tasks:
-- 1.1 [blocked-on-decision] Resolve dangling `backend.config` import (PY-001). Audit shows `py.dangling_imports = 0` but hypothesis H1 says `backend_functions/config.py` imports `backend.config` with no `backend/config.py` (only stale `.pyc`). Use `git log --diff-filter=D -- backend/config.py` to learn what happened. If ambiguous → DECISIONS.md, stop.
-- 1.2 [safe] Remove `fastapi` from executioner/library layer (PY-004): `backend_functions/ultimate_task_executioner_v2.py:8` imports `<fastapi>`. Replace `HTTPException` etc. with plain domain exceptions; translate in routers.
-- 1.3 [safe] Extract router-resident logic (PY-005/PY-006/PY-007): for each private helper, create a public function in `backend_functions/<domain>_service.py`; routers and callers (scripts/tests) import it. Move threading/orchestration out of routers.
-  - PY-005: 16 private cross-imports (food_search `_quality_label` etc., admin `_failed_run_message`, activities `_run_step`/`_task_failure_message`).
-  - PY-006: 11 route handlers calling DB directly (admin.py, music.py, segments.py, main.py).
-- 1.4 [safe] Write `docs/reorg/DYNAMIC_TARGETS.md` (real `importlib` targets from PY-010): 6 non-literal dynamic imports in `service_logins.py`, `task_execution.py`, `ultimate_task_executioner_v2.py`. Add them as pinned in `audit.toml`.
-- 1.5 [complete] Garmin: vendored copies deleted; imports repointed to `pirate-garmin_clone` library; `json_extractors.py` and `service_logins.py` updated; `pytest.ini` pythonpath added.
-  - PY-013: `backend_functions/pirate_garmin_endpoints.py` ~ `pirate-garmin_clone/src/pirate_garmin/endpoints.py` (0.93 similarity).
-- 1.6 [complete] Deleted 6 legacy orphan modules: `admin_functions.py`, `running_functions.py`, `admin_schemas.py`, `data_helpers.py`, `db_wrapper.py`, `image_creation.py`. All had zero code importers.
-- 1.7 [safe] Enable all current `[[forbid]]` rules in `audit.toml`.
+#### Task 0.5 — Install `rope`, build `tools/refactor/move_python.py`, fixture-test  `[AGENT]` `[TODO]`
 
-Exit: `py.dangling_imports = 0`, `py.pkg_cycles = 0`, `py.layer_violations = 0`,
-`py.private_cross_imports = 0`, `py.router_direct_db_handlers` reduced, OpenAPI snapshot identical, tests green.
+**Scope:** `.venv` (adds `rope`); creates `tools/refactor/move_python.py`, `tools/refactor/tests/fixture/`, `tools/refactor/tests/test_move_python.ps1`. No source moves yet.
+**Depends on:** none. **Environment:** plain PowerShell; `$py = ".venv\Scripts\python.exe"`.
 
-Estimated commits: 5–7.
+**Actions:**
 
-## Phase 2 — Mechanical moves that do not change Python import paths (branch `reorg/02-moves`)
+1. Install rope:
+   ```
+   & ".venv\Scripts\python.exe" -m pip install rope
+   ```
+2. Create `tools\refactor\move_python.py` with this contract:
+   - CLI: `python move_python.py <manifest.json> (--dry-run | --apply)`
+   - Manifest: `{"old.module.path": "new.module.path", ...}`
+   - Uses `rope.refactor.move.MoveModule` (or `rope.refactor.rename.Rename` if installed rope version moved the API — check `python -c "import rope.refactor; print(dir(rope.refactor))"` first).
+   - Prints per-file rewrites on `--dry-run`, applies on `--apply`.
+   - Exits non-zero if any module cannot be resolved.
+3. Create fixture at `tools\refactor\tests\fixture\`:
+   - `pkg_a\__init__.py`, `pkg_a\foo.py` (`def hello(): return "hi"`)
+   - `pkg_b\__init__.py`
+   - `user.py` (`from pkg_a.foo import hello`; `hello()`)
+   - `manifest.json` → `{"pkg_a.foo": "pkg_b.foo"}`
+4. Create `tools\refactor\tests\test_move_python.ps1`:
+   - Copies fixture to temp dir, `cd` temp, runs `& $py <path>\move_python.py manifest.json --apply`
+   - Asserts: `pkg_b\foo.py` exists; `pkg_a\foo.py` absent; `user.py` contains `from pkg_b.foo import hello`; `& $py -c "import user; print(user.hello())"` prints `hi`.
+   - Removes temp dir.
+5. Commit: `reorg(tool): rope wrapper + fixture [0.5]`
 
-Tasks:
-- 2.0 [safe] Pre-flight: prove/restore bootstrap manifests required by `deploy_react.sh`. `requirements-react.txt` and `npm_requirements.txt` were restored to `deploy/scripts/` from commit `bb90e2c^` after being inadvertently removed during reorganization. Verify both files exist at the paths `deploy_react.sh` references (lines 54–55, 112, 117–122) and that `bash -n deploy_react.sh` passes. Do not proceed to 2.4/2.5 until this gate passes.
-- 2.1 [needs-approval] `db/`: No migration files on disk (`sql.migrations = 0`). Any future SQL scripts land in `.features/migration_ddl/` (outside git) and are applied one-by-one by humans on PRD/DEV. No `sql.proposed_order`; no global ordering; no `db/migrations/` move.
-  - Audit shows `sql.files = 0`, `sql.migrations = 0` — no migration files on disk.
-- 2.2 [safe] `scripts/` triage per approved list: durable tools → `tools/{db,diagnostics,audit,features,codemod}/`; approved one-offs → delete; test-like scripts → `backend/tests/integration/` only if trivial else delete; misplaced `test_*.py` → `tests/`. Update `pytest.ini`, `.clinerules`, docs.
-  - keep-tool (6): `schema_cache.py`, `sync-prod-to-dev.ps1`, `validate_pydantic_models.py`, `validate_queries.py`, `validate_sql.py`, `regenerate-audit.ps1`
-  - misplaced-test (5): `test_db_connectivity.py`, `test_dotenv.py`, `test_garmin_login.py`, `test_logins.py`, `test_queries.py`
-  - review (6, human decision): `audit_db_investigation.py`, `audit_view_columns.py`, `document_stored_procedures.py`, `generate_data_flow_diagrams.py`, `generate_schema_documentation.py`, `smoke_test.py`
-- ~~2.3 [rejected] Docs: `.features/designs_complete` → `docs/features/done/`; `designs_active` + `descriptions` → `docs/features/active/`; `memory-bank/` → `docs/` (hand-written) and `docs/generated/` (reports; gitignore or regenerate). **Update `.clinerules/workflows/*`, `.agents/skills/*`, `local_clinerules.txt`, and `tools/features/fd.py` path constants in the same commit.** Skip if human chose to keep `.features/`.~~
-  - **Decision (2026-10-29):** Phase 2.3 is REJECTED. `.features/` is retained as-is as a legacy feature-management workspace. Added `/.features/` to `.gitignore` (new files will not be tracked; existing tracked files remain). Audit tools should skip this tree. No path constant updates in `.clinerules/`, `.agents/skills/*`, `local_clinerules.txt`, or `tools/features/fd.py` — all existing `.features/` references remain valid and unchanged.
-- 2.4 [safe] Merge `deploy/` + `deployment/` → `deploy/{systemd,nginx,scripts}`; update units/bootstrap in same commit; append to `CUTOVER.md`.
-- 2.5 [needs-approval] Consolidate dependency manifests per DECISIONS.md §13 (two categories, not one file):
-  - Canonical Python source: `backend/pyproject.toml`; bootstrap copy: `deploy/scripts/library_requirements.txt` (read by `pi5_deploy.sh:152`).
-  - Canonical npm source: `frontend/pifitness/package.json`; bootstrap copy: `deploy/scripts/npm_requirements.txt` (read by `deploy_react.sh` lines 117–122).
-  - Merge `deploy/scripts/requirements-react.txt` into `library_requirements.txt`, then delete; repoint `deploy_react.sh:54` (`REQUIREMENTS_FILE`) to `library_requirements.txt`.
-  - Delete root `npm_requirements.txt` only after proof; repoint `pi5_deploy.sh:183` (`../../npm_requirements.txt`) to `deploy/scripts/npm_requirements.txt`.
-  - `setup.py` replaced by `backend/pyproject.toml` in Phase 3.0.
-  - Proof gate before any deletion: `pip install -e backend` + `pytest -q` green; `npm ci` + `next build` in `frontend/pifitness/` green; `bash -n` on both shell scripts after repointing.
-- 2.6 [safe, completed 2026-10-29] Consolidate byte-identical duplicate query/schema files. 7 duplicates in `backend_functions/queries/` and `backend_functions/schemas/` mirrored canonical modules now in `pifitness.<domain>.queries`. Deleted all 7; rewrote `backend_functions/queries/__init__.py` with backward-compat note for `food_queries`. Post-cleanup correction: `health_queries` was also already deleted (pre-Phase 2, renamed to `.bak`); `__init__.py` docstring corrected to only reference `food_queries` remaining. Note that `pifitness/food/queries.py` and `backend_functions/queries/food_queries.py` are near-duplicates (1 trailing newline difference), NOT eliminated by Phase 2.
+**Success criteria:**
 
-Exit: `scripts.oneoff = 0`, `scripts.misplaced_tests = 0`,
-`inventory.duplicate_groups = 0`; `impact` on every old path = 0 references.
+| # | Check | Expected |
+|---|---|---|
+| 1 | `& $py -m pip show rope` | exit 0 |
+| 2 | `powershell -File tools\refactor\tests\test_move_python.ps1` | exit 0 |
+| 3 | `tools\refactor\move_python.py` exists, has `--apply` and `--dry-run` args | `Select-String -Path tools\refactor\move_python.py -Pattern "--apply\|--dry-run"` → ≥1 match |
+| 4 | `git status --short` after commit | empty |
 
-Estimated commits: 6–9.
+**If verification fails:** the fixture test *is* the debug surface. Do not test on real source. Fix `move_python.py` until the fixture passes, then re-commit.
 
-## Phase 3 — Python package by domain (branch per slice: `reorg/03-<domain>`)
+**Rollback:** `git reset --hard HEAD~1; & ".venv\Scripts\python.exe" -m pip uninstall -y rope; Remove-Item -Recurse tools\refactor`
 
-Tasks:
-- 3.0 [safe] Create `backend/pyproject.toml` (package `pifitness` at `backend/pifitness/`), move dependency declarations into it, update `pytest.ini` (`pythonpath`), reinstall editable. **No compatibility shims at end of phase.**
-- 3.1 [safe per slice, needs-approval for deletions] Slice order: `health` → `exercises` → `volleyball` → `admin` → `food` → `music` → `integrations` → `activities` → `worker` → `core` → `api` wiring. For each slice build `moves.json` from `domains.assignment` (router → `router.py`, queries → `queries.py`, schemas → `schemas.py`, functions → `service.py` or named modules, tests → `backend/tests/<domain>/`), run `impact`, run codemod (`tools/codemod/move_python.py`), run gates, commit.
-- 3.2 [safe] Systemd units and entrypoints (`uvicorn pifitness.api.main:app`, worker entrypoint) change in the slice that moves them; update `deploy/` and `CUTOVER.md` in that commit.
-- 3.3 [safe] Final slice: enable TARGET `[[forbid]]` rules, disable old ones, update `[domains]` keywords.
-- 3.4 [safe] Clean-room check: new temp venv outside repo → `pip install -e backend` → `pytest -q` → import the app.
+---
 
-Exit: OpenAPI snapshot identical to `openapi.before.json`; `py.layer_violations = 0` under TARGET rules;
-`py.module_cycles = 0`; `py.router_direct_db_handlers = 0`; no `backend_functions`, `frontend_functions`, `agents` dirs.
+#### Task 2.5.dep — Fix `deploy_react.sh` manifest reference  `[AGENT]` `[TODO]`
 
-Estimated commits: 10–14 (one per slice + wiring).
+**Scope:** `deploy/scripts/deploy_react.sh`, `deploy/scripts/library_requirements.txt` (only if merge needed). No source code.
+**Depends on:** none — parallel-safe with 0.5. **Environment:** plain PowerShell for inspection; `[git-bash]` for `bash -n`.
 
-## Phase 4 — Frontend (branch `reorg/04-frontend`, slices `reorg/04-<domain>`)
+**Actions:**
 
-Tasks:
-- 4.1 [approved] Flatten `frontend/pifitness` → `frontend`; update every reference (`deploy/`, nginx-react.conf, scripts, `.clineignore`, docs, `package.json` scripts). Delete root `package.json`/lockfile/`node_modules` only after `ts` audit (TS-009) and clean `npm ci` + build prove unused + human approved.
-  - TS-009: root `package.json` duplicates 17 deps of frontend manifest.
-- 4.2 [safe] Introduce `features/<domain>/` per `domains.assignment`: move route-local components, `hooks/use<Domain>.ts`, `lib/types/<domain>.ts`, single-consumer `lib/*` (TS-007) into their feature; keep `app/<route>/page.tsx` thin; move `app/components` → `components/`. Eliminate route → route imports (TS-006: `app/beachchanger -> app/activities`).
-- 4.3 [approved] Only if approved: generate API types from FastAPI OpenAPI schema (`openapi-typescript`) into `src/lib/api/generated.ts`; replace hand-written `lib/types/*` incrementally.
-- 4.4 [approved] Remove modules import graph proves unreachable (TS-001: 4 unreachable files — `DBSessions.tsx`, `index.ts`, `MapView.tsx`, `useViewport.ts`) with approval; remove unused npm packages (TS-004: 5 unused) only if approved (lockfile changes need sign-off).
+1. Inspect what `deploy_react.sh` expects:
+   ```
+   Select-String -Path deploy\scripts\deploy_react.sh -Pattern "REQUIREMENTS_FILE|requirements-react|library_requirements"
+   ```
+2. Inspect what `library_requirements.txt` contains:
+   ```
+   Get-Content deploy\scripts\library_requirements.txt
+   ```
+3. Inspect what `deploy_react.sh` was trying to install. Reference commit `bb90e2c^` where `requirements-react.txt` existed:
+   ```
+   git show bb90e2c^:deploy/scripts/requirements-react.txt
+   ```
+4. **If `library_requirements.txt` already contains every package from the historical `requirements-react.txt`** → repoint only:
+   - In `deploy\scripts\deploy_react.sh`, change `REQUIREMENTS_FILE="requirements-react.txt"` → `REQUIREMENTS_FILE="library_requirements.txt"`
+5. **If `library_requirements.txt` is missing packages from the historical file** → merge first, then repoint:
+   - Append missing lines to `deploy\scripts\library_requirements.txt`
+   - Then do the repoint from step 4.
+6. Validate shell syntax:
+   ```
+   & "C:\Program Files\Git\bin\bash.exe" -n deploy/scripts/deploy_react.sh
+   ```
+7. Commit: `reorg(2.5): repoint deploy_react.sh to library_requirements.txt [2.5.dep]`
 
-Exit: `ts.unresolved_imports = 0`, `ts.cross_route_imports = 0`, `ts.npm_undeclared = 0`,
-`ts.unreachable_files` ≤ baseline (target 0 after approvals), `inventory.npm_manifests = 1`,
-`tsc --noEmit`, `vitest run`, `next build` green.
+**Success criteria:**
 
-Estimated commits: 8–12.
+| # | Check | Expected |
+|---|---|---|
+| 1 | `Select-String deploy\scripts\deploy_react.sh -Pattern "requirements-react"` | zero matches |
+| 2 | `Select-String deploy\scripts\deploy_react.sh -Pattern "library_requirements.txt"` | ≥1 match |
+| 3 | `bash -n deploy/scripts/deploy_react.sh` | exit 0, no output |
+| 4 | Every package from `git show bb90e2c^:deploy/scripts/requirements-react.txt` present in `library_requirements.txt` | manual check — list both, diff visually |
+| 5 | `git status --short` after commit | empty |
 
-## Phase 5 — Guardrails and wrap-up (branch `reorg/05-guardrails`)
+**If verification fails:** do not merge additional packages without seeing the diff first. Paste `git show bb90e2c^:deploy/scripts/requirements-react.txt` and `Get-Content library_requirements.txt` — we'll decide the merge together.
 
-Tasks:
-- 5.1 [safe] Add ESLint boundaries rule (or `no-restricted-imports`) so `features/*` import only from `components/`, `lib/`, and their own folder — only if no new dependency; otherwise list as recommendation.
-- 5.2 [needs-approval] Add `import-linter` contracts mirroring TARGET rules only if approved (new dev dependency); otherwise keep `repo_audit check` as gate and document in `README.md`.
-- 5.3 [propose] Wire `repo_audit check` into PR/pre-commit flow (`.clinerules/hooks` or git hook; propose, don't force).
-- 5.4 [safe] Write `docs/ARCHITECTURE.md` (layout, dependency rules, how to add a domain, how to run the audit), update `README.md`, generate `docs/reorg/FINAL_REPORT.md` from `repo_audit diff` plus git co-change baseline.
+**Rollback:** `git reset --hard HEAD~1`
 
-Exit: all gated metrics at targets; baseline refreshed (`repo_audit baseline`) and committed.
+---
 
-Estimated commits: 2–3.
+### Deferred — expand after 0.5 is green
 
-## Risks and rollback
+- **3.integrations** — move `backend/api/auth.py`, `backend/api/config.py` → `backend/pifitness/integrations/`. Uses `rope` (Task 0.5). Spec written after 0.5 verified.
+- **3.worker** — move `backend_functions/backend_tasks.py` → `backend/pifitness/worker/worker.py`. Spec written after 3.integrations passes.
+- **3.core** — move `backend_functions/{config,domain_exceptions,logging_functions}.py` → `backend/pifitness/core/`. Must precede 3.api.
+- **3.api** — move `backend/main.py` → `backend/pifitness/api/main.py`; then `from pifitness.api.main import app` must pass. This is the final Phase-3 gate.
+- **3.0.verify, 3.2.verify, 3.3.verify** — probe tasks for the unverified rows in §1.
+- **3.4** — clean-room check, blocked on 3.api.
+- **4.1–4.4** — frontend flatten + features/ restructure.
+- **5.1–5.4** — guardrails.
 
-- **Rollback for every phase:** discard the branch. `git mv` preserves history so reverting a branch is clean.
-- **Stale editable installs:** `__editable__.pifitness-*` finders can keep resolving old module names after a rename; clean-room check (3.4) is mandatory.
-- **Windows case-insensitivity:** case-only renames need an intermediate name. Long paths under `.features/` may hit limits.
-- **Dynamic loading:** `importlib` targets invisible to static analysis; pinned modules must not move without `DYNAMIC_TARGETS.md` entry.
-- **uvicorn/systemd:** reference module paths as strings; `impact` finds them only if in repo. Pi-external config goes in `CUTOVER.md`.
-- **Generated artifacts:** `memory-bank/*report*.json`, `data_flow_diagrams.*`, `.audit/*` need regeneration command documented before deletion/gitignore.
+Each will be written in full task format once its predecessor is green. No partial-spec tasks.
 
-Gate commands (after every commit, per §8): `compileall`, `pytest -q`, OpenAPI snapshot diff vs `openapi.before.json`, `repo_audit all` + `check` (exit 0), `tsc --noEmit`, `vitest run`, `next build`, `git status --short`.
+## §5 Test baseline
+
+Full suite runs once per phase, not per task. Task-level verification uses targeted paths.
+
+```
+Full suite  : & ".venv\Scripts\python.exe" -m pytest -q      (210 passed, 161s)
+Compileall  : & ".venv\Scripts\python.exe" -m compileall -q backend backend_functions tests
+Targeted    : & ".venv\Scripts\python.exe" -m pytest -q <specific/paths>
+```
+
+After every task-commit:
+```
+& ".venv\Scripts\python.exe" scripts\repo_audit all
+& ".venv\Scripts\python.exe" scripts\repo_audit check
+```
+
+Both must exit 0.
