@@ -28,7 +28,7 @@ FILES CHANGED (git status --short, raw)
   ?? backend/pifitness/integrations/
 
 COMMIT
-  NOT COMMITTED (commit step follows verification)
+  505761d reorg(int-0): scaffold pifitness.integrations + capture baseline [INT-0]
 
 PYTEST
   210 passed
