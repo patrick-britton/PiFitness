@@ -184,3 +184,13 @@ def test_assert_conforms_rejects_bad_status_type():
 
     with pytest.raises(AssertionError):
         assert_conforms(BadStatus())
+
+def test_spotify_provider_conforms():
+    """INT-7a: the real SpotifyProvider must satisfy AuthProvider.
+
+    If this fails, the protocol is over-fit for Spotify and INT-7b (the
+    code move) must not proceed until base.py is reshaped.
+    """
+    from pifitness.integrations.spotify.provider import spotify_provider
+
+    assert_conforms(spotify_provider)
