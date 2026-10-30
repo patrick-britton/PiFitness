@@ -1,4 +1,4 @@
-from pkg_a.foo import hello
+from pkg_a.foo import hello, other
 
 if __name__ == "__main__":
-    print(hello())
+    print(hello(), other())

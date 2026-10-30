@@ -18,8 +18,7 @@ DONE = verified by probe at HEAD `287c9dff` (see `.audit/discovery/ledger.tsv`).
 | 0 | 0.3 gitignore logs/caches | ✅ DONE | `.gitignore` covers `.next`, `*.dump` |
 | 0 | 0.5 streamlit residue | ✅ DONE | `.streamlit` absent |
 | 0 | 0.6 regenerate-audit | ✅ DONE | wrapper present |
-| 0 | T0.5 rope tool | ✅ DONE | move_python.py + fixture test passes |
-| 0 | T0.5.1 rename support | ✅ DONE | move via rope, rename via fs+regex; fixture covers both |
+| 0 | T0.5 move tool | ✅ DONE | libcst engine; move+rename; multi-name/alias safe; comment/string preserved; fixture covers all cases |
 | 0 | T0.5.1 rename support | ✅ DONE | move via rope, rename via fs+regex; fixture covers both |
 | 1 | 1.1 dangling config | ✅ DONE | docstring only, no real import (Task 0.3.5) |
 | 1 | 1.2 fastapi removed from exec | ✅ DONE | no `import fastapi` in exec |

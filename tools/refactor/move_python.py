@@ -1,157 +1,223 @@
-"""Move and/or rename Python modules, rewriting imports.
+"""Move and/or rename Python modules, rewriting imports via libcst.
 
-Manifest format: {"old.module.path": "new.module.path", ...}
+Manifest: {"old.module.path": "new.module.path", ...}
 
-Cases supported per entry:
-  - Move only        : pkg_a.foo -> pkg_b.foo   (same basename)
-  - Rename in place  : pkg_a.foo -> pkg_a.bar   (same package, new basename)
-  - Move + rename    : pkg_a.foo -> pkg_b.bar   (new package AND new basename)
-  - No-op            : rejected
+Package roots are mapped explicitly via --pkg-map so the tool can compute
+physical file paths without relying on Python's import system.
 
 Implementation:
-  - Move  : rope.refactor.move.MoveModule  (AST-precise import rewriting)
-  - Rename: os.rename + regex rewrite of `old.module.path` -> `new.module.path`
-            across all .py files (word-boundary match). Rename is NOT AST-based
-            because rope has no public module-rename API. Adequate for the
-            pattern `from X.Y import` / `import X.Y` / `X.Y.attr`.
+  - File move     : os.rename + ensure __init__.py in dest folder
+  - Import rewrite: libcst AST transformer (Python 3.14+ compatible)
+    Only rewrites actual Import/ImportFrom statements. Strings and comments
+    containing the module path are left byte-identical.
+
+Handles:
+  - from old_module import X       -> from new_module import X
+  - from old_module.sub import X   -> from new_module.sub import X
+  - import old_module              -> import new_module
+  - import old_module.sub          -> import new_module.sub
+  - import old_module as Y         -> import new_module as Y
+
+Does NOT handle (fail loudly at test time if encountered):
+  - from parent_pkg import child_module (importing a module from its parent)
+  - Attribute access like module.X.Y() (fully-qualified names in call sites)
+  - Dynamic imports (importlib.import_module("..."))
+
+If a move produces ModuleNotFoundError in tests and the offending line looks
+like one of these, that pattern needs to be added here or handled manually.
 """
 import argparse
 import json
 import os
-import re
 import sys
 from pathlib import Path
 
-from rope.base.project import Project
-from rope.refactor.move import MoveModule
+import libcst as cst
+
+SKIP_DIRS = {".venv", ".git", "__pycache__", "node_modules",
+             ".pytest_cache", "build", "dist", ".next"}
 
 
-def _split(mod: str) -> tuple[str, str]:
-    head, _, tail = mod.rpartition(".")
-    return head, tail
+def parse_pkg_map(s: str) -> dict:
+    mapping = {}
+    for pair in s.split(","):
+        pair = pair.strip()
+        if not pair:
+            continue
+        if "=" not in pair:
+            raise ValueError(f"bad --pkg-map entry: {pair!r}")
+        k, v = pair.split("=", 1)
+        mapping[k.strip()] = v.strip()
+    return mapping
 
 
-def _dest_folder(project: Project, new_pkg: str):
-    return project.get_folder(new_pkg) if new_pkg else project.root
+def resolve_physical(mod: str, pkg_map: dict, project_root: Path) -> Path:
+    for prefix in sorted(pkg_map.keys(), key=len, reverse=True):
+        if mod == prefix:
+            return project_root / pkg_map[prefix] / "__init__.py"
+        if mod.startswith(prefix + "."):
+            rest = mod[len(prefix) + 1:].replace(".", os.sep)
+            return project_root / pkg_map[prefix] / (rest + ".py")
+    raise ValueError(f"module {mod!r} does not match any --pkg-map prefix")
 
 
-def _walk_ignore(path: str) -> bool:
-    """Return True if path should be skipped during regex rewrite."""
-    parts = Path(path).parts
-    return any(p in parts for p in (".venv", ".git", "__pycache__", "node_modules", ".pytest_cache", "build", "dist"))
+def ensure_package(folder: Path) -> None:
+    folder.mkdir(parents=True, exist_ok=True)
+    init_py = folder / "__init__.py"
+    if not init_py.exists():
+        init_py.write_text("", encoding="utf-8", newline="")
 
 
-def _rewrite_imports_regex(project_root: Path, old_mod: str, new_mod: str) -> tuple[int, str | None]:
-    """Regex-rewrite all references to old_mod -> new_mod. Returns (files_changed, error)."""
-    pattern = re.compile(rf"\b{re.escape(old_mod)}\b")
+class _ImportRewriter(cst.CSTTransformer):
+    def __init__(self, old: str, new: str):
+        self.old = old
+        self.new = new
+
+    @staticmethod
+    def _get_dotted(node):
+        if node is None:
+            return None
+        if isinstance(node, cst.Name):
+            return node.value
+        if isinstance(node, cst.Attribute):
+            base = _ImportRewriter._get_dotted(node.value)
+            if base is None:
+                return None
+            return f"{base}.{node.attr.value}"
+        return None
+
+    @staticmethod
+    def _make_dotted(dotted: str):
+        parts = dotted.split(".")
+        node = cst.Name(parts[0])
+        for part in parts[1:]:
+            node = cst.Attribute(value=node, attr=cst.Name(part))
+        return node
+
+    def _rewrite_ref(self, dotted: str):
+        """Return rewritten dotted path if matches self.old prefix, else None."""
+        if dotted == self.old:
+            return self.new
+        if dotted.startswith(self.old + "."):
+            return self.new + dotted[len(self.old):]
+        return None
+
+    def leave_ImportFrom(self, original_node, updated_node):
+        if updated_node.module is None:
+            return updated_node  # relative import
+        mod = self._get_dotted(updated_node.module)
+        if mod is None:
+            return updated_node
+        new_mod = self._rewrite_ref(mod)
+        if new_mod is None:
+            return updated_node
+        return updated_node.with_changes(module=self._make_dotted(new_mod))
+
+    def leave_Import(self, original_node, updated_node):
+        new_names = []
+        changed = False
+        for name in updated_node.names:
+            dotted = self._get_dotted(name.name)
+            if dotted is None:
+                new_names.append(name)
+                continue
+            new_dotted = self._rewrite_ref(dotted)
+            if new_dotted is None:
+                new_names.append(name)
+                continue
+            new_names.append(name.with_changes(name=self._make_dotted(new_dotted)))
+            changed = True
+        if changed:
+            return updated_node.with_changes(names=tuple(new_names))
+        return updated_node
+
+
+def rewrite_imports_libcst(project_root: Path, old_mod: str, new_mod: str) -> int:
     changed = 0
     for root, dirs, files in os.walk(project_root):
-        dirs[:] = [d for d in dirs if not _walk_ignore(os.path.join(root, d))]
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for fname in files:
             if not fname.endswith(".py"):
                 continue
-            fpath = Path(root) / fname
+            fp = Path(root) / fname
             try:
-                text = fpath.read_text(encoding="utf-8")
+                text = fp.read_text(encoding="utf-8")
             except Exception:
                 continue
-            new_text = pattern.sub(new_mod, text)
+            try:
+                tree = cst.parse_module(text)
+            except Exception:
+                continue
+            new_tree = tree.visit(_ImportRewriter(old_mod, new_mod))
+            new_text = new_tree.code
             if new_text != text:
-                try:
-                    fpath.write_text(new_text, encoding="utf-8", newline="")
-                except Exception as e:
-                    return changed, f"write {fpath}: {e}"
+                fp.write_text(new_text, encoding="utf-8", newline="")
                 changed += 1
-    return changed, None
+    return changed
 
 
-def _apply_entry(project: Project, project_root: Path, old_mod: str, new_mod: str) -> tuple[list[str], str | None]:
-    old_pkg, old_base = _split(old_mod)
-    new_pkg, new_base = _split(new_mod)
-
-    if old_pkg == new_pkg and old_base == new_base:
+def plan_entry(project_root: Path, pkg_map: dict, old_mod: str, new_mod: str):
+    try:
+        src = resolve_physical(old_mod, pkg_map, project_root)
+        dst = resolve_physical(new_mod, pkg_map, project_root)
+    except ValueError as e:
+        return [], str(e)
+    if not src.exists():
+        return [], f"source not found: {src.relative_to(project_root)}"
+    if src == dst:
         return [], "no-op: identical paths"
-
-    steps: list[str] = []
-    current = old_mod
-
-    # Step 1: move (rope)
-    if old_pkg != new_pkg:
-        try:
-            resource = project.get_module(current).get_resource()
-            dest = _dest_folder(project, new_pkg)
-            change = MoveModule(project, resource).get_changes(dest)
-            project.do(change)
-        except Exception as e:
-            return steps, f"move: {e}"
-        current = f"{new_pkg}.{old_base}" if new_pkg else old_base
-        steps.append(f"moved {old_mod} -> {current}")
-
-    # Step 2: rename (fs + regex)
-    if old_base != new_base:
-        try:
-            resource = project.get_module(current).get_resource()
-        except Exception as e:
-            return steps, f"resolve-for-rename: {e}"
-
-        cur_pkg, _ = _split(current)
-        final_mod = f"{cur_pkg}.{new_base}" if cur_pkg else new_base
-        new_rel_path = (resource.parent.path + "/" + new_base + ".py") if resource.parent.path else (new_base + ".py")
-        old_full = project_root / resource.path
-        new_full = project_root / new_rel_path
-
-        try:
-            os.rename(old_full, new_full)
-        except Exception as e:
-            return steps, f"fs-rename: {e}"
-
-        changed, err = _rewrite_imports_regex(project_root, current, final_mod)
-        if err:
-            return steps, f"regex-rewrite: {err}"
-        steps.append(f"renamed {current} -> {final_mod} ({changed} files rewritten)")
-
-    return steps, None
+    return [f"WOULD move {src.relative_to(project_root)} -> {dst.relative_to(project_root)}"], None
 
 
-def _plan_entry(project: Project, old_mod: str, new_mod: str) -> tuple[list[str], str | None]:
-    old_pkg, old_base = _split(old_mod)
-    new_pkg, new_base = _split(new_mod)
-
-    if old_pkg == new_pkg and old_base == new_base:
+def apply_entry(project_root: Path, pkg_map: dict, old_mod: str, new_mod: str):
+    try:
+        src = resolve_physical(old_mod, pkg_map, project_root)
+        dst = resolve_physical(new_mod, pkg_map, project_root)
+    except ValueError as e:
+        return [], str(e)
+    if not src.exists():
+        return [], f"source not found: {src.relative_to(project_root)}"
+    if src == dst:
         return [], "no-op: identical paths"
 
     try:
-        resource = project.get_module(old_mod).get_resource()
-        if not resource.exists():
-            return [], f"source module not found: {old_mod}"
+        ensure_package(dst.parent)
+        os.rename(src, dst)
     except Exception as e:
-        return [], f"resolve: {e}"
+        return [], f"rename: {e}"
 
-    if old_pkg != new_pkg:
-        try:
-            _dest_folder(project, new_pkg)
-        except Exception as e:
-            return [], f"dest folder: {e}"
-
-    plan: list[str] = []
-    if old_pkg != new_pkg:
-        target = f"{new_pkg}/{old_base}.py" if new_pkg else f"{old_base}.py"
-        plan.append(f"WOULD move {old_mod} -> {target}")
-    if old_base != new_base:
-        plan.append(f"WOULD rename {old_base}.py -> {new_base}.py (fs + regex imports)")
-    return plan, None
+    steps = [f"moved {src.relative_to(project_root)} -> {dst.relative_to(project_root)}"]
+    if old_mod != new_mod:
+        n = rewrite_imports_libcst(project_root, old_mod, new_mod)
+        steps.append(f"rewrote imports in {n} file(s)")
+    return steps, None
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     p.add_argument("manifest", help="JSON file: {old_module: new_module}")
-    p.add_argument("--dry-run", action="store_true", help="preview only; do not apply")
-    p.add_argument("--apply", action="store_true", help="apply the moves/renames")
-    p.add_argument("--project-root", default=".", help="project root (default: cwd)")
+    p.add_argument("--pkg-map", required=True,
+                   help='comma-separated prefix=physical, e.g. "backend_functions=backend/backend_functions,pifitness=backend/pifitness"')
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--apply", action="store_true")
+    p.add_argument("--project-root", default=".")
     args = p.parse_args()
 
     if args.dry_run == args.apply:
         print("ERROR: pass exactly one of --dry-run or --apply", file=sys.stderr)
+        return 2
+
+    project_root = Path(args.project_root).resolve()
+    try:
+        pkg_map = parse_pkg_map(args.pkg_map)
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
+    if not pkg_map:
+        print("ERROR: --pkg-map is empty", file=sys.stderr)
         return 2
 
     manifest_path = Path(args.manifest)
@@ -161,20 +227,18 @@ def main() -> int:
     try:
         moves = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as e:
-        print(f"ERROR: manifest is not valid JSON: {e}", file=sys.stderr)
+        print(f"ERROR: manifest not valid JSON: {e}", file=sys.stderr)
         return 2
     if not isinstance(moves, dict) or not moves:
         print("ERROR: manifest must be a non-empty JSON object", file=sys.stderr)
         return 2
 
-    project_root = Path(args.project_root).resolve()
-    project = Project(str(project_root))
     applied = 0
-    failed: list[tuple[str, str, str]] = []
+    failed = []
 
     for old_mod, new_mod in moves.items():
         if args.dry_run:
-            plan, err = _plan_entry(project, old_mod, new_mod)
+            plan, err = plan_entry(project_root, pkg_map, old_mod, new_mod)
             if err:
                 failed.append((old_mod, new_mod, err))
                 continue
@@ -182,7 +246,7 @@ def main() -> int:
                 print(line)
             applied += 1
         else:
-            steps, err = _apply_entry(project, project_root, old_mod, new_mod)
+            steps, err = apply_entry(project_root, pkg_map, old_mod, new_mod)
             if err:
                 failed.append((old_mod, new_mod, err))
                 continue
@@ -190,14 +254,12 @@ def main() -> int:
                 print(s)
             applied += 1
 
-    project.close()
-
     print()
     print(f"Applied {applied} of {len(moves)} move(s).")
     if failed:
         print(f"FAILED {len(failed)}:")
-        for old, new, err in failed:
-            print(f"  {old} -> {new}: {err}")
+        for o, n, e in failed:
+            print(f"  {o} -> {n}: {e}")
         return 1
     return 0
 
