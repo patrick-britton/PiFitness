@@ -10,14 +10,42 @@ import pytest
 from pifitness.integrations.base import AuthProvider, TokenStatus
 
 
-def assert_conforms(provider: AuthProvider) -> None:
-    """Assert that a provider object satisfies the AuthProvider protocol."""
-    assert hasattr(provider, "name"), "provider missing 'name' attribute"
-    assert isinstance(provider.name, str), "provider 'name' must be a string"
-    assert callable(getattr(provider, "is_configured", None)), "provider missing callable is_configured"
-    assert callable(getattr(provider, "get_client", None)), "provider missing callable get_client"
-    assert callable(getattr(provider, "get_status", None)), "provider missing callable get_status"
-    assert callable(getattr(provider, "refresh", None)), "provider missing callable refresh"
+def assert_conforms(provider):
+    """Verify a provider object satisfies the AuthProvider protocol.
+
+    Safe to call in CI without credentials or network access. Does NOT call
+    get_client() or refresh() because those may trigger live auth or browser
+    flows; those are exercised by manual gates in the provider's own block.
+
+    DOES call get_status(): the protocol requires it to be cheap and to never
+    raise, so it is safe to invoke during conformance checks.
+    """
+    name = getattr(provider, "name", None)
+    assert isinstance(name, str) and name, (
+        "provider.name must be a non-empty string, got %r" % (name,)
+    )
+    for method in ("is_configured", "get_client", "get_status", "refresh"):
+        fn = getattr(provider, method, None)
+        assert callable(fn), (
+            "provider.%s must be callable, got %r" % (method, fn)
+        )
+    configured = provider.is_configured()
+    assert isinstance(configured, bool), (
+        "is_configured() must return bool, got %s" % type(configured).__name__
+    )
+
+    status = provider.get_status()
+    assert isinstance(status, TokenStatus), (
+        "get_status() must return TokenStatus, got %s" % type(status).__name__
+    )
+    assert status.service == provider.name, (
+        "status.service (%r) must equal provider.name (%r)"
+        % (status.service, provider.name)
+    )
+    assert isinstance(status.authenticated, bool), (
+        "status.authenticated must be bool, got %s"
+        % type(status.authenticated).__name__
+    )
 
 
 class _DummyProvider:
@@ -102,17 +130,57 @@ def test_dummy_provider_conforms():
 
 def test_missing_refresh_raises():
     provider = _MissingRefresh()
-    with pytest.raises(AssertionError, match="missing callable refresh"):
+    with pytest.raises(AssertionError, match="refresh must be callable"):
         assert_conforms(provider)
 
 
 def test_non_string_name_raises():
     provider = _NonStringName()
-    with pytest.raises(AssertionError, match="provider 'name' must be a string"):
+    with pytest.raises(AssertionError, match="non-empty string"):
         assert_conforms(provider)
 
 
 def test_missing_name_raises():
     provider = _MissingName()
-    with pytest.raises(AssertionError, match="provider missing 'name' attribute"):
+    with pytest.raises(AssertionError, match="non-empty string"):
         assert_conforms(provider)
+
+
+def test_garmin_provider_conforms():
+    """INT-6a: the real GarminProvider must satisfy AuthProvider.
+
+    This is the first time the protocol in base.py is tested against a real
+    provider's shape. If this test fails, the protocol is over-fit for Garmin
+    and INT-6b (the code move) must not proceed until base.py is reshaped.
+    """
+    from pifitness.integrations.garmin.provider import garmin_provider
+
+    assert_conforms(garmin_provider)
+
+
+def test_assert_conforms_rejects_bad_status_type():
+    """INT-6a: restore this test from INT-5's spec (was dropped).
+
+    Enforces the TokenStatus shared-type contract. If a future regression in
+    assert_conforms removes the isinstance(TokenStatus) check, this test will
+    catch it -- the shared type is the only thing preventing provider-specific
+    shapes from leaking into the shared layer.
+    """
+
+    class BadStatus:
+        name = "bad_status"
+
+        def is_configured(self):
+            return False
+
+        def get_client(self):
+            return None
+
+        def get_status(self):
+            return {"authenticated": False}
+
+        def refresh(self):
+            return None
+
+    with pytest.raises(AssertionError):
+        assert_conforms(BadStatus())
