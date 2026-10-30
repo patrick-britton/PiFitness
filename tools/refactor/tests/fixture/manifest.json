@@ -1,1 +1,1 @@
-{"pkg_a.foo": "pkg_b.foo"}
+{"pkg_a.foo": "pkg_b.foo", "pkg_a.bar": "pkg_b.baz"}
