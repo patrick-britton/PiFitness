@@ -18,6 +18,7 @@ DONE = verified by probe at HEAD `287c9dff` (see `.audit/discovery/ledger.tsv`).
 | 0 | 0.3 gitignore logs/caches | ✅ DONE | `.gitignore` covers `.next`, `*.dump` |
 | 0 | 0.5 streamlit residue | ✅ DONE | `.streamlit` absent |
 | 0 | 0.6 regenerate-audit | ✅ DONE | wrapper present |
+| 0 | T0.5 rope tool | ✅ DONE | move_python.py + fixture test passes |
 | 1 | 1.1 dangling config | ✅ DONE | docstring only, no real import (Task 0.3.5) |
 | 1 | 1.2 fastapi removed from exec | ✅ DONE | no `import fastapi` in exec |
 | 1 | 1.3 router logic extracted | ⚠️ UNVERIFIED | not probed — see Task 1.3.verify |
@@ -65,7 +66,7 @@ DONE = verified by probe at HEAD `287c9dff` (see `.audit/discovery/ledger.tsv`).
 
 ### Next batch — run in order
 
-#### Task 0.5 — Install `rope`, build `tools/refactor/move_python.py`, fixture-test  `[AGENT]` `[TODO]`
+#### Task T0.5 — Install `rope`, build `tools/refactor/move_python.py`, fixture-test  `[AGENT]` `[TODO]`
 
 **Scope:** `.venv` (adds `rope`); creates `tools/refactor/move_python.py`, `tools/refactor/tests/fixture/`, `tools/refactor/tests/test_move_python.ps1`. No source moves yet.
 **Depends on:** none. **Environment:** plain PowerShell; `$py = ".venv\Scripts\python.exe"`.
