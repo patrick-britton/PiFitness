@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from garminconnect import Garmin, GarminConnectAuthenticationError, GarminConnectTooManyRequestsError, \
     GarminConnectConnectionError
 from spotipy import SpotifyOAuth, SpotifyException
+from spotipy.cache_handler import CacheFileHandler
 from pathlib import Path
 from backend_functions.credential_management import decrypt_dict
 from backend_functions.database_functions import one_sql_result, get_conn, qec
@@ -273,7 +274,7 @@ def get_spotify_token():
         client_secret=client_secret,
         redirect_uri=redirect_uri,
         scope=scope,
-        cache_path=os.path.join(cache_loc, ".spotify_cache")
+        cache_handler=CacheFileHandler(cache_path=os.path.join(cache_loc, ".spotify_cache"))
     )
 
     # Step 2: Check DB for stored token (Pi fallback — no local cache file)
