@@ -15,12 +15,14 @@ client = TestClient(app)
 
 
 def test_now_playing_skip_route_exists():
+    "Skip returns 503 when no Spotify client is available for music routes."
     with patch('pifitness.music.router.get_spotify_client_for_music', return_value=None):
         response = client.post("/api/music/now-playing/skip")
         assert response.status_code == 503
 
 
 def test_now_playing_promote_no_track():
+    "Promote returns ok=False with a 'No track' message when nothing is playing."
     with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/promote")
         assert response.status_code == 200
@@ -30,6 +32,7 @@ def test_now_playing_promote_no_track():
 
 
 def test_now_playing_promote_wrong_context():
+    "Promote rejects a non-recommendation context with 'only applies to recommendations'."
     mock_state = {
         "playing": True,
         "track": {
@@ -48,6 +51,7 @@ def test_now_playing_promote_wrong_context():
 
 
 def test_now_playing_soft_reject_no_track():
+    "Soft-reject returns ok=False when nothing is playing."
     with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/soft-reject")
         assert response.status_code == 200
@@ -56,6 +60,7 @@ def test_now_playing_soft_reject_no_track():
 
 
 def test_now_playing_hard_reject_no_track():
+    "Hard-reject returns ok=False when nothing is playing."
     with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/hard-reject")
         assert response.status_code == 200
@@ -64,6 +69,7 @@ def test_now_playing_hard_reject_no_track():
 
 
 def test_now_playing_remove_no_track():
+    "Remove returns ok=False when nothing is playing."
     with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/remove")
         assert response.status_code == 200
@@ -72,6 +78,7 @@ def test_now_playing_remove_no_track():
 
 
 def test_now_playing_remove_family_miss():
+    "Remove returns ok=False with 'the playlist cannot be found' when no family rows match."
     mock_state = {
         "playing": True,
         "track": {
@@ -137,6 +144,7 @@ def test_now_playing_remove_full_flow():
 
 
 def test_now_playing_rank_up_wrong_context():
+    "Rank-up rejects a recommendation-context track with 'only applies to playlist tracks'."
     mock_state = {
         "playing": True,
         "track": {
@@ -154,6 +162,7 @@ def test_now_playing_rank_up_wrong_context():
 
 
 def test_now_playing_rank_down_no_track():
+    "Rank-down returns ok=False when nothing is playing."
     with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/rank-down")
         assert response.status_code == 200
@@ -162,6 +171,7 @@ def test_now_playing_rank_down_no_track():
 
 
 def test_now_playing_add_to_playlist_no_track():
+    "Add-to-playlist returns ok=False when nothing is playing."
     with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.post("/api/music/now-playing/add-to-playlist?playlist_id=pl123")
         assert response.status_code == 200
@@ -170,6 +180,7 @@ def test_now_playing_add_to_playlist_no_track():
 
 
 def test_now_playing_add_targets_no_track():
+    "Add-targets returns eligible=False with an empty playlist list when nothing is playing."
     with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.get("/api/music/now-playing/add-targets")
         assert response.status_code == 200
@@ -177,16 +188,10 @@ def test_now_playing_add_targets_no_track():
         assert data["eligible"] is False
         assert data["playlists"] == []
 
-def test_now_playing_add_targets_no_track():
-    with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
-        response = client.get("/api/music/now-playing/add-targets")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["eligible"] is False
-        assert data["playlists"] == []
 
 
 def test_now_playing_add_targets_with_track():
+    "Add-targets returns eligible=True with the playlists not containing the current track."
     mock_state = {
         "playing": True,
         "track": {"isrc": "TEST123"}
@@ -206,6 +211,7 @@ def test_now_playing_add_targets_with_track():
 
 
 def test_now_playing_promote_full_flow():
+    "Promote adds the recommendation ISRC to the parent playlist and seeds its rating."
     mock_state = {
         "playing": True,
         "track": {
@@ -234,6 +240,7 @@ def test_now_playing_promote_full_flow():
 
 
 def test_now_playing_rank_up_full_flow():
+    "Rank-up records a +2 matchup result seeded from the current track's ELO."
     mock_state = {
         "playing": True,
         "track": {
@@ -258,28 +265,7 @@ def test_now_playing_rank_up_full_flow():
 
 
 def test_now_playing_rank_down_full_flow():
-    mock_state = {
-        "playing": True,
-        "track": {
-            "isrc": "TEST123",
-            "trackName": "Test Track",
-            "rating": {"value": 1500},
-            "context": {"relationshipType": "regular", "playlistId": "pl123"}
-        }
-    }
-    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
-         patch('pifitness.music.router.save_matchup_results') as mock_save:
-        response = client.post("/api/music/now-playing/rank-down")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        assert "ranked down" in data["message"]
-        mock_save.assert_called_once_with(
-            hd={"isrc": "TEST123", "playlistId": "pl123", "currentELO": 1500},
-            ad=None,
-            mr=-2,
-        )
-def test_now_playing_rank_down_full_flow():
+    "Rank-down records a -2 matchup result seeded from the current track's ELO."
     mock_state = {
         "playing": True,
         "track": {
