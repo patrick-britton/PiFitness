@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from backend.main import app
 
 def test_health():
+    "GET /api/health returns 200 with status 'ok' and 'database' and 'timestamp' keys present."
     # Create a test client for FastAPI
     client = TestClient(app)
 
