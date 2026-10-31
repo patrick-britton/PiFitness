@@ -66,6 +66,7 @@ def _partial():
 # ---------------------------------------------------------------------------
 
 def test_rank_sinks_partial_and_orders_by_relevance_tier():
+    "Ranks whole milk, milk, and milk chocolate in that order; the partial hit fails the gate and is flagged for review."
     hit_full = _survey("whole milk", "Foundation", _complete(), _EXTRA_ALL, fdc=1)
     hit_partial = _survey("milk chocolate", "Branded", _partial(), fdc=2)
     hit_most = _survey("milk", "SR Legacy", _complete(),
@@ -124,6 +125,7 @@ def testquality_label_counts_extras():
 # ---------------------------------------------------------------------------
 
 def test_fetch_budget_and_cache(monkeypatch):
+    "First query performs 2 parallel fetches plus 1 fallback; an identical query is served from cache with no new fetches."
     fsearch.cache.clear()
     fsearch.cache_order.clear()
     calls = []
@@ -172,6 +174,7 @@ _SAVED_ROW = {
 
 
 def test_search_returns_trimmed_saved_first_results(monkeypatch):
+    "Search returns the saved food at rank 0 and the USDA hit at rank 1 with identical keys and the raw payload trimmed."
     monkeypatch.setattr(food_api_module, "search_saved_foods",
                         lambda q, limit: [dict(_SAVED_ROW)])
 
@@ -215,6 +218,7 @@ def test_search_returns_trimmed_saved_first_results(monkeypatch):
 
 
 def test_search_suppresses_usda_hit_when_fdcid_saved(monkeypatch):
+    "A USDA hit whose fdcId matches a saved food fdc_id is dropped; only the unsaved hit is returned."
     saved = dict(_SAVED_ROW)
     saved["fdc_id"] = 12345
     monkeypatch.setattr(food_api_module, "search_saved_foods",
@@ -269,6 +273,7 @@ def _branded(name, nutrients, ingredients, category="Beverages", fdc=1,
 
 
 def test_match_pct_anchors_then_overlap():
+    "match_pct returns 100 for exact, 90 for prefix, 80 for contains, and 0 for no overlap; match_band returns tens."
     assert fsearch.match_pct("coffee", "coffee") == 100
     assert fsearch.match_pct("coffee ice cream", "coffee") == 90
     assert fsearch.match_pct("drip coffee", "coffee") == 80
@@ -279,6 +284,7 @@ def test_match_pct_anchors_then_overlap():
 
 
 def test_kcal_gate_hard_filter_with_floor_and_alcohol():
+    "kcal_gate keeps tiny-absolute-error foods, drops >15% mismatches, subtracts alcohol energy, and skips when macros are absent."
     # Black-coffee class: huge relative error, tiny absolute -> kept.
     excluded, _ = fsearch.kcal_gate(
         {"kcal_per_100g": 2.0, "protein_g": 0.3, "fat_g": 0.0,
@@ -300,6 +306,7 @@ def test_kcal_gate_hard_filter_with_floor_and_alcohol():
 
 
 def test_quality_percent_presence_and_single_ingredient():
+    "quality_percent returns 100, 90, or 70 based on caffeine and serving presence; ingredient_stats returns (single, count)."
     nuts = {"kcal_per_100g": 2.0, "protein_g": 0.3, "fat_g": 0.0,
             "carbs_g": 0.0, "fiber_g": 0.0, "sugars_g": 0.0,
             "sodium_mg": 5.0, "caffeine_mg": 40.0}
@@ -317,6 +324,7 @@ def test_quality_percent_presence_and_single_ingredient():
 
 
 def test_rank_coffee_single_ingredient_first_mismatch_dropped():
+    "rank_usda_hits drops the kcal-gated coffee candy and ranks the exact single-ingredient coffee row first."
     good = _branded("coffee", {"Energy": 2.0, "Protein": 0.3,
                                "Total lipid (fat)": 0.0,
                                "Carbohydrate, by difference": 0.0},
@@ -389,6 +397,7 @@ SAMPLE_ENTRY = {
 
 
 def test_persist_on_log_creates_food_then_entry(monkeypatch):
+    "POST /api/food/diary/from-api persists the food row first, then logs the entry, returning 201 with food_id 42."
     order = []
 
     def fake_persist(*a, **kw):
@@ -542,6 +551,7 @@ def test_log_api_entry_persists_feed_serving(monkeypatch):
 
 
 def test_persist_on_log_requires_payload():
+    "POST /api/food/diary/from-api without a usda_payload returns 400."
     client = TestClient(_make_app())
     res = client.post("/api/food/diary/from-api",
                       json={"qty": 100.0, "unit": "g"})
@@ -551,6 +561,7 @@ def test_persist_on_log_requires_payload():
 # ---------------------------------------------------------------------------
 
 def test_confirm_logs_picked_rank(monkeypatch):
+    "Confirming a diary entry with rank, result_source, and query calls log_pick once and returns 201."
     seen = []
     monkeypatch.setattr(fsearch, "log_pick",
                         lambda rank, src, q: seen.append((rank, src, q)))
@@ -567,6 +578,7 @@ def test_confirm_logs_picked_rank(monkeypatch):
 
 
 def test_confirm_without_pick_does_not_log(monkeypatch):
+    "Confirming a diary entry without rank, result_source, or query leaves log_pick uncalled and still returns 201."
     seen = []
     monkeypatch.setattr(fsearch, "log_pick", lambda *a: seen.append(a))
     monkeypatch.setattr(food_api_module, "log_diary_entry",
@@ -584,6 +596,7 @@ def test_confirm_without_pick_does_not_log(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_normalize_usda_branded_passes_through_per_100g():
+    "normalize_usda_branded passes branded per-100g nutrients through unchanged (30 stays 30) and flags missing panel data."
     # T12 (Bug 010-003-T12-1): branded search nutrients are ALREADY per-100g
     # (LCCS converted upstream) — no 100/grams rescale. Raw 30 on any
     # serving stays 30 (old code manufactured 30 x 100/50 = 60).
@@ -603,6 +616,7 @@ def test_normalize_usda_branded_passes_through_per_100g():
 
 
 def test_normalize_usda_branded_keeps_nutrients_on_bad_serving():
+    "Unparseable serving size leaves nutrients unchanged, sets needs_review, and reports 'unparseable serving'."
     # T12: unparseable serving degrades serving defaults/density only —
     # nutrients pass through as-is with a review note (never NULLed).
     per100, needs_review, reason = normalize_usda_branded(
@@ -613,6 +627,7 @@ def test_normalize_usda_branded_keeps_nutrients_on_bad_serving():
 
 
 def test_normalize_off_maps_100g_fields():
+    "normalize_off maps energy-kcal_100g to kcal_per_100g and proteins_100g to protein_g, leaving caffeine_mg None."
     per100 = normalize_off({
         "energy-kcal_100g": 61.0, "proteins_100g": 3.0, "fat_100g": 3.3,
         "carbohydrates_100g": 4.8, "sugars_100g": 5.0, "sodium_100g": 0.04,
@@ -635,6 +650,7 @@ def _almond_foods():
 
 
 def test_t12_almond_raw_571_stays_571():
+    "Almond branded entry with 571 kcal/100g passes through unchanged instead of being rescaled to 2039."
     foods = _almond_foods()
     raw28 = next(f for f in foods if f["fdcId"] == 2073909)
     per100, _, _ = normalize_usda_branded(raw28)
@@ -642,6 +658,7 @@ def test_t12_almond_raw_571_stays_571():
 
 
 def test_t12_almond_branded_range_median():
+    "Branded almond kcal values span 247 to 667, with 571 appearing 8 times and the median between 571 and 588."
     foods = _almond_foods()
     vals = sorted(per100["kcal_per_100g"]
                   for f in foods if f["dataType"] == "Branded"
@@ -653,6 +670,7 @@ def test_t12_almond_branded_range_median():
 
 
 def test_t12_foundation_energy_prefers_2048_specific():
+    "normalize_usda_survey prefers the 2048-specific energy: almond flour is 578 and the anchor is 579 kcal/100g."
     from backend_functions.food_normalize import normalize_usda_survey
     foods = _almond_foods()
     flour = next(f for f in foods if f["fdcId"] == 2261420)
@@ -662,6 +680,7 @@ def test_t12_foundation_energy_prefers_2048_specific():
 
 
 def test_t12_flags_argires_post_schnucks_not_canonical():
+    "Density and mismatch flags annotate the Argires, Post, and Schnucks almond rows while canonical rows stay clean."
     foods = _almond_foods()
     ranked = fsearch.rank_usda_hits(foods, "almonds")
     by_fdc = {m["fdcId"]: m for m in ranked}
