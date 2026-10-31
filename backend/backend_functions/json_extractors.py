@@ -10,6 +10,7 @@ from backend_functions.helper_functions import get_sync_dates, random_sleep, saf
 from backend_functions.logging_functions import log_app_event
 from backend_functions.music_functions import get_playlist_list
 from backend_functions.service_logins import get_spotify_client
+from pifitness.integrations.garmin.endpoints import resolve_endpoint
 
 
 class NoWorkToSync(Exception):
@@ -467,14 +468,14 @@ def extract_json_isrc_search(client=None, td=None, aid=None):
 
 
 def get_pirate_data(client, endpoint, path_params=None, query_params=None):
-    """Fetch data from Garmin via pirate-garmin's native Android API.
+    """Fetch data from Garmin via the vendored integrations.garmin client.
     
     Uses the passed-in GarminClient directly instead of spinning up a
     separate CLI invocation. The client handles auth, token refresh,
     and 401 retry internally.
     
     Args:
-        client: GarminClient instance from backend_functions.pirate_garmin_auth (authenticated)
+        client: pifitness.integrations.garmin.client.GarminClient instance (authenticated)
         endpoint: Endpoint key string (e.g. 'usersummary.daily')
         path_params: Dict of path placeholder values
         query_params: Dict of query parameter values
@@ -482,7 +483,6 @@ def get_pirate_data(client, endpoint, path_params=None, query_params=None):
     Returns:
         tuple: (response_json, None) on success, (None, error_msg) on failure
     """
-    from pirate_garmin.endpoints import resolve_endpoint, render_endpoint
 
     try:
         endpoint_def = resolve_endpoint(endpoint)
