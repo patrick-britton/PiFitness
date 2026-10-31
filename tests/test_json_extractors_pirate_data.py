@@ -4,6 +4,7 @@ from backend_functions.json_extractors import get_pirate_data
 
 
 def test_get_pirate_data_happy_path():
+    """get_pirate_data returns the client JSON response and None error for a valid endpoint."""
     endpoint = 'usersummary.daily'
     ep = resolve_endpoint(endpoint)
     client = MagicMock()
@@ -21,6 +22,7 @@ def test_get_pirate_data_happy_path():
 
 
 def test_get_pirate_data_invalid_endpoint_returns_error():
+    """get_pirate_data returns None and an error containing the endpoint name for an invalid endpoint."""
     endpoint = 'nonexistent.fake'
     client = MagicMock()
 
@@ -31,6 +33,7 @@ def test_get_pirate_data_invalid_endpoint_returns_error():
 
 
 def test_get_pirate_data_client_exception_returns_error():
+    """get_pirate_data returns None and an error containing the exception message when request_json raises."""
     endpoint = 'usersummary.daily'
     client = MagicMock()
     client.request_json.side_effect = RuntimeError("boom")
@@ -42,6 +45,7 @@ def test_get_pirate_data_client_exception_returns_error():
 
 
 def test_no_pirate_garmin_imports_in_json_extractors():
+    """json_extractors module contains no import of pirate_garmin in any Import or ImportFrom node."""
     import ast
     import pathlib
 

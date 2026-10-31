@@ -9,11 +9,13 @@ import backend_functions.music_functions as mf
 
 
 def test_music_functions_module_has_no_pandas():
+    """music_functions module source contains no pandas import or pd attribute reference."""
     src = Path(mf.__file__).read_text(encoding="utf-8")
     assert not re.search(r"\bimport pandas\b|pd\.", src), "pandas/pd. reference found in music_functions.py"
 
 
 def test_auto_shuffle_parity_target_id_and_ordered_track_list(monkeypatch):
+    """auto_shuffle_playlists preserves sql_to_dict row order and uploads to the first row's target_playlist_id using parameterized params."""
     # Rows in view order (default_new_order asc) — parity expects this exact order.
     rows = [
         {"target_playlist_id": "TGT0000000000000000000a", "track_id": "t3", "default_new_order": 3},
@@ -52,6 +54,7 @@ def test_auto_shuffle_parity_target_id_and_ordered_track_list(monkeypatch):
 
 
 def test_auto_shuffle_limit_minutes_parameterized(monkeypatch):
+    """auto_shuffle_playlists filters by cumulative_duration_s/60 < minutes_to_sync when limit_minutes is provided."""
     captured = {}
 
     def fake_sql_to_dict(sql, params=None):

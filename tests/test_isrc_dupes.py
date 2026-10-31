@@ -68,6 +68,7 @@ class FakeConn:
 
 
 def test_dupe_count_halves_rows_to_pairs():
+    """get_isrc_dupe_count returns one_sql_result divided by two (7 becomes 3)."""
     with patch(
         'pifitness.music.queries.one_sql_result',
         return_value=7,
@@ -76,6 +77,7 @@ def test_dupe_count_halves_rows_to_pairs():
 
 
 def test_dupe_count_empty_is_zero():
+    """get_isrc_dupe_count returns 0 when one_sql_result returns None."""
     with patch(
         'pifitness.music.queries.one_sql_result',
         return_value=None,
@@ -84,6 +86,7 @@ def test_dupe_count_empty_is_zero():
 
 
 def test_accept_writes_swaps_and_deletes_pair_in_one_transaction():
+    """process_isrc_dupe_decision accept=True writes ISRC-A and ISRC-B to isrc_swaps and deletes the pair."""
     fake = FakeConn()
     with patch(
         'pifitness.music.queries.get_conn',
@@ -113,6 +116,7 @@ def test_accept_writes_swaps_and_deletes_pair_in_one_transaction():
 
 
 def test_reject_writes_non_swaps_and_deletes_pair_in_one_transaction():
+    """process_isrc_dupe_decision accept=False writes ISRC-A and ISRC-B to isrc_non_swaps and deletes the pair."""
     fake = FakeConn()
     with patch(
         'pifitness.music.queries.get_conn',
@@ -137,6 +141,7 @@ def test_reject_writes_non_swaps_and_deletes_pair_in_one_transaction():
 
 
 def test_decision_insert_failure_rolls_back_and_raises():
+    """process_isrc_dupe_decision rolls back and re-raises when the swaps insert fails."""
     fake = FakeConn(fail_on='executemany')
     with patch(
         'pifitness.music.queries.get_conn',
@@ -151,6 +156,7 @@ def test_decision_insert_failure_rolls_back_and_raises():
 
 
 def test_decision_delete_failure_rolls_back_and_raises():
+    """process_isrc_dupe_decision rolls back and re-raises when the pair delete fails after a successful insert."""
     # Inserts succeed, the pool delete fails -> the whole decision is rolled back.
     fake = FakeConn(fail_on='execute')
     with patch(
@@ -167,6 +173,7 @@ def test_decision_delete_failure_rolls_back_and_raises():
 
 
 def test_rescan_issues_call_in_one_transaction():
+    """run_isrc_duplicate_finder executes the duplicate finder CALL on one connection and commits in one transaction."""
     fake = FakeConn()
     with patch(
         'pifitness.music.queries.get_conn',
@@ -184,6 +191,7 @@ def test_rescan_issues_call_in_one_transaction():
 
 
 def test_rescan_failure_rolls_back_and_raises():
+    """run_isrc_duplicate_finder rolls back and re-raises when the CALL fails."""
     # T08: a failed CALL must not look like a successful re-scan.
     fake = FakeConn(fail_on='execute')
     with patch(
