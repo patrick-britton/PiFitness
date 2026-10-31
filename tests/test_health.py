@@ -19,3 +19,7 @@ def test_health():
     assert response_data["status"] == "ok"
     assert "database" in response_data
     assert "timestamp" in response_data
+
+
+import pytest
+pytestmark = pytest.mark.slow

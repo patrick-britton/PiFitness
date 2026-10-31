@@ -160,3 +160,7 @@ def testprocess_generator_error_terminal_still_emits_running_first(monkeypatch):
     # …and the terminal reports failure.
     assert seen[-1].get('complete') is True
     assert seen[-1].get('success') is False
+
+
+import pytest
+pytestmark = pytest.mark.slow

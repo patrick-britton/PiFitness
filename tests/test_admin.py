@@ -201,3 +201,6 @@ def test_admin_credential_requirements():
     assert "data" in data
     assert "count" in data
     assert isinstance(data["count"], int)
+
+
+pytestmark = pytest.mark.slow

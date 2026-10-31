@@ -146,6 +146,7 @@ def test_missing_name_raises():
         assert_conforms(provider)
 
 
+@pytest.mark.slow
 def test_garmin_provider_conforms():
     """INT-6a: the real GarminProvider must satisfy AuthProvider.
 
@@ -185,6 +186,7 @@ def test_assert_conforms_rejects_bad_status_type():
     with pytest.raises(AssertionError):
         assert_conforms(BadStatus())
 
+@pytest.mark.slow
 def test_spotify_provider_conforms():
     """INT-7a: the real SpotifyProvider must satisfy AuthProvider.
 

@@ -166,3 +166,10 @@ def test_stored_order_matches_spotify():
         f"  db ({len(db_isrcs)}): {db_isrcs[:5]}...\n"
         f"  spotify ({len(sp_isrcs)}): {sp_isrcs[:5]}..."
     )
+
+
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.integration,
+    pytest.mark.live,
+]

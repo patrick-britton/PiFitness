@@ -13,6 +13,8 @@ from backend.main import app
 
 client = TestClient(app)
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_activities_list():
     """Test GET /api/activities returns successfully with schema-aware columns."""
     response = client.get("/api/activities")
@@ -35,6 +37,8 @@ def test_activities_list():
         if "distance_m" in first_activity:
             assert isinstance(first_activity["distance_m"], (int, float))
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_activity_by_id():
     """Test GET /api/activities/{id} returns successfully."""
     # First get an activity ID
@@ -50,6 +54,8 @@ def test_activity_by_id():
         assert "data" in data
         assert data["data"]["activity_id"] == activity_id
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_activity_telemetry():
     """Test GET /api/activities/{id}/telemetry returns successfully."""
     # First get an activity ID
@@ -70,6 +76,8 @@ def test_activity_telemetry():
             assert "longitude" in first_point
             assert "elevation_m" in first_point
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_activity_segments():
     """Test GET /api/activities/{id}/segments returns successfully."""
     # First get an activity ID
@@ -405,6 +413,8 @@ def test_segment_bulk_reject_empty_404_422():
     assert response.status_code == 422
 
 
+@pytest.mark.slow
+@pytest.mark.integration
 def test_activity_route_elapsed_s():
     """GET /api/segments/{id}/route returns elapsed_s 1:1 with path_coords
     (009-003 T38/OQ-6): ints, monotonically non-decreasing, no timestamp
