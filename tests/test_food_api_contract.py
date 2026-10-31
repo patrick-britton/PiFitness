@@ -101,6 +101,7 @@ def test_route_table_matches_contract_exactly():
 
 
 def test_get_usuals_returns_usual_food_shapes(monkeypatch):
+    "GET /usuals returns one item per usual food with exactly the UsualFood key set."
     _patch_reads(monkeypatch)
     client = TestClient(_make_app())
     res = client.get("/api/food/usuals?at=2026-10-04T12:00:00")
@@ -115,6 +116,7 @@ def test_get_usuals_returns_usual_food_shapes(monkeypatch):
 
 
 def test_get_diary_returns_day_entry_array(monkeypatch):
+    "GET /diary returns a list of DayEntry objects with the exact entry and nutrient key sets."
     _patch_reads(monkeypatch)
     client = TestClient(_make_app())
     res = client.get("/api/food/diary?day=2026-10-04")
@@ -133,6 +135,7 @@ def test_get_diary_returns_day_entry_array(monkeypatch):
 
 
 def test_get_recipes_returns_recipe_summaries_only(monkeypatch):
+    "GET /recipes returns RecipeSummary objects carrying only the four summary fields."
     _patch_reads(monkeypatch)
     client = TestClient(_make_app())
     res = client.get("/api/food/recipes")
@@ -144,6 +147,7 @@ def test_get_recipes_returns_recipe_summaries_only(monkeypatch):
 
 
 def test_get_foods_returns_food_list_response(monkeypatch):
+    "GET /foods returns {data, next_cursor} with each row nested under nutrients and soft-delete fields."
     _patch_reads(monkeypatch)
     client = TestClient(_make_app())
     res = client.get("/api/food/foods?q=avo")
@@ -159,6 +163,7 @@ def test_get_foods_returns_food_list_response(monkeypatch):
         "fiber_g", "sugars_g", "sodium_mg", "caffeine_mg",
     }
 def test_post_diary_returns_day_entry(monkeypatch):
+    "POST /diary returns 201 and a DayEntry carrying both snapshot fields."
     monkeypatch.setattr(food_api_module, "log_diary_entry",
                         lambda **kw: dict(SAMPLE_ENTRY))
     client = TestClient(_make_app())
@@ -171,6 +176,7 @@ def test_post_diary_returns_day_entry(monkeypatch):
 
 
 def test_post_recipes_returns_recipe_summary(monkeypatch):
+    "POST /recipes returns 201 and exactly the RecipeSummary key set."
     monkeypatch.setattr(food_api_module, "save_recipe", lambda **kw: dict(SAMPLE_RECIPE))
     client = TestClient(_make_app())
     res = client.post("/api/food/recipes", json={
@@ -192,6 +198,7 @@ def test_post_recipes_returns_recipe_summary(monkeypatch):
 
 
 def test_post_diary_rejects_deleted_food(monkeypatch):
+    "POST /diary returns 400 when log_diary_entry raises on a soft-deleted food."
     def _raise(**kw):
         raise ValueError("is soft-deleted and cannot be re-logged")
     monkeypatch.setattr(food_api_module, "log_diary_entry", _raise)
@@ -202,6 +209,7 @@ def test_post_diary_rejects_deleted_food(monkeypatch):
 
 
 def test_diary_stats_shape(monkeypatch):
+    "GET /diary/stats returns the exact four-field stats object from get_diary_stats."
     monkeypatch.setattr(food_api_module, "get_diary_stats",
                         lambda *a, **kw: {"today_kcal": 500.0,
                                           "last_24h_kcal": 600.0,
@@ -215,6 +223,7 @@ def test_diary_stats_shape(monkeypatch):
 
 
 def test_patch_entry_moves_day(monkeypatch):
+    "PATCH /diary/{id} forwards qty and logged_at and echoes the moved logged_at."
     seen = {}
 
     def _upd(**kw):
@@ -230,12 +239,14 @@ def test_patch_entry_moves_day(monkeypatch):
 
 
 def test_patch_entry_empty_rejected():
+    "PATCH /diary/{id} with an empty body returns 400."
     client = TestClient(_make_app())
     res = client.patch("/api/food/diary/10", json={})
     assert res.status_code == 400
 
 
 def test_delete_entry(monkeypatch):
+    "DELETE /diary/{id} returns {success: true, entry_id: id}."
     monkeypatch.setattr(food_api_module, "delete_diary_entry", lambda *a, **kw: True)
     client = TestClient(_make_app())
     res = client.delete("/api/food/diary/10")
@@ -244,6 +255,7 @@ def test_delete_entry(monkeypatch):
 
 
 def test_kcal_for_fda_label_table():
+    "_kcal_for converts g/cup/oz/tbsp/serving via the FDA table and raises on unknown units."
     from pifitness.food.schemas import UNIT_TO_G_OR_ML
     k = food_queries._kcal_for
     assert k(100, "g", 160.0, conversions=UNIT_TO_G_OR_ML) == 160.0
@@ -276,6 +288,7 @@ def _flat_food_row():
 
 
 def test_to_food_row_nests_nutrients():
+    "_to_food_row nests the eight flat nutrient columns under 'nutrients' and preserves flags."
     row = food_queries._to_food_row(_flat_food_row())
     assert row["food_id"] == 1 and row["name"] == "Avocado"
     assert row["nutrients"] == {
@@ -287,6 +300,7 @@ def test_to_food_row_nests_nutrients():
 
 
 def test_to_day_entry_nests_snapshot_and_iso_time():
+    "_to_day_entry nests the nutrient snapshot and renders logged_at as an ISO-8601 string."
     flat = dict(_flat_food_row())
     flat.update({
         "entry_id": 10, "name_snapshot": "Avocado", "is_partial": False,
@@ -300,6 +314,7 @@ def test_to_day_entry_nests_snapshot_and_iso_time():
 
 
 def test_to_recipe_summary_preserves_exact_fields():
+    "_to_recipe_summary returns exactly recipe_id, title, category, and times_prepared."
     row = {"recipe_id": 3, "title": "Guacamole", "category": "Side",
            "times_prepared": 0, "is_deleted": False, "created_at": None}
     out = food_queries._to_recipe_summary(row)
