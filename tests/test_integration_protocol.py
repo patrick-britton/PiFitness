@@ -124,23 +124,27 @@ class _MissingName:
 
 
 def test_dummy_provider_conforms():
+    "assert_conforms passes for a dummy provider with all required attributes and methods."
     provider = _DummyProvider()
     assert_conforms(provider)
 
 
 def test_missing_refresh_raises():
+    "assert_conforms raises 'refresh must be callable' when the provider lacks refresh."
     provider = _MissingRefresh()
     with pytest.raises(AssertionError, match="refresh must be callable"):
         assert_conforms(provider)
 
 
 def test_non_string_name_raises():
+    "assert_conforms raises 'non-empty string' when provider.name is a non-string value."
     provider = _NonStringName()
     with pytest.raises(AssertionError, match="non-empty string"):
         assert_conforms(provider)
 
 
 def test_missing_name_raises():
+    "assert_conforms raises 'non-empty string' when provider has no name attribute."
     provider = _MissingName()
     with pytest.raises(AssertionError, match="non-empty string"):
         assert_conforms(provider)
