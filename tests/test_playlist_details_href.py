@@ -71,6 +71,7 @@ def _patch(monkeypatch, captured):
 
 
 def test_all_pages_normalized_before_json_loading(monkeypatch):
+    "playlist_to_db rewrites every page's href from '/items?' to '/tracks?' before json_loading is called."
     captured = {}
     _patch(monkeypatch, captured)
     mf.playlist_to_db(client={"client": None}, list_id=BARE_ID)
@@ -84,6 +85,7 @@ def test_all_pages_normalized_before_json_loading(monkeypatch):
 
 
 def test_derived_id_is_bare_22char_for_every_page(monkeypatch):
+    "Every page href yields the bare 22-char playlist id when run through the SPROC derivation replica."
     captured = {}
     _patch(monkeypatch, captured)
     mf.playlist_to_db(client={"client": None}, list_id=BARE_ID)
