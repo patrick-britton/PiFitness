@@ -46,6 +46,7 @@ def _ok_executioner(**kwargs):
 # ---------------------------------------------------------------------------
 
 def test_post_processing_steps_yields_marker_before_execution(monkeypatch):
+    "activity_post_processing_steps yields the start marker before the sub-step runs and the terminal after it."
     executed = []
     monkeypatch.setattr(sm, 'insert_heartrate_for_activity',
                         lambda aid: executed.append(('insert_heartrate', aid)))
@@ -88,6 +89,7 @@ def test_post_processing_steps_marker_terminal_interleaved(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def testprocess_generator_running_event_precedes_substep_execution(monkeypatch):
+    "process_generator streams a 'running' event while the announced sub-step has not yet executed."
     executed = []
 
     def fake_steps(aid):
