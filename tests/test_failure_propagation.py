@@ -88,6 +88,7 @@ def test_post_processing_success_returns_true(monkeypatch):
 
 
 def test_post_processing_empty_queue_returns_true(monkeypatch):
+    "Empty queue returns True without processing any activities."
     monkeypatch.setattr(sm, 'sql_to_list', lambda sql: [])
     monkeypatch.setattr(sm, 'log_app_event', _noop)
     assert sm.activity_post_processing() is True
@@ -111,6 +112,7 @@ def _install_fake_python_function(monkeypatch, fn):
 
 
 def test_execute_python_returns_failure_message_without_reconciling(monkeypatch):
+    "execute_python returns the aggregate failure string and does not call reconcile_task_dates."
     calls = []
 
     def boom():
@@ -137,6 +139,7 @@ def test_execute_python_returns_failure_message_without_reconciling(monkeypatch)
 
 
 def test_execute_python_success_returns_none(monkeypatch):
+    "execute_python returns None when the python function completes without raising."
     monkeypatch.setattr(ute, 'log_app_event', _noop)
     _install_fake_python_function(monkeypatch, lambda: None)
 
@@ -196,6 +199,7 @@ def test_executioner_reconciles_failed_with_ids_in_message(monkeypatch):
 
 
 def test_executioner_reports_success_when_all_pass(monkeypatch):
+    "Executioner reconciles success once and marks results[] success True when no task fails."
     calls, summary = _run_single_task(monkeypatch, lambda: None)
 
     assert len(calls) == 1
@@ -209,6 +213,7 @@ def test_executioner_reports_success_when_all_pass(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def testrun_step_marks_error_on_failed_results():
+    "run_step marks the step error and includes the task name and error when results[] contains a failure."
     def failed_runner(force_task_id=None):
         return {
             'tasks_processed': 1,
@@ -229,6 +234,7 @@ def testrun_step_marks_error_on_failed_results():
 
 
 def testrun_step_complete_on_all_success_results():
+    "run_step returns status complete with error None when all results[] entries have success True."
     def ok_runner(force_task_id=None):
         return {
             'tasks_processed': 1,
@@ -243,6 +249,7 @@ def testrun_step_complete_on_all_success_results():
 
 
 def testrun_step_complete_on_non_task_return_shapes():
+    "run_step returns complete for None, a dict without results, and results entries lacking success."
     # No return value.
     assert run_step('x', lambda: None).status == 'complete'
     # Unrelated dict without a results list.
@@ -252,6 +259,7 @@ def testrun_step_complete_on_non_task_return_shapes():
 
 
 def testrun_step_error_on_exception_unchanged():
+    "run_step catches a raised exception, returns status error, and preserves the exception message."
     def boom():
         raise ValueError('kaput')
 
@@ -261,6 +269,7 @@ def testrun_step_error_on_exception_unchanged():
 
 
 def testtask_failure_message_is_conservative():
+    "task_failure_message returns None for six non-failure shapes and 'name: error' only when a result fails."
     assert task_failure_message(None) is None
     assert task_failure_message([{'results': []}]) is None
     assert task_failure_message({'results': 'nope'}) is None
@@ -320,6 +329,7 @@ def test_executioner_single_reconcile_on_extract_failure(monkeypatch):
 
 
 def test_executioner_single_reconcile_on_load_failure(monkeypatch):
+    "Executioner reconciles load failure once with the surfaced message and marks results[] failed."
     calls, summary = _run_single_extract_task(
         monkeypatch, {}, 'Load Failure: staging blew up')
 
@@ -329,6 +339,7 @@ def test_executioner_single_reconcile_on_load_failure(monkeypatch):
 
 
 def test_executioner_single_reconcile_on_sproc_failure(monkeypatch):
+    "Executioner reconciles SPROC failure once with the surfaced message and marks results[] failed."
     calls, summary = _run_single_extract_task(
         monkeypatch, {}, 'Failed to execute sql: boom')
 
