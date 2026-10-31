@@ -33,6 +33,7 @@ MATCH_ROW = {
 
 
 def test_count_returns_pair_count():
+    "GET /isrc-dupes/count returns {count: N} from get_isrc_dupe_count."
     with patch(
         'pifitness.music.router.get_isrc_dupe_count', return_value=4
     ):
@@ -42,6 +43,7 @@ def test_count_returns_pair_count():
 
 
 def test_match_shapes_row_to_camel_case():
+    "GET /isrc-dupes/match maps snake_case match row keys to camelCase in the response."
     with patch(
         'pifitness.music.router.get_isrc_dupe_match', return_value=[MATCH_ROW]
     ):
@@ -59,6 +61,7 @@ def test_match_shapes_row_to_camel_case():
 
 
 def test_match_empty_queue_returns_null():
+    "GET /isrc-dupes/match returns {match: null} when no dupe rows are queued."
     with patch(
         'pifitness.music.router.get_isrc_dupe_match', return_value=[]
     ):
@@ -68,6 +71,7 @@ def test_match_empty_queue_returns_null():
 
 
 def test_decision_accept_calls_helper_and_confirms():
+    "POST /decision with accept=true calls the helper with the four fields and returns an 'accepted' message."
     with patch(
         'pifitness.music.router.process_isrc_dupe_decision'
     ) as mock_decide:
@@ -87,6 +91,7 @@ def test_decision_accept_calls_helper_and_confirms():
 
 
 def test_decision_reject_calls_helper_and_confirms():
+    "POST /decision with accept=false calls the helper with the four fields and returns a 'rejected' message."
     with patch(
         'pifitness.music.router.process_isrc_dupe_decision'
     ) as mock_decide:
@@ -106,6 +111,7 @@ def test_decision_reject_calls_helper_and_confirms():
 
 
 def test_decision_missing_field_returns_422():
+    "POST /decision without preferredIsrc returns 422 from request validation."
     response = client.post("/api/music/isrc-dupes/decision", json={
         "isrc1": "ISRC-A",
         "isrc2": "ISRC-B",
@@ -115,6 +121,7 @@ def test_decision_missing_field_returns_422():
 
 
 def test_rescan_runs_finder_and_reports_count():
+    "POST /rescan calls the finder once and returns a message with the resulting count of 3."
     with patch(
         'pifitness.music.router.run_isrc_duplicate_finder'
     ) as mock_run, patch(
@@ -129,6 +136,7 @@ def test_rescan_runs_finder_and_reports_count():
 
 
 def test_rescan_empty_reports_no_dupes():
+    "POST /rescan with zero count returns {ok: true, message: 'No duplicate isrcs found'}."
     with patch(
         'pifitness.music.router.run_isrc_duplicate_finder'
     ), patch(
@@ -142,6 +150,7 @@ def test_rescan_empty_reports_no_dupes():
 
 
 def test_decision_write_failure_returns_500():
+    "POST /decision returns 500 with a 'Failed to record' detail when the helper raises."
     # T08 / Bug 008-005-T03-1: a failed write must not be reported as {ok: true}.
     with patch(
         'pifitness.music.router.process_isrc_dupe_decision',
@@ -158,6 +167,7 @@ def test_decision_write_failure_returns_500():
 
 
 def test_rescan_failure_returns_500():
+    "POST /rescan returns 500 with a 'Failed to rescan' detail when the finder raises."
     # T08 / Bug 008-005-T03-1: a failed CALL must not be reported as a success.
     with patch(
         'pifitness.music.router.run_isrc_duplicate_finder',
@@ -167,6 +177,7 @@ def test_rescan_failure_returns_500():
         assert response.status_code == 500
         assert "Failed to rescan ISRC dupes" in response.json()["detail"]
 def test_rescan_route_runs_off_the_event_loop():
+    "The registered /isrc-dupes/rescan endpoint is a plain sync function, not a coroutine."
     # T09 / Bug 008-005-T08-1: the blocking ~25 s CALL must run in FastAPI's
     # threadpool, never awaited on the event loop. Starlette dispatches
     # non-coroutine endpoints via run_in_threadpool, so the registered handler
