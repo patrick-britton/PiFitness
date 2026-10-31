@@ -17,7 +17,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / "backend" / ".env",
 from backend.pifitness.admin.services import failed_run_message
 
 
-def testfailed_run_message_carries_underlying_error():
+def test_failed_run_message_carries_underlying_error():
     failed = [{"task_id": 19, "task_name": "Activity Details",
                "success": False, "error": "No API response to load"}]
     msg = failed_run_message(failed)
@@ -26,7 +26,7 @@ def testfailed_run_message_carries_underlying_error():
     assert "No API response to load" in msg
 
 
-def testfailed_run_message_aggregates_multiple():
+def test_failed_run_message_aggregates_multiple():
     failed = [
         {"task_id": 19, "task_name": "Activity Details",
          "success": False, "error": "No API response to load"},

@@ -81,7 +81,8 @@ def test_rank_sinks_partial_and_orders_by_relevance_tier():
     assert ranked[0]["gate_ok"] and ranked[1]["gate_ok"]
 
 
-def testquality_label_thresholds():
+def test_quality_label_thresholds():
+    "quality_label returns High at present>=6, Medium at 3-5, and Low at 2 or below."
     # T09 (OQ-7): High >= 6 (survey rows max 6), Medium >= 3.
     assert fsearch.quality_label(11) == "High"
     assert fsearch.quality_label(6) == "High"
@@ -113,7 +114,8 @@ def test_name_bonus_orders_exact_first():
         "milk", "milk, whole", "crackers, milk", "buttermilk"]
 
 
-def testquality_label_counts_extras():
+def test_quality_label_counts_extras():
+    "A complete survey food with all extras present yields present=11 and quality_label 'High'."
     full = fsearch.map_usda_food(
         _survey("whole milk", "Foundation", _complete(), _EXTRA_ALL))
     assert fsearch.quality_label(full["present"]) == "High"

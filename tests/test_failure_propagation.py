@@ -212,7 +212,7 @@ def test_executioner_reports_success_when_all_pass(monkeypatch):
 # 4. run_step: forced-task failure marks the step error (OQ-2a, AC-2)
 # ---------------------------------------------------------------------------
 
-def testrun_step_marks_error_on_failed_results():
+def test_run_step_marks_error_on_failed_results():
     "run_step marks the step error and includes the task name and error when results[] contains a failure."
     def failed_runner(force_task_id=None):
         return {
@@ -233,7 +233,7 @@ def testrun_step_marks_error_on_failed_results():
     assert 'extraction error: 401 unauthorized' in result.error
 
 
-def testrun_step_complete_on_all_success_results():
+def test_run_step_complete_on_all_success_results():
     "run_step returns status complete with error None when all results[] entries have success True."
     def ok_runner(force_task_id=None):
         return {
@@ -248,7 +248,7 @@ def testrun_step_complete_on_all_success_results():
     assert result.error is None
 
 
-def testrun_step_complete_on_non_task_return_shapes():
+def test_run_step_complete_on_non_task_return_shapes():
     "run_step returns complete for None, a dict without results, and results entries lacking success."
     # No return value.
     assert run_step('x', lambda: None).status == 'complete'
@@ -258,7 +258,7 @@ def testrun_step_complete_on_non_task_return_shapes():
     assert run_step('x', lambda: {'results': [{'task_id': 1}]}).status == 'complete'
 
 
-def testrun_step_error_on_exception_unchanged():
+def test_run_step_error_on_exception_unchanged():
     "run_step catches a raised exception, returns status error, and preserves the exception message."
     def boom():
         raise ValueError('kaput')
@@ -268,7 +268,7 @@ def testrun_step_error_on_exception_unchanged():
     assert result.error == 'kaput'
 
 
-def testtask_failure_message_is_conservative():
+def test_task_failure_message_is_conservative():
     "task_failure_message returns None for six non-failure shapes and 'name: error' only when a result fails."
     assert task_failure_message(None) is None
     assert task_failure_message([{'results': []}]) is None
