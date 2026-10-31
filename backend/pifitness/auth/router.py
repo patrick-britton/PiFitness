@@ -33,6 +33,12 @@ from backend_functions.service_logins import (
 from backend_functions.database_functions import sql_to_dict, one_sql_result
 from backend_functions.logging_functions import log_api_event
 
+from pifitness.integrations.spotify.oauth_flow import (
+    build_authorize_url,
+    exchange_code,
+    force_refresh,
+)
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
@@ -91,7 +97,7 @@ async def refresh_spotify_token():
     Used by the React UI to trigger re-auth.
     """
     try:
-        token = get_spotify_token()
+        token = force_refresh()
         if token and token.get("token"):
             return {
                 "status": "ok",
@@ -120,14 +126,6 @@ async def get_spotify_auth_url():
     Used for headless Pi re-authorization.
     """
     try:
-        import spotipy
-        from spotipy import SpotifyOAuth
-        import os
-        from pathlib import Path
-        from dotenv import load_dotenv
-
-        load_dotenv()
-
         cid, csec, redirect_uri = spotify_creds()
         if not all([cid, csec, redirect_uri]):
             raise HTTPException(
@@ -135,29 +133,7 @@ async def get_spotify_auth_url():
                 detail="Spotify credentials not configured",
             )
 
-        # Build scopes matching the existing application
-        scope_list = [
-            'user-read-recently-played',
-            'user-library-read',
-            'user-modify-playback-state',
-            'playlist-read-private',
-            'playlist-read-collaborative',
-            'playlist-modify-private',
-            'playlist-modify-public',
-            'user-library-modify',
-            'user-read-playback-state',
-        ]
-        scope = ' '.join(scope_list)
-
-        auth_manager = SpotifyOAuth(
-            client_id=cid,
-            client_secret=csec,
-            redirect_uri=redirect_uri,
-            scope=scope,
-            show_dialog=True,
-        )
-
-        auth_url = auth_manager.get_authorize_url()
+        auth_url = build_authorize_url()
 
         return {
             "status": "ok",
@@ -193,14 +169,6 @@ async def spotify_callback(request: SpotifyCallbackRequest):
     """
     try:
         import urllib.parse
-        import spotipy
-        from spotipy import SpotifyOAuth
-        import os
-        from pathlib import Path
-        from dotenv import load_dotenv
-
-        load_dotenv()
-
         redirect_url = request.redirect_url
 
         # Parse the authorization code from the redirect URL
@@ -223,31 +191,8 @@ async def spotify_callback(request: SpotifyCallbackRequest):
                 detail="Spotify credentials not configured",
             )
 
-        scope_list = [
-            'user-read-recently-played',
-            'user-library-read',
-            'user-modify-playback-state',
-            'playlist-read-private',
-            'playlist-read-collaborative',
-            'playlist-modify-private',
-            'playlist-modify-public',
-            'user-library-modify',
-            'user-read-playback-state',
-        ]
-        scope = ' '.join(scope_list)
-
-        auth_manager = SpotifyOAuth(
-            client_id=cid,
-            client_secret=csec,
-            redirect_uri=redirect_uri,
-            scope=scope,
-        )
-
         # Exchange the authorization code for tokens
-        token_info = auth_manager.get_access_token(
-            code=auth_code,
-            as_dict=True,
-        )
+        token_info = exchange_code(auth_code)
 
         if not token_info or not token_info.get("access_token"):
             raise HTTPException(
