@@ -1,7 +1,7 @@
 """Aggregated auth status across provider integrations.
 
-Extracted during INT-9-fix2 so that the source module can shrink to a thin shim. This module is intentionally
-defensive: individual DB lookups are wrapped in try/except so a single query
+This module is the single source of truth for auth health across providers.
+Defensive by design: individual DB lookups are wrapped in try/except so a single query
 failure does not break the whole status report.
 
 Depends on pifitness.integrations.spotify.provider and

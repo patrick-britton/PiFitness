@@ -16,6 +16,7 @@ Endpoints:
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+import spotipy
 from typing import Optional, Dict, Any
 
 from backend_functions.service_logins import (
@@ -262,8 +263,7 @@ async def test_spotify_auth():
     Returns success/failure with details.
     """
     try:
-        import spotipy
-        
+
         # Get token (will refresh if needed)
         token_dict = get_spotify_token()
         
@@ -334,7 +334,6 @@ async def auth_health():
 
     # Spotify: try to get current user
     try:
-        import spotipy
         token = get_spotify_token()
         if token and token.get("token"):
             client = spotipy.Spotify(auth=token["token"])

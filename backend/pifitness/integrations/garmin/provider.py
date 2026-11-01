@@ -1,9 +1,9 @@
 """Garmin AuthProvider + implementation.
 
-INT-6b moved the 4 garmin implementation functions (garmin_creds, garmin_login,
-get_garmin_client, pirate_garmin_login) here from
-backend_functions.service_logins. This inverts the dependency direction:
-service_logins now imports these from provider, not the other way around.
+This module owns the Garmin implementation functions (garmin_creds,
+garmin_login, get_garmin_client) and the GarminProvider class.
+backend_functions.service_logins imports from here; the dependency arrow points
+inward from legacy callers to this module.
 
 Vendored imports: this module imports GarminAuthError, MissingCredentialsError,
 and GarminClient from pifitness.integrations.garmin.{auth,client} -- the
@@ -207,16 +207,15 @@ def pirate_garmin_login(headless=False):
 
 
 
-# --- AuthProvider implementation (from INT-6a, class body unchanged) ---
+# --- AuthProvider implementation ---
 
 class GarminProvider:
     """AuthProvider implementation for Garmin.
 
-    get_status() is intentionally minimal in this block: it reports
-    authenticated=True/False based on the presence of a stored token, but does
-    not inspect token freshness. The richer status logic currently in
-    service_logins.get_auth_status will be reconciled with this provider in
-    INT-13 (/health/auth endpoint).
+    get_status() is intentionally minimal: it reports authenticated=True/False
+    based on the presence of a stored token, but does not inspect token
+    freshness. The richer status (rate limits, last login, errors) is exposed
+    by pifitness.auth.status.get_auth_status(), which is the canonical consumer.
     """
 
     name = "garmin"
@@ -260,7 +259,7 @@ class GarminProvider:
         return TokenStatus(
             service=self.name,
             authenticated=True,
-            notes="token present (expiry check deferred to INT-13)",
+            notes="token present (refresh handled on demand by client)",
         )
 
     def refresh(self) -> TokenStatus:

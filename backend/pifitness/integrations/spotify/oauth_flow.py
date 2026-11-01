@@ -2,7 +2,6 @@
 Spotify OAuth flow helpers.
 
 Centralizes SpotifyOAuth() construction for the router endpoints.
-Extracted from backend/pifitness/auth/router.py (INT-8).
 
 This module deliberately does NOT use a CacheFileHandler. Router endpoints use
 redirect flow (get_authorize_url + get_access_token); the resulting token is
