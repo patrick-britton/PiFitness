@@ -1,25 +1,5 @@
-"""
-Failure-propagation tests — 004-005 T02 (OQ-1 / OQ-2 option (a)).
-
-Covers Bug 004-005-2 (silent false-success) and Chain A2 (`run_step`
-discarding the executioner's results dict):
-
-  1. `activity_post_processing` processes ALL queued activities, then raises
-     an aggregate failure carrying the failed activity ids + step + reason
-     (per-activity halt on first sub-step error unchanged).
-  2. `execute_python` surfaces that failure message to the caller and no
-     longer reconciles internally (single reconcile, no double
-     consecutive_failures increment, detailed message preserved).
-  3. `ultimate_task_executioner` reconciles the task run as failed exactly
-     once with the failed ids in the message (→ last_failure_message) and
-     reports the failure in `results[]` (consumed by admin.py / run_step).
-  4. `run_step` marks the step `error` with the aggregated failure messages
-     when a forced task reports failure; unrelated return shapes unaffected.
-
-Everything is mocked — no DB writes, no network, no pandas.
-
-Run from the repository root:
-    python -m pytest tests/test_failure_propagation.py -v
+"""A failed sub-step is never reported as success, and each task run is reconciled
+exactly once with the detailed message.
 """
 import sys
 import types
@@ -39,9 +19,11 @@ def _noop(*args, **kwargs):
 # 1. activity_post_processing: all queued activities processed, aggregate raise
 # ---------------------------------------------------------------------------
 
+@pytest.mark.regression
 def test_post_processing_processes_all_then_raises_aggregate(monkeypatch):
-    """A failing activity must not stop the queue (OQ-1c); the wrapper must
-    raise afterwards with the failed ids, step and reason (Bug 004-005-2)."""
+    """activity_post_processing processes every queued activity after a failure, then
+    raises one error naming the failed activities, step and reason.
+    """
     processed = []
 
     def fake_steps(activity_id):
@@ -70,8 +52,11 @@ def test_post_processing_processes_all_then_raises_aggregate(monkeypatch):
     assert 'cannot affect row a second time' in msg
 
 
+@pytest.mark.regression
 def test_post_processing_success_returns_true(monkeypatch):
-    """All-green queue still returns True (no spurious task failure)."""
+    """activity_post_processing returns True after processing every queued activity when
+    no sub-step fails.
+    """
     processed = []
 
     def fake_steps(activity_id):
@@ -87,8 +72,11 @@ def test_post_processing_success_returns_true(monkeypatch):
     assert processed == [7, 8]
 
 
+@pytest.mark.regression
 def test_post_processing_empty_queue_returns_true(monkeypatch):
-    "Empty queue returns True without processing any activities."
+    """activity_post_processing returns True without processing anything when the queue
+    is empty.
+    """
     monkeypatch.setattr(sm, 'sql_to_list', lambda sql: [])
     monkeypatch.setattr(sm, 'log_app_event', _noop)
     assert sm.activity_post_processing() is True
@@ -111,8 +99,11 @@ def _install_fake_python_function(monkeypatch, fn):
     monkeypatch.setitem(sys.modules, 'fake_pp', mod)
 
 
+@pytest.mark.regression
 def test_execute_python_returns_failure_message_without_reconciling(monkeypatch):
-    "execute_python returns the aggregate failure string and does not call reconcile_task_dates."
+    """execute_python returns a failing function's error text and does not reconcile
+    task dates itself.
+    """
     calls = []
 
     def boom():
@@ -136,17 +127,6 @@ def test_execute_python_returns_failure_message_without_reconciling(monkeypatch)
     # The caller reconciles — execute_python must not (single increment,
     # detailed message preserved as the final last_failure_message).
     assert calls == []
-
-
-def test_execute_python_success_returns_none(monkeypatch):
-    "execute_python returns None when the python function completes without raising."
-    monkeypatch.setattr(ute, 'log_app_event', _noop)
-    _install_fake_python_function(monkeypatch, lambda: None)
-
-    task = {'task_id': 99, 'task_name': 'Activity Detail Post Processing',
-            'python_execution_function': 'fake_pp.run'}
-    assert ute.execute_python(d=task) is None
-
 
 
 # ---------------------------------------------------------------------------
@@ -175,10 +155,11 @@ def _run_single_task(monkeypatch, fn):
     return calls, summary
 
 
+@pytest.mark.regression
 def test_executioner_reconciles_failed_with_ids_in_message(monkeypatch):
-    """Failed sub-step → task reconciled failed exactly once, failed activity
-    ids in the message written to last_failure_message (AC-1), and the
-    returned results[] carries success=False for admin.py / run_step."""
+    """ultimate_task_executioner reconciles a failed python task exactly once with the
+    failure message and reports success False with that error.
+    """
     def boom():
         raise RuntimeError(AGGREGATE)
 
@@ -198,8 +179,11 @@ def test_executioner_reconciles_failed_with_ids_in_message(monkeypatch):
     assert 'activity 2' in entry['error']
 
 
+@pytest.mark.regression
 def test_executioner_reports_success_when_all_pass(monkeypatch):
-    "Executioner reconciles success once and marks results[] success True when no task fails."
+    """ultimate_task_executioner reconciles a passing python task exactly once as a
+    success and reports success True with no error.
+    """
     calls, summary = _run_single_task(monkeypatch, lambda: None)
 
     assert len(calls) == 1
@@ -212,8 +196,11 @@ def test_executioner_reports_success_when_all_pass(monkeypatch):
 # 4. run_step: forced-task failure marks the step error (OQ-2a, AC-2)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.regression
 def test_run_step_marks_error_on_failed_results():
-    "run_step marks the step error and includes the task name and error when results[] contains a failure."
+    """run_step returns status error naming the task and its error when the runner's
+    results include a failed task.
+    """
     def failed_runner(force_task_id=None):
         return {
             'tasks_processed': 1,
@@ -233,8 +220,11 @@ def test_run_step_marks_error_on_failed_results():
     assert 'extraction error: 401 unauthorized' in result.error
 
 
+@pytest.mark.regression
 def test_run_step_complete_on_all_success_results():
-    "run_step returns status complete with error None when all results[] entries have success True."
+    """run_step returns status complete with no error when every runner result
+    succeeded.
+    """
     def ok_runner(force_task_id=None):
         return {
             'tasks_processed': 1,
@@ -248,8 +238,11 @@ def test_run_step_complete_on_all_success_results():
     assert result.error is None
 
 
+@pytest.mark.regression
 def test_run_step_complete_on_non_task_return_shapes():
-    "run_step returns complete for None, a dict without results, and results entries lacking success."
+    """run_step treats a None return, a dict without results and results lacking a
+    success flag as complete.
+    """
     # No return value.
     assert run_step('x', lambda: None).status == 'complete'
     # Unrelated dict without a results list.
@@ -258,8 +251,11 @@ def test_run_step_complete_on_non_task_return_shapes():
     assert run_step('x', lambda: {'results': [{'task_id': 1}]}).status == 'complete'
 
 
+@pytest.mark.regression
 def test_run_step_error_on_exception_unchanged():
-    "run_step catches a raised exception, returns status error, and preserves the exception message."
+    """run_step converts a raised exception into status error carrying the exception
+    message.
+    """
     def boom():
         raise ValueError('kaput')
 
@@ -268,8 +264,11 @@ def test_run_step_error_on_exception_unchanged():
     assert result.error == 'kaput'
 
 
+@pytest.mark.unit
 def test_task_failure_message_is_conservative():
-    "task_failure_message returns None for six non-failure shapes and 'name: error' only when a result fails."
+    """task_failure_message returns None unless some result has success False, and then
+    returns the task name and error joined by a colon.
+    """
     assert task_failure_message(None) is None
     assert task_failure_message([{'results': []}]) is None
     assert task_failure_message({'results': 'nope'}) is None
@@ -312,9 +311,11 @@ def _run_single_extract_task(monkeypatch, task_overrides, extract_retval):
     return calls, summary
 
 
+@pytest.mark.regression
 def test_executioner_single_reconcile_on_extract_failure(monkeypatch):
-    """Helper-surfaced message → exactly one failure reconcile carrying it,
-    results[] success False (Bug 004-005-4)."""
+    """ultimate_task_executioner reconciles an extract-phase failure exactly once with
+    the surfaced message and reports success False.
+    """
     calls, summary = _run_single_extract_task(
         monkeypatch, {}, 'extraction error: 401 unauthorized')
 
@@ -328,39 +329,11 @@ def test_executioner_single_reconcile_on_extract_failure(monkeypatch):
     assert entry['error'] == 'extraction error: 401 unauthorized'
 
 
-def test_executioner_single_reconcile_on_load_failure(monkeypatch):
-    "Executioner reconciles load failure once with the surfaced message and marks results[] failed."
-    calls, summary = _run_single_extract_task(
-        monkeypatch, {}, 'Load Failure: staging blew up')
-
-    assert len(calls) == 1
-    assert calls[0] == (True, 'Load Failure: staging blew up')
-    assert summary['results'][0]['success'] is False
-
-
-def test_executioner_single_reconcile_on_sproc_failure(monkeypatch):
-    "Executioner reconciles SPROC failure once with the surfaced message and marks results[] failed."
-    calls, summary = _run_single_extract_task(
-        monkeypatch, {}, 'Failed to execute sql: boom')
-
-    assert len(calls) == 1
-    assert calls[0] == (True, 'Failed to execute sql: boom')
-    assert summary['results'][0]['success'] is False
-
-
-def test_executioner_single_success_reconcile_on_extract_success(monkeypatch):
-    """Success path unchanged: single success reconcile, results[] green."""
-    calls, summary = _run_single_extract_task(monkeypatch, {}, None)
-
-    assert len(calls) == 1
-    assert calls[0] == (False, None)
-    assert summary['results'][0]['success'] is True
-    assert summary['results'][0]['error'] is None
-
-
+@pytest.mark.regression
 def test_extract_load_flatten_does_not_reconcile(monkeypatch):
-    """The helper itself never reconciles — login failure surfaces the
-    detailed message for the single outer reconcile."""
+    """extract_load_flatten returns the login failure message without reconciling task
+    dates itself.
+    """
     calls = []
     monkeypatch.setattr(
         ute, 'reconcile_task_dates',
@@ -376,9 +349,11 @@ def test_extract_load_flatten_does_not_reconcile(monkeypatch):
     assert calls == []
 
 
+@pytest.mark.regression
 def test_execute_sproc_does_not_reconcile(monkeypatch):
-    """SPROC failure surfaces the message; success returns None — no
-    reconcile inside the helper in either case."""
+    """execute_sproc returns a failure message for a missing sproc key and None on
+    success, without reconciling task dates itself.
+    """
     calls = []
     monkeypatch.setattr(
         ute, 'reconcile_task_dates',

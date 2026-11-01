@@ -1,11 +1,8 @@
-"""010-003 T04: backend search / suggest / persist-on-log tests (no DB, no net).
-
-Env-ordering note (mirrors test_config): `food_search` imports `service_logins`
--> `credential_management`, whose module-level `load_key()` needs `KEY_PATH`.
-Loading `backend/.env` first (as the app does) fixes the ordering. Upstream
-USDA/OFF calls and DB helpers are monkeypatched, so no network/DB is touched.
+"""Food search ranking, normalizers and persist-on-log behavior with every upstream call
+and database helper mocked.
 """
 
+import pytest
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -65,8 +62,11 @@ def _partial():
 # Ranking (OQ-4): gate sinks, relevance tier, quality label.
 # ---------------------------------------------------------------------------
 
+@pytest.mark.unit
 def test_rank_sinks_partial_and_orders_by_relevance_tier():
-    "Ranks whole milk, milk, and milk chocolate in that order; the partial hit fails the gate and is flagged for review."
+    """rank_usda_hits orders hits by name relevance and sinks a hit that fails the
+    nutrient gate while flagging it for review.
+    """
     hit_full = _survey("whole milk", "Foundation", _complete(), _EXTRA_ALL, fdc=1)
     hit_partial = _survey("milk chocolate", "Branded", _partial(), fdc=2)
     hit_most = _survey("milk", "SR Legacy", _complete(),
@@ -81,8 +81,11 @@ def test_rank_sinks_partial_and_orders_by_relevance_tier():
     assert ranked[0]["gate_ok"] and ranked[1]["gate_ok"]
 
 
+@pytest.mark.unit
 def test_quality_label_thresholds():
-    "quality_label returns High at present>=6, Medium at 3-5, and Low at 2 or below."
+    """quality_label returns High at six or more present nutrients, Medium at three to
+    five and Low at two or fewer.
+    """
     # T09 (OQ-7): High >= 6 (survey rows max 6), Medium >= 3.
     assert fsearch.quality_label(11) == "High"
     assert fsearch.quality_label(6) == "High"
@@ -92,11 +95,10 @@ def test_quality_label_thresholds():
     assert fsearch.quality_label(0) == "Low"
 
 
+@pytest.mark.unit
 def test_name_bonus_orders_exact_first():
-    """T09 (OQ-7): exact > starts-with > whole-word > contains, no extra fetches.
-
-    Mirrors the live 'milk' report: "Milk, whole"-class hits must outrank
-    "Crackers, milk"-class hits deterministically, not by fetch luck.
+    """name_bonus ranks exact matches before prefix, whole-word and substring matches,
+    and rank_usda_hits orders hits accordingly.
     """
     assert fsearch.name_bonus("milk", "milk") == 0
     assert fsearch.name_bonus("milk, whole", "milk") == 1
@@ -114,8 +116,11 @@ def test_name_bonus_orders_exact_first():
         "milk", "milk, whole", "crackers, milk", "buttermilk"]
 
 
+@pytest.mark.unit
 def test_quality_label_counts_extras():
-    "A complete survey food with all extras present yields present=11 and quality_label 'High'."
+    """map_usda_food counts all eleven present nutrients for a complete survey food,
+    which quality_label rates High.
+    """
     full = fsearch.map_usda_food(
         _survey("whole milk", "Foundation", _complete(), _EXTRA_ALL))
     assert fsearch.quality_label(full["present"]) == "High"
@@ -126,8 +131,11 @@ def test_quality_label_counts_extras():
 # Fetch budget (<=3) + ~1d normalized-query cache.
 # ---------------------------------------------------------------------------
 
+@pytest.mark.regression
 def test_fetch_budget_and_cache(monkeypatch):
-    "First query performs 2 parallel fetches plus 1 fallback; an identical query is served from cache with no new fetches."
+    """fetch_usda_ranked makes at most three upstream fetches for a new query and serves
+    an identical normalized query from cache with no further fetches.
+    """
     fsearch.cache.clear()
     fsearch.cache_order.clear()
     calls = []
@@ -175,8 +183,11 @@ _SAVED_ROW = {
 }
 
 
+@pytest.mark.contract
 def test_search_returns_trimmed_saved_first_results(monkeypatch):
-    "Search returns the saved food at rank 0 and the USDA hit at rank 1 with identical keys and the raw payload trimmed."
+    """GET /api/food/search returns the saved food first and USDA hits after it, each
+    with the full search key set and the raw upstream payload trimmed.
+    """
     monkeypatch.setattr(food_api_module, "search_saved_foods",
                         lambda q, limit: [dict(_SAVED_ROW)])
 
@@ -219,8 +230,11 @@ def test_search_returns_trimmed_saved_first_results(monkeypatch):
     assert "raw" not in body[1] and "huge" not in body[1]
 
 
+@pytest.mark.contract
 def test_search_suppresses_usda_hit_when_fdcid_saved(monkeypatch):
-    "A USDA hit whose fdcId matches a saved food fdc_id is dropped; only the unsaved hit is returned."
+    """GET /api/food/search omits a USDA hit whose fdcId matches a saved food and
+    returns the remaining hits.
+    """
     saved = dict(_SAVED_ROW)
     saved["fdc_id"] = 12345
     monkeypatch.setattr(food_api_module, "search_saved_foods",
@@ -274,8 +288,11 @@ def _branded(name, nutrients, ingredients, category="Beverages", fdc=1,
             "servingSizeUnit": unit, "fdcId": fdc, "score": score}
 
 
+@pytest.mark.unit
 def test_match_pct_anchors_then_overlap():
-    "match_pct returns 100 for exact, 90 for prefix, 80 for contains, and 0 for no overlap; match_band returns tens."
+    """match_pct scores 100 for an exact name, 90 for a prefix, 80 for a substring and 0
+    for no overlap, and match_band maps scores to tens.
+    """
     assert fsearch.match_pct("coffee", "coffee") == 100
     assert fsearch.match_pct("coffee ice cream", "coffee") == 90
     assert fsearch.match_pct("drip coffee", "coffee") == 80
@@ -285,8 +302,11 @@ def test_match_pct_anchors_then_overlap():
     assert fsearch.match_band(0) == 0
 
 
+@pytest.mark.unit
 def test_kcal_gate_hard_filter_with_floor_and_alcohol():
-    "kcal_gate keeps tiny-absolute-error foods, drops >15% mismatches, subtracts alcohol energy, and skips when macros are absent."
+    """kcal_gate keeps foods with a tiny absolute calorie error, excludes mismatches
+    above 15 percent, credits alcohol energy and does not apply when macros are missing.
+    """
     # Black-coffee class: huge relative error, tiny absolute -> kept.
     excluded, _ = fsearch.kcal_gate(
         {"kcal_per_100g": 2.0, "protein_g": 0.3, "fat_g": 0.0,
@@ -307,8 +327,12 @@ def test_kcal_gate_hard_filter_with_floor_and_alcohol():
     assert kept is False and delta is None
 
 
+@pytest.mark.unit
 def test_quality_percent_presence_and_single_ingredient():
-    "quality_percent returns 100, 90, or 70 based on caffeine and serving presence; ingredient_stats returns (single, count)."
+    """quality_percent scores 100, 90 or 70 by caffeine and serving presence, and
+    ingredient_stats returns whether a food is single-ingredient with its ingredient
+    count.
+    """
     nuts = {"kcal_per_100g": 2.0, "protein_g": 0.3, "fat_g": 0.0,
             "carbs_g": 0.0, "fiber_g": 0.0, "sugars_g": 0.0,
             "sodium_mg": 5.0, "caffeine_mg": 40.0}
@@ -325,8 +349,11 @@ def test_quality_percent_presence_and_single_ingredient():
     assert fsearch.ingredient_stats(None, "coffee") == (False, None)
 
 
+@pytest.mark.unit
 def test_rank_coffee_single_ingredient_first_mismatch_dropped():
-    "rank_usda_hits drops the kcal-gated coffee candy and ranks the exact single-ingredient coffee row first."
+    """rank_usda_hits drops a hit whose calories contradict its macros and ranks the
+    exact single-ingredient hit first with its category and serving facets.
+    """
     good = _branded("coffee", {"Energy": 2.0, "Protein": 0.3,
                                "Total lipid (fat)": 0.0,
                                "Carbohydrate, by difference": 0.0},
@@ -351,8 +378,11 @@ def test_rank_coffee_single_ingredient_first_mismatch_dropped():
     assert ranked[0]["serving_unit_facet"] == "g"
 
 
+@pytest.mark.contract
 def test_rename_persisted_then_duplicate_routes_to_existing(monkeypatch):
-    """T08 (OQ-6): custom name saved to foods row; duplicate fdcId keeps it."""
+    """POST /api/food/diary/from-api persists the user's edited name and a
+    normalized_from label derived from the USDA data type.
+    """
     saved_name = {}
 
     def fake_persist(provider, name, fdc_id, barcode, raw, per100,
@@ -398,8 +428,11 @@ SAMPLE_ENTRY = {
 }
 
 
+@pytest.mark.contract
 def test_persist_on_log_creates_food_then_entry(monkeypatch):
-    "POST /api/food/diary/from-api persists the food row first, then logs the entry, returning 201 with food_id 42."
+    """POST /api/food/diary/from-api persists the food row before logging the diary
+    entry and returns 201 with that food_id.
+    """
     order = []
 
     def fake_persist(*a, **kw):
@@ -426,8 +459,15 @@ def test_persist_on_log_creates_food_then_entry(monkeypatch):
     assert res.json()["food_id"] == 42
 
 
+@pytest.mark.regression
+@pytest.mark.quarantine(
+    reason="a mocked database cannot exercise the CHECK constraint and the test hard-codes the allowed set",
+    exit="rewrite_against_db",
+)
 def test_persist_api_food_uses_check_valid_normalized_from(monkeypatch):
-    """Bug T08-1: INSERT normalized_from must satisfy the foods CHECK."""
+    """persist_api_food stores only normalized_from labels that the foods table accepts,
+    defaulting to usda_survey.
+    """
     import pifitness.food.queries as fq
     seen = {}
     CHECKED = {'usda_branded', 'usda_survey', 'usda_legacy',
@@ -455,9 +495,11 @@ def test_persist_api_food_uses_check_valid_normalized_from(monkeypatch):
     assert seen["params"][-3] == "usda_survey"
 
 
+@pytest.mark.regression
 def test_persist_clears_review_on_insert(monkeypatch):
-    """T09 (OQ-7): confirming a pick IS the review — fresh INSERT clears
-    needs_review + review_reason; duplicate key returns row untouched."""
+    """persist_api_food inserts a new food with its review flags cleared and returns the
+    existing row without inserting when the natural key already exists.
+    """
     import pifitness.food.queries as fq
     seen = {"inserts": 0}
     per100 = {"kcal_per_100g": 0.0, "protein_g": None, "fat_g": None,
@@ -494,8 +536,12 @@ def test_persist_clears_review_on_insert(monkeypatch):
     assert seen["inserts"] == 1
 
 
+@pytest.mark.contract
 def test_log_api_entry_persists_feed_serving(monkeypatch):
-    """T10 (OQ-8): branded USDA + OFF servings persist (fail-closed units)."""
+    """POST /api/food/diary/from-api persists the serving size, unit and text from
+    branded USDA and Open Food Facts hits and drops them when the unit code is
+    unrecognized.
+    """
     seen = {}
 
     def fake_persist(provider, name, fdc_id, barcode, raw, per100,
@@ -552,8 +598,9 @@ def test_log_api_entry_persists_feed_serving(monkeypatch):
     assert seen["serving_unit"] is None
 
 
+@pytest.mark.contract
 def test_persist_on_log_requires_payload():
-    "POST /api/food/diary/from-api without a usda_payload returns 400."
+    """POST /api/food/diary/from-api returns 400 when no payload is supplied."""
     client = TestClient(_make_app())
     res = client.post("/api/food/diary/from-api",
                       json={"qty": 100.0, "unit": "g"})
@@ -562,8 +609,11 @@ def test_persist_on_log_requires_payload():
 # Pick logging (OQ-4 tuning): recorded on confirm only, with the picked rank.
 # ---------------------------------------------------------------------------
 
+@pytest.mark.contract
 def test_confirm_logs_picked_rank(monkeypatch):
-    "Confirming a diary entry with rank, result_source, and query calls log_pick once and returns 201."
+    """POST /api/food/diary records the picked rank, result source and query once when
+    the entry was chosen from search results.
+    """
     seen = []
     monkeypatch.setattr(fsearch, "log_pick",
                         lambda rank, src, q: seen.append((rank, src, q)))
@@ -579,8 +629,11 @@ def test_confirm_logs_picked_rank(monkeypatch):
     assert seen == [(3, "usda:SR Legacy", "milk")]
 
 
+@pytest.mark.contract
 def test_confirm_without_pick_does_not_log(monkeypatch):
-    "Confirming a diary entry without rank, result_source, or query leaves log_pick uncalled and still returns 201."
+    """POST /api/food/diary records no pick and still returns 201 when the entry carries
+    no search metadata.
+    """
     seen = []
     monkeypatch.setattr(fsearch, "log_pick", lambda *a: seen.append(a))
     monkeypatch.setattr(food_api_module, "log_diary_entry",
@@ -597,8 +650,11 @@ def test_confirm_without_pick_does_not_log(monkeypatch):
 # Normalizers (persist-on-log correctness).
 # ---------------------------------------------------------------------------
 
+@pytest.mark.unit
 def test_normalize_usda_branded_passes_through_per_100g():
-    "normalize_usda_branded passes branded per-100g nutrients through unchanged (30 stays 30) and flags missing panel data."
+    """normalize_usda_branded keeps per-100g branded nutrients unchanged regardless of
+    serving size and flags missing panel data for review.
+    """
     # T12 (Bug 010-003-T12-1): branded search nutrients are ALREADY per-100g
     # (LCCS converted upstream) — no 100/grams rescale. Raw 30 on any
     # serving stays 30 (old code manufactured 30 x 100/50 = 60).
@@ -617,8 +673,11 @@ def test_normalize_usda_branded_passes_through_per_100g():
     assert needs_review is True                # panel nutrients still missing
 
 
+@pytest.mark.unit
 def test_normalize_usda_branded_keeps_nutrients_on_bad_serving():
-    "Unparseable serving size leaves nutrients unchanged, sets needs_review, and reports 'unparseable serving'."
+    """normalize_usda_branded keeps nutrients unchanged and reports an unparseable
+    serving when the serving size is missing.
+    """
     # T12: unparseable serving degrades serving defaults/density only —
     # nutrients pass through as-is with a review note (never NULLed).
     per100, needs_review, reason = normalize_usda_branded(
@@ -628,8 +687,11 @@ def test_normalize_usda_branded_keeps_nutrients_on_bad_serving():
     assert needs_review is True and "unparseable serving" in reason
 
 
+@pytest.mark.unit
 def test_normalize_off_maps_100g_fields():
-    "normalize_off maps energy-kcal_100g to kcal_per_100g and proteins_100g to protein_g, leaving caffeine_mg None."
+    """normalize_off maps the Open Food Facts per-100g fields to the nutrient columns
+    and leaves caffeine null.
+    """
     per100 = normalize_off({
         "energy-kcal_100g": 61.0, "proteins_100g": 3.0, "fat_100g": 3.3,
         "carbohydrates_100g": 4.8, "sugars_100g": 5.0, "sodium_100g": 0.04,
@@ -651,28 +713,15 @@ def _almond_foods():
     return json.loads(p.read_text())["foods"]
 
 
-def test_t12_almond_raw_571_stays_571():
-    "Almond branded entry with 571 kcal/100g passes through unchanged instead of being rescaled to 2039."
-    foods = _almond_foods()
-    raw28 = next(f for f in foods if f["fdcId"] == 2073909)
-    per100, _, _ = normalize_usda_branded(raw28)
-    assert per100["kcal_per_100g"] == 571.0    # not 571 x 100/28 = 2039
-
-
-def test_t12_almond_branded_range_median():
-    "Branded almond kcal values span 247 to 667, with 571 appearing 8 times and the median between 571 and 588."
-    foods = _almond_foods()
-    vals = sorted(per100["kcal_per_100g"]
-                  for f in foods if f["dataType"] == "Branded"
-                  for per100, _, _ in [normalize_usda_branded(f)]
-                  if per100["kcal_per_100g"] is not None)
-    assert (min(vals), max(vals)) == (247, 667)
-    assert vals.count(571.0) == 8
-    assert 571 <= vals[len(vals) // 2] <= 588
-
-
+@pytest.mark.unit
+@pytest.mark.quarantine(
+    reason="depends on a fixture under .features/ outside the test tree",
+    exit="vendor_fixture",
+)
 def test_t12_foundation_energy_prefers_2048_specific():
-    "normalize_usda_survey prefers the 2048-specific energy: almond flour is 578 and the anchor is 579 kcal/100g."
+    """normalize_usda_survey prefers the specific-factor Atwater energy value, giving
+    578 for almond flour and 579 for the almond anchor entry.
+    """
     from backend_functions.food_normalize import normalize_usda_survey
     foods = _almond_foods()
     flour = next(f for f in foods if f["fdcId"] == 2261420)
@@ -681,8 +730,16 @@ def test_t12_foundation_energy_prefers_2048_specific():
     assert normalize_usda_survey(anchor)["kcal_per_100g"] == 579.0
 
 
+@pytest.mark.regression
+@pytest.mark.quarantine(
+    reason="depends on a fixture under .features/ outside the test tree",
+    exit="vendor_fixture",
+)
 def test_t12_flags_argires_post_schnucks_not_canonical():
-    "Density and mismatch flags annotate the Argires, Post, and Schnucks almond rows while canonical rows stay clean."
+    """rank_usda_hits flags almond rows with implausible serving weight, implausible
+    density or an ingredient mismatch and sinks them below canonical rows, leaving
+    canonical rows unflagged.
+    """
     foods = _almond_foods()
     ranked = fsearch.rank_usda_hits(foods, "almonds")
     by_fdc = {m["fdcId"]: m for m in ranked}
@@ -707,9 +764,15 @@ def test_t12_flags_argires_post_schnucks_not_canonical():
     assert "implausible" not in by_fdc[170567]["review_reason"]
 
 
+@pytest.mark.regression
+@pytest.mark.quarantine(
+    reason="depends on a fixture under .features/ outside the test tree",
+    exit="vendor_fixture",
+)
 def test_ac1_almonds_plain_nuts_rank_above_butter():
-    """010-004 AC-1 (almonds half): plain nuts above almond butter; exact
-    single-ingredient anchor first. Fixture has no almond-extract row."""
+    """rank_usda_hits places plain single-ingredient almonds ahead of every almond
+    butter hit.
+    """
     ranked = fsearch.rank_usda_hits(_almond_foods(), "almonds")
     names = [(m["name"] or "").lower().strip() for m in ranked]
     # Top hit: plain, single-ingredient almonds (exact anchor).

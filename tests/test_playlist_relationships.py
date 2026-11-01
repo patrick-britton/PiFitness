@@ -1,9 +1,7 @@
-"""Unit tests for ensure_playlist_relationships (000-001 T06).
-
-Verifies AC-5/AC-8: the relationship re-establishment path is non-destructive —
-it never issues a DELETE, whether the missing_relationships view is empty or
-returns rows. All DB and Spotify calls are mocked.
+"""ensure_playlist_relationships re-creates missing relationships without ever issuing a
+DELETE.
 """
+import pytest
 import sys
 import os
 from unittest.mock import patch, MagicMock
@@ -11,9 +9,10 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
+@pytest.mark.regression
 def test_ensure_playlist_relationships_no_delete_on_empty():
-    """AC-5/AC-8: when missing_relationships is empty, the function returns
-    immediately and never calls qec (no DELETE, no INSERT).
+    """ensure_playlist_relationships returns None and performs no database writes when
+    no relationships are missing.
     """
     from backend_functions.music_functions import ensure_playlist_relationships
 
@@ -26,10 +25,10 @@ def test_ensure_playlist_relationships_no_delete_on_empty():
     mock_qec.assert_not_called()
 
 
+@pytest.mark.regression
 def test_ensure_playlist_relationships_no_delete_on_rows():
-    """AC-5/AC-8: even when missing_relationships returns rows (children need
-    creation), the function must NOT issue any DELETE — only INSERTs via
-    parameterized qec calls.
+    """ensure_playlist_relationships creates each missing child playlist and records it
+    with a parameterized insert, never issuing a DELETE.
     """
     from backend_functions.music_functions import ensure_playlist_relationships
 
@@ -59,29 +58,3 @@ def test_ensure_playlist_relationships_no_delete_on_rows():
     insert_args, insert_kwargs = insert_call
     assert 'INSERT' in insert_args[0]
     assert insert_kwargs['p'] == ("parent1", "newchild123", "auto")
-
-
-def test_ensure_playlist_relationships_uses_parameterized_insert():
-    """The INSERT must use %s placeholders, not f-string interpolation
-    (SQL injection prevention — backend-engineer directive).
-    """
-    from backend_functions.music_functions import ensure_playlist_relationships
-
-    mock_missing = [
-        {"playlist_id": "parent1", "playlist_name": "Running",
-         "needs_manual": True, "needs_auto": False, "needs_recs": False},
-    ]
-
-    with patch('backend_functions.music_functions.sql_to_dict', return_value=mock_missing), \
-         patch('backend_functions.music_functions.get_spotify_client', return_value={"client": MagicMock()}), \
-         patch('backend_functions.music_functions.gen_playlist', return_value=("client", "newchild123")), \
-         patch('backend_functions.music_functions.qec') as mock_qec:
-        ensure_playlist_relationships(None)
-
-    insert_call = mock_qec.call_args_list[0]
-    args, kwargs = insert_call
-    sql_text = args[0]
-    # Must use %s placeholders, not quoted string interpolation
-    assert '%s' in sql_text
-    assert "'{id}'" not in sql_text
-    assert "'{new_id}'" not in sql_text

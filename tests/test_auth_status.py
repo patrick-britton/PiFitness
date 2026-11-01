@@ -1,17 +1,8 @@
-"""Behavioral tests for get_auth_status.
-
-Written BEFORE INT-9's extraction so we can prove the extraction preserves
-behavior. These tests run twice:
-  1. Pre-extraction: get_auth_status lives in backend_functions.service_logins
-  2. Post-extraction: get_auth_status lives in pifitness.auth.status,
-     re-exported from service_logins.
-
-The test file imports from backend_functions.service_logins in both cases;
-the re-export makes this stable. Dependencies are patched on the service_logins
-module, which the extracted body resolves through via service_logins.X() calls
-(see INT-9-fix spec for rationale).
+"""get_auth_status returns the per-service status mapping that the auth status API
+serves.
 """
 
+import pytest
 from backend_functions.service_logins import get_auth_status
 
 
@@ -28,8 +19,11 @@ def _mock_db_returns(monkeypatch, sql_results):
     )
 
 
+@pytest.mark.contract
 def test_returns_expected_structure(monkeypatch):
-    """get_auth_status always returns the documented dict shape."""
+    """get_auth_status returns a services mapping whose Spotify and Garmin entries carry
+    exactly the documented status fields.
+    """
     _mock_db_returns(monkeypatch, {})
     monkeypatch.setattr("pifitness.auth.status.sql_rate_limited", lambda: False)
     monkeypatch.setattr("pifitness.auth.status.spotify_creds", lambda: (None, None, None))
@@ -49,8 +43,11 @@ def test_returns_expected_structure(monkeypatch):
     }
 
 
+@pytest.mark.contract
 def test_missing_credentials_reports_missing(monkeypatch):
-    """Both services report missing_credentials when creds are absent."""
+    """get_auth_status reports missing_credentials for both services when no credentials
+    are configured.
+    """
     _mock_db_returns(monkeypatch, {})
     monkeypatch.setattr("pifitness.auth.status.sql_rate_limited", lambda: False)
     monkeypatch.setattr("pifitness.auth.status.spotify_creds", lambda: (None, None, None))
@@ -62,8 +59,11 @@ def test_missing_credentials_reports_missing(monkeypatch):
     assert result["services"]["Garmin"]["status"] == "missing_credentials"
 
 
+@pytest.mark.contract
 def test_ok_when_credentials_present(monkeypatch):
-    """Both services report ok when creds exist and nothing else overrides."""
+    """get_auth_status reports ok for both services when credentials exist and nothing
+    overrides the status.
+    """
     _mock_db_returns(monkeypatch, {})
     monkeypatch.setattr("pifitness.auth.status.sql_rate_limited", lambda: False)
     monkeypatch.setattr("pifitness.auth.status.spotify_creds", lambda: ("cid", "csec", "uri"))
@@ -75,8 +75,11 @@ def test_ok_when_credentials_present(monkeypatch):
     assert result["services"]["Garmin"]["status"] == "ok"
 
 
+@pytest.mark.contract
 def test_spotify_rate_limited_reports_rate_limited(monkeypatch):
-    """When Spotify is rate limited, its status overrides ok to rate_limited."""
+    """get_auth_status reports Spotify as rate_limited, with its clearance timestamp,
+    while the rate limit is active.
+    """
     _mock_db_returns(monkeypatch, {
         "rate_limit_cleared_utc": "2026-01-01T00:00:00",
     })

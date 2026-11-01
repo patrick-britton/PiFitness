@@ -1,5 +1,6 @@
-"""ISRC dupe review endpoints (008-005, T04). Thin routes over T03 helpers."""
+"""ISRC duplicate-review endpoints over mocked query helpers."""
 
+import pytest
 import sys
 import os
 import inspect
@@ -32,8 +33,9 @@ MATCH_ROW = {
 }
 
 
+@pytest.mark.contract
 def test_count_returns_pair_count():
-    "GET /isrc-dupes/count returns {count: N} from get_isrc_dupe_count."
+    """GET /api/music/isrc-dupes/count returns the pair count from the query helper."""
     with patch(
         'pifitness.music.router.get_isrc_dupe_count', return_value=4
     ):
@@ -42,8 +44,11 @@ def test_count_returns_pair_count():
         assert response.json() == {"count": 4}
 
 
+@pytest.mark.contract
 def test_match_shapes_row_to_camel_case():
-    "GET /isrc-dupes/match maps snake_case match row keys to camelCase in the response."
+    """GET /api/music/isrc-dupes/match returns the next duplicate pair with its keys
+    converted from snake_case to camelCase.
+    """
     with patch(
         'pifitness.music.router.get_isrc_dupe_match', return_value=[MATCH_ROW]
     ):
@@ -60,8 +65,11 @@ def test_match_shapes_row_to_camel_case():
         assert match["preferredIsrc"] == "ISRC-A"
 
 
+@pytest.mark.contract
 def test_match_empty_queue_returns_null():
-    "GET /isrc-dupes/match returns {match: null} when no dupe rows are queued."
+    """GET /api/music/isrc-dupes/match returns a null match when no duplicate pairs are
+    queued.
+    """
     with patch(
         'pifitness.music.router.get_isrc_dupe_match', return_value=[]
     ):
@@ -70,8 +78,11 @@ def test_match_empty_queue_returns_null():
         assert response.json() == {"match": None}
 
 
+@pytest.mark.contract
 def test_decision_accept_calls_helper_and_confirms():
-    "POST /decision with accept=true calls the helper with the four fields and returns an 'accepted' message."
+    """POST /api/music/isrc-dupes/decision with accept true passes both ISRCs, the
+    preferred ISRC and the flag to the helper and confirms acceptance.
+    """
     with patch(
         'pifitness.music.router.process_isrc_dupe_decision'
     ) as mock_decide:
@@ -90,8 +101,11 @@ def test_decision_accept_calls_helper_and_confirms():
         )
 
 
+@pytest.mark.contract
 def test_decision_reject_calls_helper_and_confirms():
-    "POST /decision with accept=false calls the helper with the four fields and returns a 'rejected' message."
+    """POST /api/music/isrc-dupes/decision with accept false passes both ISRCs, the
+    preferred ISRC and the flag to the helper and confirms rejection.
+    """
     with patch(
         'pifitness.music.router.process_isrc_dupe_decision'
     ) as mock_decide:
@@ -110,8 +124,9 @@ def test_decision_reject_calls_helper_and_confirms():
         )
 
 
+@pytest.mark.contract
 def test_decision_missing_field_returns_422():
-    "POST /decision without preferredIsrc returns 422 from request validation."
+    """POST /api/music/isrc-dupes/decision returns 422 when preferredIsrc is missing."""
     response = client.post("/api/music/isrc-dupes/decision", json={
         "isrc1": "ISRC-A",
         "isrc2": "ISRC-B",
@@ -120,8 +135,11 @@ def test_decision_missing_field_returns_422():
     assert response.status_code == 422
 
 
+@pytest.mark.contract
 def test_rescan_runs_finder_and_reports_count():
-    "POST /rescan calls the finder once and returns a message with the resulting count of 3."
+    """POST /api/music/isrc-dupes/rescan runs the duplicate finder once and reports the
+    resulting pair count.
+    """
     with patch(
         'pifitness.music.router.run_isrc_duplicate_finder'
     ) as mock_run, patch(
@@ -135,8 +153,11 @@ def test_rescan_runs_finder_and_reports_count():
         mock_run.assert_called_once_with()
 
 
+@pytest.mark.contract
 def test_rescan_empty_reports_no_dupes():
-    "POST /rescan with zero count returns {ok: true, message: 'No duplicate isrcs found'}."
+    """POST /api/music/isrc-dupes/rescan reports that no duplicates were found when the
+    count is zero.
+    """
     with patch(
         'pifitness.music.router.run_isrc_duplicate_finder'
     ), patch(
@@ -149,8 +170,11 @@ def test_rescan_empty_reports_no_dupes():
         }
 
 
+@pytest.mark.regression
 def test_decision_write_failure_returns_500():
-    "POST /decision returns 500 with a 'Failed to record' detail when the helper raises."
+    """POST /api/music/isrc-dupes/decision returns 500 instead of ok when recording the
+    decision fails.
+    """
     # T08 / Bug 008-005-T03-1: a failed write must not be reported as {ok: true}.
     with patch(
         'pifitness.music.router.process_isrc_dupe_decision',
@@ -166,8 +190,11 @@ def test_decision_write_failure_returns_500():
         assert "Failed to record ISRC dupe decision" in response.json()["detail"]
 
 
+@pytest.mark.regression
 def test_rescan_failure_returns_500():
-    "POST /rescan returns 500 with a 'Failed to rescan' detail when the finder raises."
+    """POST /api/music/isrc-dupes/rescan returns 500 instead of success when the finder
+    raises.
+    """
     # T08 / Bug 008-005-T03-1: a failed CALL must not be reported as a success.
     with patch(
         'pifitness.music.router.run_isrc_duplicate_finder',
@@ -176,8 +203,11 @@ def test_rescan_failure_returns_500():
         response = client.post("/api/music/isrc-dupes/rescan")
         assert response.status_code == 500
         assert "Failed to rescan ISRC dupes" in response.json()["detail"]
+@pytest.mark.regression
 def test_rescan_route_runs_off_the_event_loop():
-    "The registered /isrc-dupes/rescan endpoint is a plain sync function, not a coroutine."
+    """The rescan endpoint is registered as a plain synchronous function so its long
+    database call runs in the threadpool instead of blocking the event loop.
+    """
     # T09 / Bug 008-005-T08-1: the blocking ~25 s CALL must run in FastAPI's
     # threadpool, never awaited on the event loop. Starlette dispatches
     # non-coroutine endpoints via run_in_threadpool, so the registered handler

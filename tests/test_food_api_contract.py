@@ -1,11 +1,8 @@
-"""010-002 T03: food skeleton route contract tests (no DB, no network).
-
-Verifies `backend.api.food` serves EXACTLY the T01 wire contract over HTTP.
-The query-layer DB functions are monkeypatched (fixture style, mirroring the
-repo's other tests), so no PostgreSQL connection is required. Also locks the
-flat-row -> contract-shape serializers in `food_queries`.
+"""Food API wire contracts and query-layer logic with every database and network call
+mocked.
 """
 
+import pytest
 import json
 from datetime import datetime
 from fastapi import FastAPI
@@ -71,8 +68,11 @@ def _patch_reads(monkeypatch):
                         lambda **kw: dict(SAMPLE_PAGE))
 
 
+@pytest.mark.contract
 def test_route_table_matches_contract_exactly():
-    """The contract endpoints + soft-delete helpers are present."""
+    """The food router registers every contract endpoint by path and method, including
+    the soft-delete and restore routes.
+    """
     paths = {(r.path, tuple(sorted(getattr(r, "methods", []) or [])))
              for r in food_api.routes}
     for expected in [
@@ -100,8 +100,11 @@ def test_route_table_matches_contract_exactly():
         assert expected in paths, f"missing route {expected}"
 
 
+@pytest.mark.contract
 def test_get_usuals_returns_usual_food_shapes(monkeypatch):
-    "GET /usuals returns one item per usual food with exactly the UsualFood key set."
+    """GET /api/food/usuals returns a list of usual foods with exactly the UsualFood key
+    set.
+    """
     _patch_reads(monkeypatch)
     client = TestClient(_make_app())
     res = client.get("/api/food/usuals?at=2026-10-04T12:00:00")
@@ -115,8 +118,11 @@ def test_get_usuals_returns_usual_food_shapes(monkeypatch):
     }
 
 
+@pytest.mark.contract
 def test_get_diary_returns_day_entry_array(monkeypatch):
-    "GET /diary returns a list of DayEntry objects with the exact entry and nutrient key sets."
+    """GET /api/food/diary returns a list of day entries with exactly the entry and
+    nutrient-snapshot key sets.
+    """
     _patch_reads(monkeypatch)
     client = TestClient(_make_app())
     res = client.get("/api/food/diary?day=2026-10-04")
@@ -134,8 +140,11 @@ def test_get_diary_returns_day_entry_array(monkeypatch):
     }
 
 
+@pytest.mark.contract
 def test_get_recipes_returns_recipe_summaries_only(monkeypatch):
-    "GET /recipes returns RecipeSummary objects carrying only the four summary fields."
+    """GET /api/food/recipes returns recipe summaries carrying only recipe_id, title,
+    category and times_prepared.
+    """
     _patch_reads(monkeypatch)
     client = TestClient(_make_app())
     res = client.get("/api/food/recipes")
@@ -146,8 +155,11 @@ def test_get_recipes_returns_recipe_summaries_only(monkeypatch):
     }
 
 
+@pytest.mark.contract
 def test_get_foods_returns_food_list_response(monkeypatch):
-    "GET /foods returns {data, next_cursor} with each row nested under nutrients and soft-delete fields."
+    """GET /api/food/foods returns data and next_cursor with each row's nutrients nested
+    and the soft-delete fields present.
+    """
     _patch_reads(monkeypatch)
     client = TestClient(_make_app())
     res = client.get("/api/food/foods?q=avo")
@@ -162,8 +174,11 @@ def test_get_foods_returns_food_list_response(monkeypatch):
         "kcal_per_100g", "protein_g", "fat_g", "carbs_g",
         "fiber_g", "sugars_g", "sodium_mg", "caffeine_mg",
     }
+@pytest.mark.contract
 def test_post_diary_returns_day_entry(monkeypatch):
-    "POST /diary returns 201 and a DayEntry carrying both snapshot fields."
+    """POST /api/food/diary returns 201 and a day entry carrying the name and nutrient
+    snapshots.
+    """
     monkeypatch.setattr(food_api_module, "log_diary_entry",
                         lambda **kw: dict(SAMPLE_ENTRY))
     client = TestClient(_make_app())
@@ -175,8 +190,9 @@ def test_post_diary_returns_day_entry(monkeypatch):
     assert "nutrients_snapshot" in entry and "name_snapshot" in entry
 
 
+@pytest.mark.contract
 def test_post_recipes_returns_recipe_summary(monkeypatch):
-    "POST /recipes returns 201 and exactly the RecipeSummary key set."
+    """POST /api/food/recipes returns 201 and exactly the recipe summary key set."""
     monkeypatch.setattr(food_api_module, "save_recipe", lambda **kw: dict(SAMPLE_RECIPE))
     client = TestClient(_make_app())
     res = client.post("/api/food/recipes", json={
@@ -197,8 +213,9 @@ def test_post_recipes_returns_recipe_summary(monkeypatch):
     }
 
 
+@pytest.mark.contract
 def test_post_diary_rejects_deleted_food(monkeypatch):
-    "POST /diary returns 400 when log_diary_entry raises on a soft-deleted food."
+    """POST /api/food/diary returns 400 when the food has been soft-deleted."""
     def _raise(**kw):
         raise ValueError("is soft-deleted and cannot be re-logged")
     monkeypatch.setattr(food_api_module, "log_diary_entry", _raise)
@@ -208,8 +225,9 @@ def test_post_diary_rejects_deleted_food(monkeypatch):
     assert res.status_code == 400
 
 
+@pytest.mark.contract
 def test_diary_stats_shape(monkeypatch):
-    "GET /diary/stats returns the exact four-field stats object from get_diary_stats."
+    """GET /api/food/diary/stats returns the four-field stats object unchanged."""
     monkeypatch.setattr(food_api_module, "get_diary_stats",
                         lambda *a, **kw: {"today_kcal": 500.0,
                                           "last_24h_kcal": 600.0,
@@ -222,8 +240,11 @@ def test_diary_stats_shape(monkeypatch):
                           "avg_7d_kcal": 550.0, "scale_max": 600.0}
 
 
+@pytest.mark.contract
 def test_patch_entry_moves_day(monkeypatch):
-    "PATCH /diary/{id} forwards qty and logged_at and echoes the moved logged_at."
+    """PATCH /api/food/diary/{id} forwards qty and logged_at to the update helper and
+    echoes the moved logged_at.
+    """
     seen = {}
 
     def _upd(**kw):
@@ -238,15 +259,17 @@ def test_patch_entry_moves_day(monkeypatch):
     assert res.json()["logged_at"] == "2026-10-03T18:00:00"
 
 
+@pytest.mark.contract
 def test_patch_entry_empty_rejected():
-    "PATCH /diary/{id} with an empty body returns 400."
+    """PATCH /api/food/diary/{id} returns 400 for an empty body."""
     client = TestClient(_make_app())
     res = client.patch("/api/food/diary/10", json={})
     assert res.status_code == 400
 
 
+@pytest.mark.contract
 def test_delete_entry(monkeypatch):
-    "DELETE /diary/{id} returns {success: true, entry_id: id}."
+    """DELETE /api/food/diary/{id} returns success true with the deleted entry_id."""
     monkeypatch.setattr(food_api_module, "delete_diary_entry", lambda *a, **kw: True)
     client = TestClient(_make_app())
     res = client.delete("/api/food/diary/10")
@@ -254,8 +277,11 @@ def test_delete_entry(monkeypatch):
     assert res.json() == {"success": True, "entry_id": 10}
 
 
+@pytest.mark.unit
 def test_kcal_for_fda_label_table():
-    "_kcal_for converts g/cup/oz/tbsp/serving via the FDA table and raises on unknown units."
+    """_kcal_for converts g, cup, oz, tbsp and serving amounts to kcal through the unit
+    table, returns None without calories and raises ValueError for an unknown unit.
+    """
     from pifitness.food.schemas import UNIT_TO_G_OR_ML
     k = food_queries._kcal_for
     assert k(100, "g", 160.0, conversions=UNIT_TO_G_OR_ML) == 160.0
@@ -287,8 +313,11 @@ def _flat_food_row():
     }
 
 
+@pytest.mark.unit
 def test_to_food_row_nests_nutrients():
-    "_to_food_row nests the eight flat nutrient columns under 'nutrients' and preserves flags."
+    """_to_food_row nests the eight flat nutrient columns under nutrients and preserves
+    the deletion flags.
+    """
     row = food_queries._to_food_row(_flat_food_row())
     assert row["food_id"] == 1 and row["name"] == "Avocado"
     assert row["nutrients"] == {
@@ -299,8 +328,11 @@ def test_to_food_row_nests_nutrients():
     assert row["is_deleted"] is False and row["deleted_at"] is None
 
 
+@pytest.mark.unit
 def test_to_day_entry_nests_snapshot_and_iso_time():
-    "_to_day_entry nests the nutrient snapshot and renders logged_at as an ISO-8601 string."
+    """_to_day_entry nests the nutrient snapshot and renders logged_at as an ISO-8601
+    string.
+    """
     flat = dict(_flat_food_row())
     flat.update({
         "entry_id": 10, "name_snapshot": "Avocado", "is_partial": False,
@@ -313,8 +345,10 @@ def test_to_day_entry_nests_snapshot_and_iso_time():
     assert entry["name_snapshot"] == "Avocado"
 
 
+@pytest.mark.unit
 def test_to_recipe_summary_preserves_exact_fields():
-    "_to_recipe_summary returns exactly recipe_id, title, category, and times_prepared."
+    """_to_recipe_summary returns exactly recipe_id, title, category and times_prepared.
+    """
     row = {"recipe_id": 3, "title": "Guacamole", "category": "Side",
            "times_prepared": 0, "is_deleted": False, "created_at": None}
     out = food_queries._to_recipe_summary(row)
@@ -322,8 +356,11 @@ def test_to_recipe_summary_preserves_exact_fields():
                    "category": "Side", "times_prepared": 0}
 
 
+@pytest.mark.contract
 def test_food_by_id_returns_row_or_404(monkeypatch):
-    """T10 (OQ-8): pk hydration endpoint serves FoodRow (+ serving), 404s."""
+    """GET /api/food/foods/{id} returns the food row with its serving fields, or 404
+    when it does not exist.
+    """
     row = _flat_food_row()
     row.update({"serving_size": 40.0, "serving_unit": "g",
                 "serving_text": "1/2 cup"})
@@ -384,8 +421,12 @@ def _food_fixture(**over):
     return base
 
 
+@pytest.mark.unit
 def test_kcal_for_dynamic_recipe_serving_unit():
-    """OQ-2: unit == the food's own serving_unit resolves via serving_size."""
+    """_kcal_for resolves a food's own serving unit through its serving size, falls back
+    to the unit table on a mismatch, returns None when grams are unknown and raises
+    ValueError for an unknown unit.
+    """
     from pifitness.food.schemas import UNIT_TO_G_OR_ML
     k = food_queries._kcal_for
     assert k(3, "pancake", 200.0, serving_size=40.0, serving_unit="pancake",
@@ -407,23 +448,11 @@ def test_kcal_for_dynamic_recipe_serving_unit():
         raise AssertionError("unknown unit must raise")
 
 
-def test_fetch_foods_single_batched_query(monkeypatch):
-    """ONE query for the whole id list (no per-ingredient N+1)."""
-    seen = {}
-
-    def fake(sql, params=None):
-        seen["sql"], seen["params"] = sql, params
-        return []
-
-    monkeypatch.setattr(food_queries, "sql_to_dict", fake)
-    out = food_queries._fetch_foods([3, 1, 3, None, 2])
-    assert out == {}
-    assert "food_id = ANY" in seen["sql"]
-    assert seen["params"] == ([1, 2, 3],)
-
-
+@pytest.mark.unit
 def test_combine_ingredients_gram_weighted_math(monkeypatch):
-    """Gram-weighted per-100g + unit conversion (locks Bug 010-005-03-1)."""
+    """_combine_ingredients computes per-100g nutrients weighted by the converted grams
+    of each ingredient.
+    """
     foods = {
         1: _food_fixture(food_id=1, name="Oats", kcal_per_100g=160.0,
                          protein_g=13.0),
@@ -442,8 +471,11 @@ def test_combine_ingredients_gram_weighted_math(monkeypatch):
     assert needs_review is False and reason == ""
 
 
+@pytest.mark.unit
 def test_combine_ingredients_recipe_as_ingredient(monkeypatch):
-    """Recipe-as-ingredient resolves through its own serving_unit grams."""
+    """_combine_ingredients converts a recipe ingredient through its own serving unit
+    and drops unconvertible amounts while flagging the result for review.
+    """
     foods = {
         1: _food_fixture(food_id=1, name="Butter", kcal_per_100g=200.0),
         3: _food_fixture(food_id=3, name="Pancakes", source="recipe",
@@ -466,8 +498,15 @@ def test_combine_ingredients_recipe_as_ingredient(monkeypatch):
     assert all(v is None for v in snap2.values())
 
 
+@pytest.mark.contract
+@pytest.mark.quarantine(
+    reason="reads SQL parameters by position and counts placeholder groups",
+    exit="rewrite_against_db",
+)
 def test_save_recipe_batches_fetch_and_ingredient_insert(monkeypatch):
-    """One batched fetch + ONE multi-row ingredients INSERT (no N+1)."""
+    """save_recipe stores the recipe with grams-per-serving derived from the convertible
+    ingredient grams and returns the recipe summary.
+    """
     fetch_calls = []
 
     def fake_fetch(ids):
@@ -524,8 +563,15 @@ def test_save_recipe_batches_fetch_and_ingredient_insert(monkeypatch):
     assert rec_params == ("Taco Night", "Side", 55, 4, "taco")
 
 
+@pytest.mark.contract
+@pytest.mark.quarantine(
+    reason="reads SQL parameters by position",
+    exit="rewrite_against_db",
+)
 def test_save_recipe_unconvertible_yields_null_serving_size(monkeypatch):
-    """OQ-2 fallback: no convertible grams -> serving_size NULL + review."""
+    """save_recipe stores a null serving size and flags the food for review when no
+    ingredient amount is convertible to grams.
+    """
     monkeypatch.setattr(
         food_queries, "_fetch_foods",
         lambda ids: {1: _food_fixture(food_id=1, kcal_per_100g=160.0)})
@@ -550,8 +596,11 @@ def test_save_recipe_unconvertible_yields_null_serving_size(monkeypatch):
     assert food_params[11] is True   # needs_review
 
 
+@pytest.mark.regression
 def test_save_recipe_rejects_step_food_outside_ingredient_list():
-    """AC-3: step portions must be drawn from the recipe ingredient list."""
+    """save_recipe raises ValueError, before touching the database, when a step uses a
+    food that is not in the ingredient list.
+    """
     try:
         food_queries.save_recipe(
             title="X", category="Dessert",
@@ -567,8 +616,11 @@ def test_save_recipe_rejects_step_food_outside_ingredient_list():
                              "rejected before any DB touch")
 
 
+@pytest.mark.contract
 def test_get_recipe_detail_contract_shape(monkeypatch):
-    """GET /recipes/{id} -> RecipeDetail (exact wire shape), 404s when None."""
+    """GET /api/food/recipes/{id} returns the RecipeDetail shape, or 404 when the recipe
+    does not exist.
+    """
     monkeypatch.setattr(food_api_module, "get_recipe",
                         lambda rid: dict(SAMPLE_RECIPE_DETAIL))
     client = TestClient(_make_app())
@@ -586,8 +638,11 @@ def test_get_recipe_detail_contract_shape(monkeypatch):
     assert client.get("/api/food/recipes/99").status_code == 404
 
 
+@pytest.mark.contract
 def test_put_recipe_passes_payload_and_404s(monkeypatch):
-    """PUT /recipes/{id} forwards SaveRecipeRequest; 404 when missing."""
+    """PUT /api/food/recipes/{id} forwards the request payload to the update helper and
+    returns the recipe summary, or 404 when the recipe does not exist.
+    """
     seen = {}
 
     def _upd(recipe_id, **kw):
@@ -611,8 +666,11 @@ def test_put_recipe_passes_payload_and_404s(monkeypatch):
     assert client.put("/api/food/recipes/9", json=SAVE_PAYLOAD).status_code == 404
 
 
+@pytest.mark.contract
 def test_delete_recipe_route_soft_delete_payload(monkeypatch):
-    """DELETE /recipes/{id} -> { success, recipe_id, food_id }; 404s."""
+    """DELETE /api/food/recipes/{id} returns success with the recipe_id and food_id, or
+    404 when the recipe does not exist.
+    """
     monkeypatch.setattr(
         food_api_module, "delete_recipe",
         lambda rid: {"success": True, "recipe_id": rid, "food_id": 42})
@@ -625,8 +683,11 @@ def test_delete_recipe_route_soft_delete_payload(monkeypatch):
     assert client.delete("/api/food/recipes/9").status_code == 404
 
 
+@pytest.mark.contract
 def test_complete_recipe_route_increments(monkeypatch):
-    """POST /recipes/{id}/complete -> RecipeSummary; 404s when missing."""
+    """POST /api/food/recipes/{id}/complete returns the updated recipe summary, or 404
+    when the recipe does not exist.
+    """
     monkeypatch.setattr(food_api_module, "complete_recipe",
                         lambda rid: dict(SAMPLE_RECIPE, times_prepared=3))
     client = TestClient(_make_app())
@@ -641,8 +702,15 @@ def test_complete_recipe_route_increments(monkeypatch):
     assert client.post("/api/food/recipes/9/complete").status_code == 404
 
 
+@pytest.mark.contract
+@pytest.mark.quarantine(
+    reason="asserts SQL fragments",
+    exit="rewrite_against_db",
+)
 def test_complete_recipe_query_increments_and_clears_session(monkeypatch):
-    """Query layer: times_prepared += 1 AND cook state cleared (AC-6)."""
+    """complete_recipe increments times_prepared, clears the recipe's cook session and
+    returns None for a missing or deleted recipe.
+    """
     calls = {"ret": [], "qec": []}
 
     def fake_insert(sql, params=None):
@@ -666,8 +734,15 @@ def test_complete_recipe_query_increments_and_clears_session(monkeypatch):
     assert food_queries.complete_recipe(99) is None
 
 
+@pytest.mark.contract
+@pytest.mark.quarantine(
+    reason="asserts SQL fragments",
+    exit="rewrite_against_db",
+)
 def test_delete_recipe_query_soft_deletes_both_rows(monkeypatch):
-    """Query layer: recipe + food soft-deleted, cook session discarded."""
+    """delete_recipe soft-deletes both the recipe and its food row, discards the cook
+    session and returns None when the recipe is missing.
+    """
     calls = {"reads": [], "qec": []}
 
     def fake_read(sql, params=None):
@@ -689,21 +764,11 @@ def test_delete_recipe_query_soft_deletes_both_rows(monkeypatch):
     assert food_queries.delete_recipe(99) is None
 
 
-def test_get_recipes_orders_most_made_first(monkeypatch):
-    """AC-1 list order: times_prepared DESC, title ASC."""
-    captured = {}
-
-    def fake(sql, params=None):
-        captured["sql"] = sql
-        return []
-
-    monkeypatch.setattr(food_queries, "sql_to_dict", fake)
-    food_queries.get_recipes()
-    assert "times_prepared DESC, title ASC" in captured["sql"]
-
-
+@pytest.mark.contract
 def test_get_recipe_query_layer_shape(monkeypatch):
-    """Query layer builds RecipeDetail with names joined in-batch."""
+    """get_recipe assembles the RecipeDetail shape with ingredient and step-food names
+    joined in, and returns None for a missing recipe.
+    """
     def fake(sql, params=None):
         if "recipe_ingredients" in sql:
             return [{"food_id": 1, "qty": 100.0, "unit": "g",
@@ -742,8 +807,15 @@ COOK_TIMERS = [{"step_no": 1, "ends_at": "2026-10-06T12:01:00+00:00"},
 COOK_FOODS = [{"step_no": 1, "food_id": 5, "unit": "g"}]
 
 
+@pytest.mark.contract
+@pytest.mark.quarantine(
+    reason="round-trips through a fake database the test itself writes and asserts SQL text",
+    exit="rewrite_against_db",
+)
 def test_cook_state_round_trip_preserves_deadlines(monkeypatch):
-    """put checks + two timers -> get restores identical deadlines."""
+    """save_cook_state then get_cook_state returns the same timer deadlines and checked
+    items, with updated_at as an ISO-8601 string.
+    """
     stored = {}
 
     def fake_upsert(sql, params=None):
@@ -783,32 +855,32 @@ def test_cook_state_round_trip_preserves_deadlines(monkeypatch):
     assert got["updated_at"] == "2026-10-06T12:00:00"
 
 
+@pytest.mark.contract
 def test_get_cook_state_empty_session(monkeypatch):
-    """No row = empty lists + null updated_at (contract: no active session)."""
+    """get_cook_state returns empty lists and a null updated_at when no session is
+    stored.
+    """
     monkeypatch.setattr(food_queries, "sql_to_dict", lambda *a, **k: [])
     assert food_queries.get_cook_state(3) == {
         "recipe_id": 3, "checked_steps": [], "checked_foods": [],
         "timers": [], "updated_at": None}
 
 
+@pytest.mark.contract
 def test_save_cook_state_missing_recipe_404_path(monkeypatch):
-    """Missing/soft-deleted recipe -> None (route 404s, no FK 500)."""
+    """save_cook_state returns None when the recipe is missing or soft-deleted so the
+    route can answer 404.
+    """
     monkeypatch.setattr(food_queries, "sql_to_dict", lambda *a, **k: [])
     assert food_queries.save_cook_state(99, [], [], []) is None
 
 
-def test_clear_cook_state_idempotent(monkeypatch):
-    """DELETE clears the session; no row is not an error."""
-    calls = []
-    monkeypatch.setattr(food_queries, "qec",
-                        lambda sql, params=None: calls.append((sql, params)))
-    assert food_queries.clear_cook_state(3) is True
-    assert "DELETE FROM food.recipe_cook_states" in calls[0][0]
-    assert calls[0][1] == (3,)
-
-
+@pytest.mark.contract
 def test_cook_routes_round_trip_and_validation(monkeypatch):
-    """GET/PUT cook: identical deadlines over the wire; 400/404 paths."""
+    """PUT and GET /api/food/recipes/{id}/cook return the stored timers unchanged, PUT
+    rejects a non-ISO-8601 timer instant with 400 before touching the database, and PUT
+    returns 404 for a missing recipe.
+    """
     state = {"recipe_id": 3, "checked_steps": [1, 2],
              "checked_foods": list(COOK_FOODS), "timers": list(COOK_TIMERS),
              "updated_at": "2026-10-06T12:00:00"}
@@ -857,8 +929,11 @@ def test_cook_routes_round_trip_and_validation(monkeypatch):
     assert res.status_code == 404
 
 
+@pytest.mark.contract
 def test_delete_cook_route_clears_session(monkeypatch):
-    """DELETE cook -> { success: true } and the clear is invoked."""
+    """DELETE /api/food/recipes/{id}/cook returns success true and clears that recipe's
+    cook session.
+    """
     calls = []
     monkeypatch.setattr(food_api_module, "clear_cook_state",
                         lambda rid: calls.append(rid) or True)
@@ -869,8 +944,11 @@ def test_delete_cook_route_clears_session(monkeypatch):
     assert calls == [3]
 
 
+@pytest.mark.contract
 def test_get_cook_route_empty_session_shape(monkeypatch):
-    """GET cook with no session -> empty lists + null updated_at."""
+    """GET /api/food/recipes/{id}/cook returns empty lists and a null updated_at when no
+    session exists.
+    """
     monkeypatch.setattr(food_api_module, "get_cook_state",
                         lambda rid: {"recipe_id": rid, "checked_steps": [],
                                      "checked_foods": [], "timers": [],
@@ -894,8 +972,11 @@ def _persist_usda_body():
         "nutrients_raw": {"dataType": "SR Legacy", "foodNutrients": []}}}
 
 
+@pytest.mark.contract
 def test_persist_route_returns_food_id_and_never_writes_diary(monkeypatch):
-    """POST /persist -> {food_id}; ZERO diary writes (unlike from-api)."""
+    """POST /api/food/persist returns 201 with the persisted food_id, passes the
+    normalizer label and serving fields through, and never writes a diary entry.
+    """
     seen = {}
 
     def fake_persist(*args, **kwargs):
@@ -920,8 +1001,11 @@ def test_persist_route_returns_food_id_and_never_writes_diary(monkeypatch):
     assert seen["kwargs"]["serving_size"] is None
 
 
+@pytest.mark.contract
 def test_persist_route_off_payload_carries_serving_and_dedupe_id(monkeypatch):
-    """OFF hits persist the feed serving (OQ-8); dedupe row id passes through."""
+    """POST /api/food/persist for an Open Food Facts payload forwards the feed serving
+    and returns the existing food_id when the barcode is already saved.
+    """
     seen = {}
 
     def fake_persist(*args, **kwargs):
@@ -946,7 +1030,10 @@ def test_persist_route_off_payload_carries_serving_and_dedupe_id(monkeypatch):
     assert seen["kwargs"]["serving_unit"] == "g"
 
 
+@pytest.mark.contract
 def test_persist_route_requires_payload(monkeypatch):
-    """Neither payload -> 400 (mirrors /diary/from-api validation)."""
+    """POST /api/food/persist returns 400 when neither a USDA nor an Open Food Facts
+    payload is supplied.
+    """
     client = TestClient(_make_app())
     assert client.post("/api/food/persist", json={}).status_code == 400

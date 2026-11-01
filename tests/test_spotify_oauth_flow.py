@@ -1,27 +1,14 @@
-"""
-Regression tests for the Spotify OAuth flow extracted in INT-8.
-
-INT-8 extracted router.py's SpotifyOAuth construction into
-pifitness.integrations.spotify.oauth_flow. A latent bug (force_refresh() not
-returning a token) shipped without a test, so this module exists to ensure that
-class of regression is caught.
-
-These tests use monkeypatching only; no network calls, no real credentials,
-no DB access.
-"""
+"""The Spotify OAuth helpers return the tokens and URLs their callers rely on."""
 
 import pytest
 
 from pifitness.integrations.spotify import oauth_flow
 
 
+@pytest.mark.regression
 def test_force_refresh_clears_cache_and_returns_token(monkeypatch):
-    """Regression for Bug 1: force_refresh() must return a token dict.
-
-    Previously force_refresh() cleared the cache but never called
-    get_spotify_token(), so router.refresh_spotify_token always returned
-    an error. This test monkeypatches both dependencies and verifies the
-    call chain and the return value.
+    """force_refresh clears the Spotify token cache and returns a freshly obtained token
+    dict.
     """
     sentinel_token = {
         'token': 'test-token-abc123',
@@ -47,8 +34,9 @@ def test_force_refresh_clears_cache_and_returns_token(monkeypatch):
     assert result is sentinel_token
 
 
+@pytest.mark.regression
 def test_exchange_code_returns_token_dict(monkeypatch):
-    """Regression: exchange_code() must return the token dict from get_access_token."""
+    """exchange_code returns the token dict from the auth manager's get_access_token."""
     sentinel_token = {'access_token': 'tok', 'token_type': 'Bearer', 'expires_in': 3600}
 
     def fake_build_manager(show_dialog=None):
@@ -65,8 +53,9 @@ def test_exchange_code_returns_token_dict(monkeypatch):
     assert result.get('access_token') == 'tok'
 
 
+@pytest.mark.regression
 def test_build_authorize_url_calls_show_dialog(monkeypatch):
-    """Regression: build_authorize_url() must request user consent dialog."""
+    """build_authorize_url requests the consent dialog and returns the authorize URL."""
     sentinels = {'called_with': None}
 
     def fake_build(show_dialog=None):

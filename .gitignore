@@ -275,3 +275,9 @@ frontend/vit2.txt
 result*.txt
 fix_test_*.py
 docs/reorg/blocks/
+
+# Test triage artifacts
+.test_triage_backup/
+# One-shot apply helpers (regenerate as needed)
+apply_t2b.py
+apply_test_food_search_backend.py

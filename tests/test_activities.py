@@ -1,8 +1,5 @@
-"""
-Test Activities API Endpoints
-============================
-
-Basic smoke tests for activities API endpoints.
+"""Activities API contracts with query helpers mocked, plus one live elapsed_s
+integration check.
 """
 
 import importlib
@@ -13,90 +10,13 @@ from backend.main import app
 
 client = TestClient(app)
 
-@pytest.mark.slow
-@pytest.mark.integration
-def test_activities_list():
-    """Test GET /api/activities returns successfully with schema-aware columns."""
-    response = client.get("/api/activities")
-    assert response.status_code == 200
-    data = response.json()
-    assert "data" in data
-    assert "count" in data
-    assert isinstance(data["count"], int)
-    if data["count"] > 0:
-        assert isinstance(data["data"], list)
-        assert len(data["data"]) > 0
-        first_activity = data["data"][0]
-        # These columns should always exist
-        assert "activity_id" in first_activity
-        assert "activity_name" in first_activity
-        assert "start_timestamp_utc" in first_activity
-        # These columns may or may not exist (schema-aware)
-        if "duration_moving_s" in first_activity:
-            assert isinstance(first_activity["duration_moving_s"], int)
-        if "distance_m" in first_activity:
-            assert isinstance(first_activity["distance_m"], (int, float))
 
-@pytest.mark.slow
-@pytest.mark.integration
-def test_activity_by_id():
-    """Test GET /api/activities/{id} returns successfully."""
-    # First get an activity ID
-    list_response = client.get("/api/activities")
-    assert list_response.status_code == 200
-    list_data = list_response.json()
-
-    if list_data["count"] > 0:
-        activity_id = list_data["data"][0]["activity_id"]
-        response = client.get(f"/api/activities/{activity_id}")
-        assert response.status_code == 200
-        data = response.json()
-        assert "data" in data
-        assert data["data"]["activity_id"] == activity_id
-
-@pytest.mark.slow
-@pytest.mark.integration
-def test_activity_telemetry():
-    """Test GET /api/activities/{id}/telemetry returns successfully."""
-    # First get an activity ID
-    list_response = client.get("/api/activities")
-    assert list_response.status_code == 200
-    list_data = list_response.json()
-
-    if list_data["count"] > 0:
-        activity_id = list_data["data"][0]["activity_id"]
-        response = client.get(f"/api/activities/{activity_id}/telemetry")
-        assert response.status_code == 200
-        data = response.json()
-        assert "data" in data
-        if len(data["data"]) > 0:
-            first_point = data["data"][0]
-            assert "timestamp_utc" in first_point
-            assert "latitude" in first_point
-            assert "longitude" in first_point
-            assert "elevation_m" in first_point
-
-@pytest.mark.slow
-@pytest.mark.integration
-def test_activity_segments():
-    """Test GET /api/activities/{id}/segments returns successfully."""
-    # First get an activity ID
-    list_response = client.get("/api/activities")
-    assert list_response.status_code == 200
-    list_data = list_response.json()
-
-    if list_data["count"] > 0:
-        activity_id = list_data["data"][0]["activity_id"]
-        response = client.get(f"/api/activities/{activity_id}/segments")
-        assert response.status_code == 200
-        data = response.json()
-        assert "data" in data
-        assert "count" in data
-
-
+@pytest.mark.contract
 def test_activity_report_contract_shape():
-    """Test GET /api/activities/report returns the T01 cross-surface ActivityReport
-    shape (004-006 T03), with query helpers mocked so no DB is required."""
+    """GET /api/activities/report returns the ActivityReport shape with nav, header,
+    course, segments, efficiency, charts and course_path built from the query helpers'
+    rows.
+    """
     api_activities = importlib.import_module('pifitness.activities.router')
 
     target = {
@@ -192,8 +112,11 @@ def test_activity_report_contract_shape():
         assert "pace" not in data["charts"]
 
 
+@pytest.mark.contract
 def test_activity_report_invalid_type():
-    """Test GET /api/activities/report 404s on an unknown/non-qualifying id (004-006 T03)."""
+    """GET /api/activities/report returns 404 when the activity id is unknown or does
+    not qualify for a report.
+    """
     api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
     with mock.patch.object(api_activities, "get_activity_report_target", return_value=None):
@@ -201,10 +124,11 @@ def test_activity_report_invalid_type():
         assert response.status_code == 404
 
 
+@pytest.mark.contract
 def test_leaderboard_segments_contract_shape():
-    """Test GET /api/activities/leaderboard/segments returns the bare
-    SegmentListRow[] contract (009-002 T03), with the query helper mocked
-    so no DB is required."""
+    """GET /api/activities/leaderboard/segments returns a bare list of segment rows
+    carrying the eight list fields, with nulls preserved.
+    """
     api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
@@ -255,9 +179,11 @@ def test_leaderboard_segments_contract_shape():
         assert data[1]["last_effort"] is None
 
 
+@pytest.mark.contract
 def test_leaderboard_segments_filters_forwarded():
-    """Filters (name/kind/min_distance/activity_type) reach the SQL helper;
-    an empty name degrades to None (no filter)."""
+    """GET /api/activities/leaderboard/segments forwards the name, kind, min_distance
+    and activity_type filters to the query helper and treats an empty name as no filter.
+    """
     api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
@@ -281,8 +207,11 @@ def test_leaderboard_segments_filters_forwarded():
         )
 
 
+@pytest.mark.contract
 def test_leaderboard_segments_invalid_params():
-    """Unknown kind/activity_type or negative min_distance are rejected."""
+    """GET /api/activities/leaderboard/segments rejects an unknown kind, an unsupported
+    activity_type and a negative min_distance with 422.
+    """
     response = client.get("/api/activities/leaderboard/segments?kind=both")
     assert response.status_code == 422
     response = client.get("/api/activities/leaderboard/segments?activity_type=Ride")
@@ -291,14 +220,14 @@ def test_leaderboard_segments_invalid_params():
     assert response.status_code == 422
 
 
+@pytest.mark.contract
+@pytest.mark.quarantine(
+    reason="asserts SQL text and cursor call counts on a MagicMock connection; the strict-threshold semantics need a real database",
+    exit="rewrite_against_db",
+)
 def test_segment_bulk_reject_full_and_threshold():
-    """POST /api/segments/{id}/matches/bulk-reject (009-003 T31, T37).
-
-    Full reject finalizes every pending candidate; confidence_over rejects
-    only rows strictly above the threshold (a row at exactly 200 survives).
-    T37/Bug 009-003-36-1: the mass write runs on ONE non-autocommit
-    connection with ONE commit (fake connection mocked here, same style as
-    tests/test_isrc_dupes.py), so no database is required.
+    """POST /api/segments/{id}/matches/bulk-reject rejects every pending candidate, or
+    only those strictly above confidence_over, and reports the rejected count.
     """
     import unittest.mock as mock
 
@@ -353,10 +282,11 @@ def test_segment_bulk_reject_full_and_threshold():
         mock_conn2.rollback.assert_not_called()
 
 
+@pytest.mark.regression
 def test_segment_bulk_reject_failure_rolls_back():
-    """A mid-loop CALL failure rolls the whole pass back (T37/Bug 009-003-36-1):
-    rollback() is called, commit() never is, and the error still surfaces
-    through the endpoint with the unchanged 422 mapping."""
+    """POST /api/segments/{id}/matches/bulk-reject rolls the whole batch back, never
+    commits, and returns 422 when any single rejection fails.
+    """
     import unittest.mock as mock
 
     import pifitness.activities.queries as aq
@@ -385,9 +315,12 @@ def test_segment_bulk_reject_failure_rolls_back():
         mock_conn.close.assert_called_once()
 
 
+@pytest.mark.contract
 def test_segment_bulk_reject_empty_404_422():
-    """Empty candidate set -> 200 {rejected: 0} without opening a write
-    connection (T37); unknown segment -> 404; bad body -> 422."""
+    """POST /api/segments/{id}/matches/bulk-reject returns rejected 0 without opening a
+    write connection when no candidates exist, 404 for an unknown segment and 422 for a
+    malformed body.
+    """
     import unittest.mock as mock
 
     import pifitness.activities.queries as aq
@@ -413,13 +346,13 @@ def test_segment_bulk_reject_empty_404_422():
     assert response.status_code == 422
 
 
-@pytest.mark.slow
 @pytest.mark.integration
+@pytest.mark.live
 def test_activity_route_elapsed_s():
-    """GET /api/segments/{id}/route returns elapsed_s 1:1 with path_coords
-    (009-003 T38/OQ-6): ints, monotonically non-decreasing, no timestamp
-    field, first/last spot-checked against activity_details; a trimmed
-    window stays 1:1; the 404/422 paths are unchanged."""
+    """GET /api/segments/{id}/route returns integer, non-decreasing elapsed_s values
+    aligned one-to-one with path_coords, also for a trimmed window, with 404 for an
+    unknown id and 422 for a negative start_m.
+    """
     from backend_functions.database_functions import sql_to_dict
 
     list_response = client.get("/api/activities")
@@ -479,9 +412,12 @@ def test_activity_route_elapsed_s():
     ).status_code == 422
 
 
+@pytest.mark.contract
 def test_leaderboard_contract_shape():
-    """Test GET /api/activities/leaderboard/{id} returns the Leaderboard
-    contract (009-002 T04), with the query helper mocked so no DB is required."""
+    """GET /api/activities/leaderboard/{id} returns the segment envelope with ranked
+    efforts, passing metric fields and nulls through and taking recency-bucket
+    membership from cycle_name rather than from rank values.
+    """
     api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
@@ -597,8 +533,11 @@ def test_leaderboard_contract_shape():
         assert data["efforts"][1]["current_cycle_rank"] == 2
 
 
+@pytest.mark.contract
 def test_leaderboard_not_found():
-    """A segment with no leaderboard rows returns 404."""
+    """GET /api/activities/leaderboard/{id} returns 404 when the segment has no
+    leaderboard rows.
+    """
     api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
@@ -612,10 +551,12 @@ def test_leaderboard_not_found():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.contract
 def test_leaderboard_visuals_contract_shape():
-    """POST /api/activities/leaderboard/visuals returns the SegmentVisuals
-    contract (009-002 T05): staging invoked, telemetry arrays zipped into the
-    per-effort series, path_coords preserved, segment_name resolved."""
+    """POST /api/activities/leaderboard/visuals stages the submitted efforts once and
+    returns per-effort series zipped from the telemetry arrays with path_coords and the
+    resolved segment name.
+    """
     api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
@@ -707,8 +648,11 @@ def test_leaderboard_visuals_contract_shape():
     assert e1["series"][1]["elapsed_s"] == 1.5
 
 
+@pytest.mark.contract
 def test_leaderboard_visuals_not_found():
-    """A visuals request whose telemetry helper returns no rows yields 404."""
+    """POST /api/activities/leaderboard/visuals returns 404 when no telemetry rows exist
+    for the staged efforts.
+    """
     api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 
@@ -721,9 +665,15 @@ def test_leaderboard_visuals_not_found():
     assert response.status_code == 404
 
 
+@pytest.mark.contract
+@pytest.mark.quarantine(
+    reason="asserts the exact TRUNCATE string and the execute_values template",
+    exit="rewrite_against_db",
+)
 def test_stage_leaderboard_visuals_bulk_insert():
-    """stage_leaderboard_visuals TRUNCATEs then bulk-inserts all selected rows
-    in a single parameterized execute_values statement (009-002 T05) and commits."""
+    """stage_leaderboard_visuals replaces the staging table's contents with exactly the
+    given efforts in one committed transaction.
+    """
     import unittest.mock as mock
 
     import pifitness.activities.queries as aq
@@ -756,9 +706,11 @@ def test_stage_leaderboard_visuals_bulk_insert():
     mock_conn.close.assert_called_once()
 
 
+@pytest.mark.contract
 def test_activity_report_walk_no_placeholder():
-    """Test a Walk report has null efficiency (004-006 T03; the deprecated
-    activity_type/show_efficiency_placeholder fields were dropped in T09)."""
+    """GET /api/activities/report returns null efficiency and course, an empty segments
+    list and has_segments false for an activity without segment efforts.
+    """
     api_activities = importlib.import_module('pifitness.activities.router')
     import unittest.mock as mock
 

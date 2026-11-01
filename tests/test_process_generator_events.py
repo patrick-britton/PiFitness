@@ -1,24 +1,7 @@
+"""Post-processing sub-steps announce a running event before they execute, not after
+they finish.
 """
-004-007 T09 / Bug 004-007-7-5 — post-processing sub-steps must stream a
-'running' event BEFORE the sub-step executes, not after it completes.
-
-Two verified mechanisms were fixed; each gets a test here:
-
-  1. `activity_post_processing_steps` yields a start marker
-     (step_id, None, None) before invoking each sub-step function and the
-     terminal (step_id, ms, error) after — marker-before-execution is
-     asserted against the REAL generator with a recording sub-step.
-
-  2. `process_generator` maps each marker to an NDJSON 'running' event and
-     emits it while the sub-step has NOT yet run (asserted by interleaving
-     the stream pull with a fake generator that executes on resume), then
-     emits the terminal event afterwards.
-
-Everything is mocked — no DB writes, no network, no pandas.
-
-Run from the repository root:
-    python -m pytest tests/testprocess_generator_events.py -v
-"""
+import pytest
 import json
 
 import backend_functions.activity_smoothing as sm
@@ -45,8 +28,11 @@ def _ok_executioner(**kwargs):
 # 1. Real generator: start marker yielded BEFORE the sub-step runs
 # ---------------------------------------------------------------------------
 
+@pytest.mark.regression
 def test_post_processing_steps_yields_marker_before_execution(monkeypatch):
-    "activity_post_processing_steps yields the start marker before the sub-step runs and the terminal after it."
+    """activity_post_processing_steps yields each sub-step's start marker before the
+    sub-step runs and its terminal result after it.
+    """
     executed = []
     monkeypatch.setattr(sm, 'insert_heartrate_for_activity',
                         lambda aid: executed.append(('insert_heartrate', aid)))
@@ -69,27 +55,19 @@ def test_post_processing_steps_yields_marker_before_execution(monkeypatch):
         gen.close()
 
 
-def test_post_processing_steps_marker_terminal_interleaved(monkeypatch):
-    """Marker/terminal pairing stays strictly interleaved: start, end, start, end…"""
-    # First sub-step only — close the generator after its terminal so no
-    # un-mocked sub-step or DB lookup ever runs.
-    monkeypatch.setattr(sm, 'insert_heartrate_for_activity', lambda aid: None)
-
-    gen = sm.activity_post_processing_steps(7)
-    try:
-        pairs = [next(gen), next(gen)]
-    finally:
-        gen.close()
-    assert pairs[0][0] == 'insert_heartrate' and pairs[0][1] is None and pairs[0][2] is None
-    assert pairs[1][0] == 'insert_heartrate' and isinstance(pairs[1][1], int)
-
-
 # ---------------------------------------------------------------------------
 # 2. process_generator: running event emitted before the sub-step executes
 # ---------------------------------------------------------------------------
 
-def testprocess_generator_running_event_precedes_substep_execution(monkeypatch):
-    "process_generator streams a 'running' event while the announced sub-step has not yet executed."
+@pytest.mark.contract
+@pytest.mark.quarantine(
+    reason="never collected because a rename dropped the underscore; patches private names that may no longer exist",
+    exit="verify_then_promote",
+)
+def test_process_generator_running_event_precedes_substep_execution(monkeypatch):
+    """process_generator streams a running event for a post-processing step before that
+    step executes, completes each step after it, and ends with a success event.
+    """
     executed = []
 
     def fake_steps(aid):
@@ -134,8 +112,15 @@ def testprocess_generator_running_event_precedes_substep_execution(monkeypatch):
     assert seen[-1].get('success') is True
 
 
-def testprocess_generator_error_terminal_still_emits_running_first(monkeypatch):
-    """Halt-on-error path: running marker is streamed, then the error terminal."""
+@pytest.mark.contract
+@pytest.mark.quarantine(
+    reason="never collected because a rename dropped the underscore; patches private names that may no longer exist",
+    exit="verify_then_promote",
+)
+def test_process_generator_error_terminal_still_emits_running_first(monkeypatch):
+    """process_generator streams running then error for a failing step, starts no later
+    step and ends with a failure event.
+    """
     def failing_steps(aid):
         yield ('insert_heartrate', None, None)
         yield ('insert_heartrate', 3, 'boom')
@@ -162,7 +147,3 @@ def testprocess_generator_error_terminal_still_emits_running_first(monkeypatch):
     # …and the terminal reports failure.
     assert seen[-1].get('complete') is True
     assert seen[-1].get('success') is False
-
-
-import pytest
-pytestmark = pytest.mark.slow

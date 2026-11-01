@@ -1,0 +1,1252 @@
+# =============================================================================
+# PiFitness test-suite triage config
+# Consumed by apply_test_triage.py (dry-run by default; --apply to write).
+#
+# Every `test*` function in every tests/**/test_*.py file must have an entry.
+#
+#   decision: keep        runs by default
+#   decision: quarantine  stays in the file, tagged and skipped unless
+#                         --run-quarantine; must leave quarantine via its `exit`
+#   decision: delete      function removed (decorators included)
+#
+# keep / quarantine entries
+#   category     one of policy.categories (becomes the single purpose marker)
+#   description  one falsifiable sentence about caller-visible behavior; becomes
+#                the docstring. Linted: ends with a period, no story IDs, no
+#                "Test..." opener, no newlines.
+#   live         true  -> @pytest.mark.live (needs the real DB or an external service)
+#   slow         "why" -> @pytest.mark.slow(reason=...) (no reason, no slow marker)
+#   weak         "why" -> keep, but first to go: --prune-weak treats it as delete
+#   rename_to    new function name (used to revive tests pytest never collected)
+#   new          true  -> defined in the file's `append_source`
+#   note         free text for humans, ignored by the tool
+# quarantine entries also need
+#   reason       why it is not trusted today
+#   exit         one of policy.quarantine_exits
+# delete entries need only `reason` (audit trail; no category or description).
+#
+# file-level keys: module_docstring, remove_symbols, append_source,
+#                  strip_module_pytestmark (default true)
+# =============================================================================
+version: 1
+policy:
+  categories:
+    unit: Pure logic or algorithm checked with real inputs and outputs; no collaborators mocked except the clock or network edge.
+    contract: 'Boundary behavior callers depend on: HTTP status codes and payload shapes, serializers, query-function return values.'
+    regression: 'Guards a named failure class: silent success, lost atomicity, swallowed errors, polluted data, destructive writes.'
+    integration: Exercises real wiring against the real database or an external service.
+    smoke: Coarse proof that a route or app is wired and alive; asserts almost nothing about content.
+  environment_markers:
+    live: Needs the real database or an external service; excluded from the hermetic run (-m 'not live').
+    slow: 'Only with a written reason: @pytest.mark.slow(reason=...).'
+  quarantine_exits:
+    rewrite_against_db: Replace SQL-text or mock-call assertions with a test against a disposable database.
+    vendor_fixture: Move the off-tree fixture file under tests/fixtures/ and point the test at it.
+    verify_then_promote: Run once, repair stale patch targets, then promote to keep or delete.
+    manual_gate: Live check that is only meaningful when a human runs it on purpose.
+files:
+
+  # ----------------------------------------------------------------------
+  tests/test_activities.py:
+    module_docstring: Activities API contracts with query helpers mocked, plus one live elapsed_s integration check.
+    tests:
+      test_activities_list:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_activity_by_id:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_activity_telemetry:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_activity_segments:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_activity_report_contract_shape:
+        decision: keep
+        category: contract
+        description: GET /api/activities/report returns the ActivityReport shape with nav, header, course, segments, efficiency, charts and course_path built from the query helpers' rows.
+      test_activity_report_invalid_type:
+        decision: keep
+        category: contract
+        description: GET /api/activities/report returns 404 when the activity id is unknown or does not qualify for a report.
+      test_leaderboard_segments_contract_shape:
+        decision: keep
+        category: contract
+        description: GET /api/activities/leaderboard/segments returns a bare list of segment rows carrying the eight list fields, with nulls preserved.
+      test_leaderboard_segments_filters_forwarded:
+        decision: keep
+        category: contract
+        description: GET /api/activities/leaderboard/segments forwards the name, kind, min_distance and activity_type filters to the query helper and treats an empty name as no filter.
+        note: bundles two cases; split when convenient
+      test_leaderboard_segments_invalid_params:
+        decision: keep
+        category: contract
+        description: GET /api/activities/leaderboard/segments rejects an unknown kind, an unsupported activity_type and a negative min_distance with 422.
+      test_segment_bulk_reject_full_and_threshold:
+        decision: quarantine
+        category: contract
+        description: POST /api/segments/{id}/matches/bulk-reject rejects every pending candidate, or only those strictly above confidence_over, and reports the rejected count.
+        reason: asserts SQL text and cursor call counts on a MagicMock connection; the strict-threshold semantics need a real database
+        exit: rewrite_against_db
+      test_segment_bulk_reject_failure_rolls_back:
+        decision: keep
+        category: regression
+        description: POST /api/segments/{id}/matches/bulk-reject rolls the whole batch back, never commits, and returns 422 when any single rejection fails.
+      test_segment_bulk_reject_empty_404_422:
+        decision: keep
+        category: contract
+        description: POST /api/segments/{id}/matches/bulk-reject returns rejected 0 without opening a write connection when no candidates exist, 404 for an unknown segment and 422 for a malformed body.
+        note: bundles three cases; split when convenient
+      test_activity_route_elapsed_s:
+        decision: keep
+        category: integration
+        description: GET /api/segments/{id}/route returns integer, non-decreasing elapsed_s values aligned one-to-one with path_coords, also for a trimmed window, with 404 for an unknown id and 422 for a negative start_m.
+        live: true
+      test_leaderboard_contract_shape:
+        decision: keep
+        category: contract
+        description: GET /api/activities/leaderboard/{id} returns the segment envelope with ranked efforts, passing metric fields and nulls through and taking recency-bucket membership from cycle_name rather than from rank values.
+      test_leaderboard_not_found:
+        decision: keep
+        category: contract
+        description: GET /api/activities/leaderboard/{id} returns 404 when the segment has no leaderboard rows.
+      test_leaderboard_visuals_contract_shape:
+        decision: keep
+        category: contract
+        description: POST /api/activities/leaderboard/visuals stages the submitted efforts once and returns per-effort series zipped from the telemetry arrays with path_coords and the resolved segment name.
+      test_leaderboard_visuals_not_found:
+        decision: keep
+        category: contract
+        description: POST /api/activities/leaderboard/visuals returns 404 when no telemetry rows exist for the staged efforts.
+      test_stage_leaderboard_visuals_bulk_insert:
+        decision: quarantine
+        category: contract
+        description: stage_leaderboard_visuals replaces the staging table's contents with exactly the given efforts in one committed transaction.
+        reason: asserts the exact TRUNCATE string and the execute_values template
+        exit: rewrite_against_db
+      test_activity_report_walk_no_placeholder:
+        decision: keep
+        category: contract
+        description: GET /api/activities/report returns null efficiency and course, an empty segments list and has_segments false for an activity without segment efforts.
+        weak: overlaps the main report contract test; half its assertions check removed fields stay absent
+
+  # ----------------------------------------------------------------------
+  tests/test_admin.py:
+    module_docstring: Admin API checks against the live database.
+    tests:
+      test_admin_tasks:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_admin_task_schedule:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_admin_task_names:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_admin_events_no_filter:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_admin_events_with_filters:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke (limit check moved into the smoke file)'
+      test_admin_db_info_task_summary:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_admin_db_info_db_size_chart:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_admin_db_info_db_size_breakdown:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_admin_logs_data_all_tables:
+        decision: keep
+        category: regression
+        description: GET /api/admin/logs/data/{table} answers 200 with the data and count envelope for every logging-schema table instead of a 500.
+        live: true
+      test_admin_logs_tables:
+        decision: delete
+        reason: passes on an empty list; the per-table test above already fails if a table is missing
+      test_admin_db_sessions:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_admin_services:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_admin_functions:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+      test_admin_credential_requirements:
+        decision: delete
+        reason: 'vacuous: branches on count > 0 and passes on an empty database; replaced by route smoke'
+
+  # ----------------------------------------------------------------------
+  tests/test_admin_failure_message.py:
+    module_docstring: failed_run_message turns failed task results into the error message the admin API reports.
+    tests:
+      test_failed_run_message_carries_underlying_error:
+        decision: keep
+        category: unit
+        description: failed_run_message includes the failure count, the failed task's name and its underlying error text.
+        weak: the aggregation test below covers everything except the singular count text
+      test_failed_run_message_aggregates_multiple:
+        decision: keep
+        category: unit
+        description: failed_run_message reports the total failure count and every failed task's error when several tasks fail.
+
+  # ----------------------------------------------------------------------
+  tests/test_auth_status.py:
+    module_docstring: get_auth_status returns the per-service status mapping that the auth status API serves.
+    tests:
+      test_returns_expected_structure:
+        decision: keep
+        category: contract
+        description: get_auth_status returns a services mapping whose Spotify and Garmin entries carry exactly the documented status fields.
+      test_missing_credentials_reports_missing:
+        decision: keep
+        category: contract
+        description: get_auth_status reports missing_credentials for both services when no credentials are configured.
+      test_ok_when_credentials_present:
+        decision: keep
+        category: contract
+        description: get_auth_status reports ok for both services when credentials exist and nothing overrides the status.
+        weak: happy-path twin of the missing-credentials test
+      test_spotify_rate_limited_reports_rate_limited:
+        decision: keep
+        category: contract
+        description: get_auth_status reports Spotify as rate_limited, with its clearance timestamp, while the rate limit is active.
+
+  # ----------------------------------------------------------------------
+  tests/test_auto_shuffle_pandas_free.py:
+    module_docstring: auto_shuffle_playlists ordering and target selection with every database and Spotify interaction mocked.
+    tests:
+      test_music_functions_module_has_no_pandas:
+        decision: delete
+        reason: greps module source; enforce with a lint rule (ruff banned-api or import-linter) instead
+      test_auto_shuffle_parity_target_id_and_ordered_track_list:
+        decision: keep
+        category: regression
+        description: auto_shuffle_playlists uploads the view's tracks in row order to the first row's target playlist.
+      test_auto_shuffle_limit_minutes_parameterized:
+        decision: delete
+        reason: asserts a SQL substring only
+
+  # ----------------------------------------------------------------------
+  tests/test_config.py:
+    module_docstring: GET /api/config/map exposes the Mapbox token to the frontend and degrades to null when it is unavailable.
+    tests:
+      test_map_config_with_token:
+        decision: keep
+        category: contract
+        description: GET /api/config/map returns the configured Mapbox token as mapboxToken.
+      test_map_config_without_token:
+        decision: keep
+        category: contract
+        description: GET /api/config/map returns a null mapboxToken when no Mapbox credential is configured.
+      test_map_config_token_resolution_error:
+        decision: keep
+        category: contract
+        description: GET /api/config/map answers 200 with a null mapboxToken when the credential lookup raises.
+
+  # ----------------------------------------------------------------------
+  tests/test_create_segment_details_write.py:
+    module_docstring: create_segment sequencing and error mapping with every database interaction mocked.
+    tests:
+      test_create_segment_writes_details_row:
+        decision: quarantine
+        category: regression
+        description: create_segment creates the segment, finalizes the match, then writes details scoped to the reference activity only.
+        reason: asserts the SQL text of three qec calls by index
+        exit: rewrite_against_db
+      test_create_segment_details_failure_maps_to_value_error:
+        decision: keep
+        category: regression
+        description: create_segment raises ValueError naming the details write when the per-activity details write fails.
+      test_create_segment_finalize_failure_skips_details_write:
+        decision: keep
+        category: regression
+        description: create_segment raises ValueError and performs no details write when finalizing the match fails.
+
+  # ----------------------------------------------------------------------
+  tests/test_empty_queue_noop.py:
+    module_docstring: An empty work queue is a successful no-op, while a non-empty queue whose API calls all fail still fails.
+    tests:
+      test_empty_iterator_raises_no_work:
+        decision: keep
+        category: regression
+        description: extract_pirate_universal raises NoWorkToSync, with a message distinct from API-failure text, when its work queue is empty.
+      test_extract_load_flatten_treats_no_work_as_success:
+        decision: delete
+        reason: subsumed by the full executioner path below; brittle multi-site patching
+      test_executioner_reconciles_no_work_as_success:
+        decision: keep
+        category: regression
+        description: ultimate_task_executioner reconciles an empty work queue as one successful run and reports the task as successful.
+      test_nonempty_all_failed_still_fails:
+        decision: keep
+        category: regression
+        description: ultimate_task_executioner reconciles a non-empty queue whose API calls all fail as one failure carrying the API error and reports the task as failed.
+
+  # ----------------------------------------------------------------------
+  tests/test_failure_propagation.py:
+    module_docstring: A failed sub-step is never reported as success, and each task run is reconciled exactly once with the detailed message.
+    tests:
+      test_post_processing_processes_all_then_raises_aggregate:
+        decision: keep
+        category: regression
+        description: activity_post_processing processes every queued activity after a failure, then raises one error naming the failed activities, step and reason.
+      test_post_processing_success_returns_true:
+        decision: keep
+        category: regression
+        description: activity_post_processing returns True after processing every queued activity when no sub-step fails.
+      test_post_processing_empty_queue_returns_true:
+        decision: keep
+        category: regression
+        description: activity_post_processing returns True without processing anything when the queue is empty.
+        weak: trivial branch; the empty-queue contract is also covered at the executioner level
+      test_execute_python_returns_failure_message_without_reconciling:
+        decision: keep
+        category: regression
+        description: execute_python returns a failing function's error text and does not reconcile task dates itself.
+      test_execute_python_success_returns_none:
+        decision: delete
+        reason: subsumed by the executioner success test
+      test_executioner_reconciles_failed_with_ids_in_message:
+        decision: keep
+        category: regression
+        description: ultimate_task_executioner reconciles a failed python task exactly once with the failure message and reports success False with that error.
+      test_executioner_reports_success_when_all_pass:
+        decision: keep
+        category: regression
+        description: ultimate_task_executioner reconciles a passing python task exactly once as a success and reports success True with no error.
+      test_run_step_marks_error_on_failed_results:
+        decision: keep
+        category: regression
+        description: run_step returns status error naming the task and its error when the runner's results include a failed task.
+      test_run_step_complete_on_all_success_results:
+        decision: keep
+        category: regression
+        description: run_step returns status complete with no error when every runner result succeeded.
+        weak: positive control for the failure-detection tests
+      test_run_step_complete_on_non_task_return_shapes:
+        decision: keep
+        category: regression
+        description: run_step treats a None return, a dict without results and results lacking a success flag as complete.
+      test_run_step_error_on_exception_unchanged:
+        decision: keep
+        category: regression
+        description: run_step converts a raised exception into status error carrying the exception message.
+      test_task_failure_message_is_conservative:
+        decision: keep
+        category: unit
+        description: task_failure_message returns None unless some result has success False, and then returns the task name and error joined by a colon.
+      test_executioner_single_reconcile_on_extract_failure:
+        decision: keep
+        category: regression
+        description: ultimate_task_executioner reconciles an extract-phase failure exactly once with the surfaced message and reports success False.
+      test_executioner_single_reconcile_on_load_failure:
+        decision: delete
+        reason: same stub and code path as the extract-failure test with a different string
+      test_executioner_single_reconcile_on_sproc_failure:
+        decision: delete
+        reason: same stub and code path as the extract-failure test with a different string
+      test_executioner_single_success_reconcile_on_extract_success:
+        decision: delete
+        reason: success reconcile is covered by the python-task and empty-queue success tests
+      test_extract_load_flatten_does_not_reconcile:
+        decision: keep
+        category: regression
+        description: extract_load_flatten returns the login failure message without reconciling task dates itself.
+      test_execute_sproc_does_not_reconcile:
+        decision: keep
+        category: regression
+        description: execute_sproc returns a failure message for a missing sproc key and None on success, without reconciling task dates itself.
+
+  # ----------------------------------------------------------------------
+  tests/test_food_api_contract.py:
+    module_docstring: Food API wire contracts and query-layer logic with every database and network call mocked.
+    tests:
+      test_route_table_matches_contract_exactly:
+        decision: keep
+        category: contract
+        description: The food router registers every contract endpoint by path and method, including the soft-delete and restore routes.
+        weak: superset check; every route except delete and restore is already exercised by its own test
+      test_get_usuals_returns_usual_food_shapes:
+        decision: keep
+        category: contract
+        description: GET /api/food/usuals returns a list of usual foods with exactly the UsualFood key set.
+      test_get_diary_returns_day_entry_array:
+        decision: keep
+        category: contract
+        description: GET /api/food/diary returns a list of day entries with exactly the entry and nutrient-snapshot key sets.
+      test_get_recipes_returns_recipe_summaries_only:
+        decision: keep
+        category: contract
+        description: GET /api/food/recipes returns recipe summaries carrying only recipe_id, title, category and times_prepared.
+      test_get_foods_returns_food_list_response:
+        decision: keep
+        category: contract
+        description: GET /api/food/foods returns data and next_cursor with each row's nutrients nested and the soft-delete fields present.
+      test_post_diary_returns_day_entry:
+        decision: keep
+        category: contract
+        description: POST /api/food/diary returns 201 and a day entry carrying the name and nutrient snapshots.
+      test_post_recipes_returns_recipe_summary:
+        decision: keep
+        category: contract
+        description: POST /api/food/recipes returns 201 and exactly the recipe summary key set.
+      test_post_diary_rejects_deleted_food:
+        decision: keep
+        category: contract
+        description: POST /api/food/diary returns 400 when the food has been soft-deleted.
+      test_diary_stats_shape:
+        decision: keep
+        category: contract
+        description: GET /api/food/diary/stats returns the four-field stats object unchanged.
+        weak: echoes the mocked value back
+      test_patch_entry_moves_day:
+        decision: keep
+        category: contract
+        description: PATCH /api/food/diary/{id} forwards qty and logged_at to the update helper and echoes the moved logged_at.
+      test_patch_entry_empty_rejected:
+        decision: keep
+        category: contract
+        description: PATCH /api/food/diary/{id} returns 400 for an empty body.
+      test_delete_entry:
+        decision: keep
+        category: contract
+        description: DELETE /api/food/diary/{id} returns success true with the deleted entry_id.
+        weak: echoes the mocked value back
+      test_kcal_for_fda_label_table:
+        decision: keep
+        category: unit
+        description: _kcal_for converts g, cup, oz, tbsp and serving amounts to kcal through the unit table, returns None without calories and raises ValueError for an unknown unit.
+      test_to_food_row_nests_nutrients:
+        decision: keep
+        category: unit
+        description: _to_food_row nests the eight flat nutrient columns under nutrients and preserves the deletion flags.
+      test_to_day_entry_nests_snapshot_and_iso_time:
+        decision: keep
+        category: unit
+        description: _to_day_entry nests the nutrient snapshot and renders logged_at as an ISO-8601 string.
+      test_to_recipe_summary_preserves_exact_fields:
+        decision: keep
+        category: unit
+        description: _to_recipe_summary returns exactly recipe_id, title, category and times_prepared.
+      test_food_by_id_returns_row_or_404:
+        decision: keep
+        category: contract
+        description: GET /api/food/foods/{id} returns the food row with its serving fields, or 404 when it does not exist.
+      test_kcal_for_dynamic_recipe_serving_unit:
+        decision: keep
+        category: unit
+        description: _kcal_for resolves a food's own serving unit through its serving size, falls back to the unit table on a mismatch, returns None when grams are unknown and raises ValueError for an unknown unit.
+      test_fetch_foods_single_batched_query:
+        decision: delete
+        reason: asserts SQL text or parameter positions rather than behavior
+      test_combine_ingredients_gram_weighted_math:
+        decision: keep
+        category: unit
+        description: _combine_ingredients computes per-100g nutrients weighted by the converted grams of each ingredient.
+      test_combine_ingredients_recipe_as_ingredient:
+        decision: keep
+        category: unit
+        description: _combine_ingredients converts a recipe ingredient through its own serving unit and drops unconvertible amounts while flagging the result for review.
+      test_save_recipe_batches_fetch_and_ingredient_insert:
+        decision: quarantine
+        category: contract
+        description: save_recipe stores the recipe with grams-per-serving derived from the convertible ingredient grams and returns the recipe summary.
+        reason: reads SQL parameters by position and counts placeholder groups
+        exit: rewrite_against_db
+      test_save_recipe_unconvertible_yields_null_serving_size:
+        decision: quarantine
+        category: contract
+        description: save_recipe stores a null serving size and flags the food for review when no ingredient amount is convertible to grams.
+        reason: reads SQL parameters by position
+        exit: rewrite_against_db
+      test_save_recipe_rejects_step_food_outside_ingredient_list:
+        decision: keep
+        category: regression
+        description: save_recipe raises ValueError, before touching the database, when a step uses a food that is not in the ingredient list.
+      test_get_recipe_detail_contract_shape:
+        decision: keep
+        category: contract
+        description: GET /api/food/recipes/{id} returns the RecipeDetail shape, or 404 when the recipe does not exist.
+      test_put_recipe_passes_payload_and_404s:
+        decision: keep
+        category: contract
+        description: PUT /api/food/recipes/{id} forwards the request payload to the update helper and returns the recipe summary, or 404 when the recipe does not exist.
+      test_delete_recipe_route_soft_delete_payload:
+        decision: keep
+        category: contract
+        description: DELETE /api/food/recipes/{id} returns success with the recipe_id and food_id, or 404 when the recipe does not exist.
+      test_complete_recipe_route_increments:
+        decision: keep
+        category: contract
+        description: POST /api/food/recipes/{id}/complete returns the updated recipe summary, or 404 when the recipe does not exist.
+      test_complete_recipe_query_increments_and_clears_session:
+        decision: quarantine
+        category: contract
+        description: complete_recipe increments times_prepared, clears the recipe's cook session and returns None for a missing or deleted recipe.
+        reason: asserts SQL fragments
+        exit: rewrite_against_db
+      test_delete_recipe_query_soft_deletes_both_rows:
+        decision: quarantine
+        category: contract
+        description: delete_recipe soft-deletes both the recipe and its food row, discards the cook session and returns None when the recipe is missing.
+        reason: asserts SQL fragments
+        exit: rewrite_against_db
+      test_get_recipes_orders_most_made_first:
+        decision: delete
+        reason: never runs a query; asserts an ORDER BY substring
+      test_get_recipe_query_layer_shape:
+        decision: keep
+        category: contract
+        description: get_recipe assembles the RecipeDetail shape with ingredient and step-food names joined in, and returns None for a missing recipe.
+        note: the fake database dispatches on table names; revisit when moving to a real database
+      test_cook_state_round_trip_preserves_deadlines:
+        decision: quarantine
+        category: contract
+        description: save_cook_state then get_cook_state returns the same timer deadlines and checked items, with updated_at as an ISO-8601 string.
+        reason: round-trips through a fake database the test itself writes and asserts SQL text
+        exit: rewrite_against_db
+      test_get_cook_state_empty_session:
+        decision: keep
+        category: contract
+        description: get_cook_state returns empty lists and a null updated_at when no session is stored.
+      test_save_cook_state_missing_recipe_404_path:
+        decision: keep
+        category: contract
+        description: save_cook_state returns None when the recipe is missing or soft-deleted so the route can answer 404.
+      test_clear_cook_state_idempotent:
+        decision: delete
+        reason: asserts SQL text or parameter positions rather than behavior
+      test_cook_routes_round_trip_and_validation:
+        decision: keep
+        category: contract
+        description: PUT and GET /api/food/recipes/{id}/cook return the stored timers unchanged, PUT rejects a non-ISO-8601 timer instant with 400 before touching the database, and PUT returns 404 for a missing recipe.
+      test_delete_cook_route_clears_session:
+        decision: keep
+        category: contract
+        description: DELETE /api/food/recipes/{id}/cook returns success true and clears that recipe's cook session.
+      test_get_cook_route_empty_session_shape:
+        decision: keep
+        category: contract
+        description: GET /api/food/recipes/{id}/cook returns empty lists and a null updated_at when no session exists.
+        weak: echoes the mocked value back; the query-layer empty-session test covers the logic
+      test_persist_route_returns_food_id_and_never_writes_diary:
+        decision: keep
+        category: contract
+        description: POST /api/food/persist returns 201 with the persisted food_id, passes the normalizer label and serving fields through, and never writes a diary entry.
+      test_persist_route_off_payload_carries_serving_and_dedupe_id:
+        decision: keep
+        category: contract
+        description: POST /api/food/persist for an Open Food Facts payload forwards the feed serving and returns the existing food_id when the barcode is already saved.
+      test_persist_route_requires_payload:
+        decision: keep
+        category: contract
+        description: POST /api/food/persist returns 400 when neither a USDA nor an Open Food Facts payload is supplied.
+
+  # ----------------------------------------------------------------------
+  tests/test_food_search_backend.py:
+    module_docstring: Food search ranking, normalizers and persist-on-log behavior with every upstream call and database helper mocked.
+    tests:
+      test_rank_sinks_partial_and_orders_by_relevance_tier:
+        decision: keep
+        category: unit
+        description: rank_usda_hits orders hits by name relevance and sinks a hit that fails the nutrient gate while flagging it for review.
+      test_quality_label_thresholds:
+        decision: keep
+        category: unit
+        description: quality_label returns High at six or more present nutrients, Medium at three to five and Low at two or fewer.
+      test_name_bonus_orders_exact_first:
+        decision: keep
+        category: unit
+        description: name_bonus ranks exact matches before prefix, whole-word and substring matches, and rank_usda_hits orders hits accordingly.
+      test_quality_label_counts_extras:
+        decision: keep
+        category: unit
+        description: map_usda_food counts all eleven present nutrients for a complete survey food, which quality_label rates High.
+        weak: largely implied by the threshold and ranking tests
+      test_fetch_budget_and_cache:
+        decision: keep
+        category: regression
+        description: fetch_usda_ranked makes at most three upstream fetches for a new query and serves an identical normalized query from cache with no further fetches.
+      test_search_returns_trimmed_saved_first_results:
+        decision: keep
+        category: contract
+        description: GET /api/food/search returns the saved food first and USDA hits after it, each with the full search key set and the raw upstream payload trimmed.
+      test_search_suppresses_usda_hit_when_fdcid_saved:
+        decision: keep
+        category: contract
+        description: GET /api/food/search omits a USDA hit whose fdcId matches a saved food and returns the remaining hits.
+      test_match_pct_anchors_then_overlap:
+        decision: keep
+        category: unit
+        description: match_pct scores 100 for an exact name, 90 for a prefix, 80 for a substring and 0 for no overlap, and match_band maps scores to tens.
+      test_kcal_gate_hard_filter_with_floor_and_alcohol:
+        decision: keep
+        category: unit
+        description: kcal_gate keeps foods with a tiny absolute calorie error, excludes mismatches above 15 percent, credits alcohol energy and does not apply when macros are missing.
+      test_quality_percent_presence_and_single_ingredient:
+        decision: keep
+        category: unit
+        description: quality_percent scores 100, 90 or 70 by caffeine and serving presence, and ingredient_stats returns whether a food is single-ingredient with its ingredient count.
+      test_rank_coffee_single_ingredient_first_mismatch_dropped:
+        decision: keep
+        category: unit
+        description: rank_usda_hits drops a hit whose calories contradict its macros and ranks the exact single-ingredient hit first with its category and serving facets.
+      test_rename_persisted_then_duplicate_routes_to_existing:
+        decision: keep
+        category: contract
+        description: POST /api/food/diary/from-api persists the user's edited name and a normalized_from label derived from the USDA data type.
+      test_persist_on_log_creates_food_then_entry:
+        decision: keep
+        category: contract
+        description: POST /api/food/diary/from-api persists the food row before logging the diary entry and returns 201 with that food_id.
+      test_persist_api_food_uses_check_valid_normalized_from:
+        decision: quarantine
+        category: regression
+        description: persist_api_food stores only normalized_from labels that the foods table accepts, defaulting to usda_survey.
+        reason: a mocked database cannot exercise the CHECK constraint and the test hard-codes the allowed set
+        exit: rewrite_against_db
+      test_persist_clears_review_on_insert:
+        decision: keep
+        category: regression
+        description: persist_api_food inserts a new food with its review flags cleared and returns the existing row without inserting when the natural key already exists.
+        note: reads insert parameters by position; fragile to column reordering
+      test_log_api_entry_persists_feed_serving:
+        decision: keep
+        category: contract
+        description: POST /api/food/diary/from-api persists the serving size, unit and text from branded USDA and Open Food Facts hits and drops them when the unit code is unrecognized.
+      test_persist_on_log_requires_payload:
+        decision: keep
+        category: contract
+        description: POST /api/food/diary/from-api returns 400 when no payload is supplied.
+        weak: twin of the persist route's payload validation test
+      test_confirm_logs_picked_rank:
+        decision: keep
+        category: contract
+        description: POST /api/food/diary records the picked rank, result source and query once when the entry was chosen from search results.
+      test_confirm_without_pick_does_not_log:
+        decision: keep
+        category: contract
+        description: POST /api/food/diary records no pick and still returns 201 when the entry carries no search metadata.
+      test_normalize_usda_branded_passes_through_per_100g:
+        decision: keep
+        category: unit
+        description: normalize_usda_branded keeps per-100g branded nutrients unchanged regardless of serving size and flags missing panel data for review.
+      test_normalize_usda_branded_keeps_nutrients_on_bad_serving:
+        decision: keep
+        category: unit
+        description: normalize_usda_branded keeps nutrients unchanged and reports an unparseable serving when the serving size is missing.
+      test_normalize_off_maps_100g_fields:
+        decision: keep
+        category: unit
+        description: normalize_off maps the Open Food Facts per-100g fields to the nutrient columns and leaves caffeine null.
+      test_t12_almond_raw_571_stays_571:
+        decision: delete
+        reason: duplicates the pass-through unit test above and needs an off-tree fixture
+      test_t12_almond_branded_range_median:
+        decision: delete
+        reason: asserts statistics of a fixture file, not behavior of the code
+      test_t12_foundation_energy_prefers_2048_specific:
+        decision: quarantine
+        category: unit
+        description: normalize_usda_survey prefers the specific-factor Atwater energy value, giving 578 for almond flour and 579 for the almond anchor entry.
+        reason: depends on a fixture under .features/ outside the test tree
+        exit: vendor_fixture
+      test_t12_flags_argires_post_schnucks_not_canonical:
+        decision: quarantine
+        category: regression
+        description: rank_usda_hits flags almond rows with implausible serving weight, implausible density or an ingredient mismatch and sinks them below canonical rows, leaving canonical rows unflagged.
+        reason: depends on a fixture under .features/ outside the test tree
+        exit: vendor_fixture
+      test_ac1_almonds_plain_nuts_rank_above_butter:
+        decision: quarantine
+        category: regression
+        description: rank_usda_hits places plain single-ingredient almonds ahead of every almond butter hit.
+        reason: depends on a fixture under .features/ outside the test tree
+        exit: vendor_fixture
+
+  # ----------------------------------------------------------------------
+  tests/test_health.py:
+    module_docstring: Smoke check that the application boots and its health route reports ok.
+    tests:
+      test_health:
+        decision: keep
+        category: smoke
+        description: GET /api/health answers 200 with status ok and the database and timestamp fields.
+        live: true
+
+  # ----------------------------------------------------------------------
+  tests/test_integration_protocol.py:
+    module_docstring: The real Garmin and Spotify providers conform to the AuthProvider protocol.
+    remove_symbols:
+    - _DummyProvider
+    - _MissingRefresh
+    - _NonStringName
+    - _MissingName
+    tests:
+      test_dummy_provider_conforms:
+        decision: delete
+        reason: tests the assert_conforms helper defined in this file, not production code
+      test_missing_refresh_raises:
+        decision: delete
+        reason: tests the assert_conforms helper defined in this file, not production code
+      test_non_string_name_raises:
+        decision: delete
+        reason: tests the assert_conforms helper defined in this file, not production code
+      test_missing_name_raises:
+        decision: delete
+        reason: tests the assert_conforms helper defined in this file, not production code
+      test_garmin_provider_conforms:
+        decision: keep
+        category: contract
+        description: The Garmin provider exposes a non-empty name and callable is_configured, get_client, get_status and refresh, and its get_status returns a TokenStatus for its own service.
+      test_assert_conforms_rejects_bad_status_type:
+        decision: delete
+        reason: tests the assert_conforms helper defined in this file, not production code
+      test_spotify_provider_conforms:
+        decision: keep
+        category: contract
+        description: The Spotify provider exposes a non-empty name and callable is_configured, get_client, get_status and refresh, and its get_status returns a TokenStatus for its own service.
+
+  # ----------------------------------------------------------------------
+  tests/test_isrc_dupe_endpoints.py:
+    module_docstring: ISRC duplicate-review endpoints over mocked query helpers.
+    tests:
+      test_count_returns_pair_count:
+        decision: keep
+        category: contract
+        description: GET /api/music/isrc-dupes/count returns the pair count from the query helper.
+      test_match_shapes_row_to_camel_case:
+        decision: keep
+        category: contract
+        description: GET /api/music/isrc-dupes/match returns the next duplicate pair with its keys converted from snake_case to camelCase.
+      test_match_empty_queue_returns_null:
+        decision: keep
+        category: contract
+        description: GET /api/music/isrc-dupes/match returns a null match when no duplicate pairs are queued.
+      test_decision_accept_calls_helper_and_confirms:
+        decision: keep
+        category: contract
+        description: POST /api/music/isrc-dupes/decision with accept true passes both ISRCs, the preferred ISRC and the flag to the helper and confirms acceptance.
+      test_decision_reject_calls_helper_and_confirms:
+        decision: keep
+        category: contract
+        description: POST /api/music/isrc-dupes/decision with accept false passes both ISRCs, the preferred ISRC and the flag to the helper and confirms rejection.
+      test_decision_missing_field_returns_422:
+        decision: keep
+        category: contract
+        description: POST /api/music/isrc-dupes/decision returns 422 when preferredIsrc is missing.
+      test_rescan_runs_finder_and_reports_count:
+        decision: keep
+        category: contract
+        description: POST /api/music/isrc-dupes/rescan runs the duplicate finder once and reports the resulting pair count.
+      test_rescan_empty_reports_no_dupes:
+        decision: keep
+        category: contract
+        description: POST /api/music/isrc-dupes/rescan reports that no duplicates were found when the count is zero.
+        weak: asserts message wording for the zero case
+      test_decision_write_failure_returns_500:
+        decision: keep
+        category: regression
+        description: POST /api/music/isrc-dupes/decision returns 500 instead of ok when recording the decision fails.
+      test_rescan_failure_returns_500:
+        decision: keep
+        category: regression
+        description: POST /api/music/isrc-dupes/rescan returns 500 instead of success when the finder raises.
+      test_rescan_route_runs_off_the_event_loop:
+        decision: keep
+        category: regression
+        description: The rescan endpoint is registered as a plain synchronous function so its long database call runs in the threadpool instead of blocking the event loop.
+        note: drop the assertion on the endpoint's __name__; it pins an implementation name
+
+  # ----------------------------------------------------------------------
+  tests/test_isrc_dupes.py:
+    module_docstring: ISRC duplicate-review query helpers run each decision or rescan in a single transaction that rolls back and re-raises on failure.
+    tests:
+      test_dupe_count_halves_rows_to_pairs:
+        decision: keep
+        category: unit
+        description: get_isrc_dupe_count returns the stored row count divided by two.
+      test_dupe_count_empty_is_zero:
+        decision: keep
+        category: unit
+        description: get_isrc_dupe_count returns 0 when the count query returns nothing.
+        weak: trivial branch
+      test_accept_writes_swaps_and_deletes_pair_in_one_transaction:
+        decision: keep
+        category: regression
+        description: process_isrc_dupe_decision with accept true records both ISRCs as swaps to the preferred ISRC and deletes the pair in one committed transaction.
+        note: the SQL substring assertions can be dropped; the lifecycle assertions carry the contract
+      test_reject_writes_non_swaps_and_deletes_pair_in_one_transaction:
+        decision: keep
+        category: regression
+        description: process_isrc_dupe_decision with accept false records both ISRCs as non-swaps and deletes the pair in one committed transaction.
+        note: the SQL substring assertions can be dropped; the lifecycle assertions carry the contract
+      test_decision_insert_failure_rolls_back_and_raises:
+        decision: keep
+        category: regression
+        description: process_isrc_dupe_decision rolls back, commits nothing and re-raises when the insert fails.
+        weak: the delete-failure test is the stronger atomicity check
+      test_decision_delete_failure_rolls_back_and_raises:
+        decision: keep
+        category: regression
+        description: process_isrc_dupe_decision rolls back the earlier insert and re-raises when deleting the pair fails.
+      test_rescan_issues_call_in_one_transaction:
+        decision: keep
+        category: regression
+        description: run_isrc_duplicate_finder runs the finder procedure on one connection and commits once.
+      test_rescan_failure_rolls_back_and_raises:
+        decision: keep
+        category: regression
+        description: run_isrc_duplicate_finder rolls back and re-raises when the procedure call fails.
+
+  # ----------------------------------------------------------------------
+  tests/test_json_extractors_pirate_data.py:
+    module_docstring: get_pirate_data returns a (data, error) pair and never raises, whatever the endpoint or client does.
+    tests:
+      test_get_pirate_data_happy_path:
+        decision: keep
+        category: contract
+        description: get_pirate_data returns the client's JSON and no error, requesting the resolved endpoint's host, path and default parameters.
+      test_get_pirate_data_invalid_endpoint_returns_error:
+        decision: keep
+        category: contract
+        description: get_pirate_data returns no data and an error naming the endpoint when the endpoint is unknown.
+      test_get_pirate_data_client_exception_returns_error:
+        decision: keep
+        category: contract
+        description: get_pirate_data returns no data and an error containing the message when the client raises.
+      test_no_pirate_garmin_imports_in_json_extractors:
+        decision: delete
+        reason: AST-checks source with a working-directory-relative path; enforce with an import lint rule
+
+  # ----------------------------------------------------------------------
+  tests/test_music_actions.py:
+    module_docstring: Music router actions, recent plays, album art, playlist payload validation and related helpers with databases and Spotify mocked.
+    append_source: |
+      NOTHING_PLAYING = {"playing": False, "track": None}
+
+
+      @pytest.mark.parametrize("path", [
+          "/api/music/now-playing/promote",
+          "/api/music/now-playing/soft-reject",
+          "/api/music/now-playing/hard-reject",
+          "/api/music/now-playing/remove",
+          "/api/music/now-playing/rank-down",
+          "/api/music/now-playing/add-to-playlist?playlist_id=pl123",
+      ])
+      def test_now_playing_actions_report_not_ok_when_nothing_is_playing(path):
+          with patch('pifitness.music.router.resolve_now_playing', return_value=NOTHING_PLAYING):
+              response = client.post(path)
+          assert response.status_code == 200
+          assert response.json()["ok"] is False
+
+
+      @pytest.mark.parametrize("limit", [5, 105, 15])
+      def test_recent_plays_rejects_invalid_limit(limit):
+          response = client.get(f"/api/music/recent-plays?limit={limit}")
+          assert response.status_code == 422
+    tests:
+      test_now_playing_skip_route_exists:
+        decision: keep
+        category: contract
+        description: POST /api/music/now-playing/skip returns 503 when no Spotify client is available.
+      test_now_playing_promote_no_track:
+        decision: delete
+        reason: duplicate of the other nothing-playing tests; replaced by one parametrized test
+      test_now_playing_promote_wrong_context:
+        decision: keep
+        category: contract
+        description: POST /api/music/now-playing/promote returns ok false saying it applies only to recommendations when the track is not a recommendation.
+      test_now_playing_soft_reject_no_track:
+        decision: delete
+        reason: duplicate of the other nothing-playing tests; replaced by one parametrized test
+      test_now_playing_hard_reject_no_track:
+        decision: delete
+        reason: duplicate of the other nothing-playing tests; replaced by one parametrized test
+      test_now_playing_remove_no_track:
+        decision: delete
+        reason: duplicate of the other nothing-playing tests; replaced by one parametrized test
+      test_now_playing_remove_family_miss:
+        decision: keep
+        category: contract
+        description: POST /api/music/now-playing/remove returns ok false saying the playlist cannot be found when no playlist family rows match.
+      test_now_playing_remove_full_flow:
+        decision: keep
+        category: regression
+        description: POST /api/music/now-playing/remove removes the track from Spotify in every family playlist that contains it, parent and child, and reports success.
+      test_now_playing_rank_up_wrong_context:
+        decision: keep
+        category: contract
+        description: POST /api/music/now-playing/rank-up returns ok false saying it applies only to playlist tracks when the track is a recommendation.
+      test_now_playing_rank_down_no_track:
+        decision: delete
+        reason: duplicate of the other nothing-playing tests; replaced by one parametrized test
+      test_now_playing_add_to_playlist_no_track:
+        decision: delete
+        reason: duplicate of the other nothing-playing tests; replaced by one parametrized test
+      test_now_playing_add_targets_no_track:
+        decision: keep
+        category: contract
+        description: GET /api/music/now-playing/add-targets returns eligible false and an empty playlist list when nothing is playing.
+      test_now_playing_add_targets_with_track:
+        decision: keep
+        category: contract
+        description: GET /api/music/now-playing/add-targets returns eligible true with the playlists that do not contain the current track.
+      test_now_playing_promote_full_flow:
+        decision: keep
+        category: contract
+        description: POST /api/music/now-playing/promote adds the recommendation to the parent playlist, records the decision, removes the recommendation and seeds its rating.
+      test_now_playing_rank_up_full_flow:
+        decision: keep
+        category: contract
+        description: POST /api/music/now-playing/rank-up records a matchup result of plus two seeded from the track's current rating.
+      test_now_playing_rank_down_full_flow:
+        decision: keep
+        category: contract
+        description: POST /api/music/now-playing/rank-down records a matchup result of minus two seeded from the track's current rating.
+        weak: sign twin of the rank-up test
+      test_recent_plays_default_limit:
+        decision: keep
+        category: contract
+        description: GET /api/music/recent-plays returns plays and a rating scale built from the returned rows.
+      test_recent_plays_custom_limit:
+        decision: keep
+        category: contract
+        description: GET /api/music/recent-plays forwards a valid limit to the query helper.
+      test_recent_plays_rejects_too_small:
+        decision: delete
+        reason: duplicate of the other limit-rejection tests; replaced by one parametrized test
+      test_recent_plays_rejects_too_large:
+        decision: delete
+        reason: duplicate of the other limit-rejection tests; replaced by one parametrized test
+      test_recent_plays_rejects_not_step:
+        decision: delete
+        reason: duplicate of the other limit-rejection tests; replaced by one parametrized test
+      test_recent_plays_empty:
+        decision: keep
+        category: contract
+        description: GET /api/music/recent-plays returns no plays and a baseline rating scale of 1500 when there is no history.
+      test_service_status_not_limited:
+        decision: keep
+        category: contract
+        description: GET /api/music/service-status reports Spotify as not rate limited with a null clearance time.
+      test_service_status_limited:
+        decision: keep
+        category: contract
+        description: GET /api/music/service-status reports Spotify as rate limited together with its clearance time.
+      test_album_art_cached:
+        decision: keep
+        category: contract
+        description: GET /api/music/album-art/{id} serves the retrieved image file as image/jpeg.
+      test_album_art_not_found:
+        decision: keep
+        category: contract
+        description: GET /api/music/album-art/{id} returns 404 when no image can be obtained.
+      test_album_image_retrieval_cached:
+        decision: delete
+        reason: patches os.path.exists and os.path.join globally, so it mostly asserts its own mocks
+      test_album_image_retrieval_no_client:
+        decision: keep
+        category: regression
+        description: album_image_retrieval returns None when the image is not cached and no Spotify client is available.
+        weak: patches os.path.exists globally
+      test_shuffle_flags_updates_playlist_config:
+        decision: quarantine
+        category: contract
+        description: POST /api/music/shuffle/flags writes the four shuffle flags to the playlist's configuration row and reports success.
+        reason: asserts SQL fragments and positional parameter order
+        exit: rewrite_against_db
+      test_shuffle_flags_defaults_to_false:
+        decision: keep
+        category: contract
+        description: POST /api/music/shuffle/flags treats missing flags as false.
+      test_sql_to_list_accepts_params:
+        decision: keep
+        category: regression
+        description: sql_to_list passes an optional parameter tuple to the cursor and returns the first column of every row.
+      test_sql_to_list_no_params_still_works:
+        decision: keep
+        category: regression
+        description: sql_to_list still executes a bare query without parameters.
+        weak: backward-compatibility twin of the params test
+      test_validate_playlist_payload_empty_aborts:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns False and logs once, without touching the database, when the payload is empty.
+      test_validate_playlist_payload_incomplete_paging_aborts:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns False for a page that advertises a next page with no successor.
+      test_validate_playlist_payload_truncated_chain_before_next_playlist_aborts:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns False when a paging chain is cut short by a page belonging to another playlist.
+      test_validate_playlist_payload_complete_paged_chain_passes:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns True for a fully fetched paging chain whose intermediate pages still carry next pointers.
+      test_validate_playlist_payload_malformed_href_id_aborts:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns False and names the offender when a page href yields an id that is not a bare 22-character playlist id.
+      test_validate_playlist_payload_detail_missing_href_aborts:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns False for a detail page whose href cannot yield a playlist id.
+      test_validate_playlist_payload_detail_item_ids_are_not_playlist_ids:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload accepts a detail page whose item ids are not playlist ids, such as local files.
+      test_validate_playlist_payload_unnormalized_items_href_aborts:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns False for an unnormalized items href that would persist a polluted playlist id.
+      test_validate_playlist_payload_malformed_item_id_aborts:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns False for a header payload whose item id is not a bare 22-character id.
+      test_validate_playlist_payload_valid_detail_payload_passes:
+        decision: delete
+        reason: subsumed by the complete-chain test, which also passes normalized detail pages
+      test_validate_playlist_payload_valid_header_payload_passes:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns True for a complete header chain whose item ids are 22-character playlist ids.
+      test_validate_playlist_payload_all_pages_empty_aborts:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns False when every page has zero items.
+      test_validate_playlist_payload_unexpected_type_aborts:
+        decision: keep
+        category: regression
+        description: validate_playlist_payload returns False instead of raising when given a payload that is not a list of pages.
+      test_playlist_details_extractor_normalizes_hrefs_and_passes_guard:
+        decision: keep
+        category: regression
+        description: extract_json_playlist_details rewrites every page href to the tracks form so the derived playlist id is the bare 22-character id and the payload passes validation.
+      test_playlist_details_extractor_no_client_aborts_loudly:
+        decision: keep
+        category: regression
+        description: extract_json_playlist_details returns an empty list and logs a loud error, without listing playlists, when no usable Spotify client exists.
+      test_now_playing_actions_report_not_ok_when_nothing_is_playing:
+        decision: keep
+        category: contract
+        description: Every now-playing action endpoint returns ok false with status 200 when nothing is playing.
+        new: true
+      test_recent_plays_rejects_invalid_limit:
+        decision: keep
+        category: contract
+        description: GET /api/music/recent-plays rejects a limit below 10, above 100 or not a multiple of 10 with 422.
+        new: true
+
+  # ----------------------------------------------------------------------
+  tests/test_playlist_details_href.py:
+    module_docstring: playlist_to_db normalizes every playlist-items page href so staging derives bare playlist ids.
+    remove_symbols:
+    - _sproc_derive
+    - BARE_RE
+    tests:
+      test_all_pages_normalized_before_json_loading:
+        decision: keep
+        category: regression
+        description: playlist_to_db rewrites every page's href from the items form to the tracks form before json_loading is called.
+      test_derived_id_is_bare_22char_for_every_page:
+        decision: delete
+        reason: re-implements the SPROC derivation in Python and only restates the normalization test
+      test_raw_href_would_pollute_proves_sensitivity:
+        decision: delete
+        reason: asserts that a constant does not match a regex; covers no production code
+
+  # ----------------------------------------------------------------------
+  tests/test_playlist_relationships.py:
+    module_docstring: ensure_playlist_relationships re-creates missing relationships without ever issuing a DELETE.
+    tests:
+      test_ensure_playlist_relationships_no_delete_on_empty:
+        decision: keep
+        category: regression
+        description: ensure_playlist_relationships returns None and performs no database writes when no relationships are missing.
+      test_ensure_playlist_relationships_no_delete_on_rows:
+        decision: keep
+        category: regression
+        description: ensure_playlist_relationships creates each missing child playlist and records it with a parameterized insert, never issuing a DELETE.
+      test_ensure_playlist_relationships_uses_parameterized_insert:
+        decision: delete
+        reason: repeats the parameter assertion of the previous test and checks SQL text
+
+  # ----------------------------------------------------------------------
+  tests/test_process_generator_events.py:
+    module_docstring: Post-processing sub-steps announce a running event before they execute, not after they finish.
+    tests:
+      test_post_processing_steps_yields_marker_before_execution:
+        decision: keep
+        category: regression
+        description: activity_post_processing_steps yields each sub-step's start marker before the sub-step runs and its terminal result after it.
+      test_post_processing_steps_marker_terminal_interleaved:
+        decision: delete
+        reason: subsumed by the marker-before-execution test
+      testprocess_generator_running_event_precedes_substep_execution:
+        decision: quarantine
+        category: contract
+        description: process_generator streams a running event for a post-processing step before that step executes, completes each step after it, and ends with a success event.
+        reason: never collected because a rename dropped the underscore; patches private names that may no longer exist
+        exit: verify_then_promote
+        rename_to: test_process_generator_running_event_precedes_substep_execution
+      testprocess_generator_error_terminal_still_emits_running_first:
+        decision: quarantine
+        category: contract
+        description: process_generator streams running then error for a failing step, starts no later step and ends with a failure event.
+        reason: never collected because a rename dropped the underscore; patches private names that may no longer exist
+        exit: verify_then_promote
+        rename_to: test_process_generator_error_terminal_still_emits_running_first
+
+  # ----------------------------------------------------------------------
+  tests/test_spotify_oauth_flow.py:
+    module_docstring: The Spotify OAuth helpers return the tokens and URLs their callers rely on.
+    tests:
+      test_force_refresh_clears_cache_and_returns_token:
+        decision: keep
+        category: regression
+        description: force_refresh clears the Spotify token cache and returns a freshly obtained token dict.
+      test_exchange_code_returns_token_dict:
+        decision: keep
+        category: regression
+        description: exchange_code returns the token dict from the auth manager's get_access_token.
+        weak: pass-through of a mocked value
+      test_build_authorize_url_calls_show_dialog:
+        decision: keep
+        category: regression
+        description: build_authorize_url requests the consent dialog and returns the authorize URL.
+
+  # ----------------------------------------------------------------------
+  tests/test_verify_spotify_isrc_refresh.py:
+    module_docstring: verify_spotify fails loudly without a Spotify client; the live refresh checks are quarantined as manual gates.
+    remove_symbols:
+    - ACTIVITIES_PY
+    - SERVICE_PY
+    - TYPES_TS
+    - REPO_ROOT
+    tests:
+      test_verify_spotify_step_exists_in_pipeline:
+        decision: delete
+        reason: greps source files and a TypeScript file for literals; breaks on any file move
+      test_spotify_client_is_usable:
+        decision: delete
+        reason: probes live Spotify state rather than code behavior
+      test_verify_spotify_fails_without_client:
+        decision: keep
+        category: regression
+        description: verify_spotify raises RuntimeError instead of silently succeeding when no usable Spotify client is available.
+      test_verify_spotify_refreshes_playlist_isrcs:
+        decision: quarantine
+        category: integration
+        description: verify_spotify refreshes the target playlist's rows in music.playlist_isrcs without changing their count.
+        reason: mutates real database rows for a hard-coded playlist id
+        exit: manual_gate
+        live: true
+      test_stored_order_matches_spotify:
+        decision: quarantine
+        category: integration
+        description: The track order stored in music.playlist_isrcs equals the playlist's live order on Spotify.
+        reason: compares live Spotify state with the database, so it can fail without any code change
+        exit: manual_gate
+        live: true
+
+  # ----------------------------------------------------------------------
+  tests/test_route_smoke.py:
+    module_docstring: Smoke checks that the read-only API routes are wired and answer with their standard envelope against the live database.
+    append_source: |
+      import pytest
+      from fastapi.testclient import TestClient
+
+      from backend.main import app
+
+      client = TestClient(app)
+
+      ENVELOPE_ROUTES = [
+          "/api/activities",
+          "/api/admin/tasks",
+          "/api/admin/tasks/schedule",
+          "/api/admin/tasks/names",
+          "/api/admin/events",
+          "/api/admin/events?search=test&errors_only=true&ignore_skips=true&event_type=INFO&limit=50",
+          "/api/admin/db-info/task-summary",
+          "/api/admin/db-info/db-size-chart",
+          "/api/admin/db-info/db-size-breakdown",
+          "/api/admin/logs/tables",
+          "/api/admin/db-sessions",
+          "/api/admin/services",
+          "/api/admin/functions",
+          "/api/admin/credentials/requirements",
+      ]
+
+
+      @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+      def test_get_route_returns_data_envelope(path):
+          response = client.get(path)
+          assert response.status_code == 200, f"{path} returned {response.status_code}"
+          body = response.json()
+          assert "data" in body
+          assert isinstance(body["count"], int)
+
+
+      def test_admin_events_limit_is_respected():
+          response = client.get("/api/admin/events?search=test&errors_only=true&ignore_skips=true&event_type=INFO&limit=50")
+          assert response.status_code == 200
+          assert len(response.json()["data"]) <= 50
+
+
+      @pytest.mark.parametrize("suffix", ["", "/telemetry", "/segments"])
+      def test_activity_detail_routes_respond_for_latest_activity(suffix):
+          listing = client.get("/api/activities")
+          assert listing.status_code == 200
+          rows = listing.json()["data"]
+          if not rows:
+              pytest.skip("no activities in the database")
+          activity_id = rows[0]["activity_id"]
+          response = client.get(f"/api/activities/{activity_id}{suffix}")
+          assert response.status_code == 200
+          body = response.json()
+          assert "data" in body
+          if suffix == "":
+              assert body["data"]["activity_id"] == activity_id
+    tests:
+      test_get_route_returns_data_envelope:
+        decision: keep
+        category: smoke
+        description: Each read-only API route in the list answers 200 with a data field and an integer count against the live database.
+        live: true
+        new: true
+      test_admin_events_limit_is_respected:
+        decision: keep
+        category: smoke
+        description: GET /api/admin/events with filters returns no more rows than the requested limit.
+        live: true
+        new: true
+      test_activity_detail_routes_respond_for_latest_activity:
+        decision: keep
+        category: smoke
+        description: The by-id, telemetry and segments routes answer 200 with a data field for the most recent activity, skipping explicitly when none exist.
+        live: true
+        new: true
+  # ----------------------------------------------------------------------
+  # tests/integration/test_dotenv.py
+  #
+  # NOT a pytest test module: a diagnostic script. Its body runs at import
+  # time (there is no `if __name__ == "__main__":` guard), imports
+  # backend_functions.database_functions, and calls load_dotenv() twice,
+  # which mutates PG_HOST/PG_USER/PG_PORT/PG_DB in os.environ for the whole
+  # pytest session. Pytest WILL import it during collection (filename
+  # matches test_*.py) and collects zero tests from it. This entry exists
+  # only so apply_test_triage.py does not flag the file as unlisted. The
+  # tool will never delete a file with no top-level test functions.
+  #
+  # REAL FIX (outside the triage tool) — add tests/integration/conftest.py:
+  #     collect_ignore = ["test_dotenv.py"]
+  # Alternative: move the file to scripts/ and rename to check_dotenv.py.
+  tests/integration/test_dotenv.py:
+    tests: {}

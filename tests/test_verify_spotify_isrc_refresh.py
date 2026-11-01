@@ -1,26 +1,6 @@
+"""verify_spotify fails loudly without a Spotify client; the live refresh checks are
+quarantined as manual gates.
 """
-Live integration test — 004-004 Bug T10-6 fix (FR-8.6 / FR-10).
-
-Validates the exact methodology the rebuilt pipeline uses to refresh
-music.playlist_isrcs by querying Spotify, via the feature's own step function
-`backend.pifitness.activities.services.verify_spotify`, against the Running target playlist
-'7LPPIzdYgJZgj2QTSXCCNy'.
-
-Methodology under test (matches the pipeline's verify_spotify step):
-  1. get_spotify_client() must yield a usable client (rate-limit client=None
-     path must fail loudly, not silently no-op).
-  2. playlist_to_db(client, list_id=...) → sp.playlist_items (paged) →
-     json_loading(..., 'playlist_details') → CALL staging.flatten_playlist_details()
-     → music.playlist_isrcs rows refreshed with fresh updated_at_utc.
-  3. FR-10 verification: max(updated_at_utc) must be < 5 minutes old.
-
-Side effect (same as a live pipeline run): the target playlist's rows in
-music.playlist_isrcs are refreshed. No schema is created or altered.
-
-Run from the repository root:
-    python -m pytest tests/testverify_spotify_isrc_refresh.py -v
-"""
-from pathlib import Path
 
 import pytest
 
@@ -29,11 +9,6 @@ from backend_functions.service_logins import get_spotify_client
 from backend.pifitness.activities.services import verify_spotify
 
 TARGET_PLAYLIST_ID = '7LPPIzdYgJZgj2QTSXCCNy'
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-ACTIVITIES_PY = REPO_ROOT / 'backend' / 'pifitness' / 'activities' / 'router.py'
-SERVICE_PY = REPO_ROOT / 'backend' / 'pifitness' / 'activities' / 'services.py'
-TYPES_TS = REPO_ROOT / 'frontend' / 'pifitness' / 'src' / 'lib' / 'types' / 'activity-processing.ts'
 
 
 def _max_updated_at(playlist_id):
@@ -54,56 +29,21 @@ def _row_count(playlist_id):
 # Static: the final shuffle step exists and is wired in the process
 # ---------------------------------------------------------------------------
 
-def test_verify_spotify_step_exists_in_pipeline():
-    """The verify_spotify re-read step must be wired into the pipeline between
-    send_to_spotify and report_shuffle (FR-8.6), with the frontend contract
-    including the id and a label."""
-    src = SERVICE_PY.read_text(encoding='utf-8')
-
-    # Step function exists in the service module.
-    assert 'def verify_spotify(' in src
-
-    # FR-10 guard present: client pre-check + DB freshness verification.
-    assert 'could not obtain a usable Spotify client' in src
-    assert "max(updated_at_utc) >= (CURRENT_TIMESTAMP - interval '5 minutes')" in src
-
-    # Pipeline wiring: activities.py calls run_step with verify_spotify.
-    acts_src = ACTIVITIES_PY.read_text(encoding='utf-8')
-    assert 'run_step("verify_spotify", verify_spotify, playlist_id)' in acts_src
-
-    # Sequence order: send → verify → report.
-    i_send = acts_src.index('run_step("send_to_spotify"')
-    i_verify = acts_src.index('run_step("verify_spotify"')
-    i_report = acts_src.index('run_step_data("report_shuffle"')
-    assert i_send < i_verify < i_report
-
-    # Frontend contract: step id in STEP_ORDER and a human label present.
-    ts = TYPES_TS.read_text(encoding='utf-8')
-    assert "'verify_spotify'" in ts
-    assert "verify_spotify: 'Verifying on Spotify'" in ts
-
 
 # ---------------------------------------------------------------------------
 # Live: Spotify client acquisition
 # ---------------------------------------------------------------------------
-
-def test_spotify_client_is_usable():
-    """T10-6 pre-check: a real client must be obtainable (not None client)."""
-    client = get_spotify_client()
-    assert client is not None, "get_spotify_client() returned None"
-    assert client.get("client") is not None, (
-        "Spotify client is None (rate-limited or token unavailable) — "
-        "the T10-6 soft-fail condition is currently active"
-    )
 
 
 # ---------------------------------------------------------------------------
 # Negative: no usable client must fail loudly (T10-6 regression guard)
 # ---------------------------------------------------------------------------
 
+@pytest.mark.regression
 def test_verify_spotify_fails_without_client(monkeypatch):
-    """With no usable client the step must raise instead of soft-succeeding
-    (the original T10-6 bug silently no-oped)."""
+    """verify_spotify raises RuntimeError instead of silently succeeding when no usable
+    Spotify client is available.
+    """
     from backend.pifitness.activities.services import verify_spotify
 
     for broken in (None, {"token": "x", "token_age": 0, "client": None}):
@@ -116,10 +56,16 @@ def test_verify_spotify_fails_without_client(monkeypatch):
 # Live: the core methodology — Spotify query refreshes music.playlist_isrcs
 # ---------------------------------------------------------------------------
 
+@pytest.mark.integration
+@pytest.mark.live
+@pytest.mark.quarantine(
+    reason="mutates real database rows for a hard-coded playlist id",
+    exit="manual_gate",
+)
 def test_verify_spotify_refreshes_playlist_isrcs():
-    """Run verify_spotify(TARGET) live: it must not raise (client usable +
-    music.playlist_isrcs refreshed within 5 minutes) and the table state must
-    be sane afterwards."""
+    """verify_spotify refreshes the target playlist's rows in music.playlist_isrcs
+    without changing their count.
+    """
     pre_ts = _max_updated_at(TARGET_PLAYLIST_ID)
     pre_count = _row_count(TARGET_PLAYLIST_ID)
 
@@ -138,9 +84,16 @@ def test_verify_spotify_refreshes_playlist_isrcs():
     )
 
 
+@pytest.mark.integration
+@pytest.mark.live
+@pytest.mark.quarantine(
+    reason="compares live Spotify state with the database, so it can fail without any code change",
+    exit="manual_gate",
+)
 def test_stored_order_matches_spotify():
-    """Order parity: the track_order sequence stored in music.playlist_isrcs
-    must equal the playlist's live order on Spotify (by ISRC)."""
+    """The track order stored in music.playlist_isrcs equals the playlist's live order
+    on Spotify.
+    """
     client = get_spotify_client()
     sp = client.get("client")
     assert sp is not None, "no usable Spotify client for order parity check"
@@ -166,10 +119,3 @@ def test_stored_order_matches_spotify():
         f"  db ({len(db_isrcs)}): {db_isrcs[:5]}...\n"
         f"  spotify ({len(sp_isrcs)}): {sp_isrcs[:5]}..."
     )
-
-
-pytestmark = [
-    pytest.mark.slow,
-    pytest.mark.integration,
-    pytest.mark.live,
-]

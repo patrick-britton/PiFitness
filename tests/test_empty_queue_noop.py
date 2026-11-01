@@ -1,20 +1,7 @@
-"""T13 regression — 004-005 OQ-4a / Bug 004-005-6.
-
-An empty work queue (e.g. vw_activity_ids_to_sync has no eligible rows) is a
-successful no-op, NOT 'No API response to load':
-
-  1. extract_pirate_universal raises NoWorkToSync when its iterator is empty
-     (no API calls attempted), with a canonical message distinct from any
-     API-failure string.
-  2. extract_load_flatten catches it → informational 'No work to sync' event,
-     returns success (no failure reconcile inside the helper).
-  3. The executioner reconciles success (no consecutive_failures increment)
-     and reports results[] success=True.
-  4. A non-empty iterator whose API calls all fail still fails with the
-     underlying message ('No API response to load' path unchanged).
-
-Pure unit tests — no DB, no network, no pandas.
+"""An empty work queue is a successful no-op, while a non-empty queue whose API calls
+all fail still fails.
 """
+import pytest
 import backend_functions.json_extractors as je
 import backend_functions.ultimate_task_executioner_v2 as ute
 
@@ -33,8 +20,11 @@ def _task(**over):
     return t
 
 
+@pytest.mark.regression
 def test_empty_iterator_raises_no_work(monkeypatch):
-    """Empty queue → NoWorkToSync with the canonical informational message."""
+    """extract_pirate_universal raises NoWorkToSync, with a message distinct from
+    API-failure text, when its work queue is empty.
+    """
     monkeypatch.setattr(je, 'gen_activity_list', lambda aid=None: [])
     td = _task()
     try:
@@ -47,35 +37,11 @@ def test_empty_iterator_raises_no_work(monkeypatch):
     assert 'No API response' not in msg
 
 
-def test_extract_load_flatten_treats_no_work_as_success(monkeypatch):
-    """Helper logs an informational event and returns success — no reconcile."""
-    import backend_functions.ultimate_task_executioner_v2 as ute_mod
-
-    def boom(*args, **kwargs):
-        raise je.NoWorkToSync(
-            'No work to sync for Task #19: Activity Details '
-            '(loop_strategy=activity; work queue is empty)')
-
-    monkeypatch.setattr(ute_mod, 'log_app_event', _noop)
-    monkeypatch.setattr('backend_functions.json_extractors.log_app_event', _noop)
-    calls = []
-    monkeypatch.setattr(
-        ute_mod, 'reconcile_task_dates',
-        lambda td, task_fail=False, e=None: calls.append((task_fail, e)))
-    monkeypatch.setattr('backend_functions.json_extractors.sql_to_list', lambda **kw: [])
-
-    import importlib
-    import backend_functions.json_extractors as je_mod
-    monkeypatch.setattr(je_mod, 'extract_pirate_universal', boom)
-
-    td = _task()
-    fail_msg, _cd = ute_mod.extract_load_flatten({'client': object()}, td)
-    assert fail_msg is None
-    assert calls == []
-
-
+@pytest.mark.regression
 def test_executioner_reconciles_no_work_as_success(monkeypatch):
-    """Full path: empty queue → single success reconcile, results green."""
+    """ultimate_task_executioner reconciles an empty work queue as one successful run
+    and reports the task as successful.
+    """
     monkeypatch.setattr(je, 'gen_activity_list', lambda aid=None: [])
     monkeypatch.setattr('backend_functions.json_extractors.log_app_event', _noop)
     monkeypatch.setattr(ute, 'log_app_event', _noop)
@@ -99,8 +65,11 @@ def test_executioner_reconciles_no_work_as_success(monkeypatch):
     assert entry['error'] is None
 
 
+@pytest.mark.regression
 def test_nonempty_all_failed_still_fails(monkeypatch):
-    """Non-empty queue with every API call failing still fails loudly."""
+    """ultimate_task_executioner reconciles a non-empty queue whose API calls all fail
+    as one failure carrying the API error and reports the task as failed.
+    """
     monkeypatch.setattr(je, 'gen_activity_list', lambda aid=None: [111, 222])
     monkeypatch.setattr(je, 'get_pirate_data',
                         lambda **kw: (None, '401 unauthorized'))

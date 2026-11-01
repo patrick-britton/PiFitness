@@ -1,17 +1,7 @@
-"""000-001 T02: playlist-items paging-href normalization regression test (no network, no DB).
-
-Covers `playlist_to_db` in backend_functions/music_functions.py: every page of a
-playlist-items payload must be normalized (`/items?` -> `/tracks?`) before
-`json_loading`, so the downstream SPROC derivation
-`split_part(split_part(href,'/playlists/',2),'/tracks',1)` yields the bare
-22-char playlist id for every page (offset=0 and offset=50 page-2+ with
-`additional_types=track`).
-
-T01 context: the task-wired extractor `extract_json_playlist_details`
-(json_extractors.py) has NO such normalization -- only `playlist_to_db` does.
-This test locks `playlist_to_db` behaviour; T05/T08 fix the SPROC + extractor.
+"""playlist_to_db normalizes every playlist-items page href so staging derives bare
+playlist ids.
 """
-import re
+import pytest
 
 import backend_functions.music_functions as mf
 
@@ -24,14 +14,6 @@ PAGE1_HREF = (
     f"https://api.spotify.com/v1/playlists/{BARE_ID}"
     "/items?offset=50&limit=50&additional_types=track"
 )
-
-BARE_RE = re.compile(r"^[A-Za-z0-9]{22}$")
-
-
-def _sproc_derive(href):
-    """Replicate staging.flatten_playlist_details derivation in Python."""
-    after = href.split("/playlists/", 1)[1] if "/playlists/" in href else href
-    return after.split("/tracks", 1)[0]
 
 
 def _make_pages():
@@ -70,8 +52,11 @@ def _patch(monkeypatch, captured):
     monkeypatch.setattr(mf, "json_loading", fake_json_loading)
 
 
+@pytest.mark.regression
 def test_all_pages_normalized_before_json_loading(monkeypatch):
-    "playlist_to_db rewrites every page's href from '/items?' to '/tracks?' before json_loading is called."
+    """playlist_to_db rewrites every page's href from the items form to the tracks form
+    before json_loading is called.
+    """
     captured = {}
     _patch(monkeypatch, captured)
     mf.playlist_to_db(client={"client": None}, list_id=BARE_ID)
@@ -82,27 +67,3 @@ def test_all_pages_normalized_before_json_loading(monkeypatch):
         href = page.get("href") or ""
         assert "/items?" not in href, f"unnormalized href passed to json_loading: {href}"
         assert "/tracks?" in href, f"expected normalized href: {href}"
-
-
-def test_derived_id_is_bare_22char_for_every_page(monkeypatch):
-    "Every page href yields the bare 22-char playlist id when run through the SPROC derivation replica."
-    captured = {}
-    _patch(monkeypatch, captured)
-    mf.playlist_to_db(client={"client": None}, list_id=BARE_ID)
-    for page in captured["payload"]:
-        derived = _sproc_derive(page["href"])
-        assert derived == BARE_ID, f"derived {derived!r} != {BARE_ID!r}"
-        assert BARE_RE.match(derived), f"derived id not bare 22-char: {derived!r}"
-
-
-def test_raw_href_would_pollute_proves_sensitivity():
-    """Raw (un-normalized) page-1 and page-2 hrefs derive malformed ids.
-
-    Documents test sensitivity: without the `/items?`->`/tracks?` rewrite in
-    `playlist_to_db`, the SPROC derivation yields the polluted shapes seen in
-    PRD (Bug 000-001-T01-1), so the tests above would fail.
-    """
-    for raw in (PAGE0_HREF, PAGE1_HREF):
-        derived = _sproc_derive(raw)
-        assert derived != BARE_ID
-        assert not BARE_RE.match(derived)

@@ -1,8 +1,6 @@
-"""004-005 T18: create_segment writes the reference activity's details row.
-
-Mocks all DB interactions — no live calls. Verifies the Bug 8 fix:
-creation → finalize → scoped update_segment_details(activity_id).
+"""create_segment sequencing and error mapping with every database interaction mocked.
 """
+import pytest
 import unittest.mock as mock
 
 import pifitness.activities.queries as aq
@@ -29,8 +27,15 @@ def _run_create(qec_calls, new_id=96):
     return result, qec_mock
 
 
+@pytest.mark.regression
+@pytest.mark.quarantine(
+    reason="asserts the SQL text of three qec calls by index",
+    exit="rewrite_against_db",
+)
 def test_create_segment_writes_details_row():
-    """Happy path: creation, finalize, then scoped details write."""
+    """create_segment creates the segment, finalizes the match, then writes details
+    scoped to the reference activity only.
+    """
     result, qec_mock = _run_create([None, None, None])
     assert result == 96
     assert qec_mock.call_count == 3
@@ -43,8 +48,11 @@ def test_create_segment_writes_details_row():
     assert calls[2][1] == [24652871872]
 
 
+@pytest.mark.regression
 def test_create_segment_details_failure_maps_to_value_error():
-    """A failing details write surfaces as ValueError (endpoint maps to 422)."""
+    """create_segment raises ValueError naming the details write when the per-activity
+    details write fails.
+    """
     try:
         _run_create([None, None, "boom"])
     except ValueError as e:
@@ -53,8 +61,11 @@ def test_create_segment_details_failure_maps_to_value_error():
         raise AssertionError("expected ValueError from details-write failure")
 
 
+@pytest.mark.regression
 def test_create_segment_finalize_failure_skips_details_write():
-    """A failing finalize never reaches the details write."""
+    """create_segment raises ValueError and performs no details write when finalizing
+    the match fails.
+    """
     try:
         _run_create([None, "boom"])
     except ValueError as e:
