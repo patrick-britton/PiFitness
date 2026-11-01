@@ -65,7 +65,7 @@ def get_auth_status():
     except Exception:
         spotify_status['status'] = 'error'
     try:
-        expires = one_sql_result('SELECT MAX(expires_at_utc) FROM _migration.spotify_auth_metadata WHERE is_active = true')
+        expires = one_sql_result('SELECT MAX(expires_at_utc) FROM api_services.spotify_auth_metadata WHERE is_active = true')
         spotify_status['token_expires_utc'] = str(expires) if expires else None
     except Exception:
         pass
@@ -80,7 +80,7 @@ def get_auth_status():
     except Exception:
         pass
     try:
-        expires_val = one_sql_result("SELECT refresh_token_expires_at_utc FROM _migration.api_tokens WHERE service_name = 'Garmin' AND is_active = true ORDER BY updated_at_utc DESC LIMIT 1")
+        expires_val = one_sql_result("SELECT refresh_token_expires_at_utc FROM api_services.api_tokens WHERE service_name = 'Garmin' AND is_active = true ORDER BY updated_at_utc DESC LIMIT 1")
         garmin_status['token_expires_utc'] = str(expires_val) if expires_val else None
     except Exception:
         pass

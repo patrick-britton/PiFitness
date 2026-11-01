@@ -211,12 +211,12 @@ if ($SkipSanitize) {
     Write-Warn2 'LIVE PRODUCTION OAUTH TOKENS WILL REMAIN IN DEV'
 } else {
     Write-Step 'Step 4: Truncate live OAuth tables in staging'
-    Invoke-Psql -Database $StagingDb -Sql 'TRUNCATE _migration.api_tokens, _migration.spotify_auth_metadata' | Out-Null
+    Invoke-Psql -Database $StagingDb -Sql 'TRUNCATE api_services.api_tokens, api_services.spotify_auth_metadata' | Out-Null
 
     Write-Info 'Verifying tables are empty'
     Invoke-Psql -Database $StagingDb -Sql @'
-SELECT 'api_tokens' AS t, count(*) FROM _migration.api_tokens
-UNION ALL SELECT 'spotify_auth_metadata', count(*) FROM _migration.spotify_auth_metadata
+SELECT 'api_tokens' AS t, count(*) FROM api_services.api_tokens
+UNION ALL SELECT 'spotify_auth_metadata', count(*) FROM api_services.spotify_auth_metadata
 '@
     Write-Ok 'OAuth tables truncated'
 }
@@ -249,8 +249,8 @@ Write-Step 'Step 7: Verify dev database'
 Invoke-Psql -Database $DevDb -Sql @'
 SELECT 'tables' AS metric, count(*)::text AS value FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema')
 UNION ALL SELECT 'views', count(*)::text FROM pg_views WHERE schemaname NOT IN ('pg_catalog','information_schema')
-UNION ALL SELECT 'api_tokens', count(*)::text FROM _migration.api_tokens
-UNION ALL SELECT 'spotify_auth_metadata', count(*)::text FROM _migration.spotify_auth_metadata
+UNION ALL SELECT 'api_tokens', count(*)::text FROM api_services.api_tokens
+UNION ALL SELECT 'spotify_auth_metadata', count(*)::text FROM api_services.spotify_auth_metadata
 '@
 
 # ============================== Step 8: Cleanup ==============================

@@ -327,7 +327,7 @@ def store_spotify_auth_metadata(refresh_token):
     from backend_functions.database_functions import qec
 
     token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-    sql = """INSERT INTO _migration.spotify_auth_metadata 
+    sql = """INSERT INTO api_services.spotify_auth_metadata 
              (authorized_at_utc, refresh_token_hash, expires_at_utc)
              VALUES (CURRENT_TIMESTAMP, %s, CURRENT_TIMESTAMP + INTERVAL '6 months')
              ON CONFLICT (refresh_token_hash) 
@@ -350,11 +350,11 @@ def get_spotify_token_expiry():
     """Return the estimated token expiry date for UI display.
 
     Returns:
-        str | None: The latest expiry timestamp from _migration.spotify_auth_metadata,
+        str | None: The latest expiry timestamp from api_services.spotify_auth_metadata,
                     or None if no data exists.
     """
     from backend_functions.database_functions import one_sql_result
-    sql = "SELECT MAX(expires_at_utc) FROM _migration.spotify_auth_metadata WHERE is_active = true"
+    sql = "SELECT MAX(expires_at_utc) FROM api_services.spotify_auth_metadata WHERE is_active = true"
     return one_sql_result(sql)
 
 

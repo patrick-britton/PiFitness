@@ -117,7 +117,7 @@ def garmin_login(headless=False):
     """Garmin login using pirate-garmin's native Android auth flow.
     
     Uses the same DB-backed session pattern as Spotify:
-    1. Load session from _migration.api_tokens → write to local cache file
+    1. Load session from api_services.api_tokens → write to local cache file
     2. Call AuthManager.ensure_authenticated() → handles refresh if needed
     3. Read refreshed session from cache file → save back to DB
     4. Return GarminClient with valid session
@@ -137,7 +137,7 @@ def garmin_login(headless=False):
     # Set up cache directory for pirate-garmin's auth files
     # The file cache exists because AuthManager reads and writes tokens to
     # disk, not DB. garmin_login() bridges the two:
-    #   DB (_migration.api_tokens) -> file cache -> AuthManager
+    #   DB (api_services.api_tokens) -> file cache -> AuthManager
     #   AuthManager -> file cache -> DB (via save_token_to_db)
     # The DB tier lets every machine share sessions; the file tier gives
     # AuthManager the interface it expects.

@@ -25,3 +25,19 @@ def pytest_collection_modifyitems(config, items):
                 reason="quarantined: " + quarantine.kwargs.get("reason", "")))
     if problems:
         raise pytest.UsageError("test classification problems:\n  " + "\n  ".join(problems))
+
+# --- INT-19b: test DB isolation guard ---
+import pytest as _pytest
+
+@_pytest.fixture(scope="session", autouse=True)
+def _guard_test_db():
+    import os
+    pg_db = os.environ.get("PG_DB", "").strip()
+    if not pg_db:
+        return
+    allowed = ("dev", "test", "local", "localhost")
+    if not any(k in pg_db.lower() for k in allowed):
+        raise RuntimeError(
+            f"Tests refuse to run: PG_DB={pg_db!r} is not a dev/test database. "
+            f"Allowed substrings: {allowed}. Set PG_DB=pifitness_dev or unset."
+        )

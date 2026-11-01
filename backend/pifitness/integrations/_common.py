@@ -46,7 +46,7 @@ def load_token_from_db(service_name):
     from backend_functions.database_functions import one_sql_result
     import json
 
-    sql = f"""SELECT token_data FROM _migration.api_tokens
+    sql = f"""SELECT token_data FROM api_services.api_tokens
              WHERE service_name = '{service_name}' AND is_active = true
              ORDER BY updated_at_utc DESC LIMIT 1"""
     result = one_sql_result(sql)
@@ -94,21 +94,30 @@ def save_token_to_db(service_name, token_info):
         except (AttributeError, TypeError):
             pass
 
-    # Deactivate old tokens, then insert new (using parameterized queries)
-    deactivate_sql = """UPDATE _migration.api_tokens
+    # Deactivate old tokens, then insert new (using parameterized queries).
+    # qec returns None on success, or a [msg1, msg2, msg3] list on failure.
+    # Fail loud: silent loss of cross-device session sync is unacceptable.
+    deactivate_sql = """UPDATE api_services.api_tokens
                         SET is_active = false
                         WHERE service_name = %s AND is_active = true"""
-    qec(deactivate_sql, [service_name])
+    result = qec(deactivate_sql, [service_name])
+    if result:
+        raise RuntimeError(
+            f"save_token_to_db deactivate failed for {service_name}: {result}"
+        )
 
     if refresh_expires_ts:
-        # Convert Unix timestamp to PostgreSQL timestamp
         expires_dt = datetime.fromtimestamp(refresh_expires_ts, tz=timezone.utc)
-        insert_sql = """INSERT INTO _migration.api_tokens 
-                          (service_name, token_data, updated_at_utc, refresh_token_expires_at_utc)
-                          VALUES (%s, %s, CURRENT_TIMESTAMP, %s)"""
-        qec(insert_sql, [service_name, Json(token_info), expires_dt])
+        insert_sql = """INSERT INTO api_services.api_tokens
+                          (service_name, token_data, updated_at_utc, is_active, refresh_token_expires_at_utc)
+                          VALUES (%s, %s, CURRENT_TIMESTAMP, true, %s)"""
+        result = qec(insert_sql, [service_name, Json(token_info), expires_dt])
     else:
-        insert_sql = """INSERT INTO _migration.api_tokens
-                        (service_name, token_data, updated_at_utc)
-                        VALUES (%s, %s, CURRENT_TIMESTAMP)"""
-        qec(insert_sql, [service_name, Json(token_info)])
+        insert_sql = """INSERT INTO api_services.api_tokens
+                        (service_name, token_data, updated_at_utc, is_active)
+                        VALUES (%s, %s, CURRENT_TIMESTAMP, true)"""
+        result = qec(insert_sql, [service_name, Json(token_info)])
+    if result:
+        raise RuntimeError(
+            f"save_token_to_db insert failed for {service_name}: {result}"
+        )
