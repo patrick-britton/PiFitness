@@ -15,7 +15,6 @@ from pifitness.integrations.garmin.provider import (
     garmin_creds,
     garmin_login,
     get_garmin_client,
-    pirate_garmin_login,
 )
 
 from pifitness.integrations.spotify.provider import (

@@ -76,11 +76,10 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-15 | this block - plan close-out | (this commit) |
 | INT-17 | Rename `create_native_session` -> `create_browser_session` | `[INT-17]` |
 | INT-18 | Rename `pirate_garmin_login` -> `garmin_login` + compatibility alias + migration script | `[INT-18]` |
+| INT-18-final | Remove compatibility alias + re-export; local dev DB has 1 api_services row still pointing at old name, reconciled at production merge | `[INT-18-final]` |
 
 ### Remaining
 
-| INT-18-live | Rick runs `scripts/migrations/int-18-rename-db-functions.sql` on the Pi; confirms zero DB rows reference `pirate_garmin_login` |
-| INT-18-final | Remove compatibility alias from `provider.py`; remove `pirate_garmin_login` import from `service_logins.py`; verify zero code references remain |
 | Block | Deliverable |
 |---|---|
 | INT-16 | Garmin refresh-path tests (mock HTTP; prove `refresh_di_token_slot` / `refresh_it_token_slot` work without Playwright) |
@@ -141,6 +140,20 @@ each rename runs in a three-phase sequence: code rename + compatibility alias
 (block), DB migration (live, no commit), alias removal (block). INT-18 is the
 first such sequence. INT-19 (env var + cache dir renames) is likely a single
 block because no DB rows reference `PIRATE_GARMIN_APP_DIR`.
+
+
+### 6. INT-18 DB reconciliation deferral
+
+INT-18-live was **skipped**. The pirate-garmin-report claimed 13 `tasks.vw_task_info`
+rows + 2 `api_services.api_service_list` rows referenced `pirate_garmin_login`.
+Actual query on the live database (2026-11-01) shows:
+
+- `tasks.task_configuration.python_execution_function` — **0 rows** reference the old name (15 rows total, all N/A or unrelated)
+- `api_services.api_service_list.api_service_function` — **1 row** references `backend_functions.service_logins.pirate_garmin_login`
+
+Rick's decision: acceptable to leave this 1 dev-DB row broken until merge to production, at which time it is rewritten. The alias was removed in INT-18-final because a 1-row dev-only deferral does not justify permanent code debt.
+
+Artifact retained: `scripts/migrations/int-18-rename-db-functions.sql` for use at merge time. It includes placeholder table names and must be adapted to the actual schema before running.
 
 ## Section 2 - Policy (applies to every task in section 4)
 

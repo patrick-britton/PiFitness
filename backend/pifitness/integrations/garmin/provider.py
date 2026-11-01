@@ -262,9 +262,3 @@ class GarminProvider:
 
 
 garmin_provider = GarminProvider()
-
-
-# Temporary compatibility alias for DB-driven dispatch. DB rows in
-# tasks.vw_task_info and api_services.api_service_list reference this name.
-# Removed in INT-18-final after INT-18-live migrates those rows.
-pirate_garmin_login = garmin_login
