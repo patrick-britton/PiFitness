@@ -65,8 +65,8 @@ def _fake_session(now: int | None = None) -> NativeOAuth2Session:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.regression
-def test_pirate_garmin_login_reuses_db_session_without_playwright(monkeypatch):
-    """When the DB holds a valid session, pirate_garmin_login never invokes Playwright."""
+def test_garmin_login_reuses_db_session_without_playwright(monkeypatch):
+    """When the DB holds a valid session, garmin_login never invokes Playwright."""
     tmp_storage = pathlib.Path(tempfile.mkdtemp(prefix="garmin-test-"))
     monkeypatch.setenv("LOCAL_STORAGE_PATH", str(tmp_storage))
 
@@ -84,7 +84,7 @@ def test_pirate_garmin_login_reuses_db_session_without_playwright(monkeypatch):
         stack.enter_context(patch("pifitness.integrations.garmin.provider.log_api_event"))
         mock_playwright = stack.enter_context(patch("pifitness.integrations.garmin.auth.login_via_browser"))
         mock_client_class.from_credentials.return_value = mock_client
-        result = __import__("pifitness.integrations.garmin.provider", fromlist=["pirate_garmin_login"]).pirate_garmin_login()
+        result = __import__("pifitness.integrations.garmin.provider", fromlist=["garmin_login"]).garmin_login()
 
     mock_playwright.assert_not_called()
     mock_save.assert_called_once()
@@ -101,8 +101,8 @@ def test_pirate_garmin_login_reuses_db_session_without_playwright(monkeypatch):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.regression
-def test_pirate_garmin_login_saves_session_to_db_after_auth(monkeypatch):
-    """Every successful pirate_garmin_login call saves the session back to the DB."""
+def test_garmin_login_saves_session_to_db_after_auth(monkeypatch):
+    """Every successful garmin_login call saves the session back to the DB."""
     tmp_storage = pathlib.Path(tempfile.mkdtemp(prefix="garmin-test-"))
     monkeypatch.setenv("LOCAL_STORAGE_PATH", str(tmp_storage))
 
@@ -117,7 +117,7 @@ def test_pirate_garmin_login_saves_session_to_db_after_auth(monkeypatch):
         mock_client_class = stack.enter_context(patch("pifitness.integrations.garmin.provider.GarminClient"))
         stack.enter_context(patch("pifitness.integrations.garmin.provider.log_api_event"))
         mock_client_class.from_credentials.return_value = mock_client
-        __import__("pifitness.integrations.garmin.provider", fromlist=["pirate_garmin_login"]).pirate_garmin_login()
+        __import__("pifitness.integrations.garmin.provider", fromlist=["garmin_login"]).garmin_login()
 
     mock_save.assert_called_once()
     assert mock_save.call_args[0][0] == "Garmin"
@@ -167,7 +167,7 @@ def test_create_browser_session_invokes_playwright_login(tmp_path):
 
 @pytest.mark.regression
 def test_get_garmin_client_returns_well_formed_token_without_relogin():
-    """get_garmin_client returns a well-formed incoming_token without calling pirate_garmin_login."""
+    """get_garmin_client returns a well-formed incoming_token without calling garmin_login."""
     from pifitness.integrations.garmin.provider import get_garmin_client
 
     incoming = {
@@ -177,7 +177,7 @@ def test_get_garmin_client_returns_well_formed_token_without_relogin():
     }
 
     with ExitStack() as stack:
-        mock_login = stack.enter_context(patch("pifitness.integrations.garmin.provider.pirate_garmin_login"))
+        mock_login = stack.enter_context(patch("pifitness.integrations.garmin.provider.garmin_login"))
         stack.enter_context(patch("pifitness.integrations.garmin.provider.log_api_event"))
         result = get_garmin_client(incoming)
 

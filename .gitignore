@@ -281,3 +281,4 @@ docs/reorg/blocks/
 # One-shot apply helpers (regenerate as needed)
 apply_t2b.py
 apply_test_food_search_backend.py
+docs/reorg/blocks/*-report.md

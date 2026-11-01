@@ -50,10 +50,10 @@ def test_executioner_reconciles_no_work_as_success(monkeypatch):
         ute, 'reconcile_task_dates',
         lambda td, task_fail=False, e=None: calls.append((task_fail, e)))
     task = _task(run_extract=1, run_python=None,
-                 python_login_function='backend_functions.service_logins.pirate_garmin_login')
+                 python_login_function='backend_functions.service_logins.garmin_login')
     monkeypatch.setattr(ute, 'sql_to_dict', lambda sql, params=None: [task])
     import backend_functions.service_logins as sl
-    monkeypatch.setattr(sl, 'pirate_garmin_login',
+    monkeypatch.setattr(sl, 'garmin_login',
                         lambda cd=None: {'client': object()})
 
     summary = ute.ultimate_task_executioner(force_task_id=19)
@@ -80,10 +80,10 @@ def test_nonempty_all_failed_still_fails(monkeypatch):
         ute, 'reconcile_task_dates',
         lambda td, task_fail=False, e=None: calls.append((task_fail, e)))
     task = _task(run_extract=1, run_python=None,
-                 python_login_function='backend_functions.service_logins.pirate_garmin_login')
+                 python_login_function='backend_functions.service_logins.garmin_login')
     monkeypatch.setattr(ute, 'sql_to_dict', lambda sql, params=None: [task])
     import backend_functions.service_logins as sl
-    monkeypatch.setattr(sl, 'pirate_garmin_login',
+    monkeypatch.setattr(sl, 'garmin_login',
                         lambda cd=None: {'client': object()})
 
     summary = ute.ultimate_task_executioner(force_task_id=19)

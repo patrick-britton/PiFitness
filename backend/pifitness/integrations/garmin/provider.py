@@ -76,46 +76,35 @@ def garmin_creds():
     return e, p
 
 
-def garmin_login():
-    """Legacy Garmin login using garminconnect library.
-    
-    DEPRECATED: Use pirate_garmin_login() instead, which uses Garmin's native
-    Android auth flow and avoids Cloudflare 429 errors.
-    
-    Kept for backward compatibility — delegates to pirate_garmin_login().
-    """
-    return pirate_garmin_login()
-
-
 def get_garmin_client(incoming_token=None):
     """Garmin client with reuse-first methodology (mirrors Spotify pattern).
 
     Methodology:
-    1. If no incoming token → call pirate_garmin_login() for fresh session
-    2. If malformed token → call pirate_garmin_login()
-    3. If client is None → call pirate_garmin_login()
+    1. If no incoming token → call garmin_login() for fresh session
+    2. If malformed token → call garmin_login()
+    3. If client is None → call garmin_login()
     4. Otherwise → return incoming_token as-is. The client's AuthManager
        refreshes on demand when request_json() is called, and the DB cache
-       layer at pirate_garmin_login() ensures cross-machine reuse. No
+       layer at garmin_login() ensures cross-machine reuse. No
        mid-flight validation needed.
 
-    The pirate_garmin_login() function handles DB-backed session storage,
+    The garmin_login() function handles DB-backed session storage,
     so any machine can do the browser login and all machines share the session.
     """
     if incoming_token is None:
-        new_token = pirate_garmin_login()
+        new_token = garmin_login()
         if new_token:
             log_api_event('Garmin', 'New Token from none', token_age=0)
         return new_token
 
     if "client" not in incoming_token or "token_age" not in incoming_token:
-        new_token = pirate_garmin_login()
+        new_token = garmin_login()
         if new_token:
             log_api_event('Garmin', 'New Token from malformed dictionary', token_age=0)
         return new_token
 
     if incoming_token.get("client") is None:
-        new_token = pirate_garmin_login()
+        new_token = garmin_login()
         if new_token:
             log_api_event('Garmin', 'Client was in token, but was None', token_age=0)
         return new_token
@@ -124,7 +113,7 @@ def get_garmin_client(incoming_token=None):
     return incoming_token
 
 
-def pirate_garmin_login(headless=False):
+def garmin_login(headless=False):
     """Garmin login using pirate-garmin's native Android auth flow.
     
     Uses the same DB-backed session pattern as Spotify:
@@ -264,7 +253,7 @@ class GarminProvider:
 
     def refresh(self) -> TokenStatus:
         try:
-            pirate_garmin_login()
+            garmin_login()
         except Exception as e:
             raise ProviderAuthError(
                 "garmin refresh failed: %s" % e
@@ -273,3 +262,9 @@ class GarminProvider:
 
 
 garmin_provider = GarminProvider()
+
+
+# Temporary compatibility alias for DB-driven dispatch. DB rows in
+# tasks.vw_task_info and api_services.api_service_list reference this name.
+# Removed in INT-18-final after INT-18-live migrates those rows.
+pirate_garmin_login = garmin_login

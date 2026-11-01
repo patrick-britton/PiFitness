@@ -75,13 +75,15 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-14 | inline `import spotipy` cleanup, stale-note cleanup, canonical `get_auth_status` tests | `25bd50e` |
 | INT-15 | this block - plan close-out | (this commit) |
 | INT-17 | Rename `create_native_session` -> `create_browser_session` | `[INT-17]` |
+| INT-18 | Rename `pirate_garmin_login` -> `garmin_login` + compatibility alias + migration script | `[INT-18]` |
 
 ### Remaining
 
+| INT-18-live | Rick runs `scripts/migrations/int-18-rename-db-functions.sql` on the Pi; confirms zero DB rows reference `pirate_garmin_login` |
+| INT-18-final | Remove compatibility alias from `provider.py`; remove `pirate_garmin_login` import from `service_logins.py`; verify zero code references remain |
 | Block | Deliverable |
 |---|---|
 | INT-16 | Garmin refresh-path tests (mock HTTP; prove `refresh_di_token_slot` / `refresh_it_token_slot` work without Playwright) |
-| INT-18 | Rename `pirate_garmin_login` -> `garmin_login`; delete the delegation wrapper at `provider.py:79-87` |
 | INT-19 | Env var + cache dir renames (`PIRATE_GARMIN_APP_DIR` -> `GARMIN_APP_DIR`; `{LOCAL_STORAGE_PATH}/pirate-garmin/` -> `{LOCAL_STORAGE_PATH}/garmin/`) |
 | INT-20 | Scrub remaining `pirate-garmin` mentions in comments/docstrings (including `provider.py:10`) |
 | INT-21 | Untrack `.audit/`, add to `.gitignore`, delete from disk |
@@ -130,6 +132,15 @@ Fresh Playwright fires only when all three are exhausted - typically when both D
 ### 4. Verification
 
 INT-13 added `tests/test_garmin_login_flow.py`, including a live test `test_real_garmin_login_returns_usable_api_response`. It passed manually on 2026-11-01 in 17.56s (fresh Playwright path, not a cache hit). If that test fails after any future change, the change broke fresh login and must be reverted.
+
+### 5. Phase B naming sequence
+
+Phase B renames aspirational "pirate" and "native" identifiers to reflect what
+the code actually does. Because live DB dispatch references some old names,
+each rename runs in a three-phase sequence: code rename + compatibility alias
+(block), DB migration (live, no commit), alias removal (block). INT-18 is the
+first such sequence. INT-19 (env var + cache dir renames) is likely a single
+block because no DB rows reference `PIRATE_GARMIN_APP_DIR`.
 
 ## Section 2 - Policy (applies to every task in section 4)
 

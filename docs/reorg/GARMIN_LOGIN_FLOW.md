@@ -15,7 +15,7 @@ successful login).
 
 ## Entry points
 
-- **`pirate_garmin_login(headless=False)`** in `provider.py:139` — the
+- **`garmin_login(headless=False)`** in `provider.py:139` — the
   primary entry point. Called by `get_garmin_client()` and by
   `GarminProvider.refresh()`.
 - **`get_garmin_client(incoming_token=None)`** in `provider.py:90` —
@@ -29,7 +29,7 @@ successful login).
 
 ### Layer 1 — DB session cache (`_migration.api_tokens`)
 
-`pirate_garmin_login()` at `provider.py:139`:
+`garmin_login()` at `provider.py`:
 
 1. Load email/password via `garmin_creds()` → `load_api_credentials('Garmin')`
 2. Load previous session via `load_token_from_db('Garmin')` (`provider.py:166`)
