@@ -345,7 +345,7 @@ def test_extract_load_flatten_does_not_reconcile(monkeypatch):
         None, {'task_id': 7, 'task_name': 'T', 'api_service_name': 'Garmin'})
 
     assert fail_msg == (
-        'Garmin login failed — check credentials or pirate-garmin CLI status.')
+        'Garmin login failed — check credentials or Playwright browser installation.')
     assert calls == []
 
 

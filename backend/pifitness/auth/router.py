@@ -304,7 +304,7 @@ async def test_garmin_auth():
         client_dict = garmin_login()
         
         if client_dict and client_dict.get("client"):
-            # Client exists - session is valid (pirate-garmin doesn't need get_full_name)
+            # Client exists - session is valid (Garmin client doesn't need get_full_name)
             return {
                 "status": "ok",
                 "message": "Garmin authentication verified",
@@ -354,7 +354,7 @@ async def auth_health():
             "detail": str(e),
         }
 
-    # Garmin: verify client exists (pirate-garmin doesn't expose get_full_name)
+    # Garmin: verify client exists (Garmin client doesn't expose get_full_name)
     try:
         client_dict = garmin_login()
         if client_dict and client_dict.get("client"):

@@ -86,7 +86,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | Block | Deliverable |
 |---|---|
 | INT-16 | Garmin refresh-path tests (mock HTTP; prove `refresh_di_token_slot` / `refresh_it_token_slot` work without Playwright) |
-| INT-20 | Scrub remaining `pirate-garmin` mentions in comments/docstrings (including `provider.py:10`) |
+| INT-20 | Scrub `pirate-garmin` mentions from live code (11 sites, 6 files + plan row) | `[INT-20]` |
 | INT-21 | Untrack `.audit/`, add to `.gitignore`, delete from disk |
 | INT-22 | Remove redundant `pifitness-0.1.0` editable install; update deploy script; verify `_backend_root.pth` covers both packages |
 | INT-23 | Move `check_rate_limit_cached` from `service_logins` to `_common.py` |

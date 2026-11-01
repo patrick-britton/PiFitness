@@ -246,9 +246,9 @@ def extract_load_flatten(cd, td):
         if service == 'Spotify':
             err_msg = 'Spotify login failed — token may be expired. Re-authorization required.'
         elif service == 'Pirate Garmin':
-            err_msg = 'Garmin login failed — check credentials or pirate-garmin CLI status.'
+            err_msg = 'Garmin login failed — check credentials or Playwright browser installation.'
         elif service == 'Garmin':
-            err_msg = 'Garmin login failed — check credentials or pirate-garmin CLI status.'
+            err_msg = 'Garmin login failed — check credentials or Playwright browser installation.'
         else:
             err_msg = f'Login failed for {service}'
         log_app_event(cat=f"Task #{td.get('task_id')}: {td.get('task_name')}",

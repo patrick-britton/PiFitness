@@ -1,19 +1,12 @@
 """Garmin AuthProvider + implementation.
 
 This module owns the Garmin implementation functions (garmin_creds,
-garmin_login, get_garmin_client) and the GarminProvider class.
-backend_functions.service_logins imports from here; the dependency arrow points
-inward from legacy callers to this module.
+garmin_login, get_garmin_client) and the GarminProvider class. It is
+the canonical home for Garmin integration.
 
-Vendored imports: this module imports GarminAuthError, MissingCredentialsError,
-and GarminClient from pifitness.integrations.garmin.{auth,client} -- the
-copies vendored in INT-1 from pirate-garmin_clone/src/pirate_garmin. Behavior
-is identical to importing from the pirate_garmin editable install; only the
-import path has changed.
-
-The class GarminProvider satisfies the AuthProvider protocol in
-pifitness.integrations.base and is validated by
-tests/test_integration_protocol.py::test_garmin_provider_conforms.
+Fresh login uses Playwright via AuthManager. Sessions are cached in
+api_services.api_tokens (DB) and mirrored to a local file cache so
+multiple machines share state.
 """
 
 import hashlib
@@ -114,7 +107,7 @@ def get_garmin_client(incoming_token=None):
 
 
 def garmin_login(headless=False):
-    """Garmin login using pirate-garmin's native Android auth flow.
+    """Garmin login using the internal Android auth flow.
     
     Uses the same DB-backed session pattern as Spotify:
     1. Load session from api_services.api_tokens → write to local cache file
@@ -134,7 +127,7 @@ def garmin_login(headless=False):
         log_api_event(service='Garmin', event='Login aborted — missing credentials')
         return None
     
-    # Set up cache directory for pirate-garmin's auth files
+    # Set up cache directory for Garmin auth files
     # The file cache exists because AuthManager reads and writes tokens to
     # disk, not DB. garmin_login() bridges the two:
     #   DB (api_services.api_tokens) -> file cache -> AuthManager
@@ -156,7 +149,7 @@ def garmin_login(headless=False):
         else:
             log_api_event('Garmin', 'Session loaded from DB to local cache')
     
-    # Step 2: Create GarminClient with pirate-garmin's AuthManager
+    # Step 2: Create GarminClient with the internal AuthManager
     # This handles: load cache → refresh tokens → Playwright login if all expired
     try:
         client = GarminClient.from_credentials(

@@ -524,7 +524,7 @@ def gen_activity_list(aid=None):
 
 def extract_pirate_universal(client=None, td=None, aid=None):
     """
-    A single, metadata-driven orchestrator for all pirate-garmin endpoints.
+    A single, metadata-driven orchestrator for all Garmin endpoints.
     """
     t0 = start_timer()
     endpoint = td.get('api_function_name')
