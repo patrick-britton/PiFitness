@@ -89,14 +89,16 @@ def garmin_login():
 
 def get_garmin_client(incoming_token=None):
     """Garmin client with reuse-first methodology (mirrors Spotify pattern).
-    
+
     Methodology:
     1. If no incoming token → call pirate_garmin_login() for fresh session
     2. If malformed token → call pirate_garmin_login()
     3. If client is None → call pirate_garmin_login()
-    4. If token age > 300s → validate with get_full_name(), reuse if valid
-    5. If token age <= 300s → skip validation, reuse immediately
-    
+    4. Otherwise → return incoming_token as-is. The client's AuthManager
+       refreshes on demand when request_json() is called, and the DB cache
+       layer at pirate_garmin_login() ensures cross-machine reuse. No
+       mid-flight validation needed.
+
     The pirate_garmin_login() function handles DB-backed session storage,
     so any machine can do the browser login and all machines share the session.
     """
@@ -118,22 +120,8 @@ def get_garmin_client(incoming_token=None):
             log_api_event('Garmin', 'Client was in token, but was None', token_age=0)
         return new_token
 
-    token_age = time.time() - incoming_token["token_age"]
-    max_age = 300  # seconds
-    if token_age > max_age:  # test token validity
-        try:
-            cl = incoming_token.get("client")
-            cl.get_full_name()
-            log_api_event('Garmin', 'Token reuse: check and pass', token_age=token_age)
-            return incoming_token
-        except Exception as e:
-            new_token = pirate_garmin_login()
-            if new_token:
-                log_api_event('Garmin', 'New Token from expired', token_age=token_age)
-            return new_token
-    else:
-        log_api_event('Garmin', 'Token reuse: recency skip', token_age=token_age)
-        return incoming_token
+    log_api_event('Garmin', 'Token reuse', token_age=time.time() - incoming_token["token_age"])
+    return incoming_token
 
 
 def pirate_garmin_login(headless=False):
@@ -235,7 +223,8 @@ class GarminProvider:
 
     def is_configured(self) -> bool:
         try:
-            return bool(garmin_creds())
+            email, password = garmin_creds()
+            return bool(email and password)
         except Exception:
             return False
 
@@ -255,7 +244,7 @@ class GarminProvider:
 
     def get_status(self) -> TokenStatus:
         try:
-            token = load_token_from_db("garmin")
+            token = load_token_from_db("Garmin")
         except Exception as e:
             return TokenStatus(
                 service=self.name,
