@@ -151,9 +151,8 @@ if [[ "$package_choice" == "1" ]]; then
     info "Installing/updating Python dependencies..."
     pip install -r deploy/scripts/library_requirements.txt
     
-    # Install pirate-garmin from local source (native Android auth flow)
-    info "Installing pirate-garmin (native Garmin auth)..."
-    pip install -e pirate-garmin_clone
+    # pirate-garmin was vendored into backend/pifitness/integrations/garmin/ (INT-1)
+    # and removed as an editable dependency in INT-10b. No install step needed.
     
     # Install Playwright browser for Garmin browser-based login
     info "Installing Playwright Chromium browser..."
