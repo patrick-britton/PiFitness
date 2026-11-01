@@ -135,7 +135,13 @@ def garmin_login(headless=False):
         return None
     
     # Set up cache directory for pirate-garmin's auth files
-    cache_dir = Path(os.getenv("LOCAL_STORAGE_PATH")) / "pirate-garmin"
+    # The file cache exists because AuthManager reads and writes tokens to
+    # disk, not DB. garmin_login() bridges the two:
+    #   DB (_migration.api_tokens) -> file cache -> AuthManager
+    #   AuthManager -> file cache -> DB (via save_token_to_db)
+    # The DB tier lets every machine share sessions; the file tier gives
+    # AuthManager the interface it expects.
+    cache_dir = Path(os.getenv("LOCAL_STORAGE_PATH")) / "garmin"
     cache_dir.mkdir(parents=True, exist_ok=True)
     
     # Step 1: Load any stored session from DB and write to local cache file

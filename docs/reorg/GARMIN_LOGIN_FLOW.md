@@ -34,7 +34,7 @@ successful login).
 1. Load email/password via `garmin_creds()` → `load_api_credentials('Garmin')`
 2. Load previous session via `load_token_from_db('Garmin')` (`provider.py:166`)
 3. Write session to local cache file at
-   `{LOCAL_STORAGE_PATH}/pirate-garmin/native-oauth2.json` (`provider.py:170`)
+   `{LOCAL_STORAGE_PATH}/garmin/native-oauth2.json` (`provider.py:170`)
 4. Call `GarminClient.from_credentials(...).auth.ensure_authenticated()` (`:190`)
 5. Save refreshed/new session back via `save_token_to_db('Garmin', ...)` (`:194`)
 

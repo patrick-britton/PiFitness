@@ -77,13 +77,14 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-17 | Rename `create_native_session` -> `create_browser_session` | `[INT-17]` |
 | INT-18 | Rename `pirate_garmin_login` -> `garmin_login` + compatibility alias + migration script | `[INT-18]` |
 | INT-18-final | Remove compatibility alias + re-export; local dev DB has 1 api_services row still pointing at old name, reconciled at production merge | `[INT-18-final]` |
+| INT-19 | Delete dead `default_app_dir()` fallback; rename cache subdir `pirate-garmin` -> `garmin`; add intent comment | `[INT-19]` |
 
 ### Remaining
 
+| INT-19b | Investigate Garmin DB cache: verify `save_token_to_db('Garmin', ...)` writes to `_migration.api_tokens`; reconcile with `load_token_from_db`; if broken, either fix schema/insert or document why file-only persistence is acceptable |
 | Block | Deliverable |
 |---|---|
 | INT-16 | Garmin refresh-path tests (mock HTTP; prove `refresh_di_token_slot` / `refresh_it_token_slot` work without Playwright) |
-| INT-19 | Env var + cache dir renames (`PIRATE_GARMIN_APP_DIR` -> `GARMIN_APP_DIR`; `{LOCAL_STORAGE_PATH}/pirate-garmin/` -> `{LOCAL_STORAGE_PATH}/garmin/`) |
 | INT-20 | Scrub remaining `pirate-garmin` mentions in comments/docstrings (including `provider.py:10`) |
 | INT-21 | Untrack `.audit/`, add to `.gitignore`, delete from disk |
 | INT-22 | Remove redundant `pifitness-0.1.0` editable install; update deploy script; verify `_backend_root.pth` covers both packages |
@@ -100,6 +101,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 - **`/health/auth` is already satisfied.** The original plan line "`/health/auth` endpoint consuming `pifitness.auth.status.get_auth_status`" is satisfied by `GET /api/auth/status` at `backend/pifitness/auth/router.py:59-87`, which has called `get_auth_status()` since before INT-14. INT-14 did not add a duplicate endpoint. This closes the plan line without redundant HTTP surface.
 - **INT-T4 is retired.** INT-T4 was never executed. Phase A ended at INT-14. INT-29 does not need to re-retire it.
 - **`browser_login.py` cannot be deleted.** See section 1.6. It is the fresh-login path.
+- **The Garmin file cache (`{LOCAL_STORAGE_PATH}/garmin/native-oauth2.json`) is load-bearing.** It exists because `AuthManager` reads/writes tokens to disk, not DB. `garmin_login()` bridges: DB -> file cache -> AuthManager -> file cache -> DB. Removing either tier breaks cross-machine session sharing or the `AuthManager` interface respectively.
 
 ## Section 1.6 - Phase A Close-out (complete)
 
