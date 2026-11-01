@@ -2,7 +2,8 @@ import os
 
 from backend_functions.database_functions import sql_to_list, elapsed_ms, qec, sql_to_dict, one_sql_result
 from backend_functions.logging_functions import log_app_event, start_timer
-from backend_functions.service_logins import get_spotify_client, check_rate_limit_cached
+from backend_functions.service_logins import get_spotify_client
+from pifitness.integrations.spotify.provider import check_rate_limit_cached
 from backend_functions.task_execution import json_loading, task_log
 from datetime import datetime, timedelta, timezone
 import time
