@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -473,10 +474,16 @@ class AuthManager:
                 return NativeTokenSlot(client_id=client_id, token=token)
         raise GarminAuthError("Garmin native IT token exchange failed:\n" + "\n".join(errors))
 
-    def refresh_di_token_slot(self, slot: NativeTokenSlot) -> NativeTokenSlot:
+    def refresh_di_token_slot(
+        self, slot: NativeTokenSlot, *, client: httpx.Client | None = None
+    ) -> NativeTokenSlot:
         if _refresh_token_expired(slot.token):
             raise GarminAuthError("Native Garmin DI refresh token has expired")
-        with httpx.Client(follow_redirects=True, timeout=self.timeout) as client:
+        with ExitStack() as stack:
+            if client is None:
+                client = stack.enter_context(
+                    httpx.Client(follow_redirects=True, timeout=self.timeout)
+                )
             response = client.post(
                 DI_TOKEN_URL,
                 headers=build_native_headers(
@@ -505,10 +512,16 @@ class AuthManager:
             token=token,
         )
 
-    def refresh_it_token_slot(self, slot: NativeTokenSlot) -> NativeTokenSlot:
+    def refresh_it_token_slot(
+        self, slot: NativeTokenSlot, *, client: httpx.Client | None = None
+    ) -> NativeTokenSlot:
         if _refresh_token_expired(slot.token):
             raise GarminAuthError("Native Garmin IT refresh token has expired")
-        with httpx.Client(follow_redirects=True, timeout=self.timeout) as client:
+        with ExitStack() as stack:
+            if client is None:
+                client = stack.enter_context(
+                    httpx.Client(follow_redirects=True, timeout=self.timeout)
+                )
             response = client.post(
                 f"{IT_TOKEN_URL}?grant_type=refresh_token",
                 headers=build_native_headers(
