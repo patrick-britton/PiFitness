@@ -81,4 +81,4 @@ To see only what has changed since your last deploy:
 
 ## Sanitization note
 
-`pifitness_dev` was restored from `prod-sanitized.dump`, which is a snapshot of production with `_migration.api_tokens` and `_migration.spotify_auth_metadata` truncated. Any migration you test locally runs against real-shaped data, but with no live credentials. If a migration touches either of those tables, test the specific statement in isolation rather than relying on the empty-table behavior.
+`pifitness_dev` was restored from `prod-sanitized.dump`, which is a snapshot of production with `api_services.api_tokens` and `api_services.spotify_auth_metadata` truncated. Any migration you test locally runs against real-shaped data, but with no live credentials. If a migration touches either of those tables, test the specific statement in isolation rather than relying on the empty-table behavior.

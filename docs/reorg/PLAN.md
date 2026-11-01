@@ -78,10 +78,11 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-18 | Rename `pirate_garmin_login` -> `garmin_login` + compatibility alias + migration script | `[INT-18]` |
 | INT-18-final | Remove compatibility alias + re-export; local dev DB has 1 api_services row still pointing at old name, reconciled at production merge | `[INT-18-final]` |
 | INT-19 | Delete dead `default_app_dir()` fallback; rename cache subdir `pirate-garmin` -> `garmin`; add intent comment | `[INT-19]` |
+| INT-19b | Move token tables `_migration` -> `api_services`; fix `save_token_to_db`; test-DB guard; persistence tests | `[INT-19b]` |
+| INT-19c | PRD migration artifact + doc refs aligned + local clinerules rewritten (operator) | `[INT-19c]` |
 
 ### Remaining
 
-| INT-19b | Investigate Garmin DB cache: verify `save_token_to_db('Garmin', ...)` writes to `_migration.api_tokens`; reconcile with `load_token_from_db`; if broken, either fix schema/insert or document why file-only persistence is acceptable |
 | Block | Deliverable |
 |---|---|
 | INT-16 | Garmin refresh-path tests (mock HTTP; prove `refresh_di_token_slot` / `refresh_it_token_slot` work without Playwright) |
@@ -117,7 +118,7 @@ This is why login is reliable and does not trip Garmin 429 rate limits.
 
 | Layer | Mechanism | Location | Prevents login when |
 |---|---|---|---|
-| 1. DB session cache | `_migration.api_tokens` via `load_token_from_db` / `save_token_to_db` | `provider.py:166, 194` | Any machine that ever logged in shares session |
+| 1. DB session cache | `api_services.api_tokens` via `load_token_from_db` / `save_token_to_db` | `provider.py:166, 194` | Any machine that ever logged in shares session |
 | 2. HTTP refresh | `AuthManager.ensure_authenticated()` | `auth.py` | DI or IT refresh tokens still valid |
 | 3. In-memory reuse | `get_garmin_client(token_age)` with `<= 300s` | `provider.py:90+` | Recent client in-process |
 
@@ -127,7 +128,7 @@ Fresh Playwright fires only when all three are exhausted - typically when both D
 
 - **`browser_login.py` cannot be deleted.** It is the fresh-login path, not vendored cruft. INT-11 aborted correctly on this basis.
 - **Playwright stays in `pi5_deploy.sh`.** Removing it breaks fresh login on any machine without a cached session.
-- **`_migration.api_tokens` cannot be removed** without an equivalent cross-machine session store.
+- **`api_services.api_tokens` cannot be removed** without an equivalent cross-machine session store.
 - **`pirate-garmin_clone/` is gone.** Deleted at INT-12. Garmin code is first-class under `backend/pifitness/integrations/garmin/`.
 
 ### 4. Verification

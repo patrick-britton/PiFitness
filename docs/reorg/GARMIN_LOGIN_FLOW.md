@@ -5,7 +5,7 @@
 Every Garmin login path runs through the same three-layer protection to
 prevent over-login (Garmin's SSO will 429 after too many auth attempts):
 
-1. **DB session cache** (`_migration.api_tokens`) — cross-process, cross-machine
+1. **DB session cache** (`api_services.api_tokens`) — cross-process, cross-machine
 2. **HTTP token refresh** — pure HTTP, no browser
 3. **In-memory client reuse** (300s window) — process-local
 
@@ -27,7 +27,7 @@ successful login).
 
 ## Session lifecycle
 
-### Layer 1 — DB session cache (`_migration.api_tokens`)
+### Layer 1 — DB session cache (`api_services.api_tokens`)
 
 `garmin_login()` at `provider.py`:
 
@@ -75,3 +75,21 @@ Inside `AuthManager.create_browser_session()` (`auth.py:360`):
 
 **`create_native_session` was misnamed.** The old name said "native" but
 the code uses Playwright. Renamed to `create_browser_session` in INT-17.
+## DB cache population
+
+The `api_services.api_tokens` table is populated by `save_token_to_db`
+after a successful auth flow. `garmin_login()` writes to it after
+`AuthManager.ensure_authenticated()` completes (provider.py:177). This is
+what lets other machines pick up the same session without re-authenticating.
+
+**The INT-13-live test does not populate the DB cache.** The test at
+`tests/test_garmin_login_flow.py::test_real_garmin_login_returns_usable_api_response`
+calls `AuthManager.create_browser_session()` directly, which exercises the
+Playwright login path but bypasses the surrounding `garmin_login()` wrapper
+that performs the DB write. A fresh Garmin session will be absent from
+`api_services.api_tokens` until a production entry point completes.
+
+**Silent-failure contract.** `save_token_to_db` raises `RuntimeError` if the
+underlying `qec` call returns an error list (INT-19b). Before INT-19b the
+failure was silent, which is why an empty token table went unnoticed across
+several blocks.

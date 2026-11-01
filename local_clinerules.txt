@@ -35,7 +35,25 @@ You are a world-class software engineer and data architect specializing in migra
 ## 3. Database-First Computation (PostgreSQL & PostGIS)
 * **Zero Inefficiency:** Minimize Python I/O overhead. All complex transformations, aggregations, spatial track filtering, and segment comparisons must execute within the PostgreSQL layer using native SQL or database stored procedures.
 * **No Rogue Refactoring:** You must never alter existing database schemas, spatial parameters, or custom functions without presenting a detailed Pros vs. Cons list to the user first.
-* **Parallel Migration Schemas:** All new tables, views, and stored procedures created during the migration must reside in schema copies suffixed with `_migration` (e.g., `activities_migration`, `health_migration`). Legacy schemas (`activities`, `health`, `music`, `staging`, etc.) must remain untouched until the user approves a final cleanup.
+- **Database target, not schema target.** Production-write protection comes
+  from the DB you connect to, not the schema you write into. Dev and test
+  work uses `pifitness_dev`; `tests/conftest.py` refuses to run against a
+  non-dev `PG_DB`. Never point an agent session at PRD.
+
+- **Domain-first schema naming.** Every table lives in a schema whose name
+  is the domain it belongs to: `api_services`, `activities`, `health`,
+  `food`, `music`, `segments`, `volleyball`, `tri_tip`. Not `_migration`,
+  `_staging`, `_temp`, `_new`, `_v2`, `_scratch` — those are lifecycle
+  names, not domain names, and they become permanent by accident.
+
+- **Transitional schema copies are domain-scoped and block-scoped.**
+  `activities_migration` is a legitimate pattern for building a new version
+  of `activities`. It must be deleted or promoted to `activities` in the
+  block that completes the migration. It cannot become a permanent home.
+
+- **PRD changes go through `scripts/migration_sql/`.** Any DDL or DML
+  against PRD is committed as an unexecuted artifact and run by the
+  operator at merge time. Agents do not run PRD migrations.
 
 ## 4. Git, Environments, & Execution Guardrails
 * **Git Hands-Off:** You are strictly forbidden from executing `git commit`, `git push`, or modifying the Git staging index. Git management belongs solely to the user.
