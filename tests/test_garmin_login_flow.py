@@ -124,12 +124,12 @@ def test_pirate_garmin_login_saves_session_to_db_after_auth(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Layer 3 — Playwright fires when create_native_session is invoked
+# Layer 3 — Playwright fires when create_browser_session is invoked
 # ---------------------------------------------------------------------------
 
 @pytest.mark.regression
-def test_create_native_session_invokes_playwright_login(tmp_path):
-    """create_native_session calls login_via_browser (the load-bearing fresh-login mechanism)."""
+def test_create_browser_session_invokes_playwright_login(tmp_path):
+    """create_browser_session calls login_via_browser (the load-bearing fresh-login mechanism)."""
     from pifitness.integrations.garmin.browser_login import FreshLoginResult
 
     mgr = AuthManager(
@@ -152,7 +152,7 @@ def test_create_native_session_invokes_playwright_login(tmp_path):
             client_id="fake-it-client",
             token=_fake_oauth2_token("it", int(datetime.now(tz=UTC).timestamp())),
         )
-        session = mgr.create_native_session()
+        session = mgr.create_browser_session()
 
     mock_playwright.assert_called_once()
     assert mock_playwright.call_args.kwargs["username"] == "u@example.com"
@@ -247,7 +247,7 @@ def test_real_garmin_login_returns_usable_api_response():
         timeout=60.0,
     )
 
-    session = mgr.create_native_session()
+    session = mgr.create_browser_session()
     assert isinstance(session, NativeOAuth2Session)
     assert session.di.token.access_token
     assert session.it.token.access_token

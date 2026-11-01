@@ -252,7 +252,7 @@ class AuthManager:
     def ensure_authenticated(self) -> NativeOAuth2Session:
         stored = self.load_native_session()
         if stored is None:
-            session = self.create_native_session()
+            session = self.create_browser_session()
             self.save_native_session(session)
             return session
 
@@ -261,7 +261,7 @@ class AuthManager:
 
         if _token_needs_refresh(session.di.token):
             if _refresh_token_expired(session.di.token):
-                session = self.create_native_session()
+                session = self.create_browser_session()
                 self.save_native_session(session)
                 return session
             session = NativeOAuth2Session(
@@ -287,7 +287,7 @@ class AuthManager:
                 di_slot = session.di
                 if _token_needs_refresh(di_slot.token):
                     if _refresh_token_expired(di_slot.token):
-                        session = self.create_native_session()
+                        session = self.create_browser_session()
                         self.save_native_session(session)
                         return session
                     di_slot = self.refresh_di_token_slot(di_slot)
@@ -312,13 +312,13 @@ class AuthManager:
     def refresh_for_host(self, host: str) -> NativeOAuth2Session:
         session = self.load_native_session()
         if session is None:
-            session = self.create_native_session()
+            session = self.create_browser_session()
             self.save_native_session(session)
             return session
 
         if host == "connectapi":
             if _refresh_token_expired(session.di.token):
-                session = self.create_native_session()
+                session = self.create_browser_session()
             else:
                 session = NativeOAuth2Session(
                     created_at=_utc_now_iso(),
@@ -351,14 +351,14 @@ class AuthManager:
                     ),
                 )
             else:
-                session = self.create_native_session()
+                session = self.create_browser_session()
         else:
             raise GarminAuthError(f"Unsupported host for native auth: {host}")
 
         self.save_native_session(session)
         return session
 
-    def create_native_session(self) -> NativeOAuth2Session:
+    def create_browser_session(self) -> NativeOAuth2Session:
         credentials = self.require_credentials()
         try:
             fresh = login_via_browser(

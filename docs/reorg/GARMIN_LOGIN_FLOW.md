@@ -49,7 +49,7 @@ Inside `AuthManager.ensure_authenticated()` (in `auth.py`):
 - Valid DI access token → return session as-is
 - DI access expired but DI refresh valid → `refresh_di_token_slot()`
 - IT access expired but IT refresh valid → `refresh_it_token_slot()`
-- Both expired → `create_native_session()` (Layer 3)
+- Both expired → `create_browser_session()` (Layer 3)
 
 Both `refresh_di_token_slot` and `refresh_it_token_slot` are pure `httpx`
 POST calls. **No Playwright required as long as refresh tokens are valid.**
@@ -64,7 +64,7 @@ can alert before both are dead.
 
 ### Layer 3 — Fresh Playwright login
 
-Inside `AuthManager.create_native_session()` (`auth.py:360`):
+Inside `AuthManager.create_browser_session()` (`auth.py:360`):
 
 1. `require_credentials()` — raise `MissingCredentialsError` if none
 2. **`login_via_browser(...)`** (Playwright) — submits credentials to
@@ -73,6 +73,5 @@ Inside `AuthManager.create_native_session()` (`auth.py:360`):
 4. HTTP POST to `IT_TOKEN_URL` with DI access token → IT token
 5. Return `NativeOAuth2Session(di, it)`
 
-**`create_native_session` is misnamed.** The name says "native" but the
-code uses Playwright. Rename to `create_browser_session` in Phase B
-(INT-17).
+**`create_native_session` was misnamed.** The old name said "native" but
+the code uses Playwright. Renamed to `create_browser_session` in INT-17.

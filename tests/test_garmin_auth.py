@@ -2,7 +2,7 @@
 Unit tests for Garmin token refresh slots in pifitness.integrations.garmin.auth.
 
 Proves the DI and IT refresh paths work with mocked HTTP transport and without
-touching Playwright, browser login, or create_native_session. Structurally
+touching Playwright, browser login, or create_browser_session. Structurally
 guarantees that refresh does not fall back to fresh login under any condition.
 """
 
@@ -144,14 +144,14 @@ def test_refresh_it_token_slot_raises_on_http_error(tmp_path):
 def test_refresh_paths_have_no_browser_or_session_dependency():
     """
     Structural guarantee: neither refresh_di_token_slot nor refresh_it_token_slot
-    may reference login_via_browser or create_native_session in any way. If a
+    may reference login_via_browser or create_browser_session in any way. If a
     future change adds a browser fallback, this test fails.
     """
     from pifitness.integrations.garmin import auth as auth_mod
 
     src = inspect.getsource(auth_mod)
     tree = ast.parse(src)
-    forbidden = {"login_via_browser", "create_native_session"}
+    forbidden = {"login_via_browser", "create_browser_session"}
     violations = []
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name in (

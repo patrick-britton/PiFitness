@@ -74,13 +74,13 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-13-live | manual Garmin live login test - passed in 17.56s | (manual) |
 | INT-14 | inline `import spotipy` cleanup, stale-note cleanup, canonical `get_auth_status` tests | `25bd50e` |
 | INT-15 | this block - plan close-out | (this commit) |
+| INT-17 | Rename `create_native_session` -> `create_browser_session` | `[INT-17]` |
 
 ### Remaining
 
 | Block | Deliverable |
 |---|---|
 | INT-16 | Garmin refresh-path tests (mock HTTP; prove `refresh_di_token_slot` / `refresh_it_token_slot` work without Playwright) |
-| INT-17 | Rename `create_native_session` -> `create_browser_session` |
 | INT-18 | Rename `pirate_garmin_login` -> `garmin_login`; delete the delegation wrapper at `provider.py:79-87` |
 | INT-19 | Env var + cache dir renames (`PIRATE_GARMIN_APP_DIR` -> `GARMIN_APP_DIR`; `{LOCAL_STORAGE_PATH}/pirate-garmin/` -> `{LOCAL_STORAGE_PATH}/garmin/`) |
 | INT-20 | Scrub remaining `pirate-garmin` mentions in comments/docstrings (including `provider.py:10`) |
@@ -106,7 +106,7 @@ Phase A (INT-0..INT-14) is closed at HEAD `25bd50e`. Each block's evidence is th
 
 ### 1. The actual Garmin login flow
 
-Every fresh Garmin login goes through Playwright. `create_native_session()` (Phase B renames it to `create_browser_session()`) calls `login_via_browser()`. There is no pure-HTTP native path. The "native Android auth" wording in older code and comments is a misnomer.
+Every fresh Garmin login goes through Playwright. `create_browser_session()` (renamed from `create_native_session` in INT-17) calls `login_via_browser()`. There is no pure-HTTP native path. The session returned is an Android-native OAuth2 session (hence `NativeOAuth2Session`), but the creator acquires it via a browser (hence `create_browser_session`). The old "native auth" naming on the creator was a misnomer; the dataclass and loader names remain accurate.
 
 ### 2. Three-layer anti-over-login protection
 
