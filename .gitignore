@@ -282,3 +282,6 @@ docs/reorg/blocks/
 apply_t2b.py
 apply_test_food_search_backend.py
 docs/reorg/blocks/*-report.md
+
+# INT-21: untrack reorg audit artifacts and stale tree dumps
+repo-tree.txt
