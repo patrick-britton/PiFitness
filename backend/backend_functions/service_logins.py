@@ -36,10 +36,6 @@ from pifitness.auth.status import (
     get_auth_status,
 )
 
-def mapbox_token():
-    creds = load_api_credentials('Mapbox')
-    return creds.get('token')
-
 
 def test_login(service_name):
     # Pulls the testable function from database and attempts login

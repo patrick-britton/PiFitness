@@ -46,7 +46,7 @@ from pifitness.activities.queries import (
     reset_match_tables,
     rename_segment,
 )
-from backend_functions.service_logins import mapbox_token
+from pifitness.config.queries import mapbox_token
 from backend_functions.segments_service import json_safe, safe_row, with_reference_window
 
 router = APIRouter(prefix="/api", tags=["segments"])

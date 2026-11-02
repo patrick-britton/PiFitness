@@ -16,7 +16,10 @@ frontend build environment.
 
 from fastapi import APIRouter
 
-from backend_functions.service_logins import mapbox_token
+from pifitness.integrations._common import load_api_credentials
+
+def mapbox_token():
+    return load_api_credentials('Mapbox').get('token')
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
