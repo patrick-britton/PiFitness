@@ -50,19 +50,19 @@ severity = "high"
 
 # ---- Pinned dynamic import targets (PY-010, DYNAMIC_TARGETS.md) ---------------------------
 [[dynamic_import]]
-file = "backend_functions/task_execution.py"
+file = "pifitness/worker/task_execution.py"
 line = 108
 kind = "importlib.import_module"
 note = "Runtime-resolved local task function from task table python_function column"
 
 [[dynamic_import]]
-file = "backend_functions/task_execution.py"
+file = "pifitness/worker/task_execution.py"
 line = 146
 kind = "importlib.import_module"
 note = "Runtime-resolved API service client function from task table api_service_function column"
 
 [[dynamic_import]]
-file = "backend_functions/ultimate_task_executioner_v2.py"
+file = "pifitness/worker/ultimate_task_executioner_v2.py"
 line = 137
 kind = "importlib.import_module"
 note = "Runtime-resolved login function"
@@ -74,7 +74,7 @@ kind = "importlib.import_module"
 note = "JSON extractor function; literal module pifitness.worker.json_extractors"
 
 [[dynamic_import]]
-file = "backend_functions/ultimate_task_executioner_v2.py"
+file = "pifitness/worker/ultimate_task_executioner_v2.py"
 line = 453
 kind = "importlib.import_module"
 note = "Runtime-resolved Python execution function"
