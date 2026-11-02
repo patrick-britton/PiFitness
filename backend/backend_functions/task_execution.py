@@ -9,7 +9,7 @@ from psycopg2.extras import execute_values
 from backend_functions.database_functions import sql_to_dict, qec, con_cur, get_table_row_count
 from backend_functions.helper_functions import get_sync_dates, get_last_date
 from backend_functions.logging_functions import start_timer, log_app_event, elapsed_ms
-from backend_functions.service_logins import sql_rate_limited
+from pifitness.integrations.spotify.provider import sql_rate_limited
 
 
 def task_executioner(force_task_name=None, force_task=False):

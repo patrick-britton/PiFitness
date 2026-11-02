@@ -25,7 +25,6 @@ from backend_functions.service_logins import (
     garmin_login,
     garmin_creds,
     spotify_creds,
-    sql_rate_limited,
     get_service_list,
     test_login,
     get_auth_status,

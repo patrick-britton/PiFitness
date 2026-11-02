@@ -24,7 +24,7 @@ from backend_functions.music_functions import (
     playlist_upload,
     playlist_to_db,
 )
-from backend_functions.service_logins import sql_rate_limited
+from pifitness.integrations.spotify.provider import sql_rate_limited
 from backend_functions.music_service import get_spotify_client_for_music
 from pifitness.music.queries import (
     add_isrc_to_local_playlist,

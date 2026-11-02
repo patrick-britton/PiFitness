@@ -20,7 +20,6 @@ from pifitness.integrations.garmin.provider import (
 from pifitness.integrations.spotify.provider import (
     spotify_creds,
     get_spotify_client,
-    sql_rate_limited,
     log_rate_limitation,
     spotify_rate_limit_detection,
     sp_client,

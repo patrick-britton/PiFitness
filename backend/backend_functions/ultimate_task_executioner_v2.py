@@ -12,7 +12,6 @@ from backend_functions.database_functions import sql_to_dict, qec, con_cur, get_
     get_conn, sql_to_list
 from backend_functions.helper_functions import get_sync_dates, get_last_date
 from backend_functions.logging_functions import start_timer, log_app_event, elapsed_ms
-from backend_functions.service_logins import sql_rate_limited
 from backend_functions.json_extractors import validate_playlist_payload
 
 def ultimate_task_executioner(force_task_name=None, force_task_id=None):

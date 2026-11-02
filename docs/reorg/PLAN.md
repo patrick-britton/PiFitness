@@ -90,7 +90,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-21 | Untrack `.audit/` + `repo-tree.txt`; add to .gitignore; delete from disk | `[INT-21]` |
 | INT-22 | Remove redundant `pifitness-0.1.0` editable install; `_backend_root.pth` alone covers both packages; deploy script already correct (INT-10b) | `[INT-22]` |
 | INT-23 | Retire `check_rate_limit_cached` shim — repoint 2 live callers + drop 1 dead import to `pifitness.integrations.spotify.provider`; roadmap correction: function was never in `service_logins` | `[INT-23]` |
-| INT-24 | Retire `sql_rate_limited` cluster (4 importers) |
+| INT-24 | Retire `sql_rate_limited` shim — 2 live callers repointed, 2 dead imports dropped, service_logins + auth/router shims removed; auth/status already imported from provider | `[INT-24]` |
 | INT-25 | Retire `get_spotify_client` cluster (3 importers) |
 | INT-26 | Retire `load_api_credentials` cluster (3 importers) |
 | INT-27 | Retire `mapbox_token` cluster (2 importers) |
