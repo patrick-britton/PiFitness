@@ -3,11 +3,11 @@
 Current state of the reorg (current-state only, no reorg history).
 
 ## HEAD + branch
-HEAD: cb6a4abd49ed1c0ccb6bbd6080931efbec207427
+Current HEAD: run `git rev-parse HEAD` on branch reorg/02-moves
 Branch: reorg/02-moves
 
 ## Test baseline
-Fast-lane pytest: 223 passed / 17 skipped / 1 deselected (post-INT-36)
+Fast-lane pytest: run `python -m pytest -q -m "not slow"`; expected `~223 passed, 17 skipped, 1 deselected`
 
 ## Load-bearing architecture facts
 - `/health/auth` satisfied via `GET /api/auth/status` at `backend/pifitness/auth/router.py:59-87`
