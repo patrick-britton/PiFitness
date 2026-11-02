@@ -1,6 +1,10 @@
 -- INT-19c: move token tables from _migration to api_services on PRD.
 -- Run at merge time by the operator. NOT executed by agents.
 --
+-- NO ROLLBACK: destructive schema retirement. Reverse via prod-latest.dump
+-- restore per deploy/README.md section "destructive changes." Recreating
+-- _migration would un-retire the schema this migration exists to retire.
+--
 -- Mirrors the dev-DB migration done in INT-19b, with sequence rewire
 -- included inline (LIKE INCLUDING ALL leaves id defaults pointing at
 -- _migration.*_id_seq, which blocks the DROP SCHEMA at the end).
