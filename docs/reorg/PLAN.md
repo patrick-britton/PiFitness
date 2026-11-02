@@ -1,8 +1,8 @@
 # PiFitness Reorg - PLAN.md (v3)
 
-**HEAD:** `25bd50e` (INT-14 complete, 2026-11-01)
+**HEAD:** `c990d6e` (INT-36 complete, 2026-11-02)
 **Rollback point:** `6549d0a` (post-INT-13, pre-INT-14)
-**Baseline:** `183 passed, 15 skipped, 28 deselected` (fast-lane, HEAD 25bd50e)
+**Baseline:** `183 passed, 15 skipped, 28 deselected` (fast-lane, HEAD c990d6e)
 **State:** INT-N Phase A complete (INT-0..INT-14) - Phase B/C/D/E planned (INT-16..INT-29) - INT-15 in progress
 
 This file is the single source of truth for the active INT-N reorg. Section 1.5 holds the current roadmap; section 1.6 holds Phase A close-out. Sections 2-6 are the historical phases-0-6 plan, preserved as record, not as active work. Per-block execution reports live in `docs/reorg/blocks/INT-N-report.md` (gitignored).
@@ -72,7 +72,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-12 | delete `pirate-garmin_clone/`, 15 files, 2941 deletions | `a7cdcd7` |
 | INT-13 | `GARMIN_LOGIN_FLOW.md` + `test_garmin_login_flow.py` + 3 provider fixes | `6549d0a` |
 | INT-13-live | manual Garmin live login test - passed in 17.56s | (manual) |
-| INT-14 | inline `import spotipy` cleanup, stale-note cleanup, canonical `get_auth_status` tests | `25bd50e` |
+| INT-14 | inline `import spotipy` cleanup, stale-note cleanup, canonical `get_auth_status` tests | `c990d6e` |
 | INT-15 | this block - plan close-out | (this commit) |
 | INT-17 | Rename `create_native_session` -> `create_browser_session` | `[INT-17]` |
 | INT-18 | Rename `pirate_garmin_login` -> `garmin_login` + compatibility alias + migration script | `[INT-18]` |
@@ -104,6 +104,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-33 | PRD fail-loud guard for get_settings(): `_get_default_db_host('windows')` raises RuntimeError instead of returning 192.168.86.104; tests/test_no_prd_default.py proves the invariant | `[INT-33]` |
 | INT-34 | Root purpose cleanup: tokens to local_storage/, dumps to .db_restore/, CUTOVER.md to docs/, validate_endpoints.py promoted to tests/test_api_endpoint_contract.py; .gitignore directory ignores; sync-prod-to-dev.ps1 writes to .db_restore/ | `[INT-34]` |
 | INT-35 | Pirate elimination: rename get_pirate_data to get_garmin_data and extract_pirate_universal to extract_garmin_universal, replace pirateGarmin JS identifiers in browser_login.py, add INT35 migration repointing pirate_garmin_login and extract_pirate_universal dispatch values | `[INT-35]` |
+| INT-36 | Docs cleanup: retire NEEDS_ATTENTION.md, refresh PLAN HEAD + Phase B close-out + Phase D/E scope notes, record pending compat shims | `[INT-36]` |
 
 ### Notes carried into Phase B-E
 
@@ -114,7 +115,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 
 ## Section 1.6 - Phase A Close-out (complete)
 
-Phase A (INT-0..INT-14) is closed at HEAD `25bd50e`. Each block's evidence is the raw report at `docs/reorg/blocks/INT-N-report.md`. Three durable facts are recorded here because they prevent a future agent from re-deleting working code:
+Phase A (INT-0..INT-14) is closed at HEAD `c990d6e`. Each block's evidence is the raw report at `docs/reorg/blocks/INT-N-report.md`. Three durable facts are recorded here because they prevent a future agent from re-deleting working code:
 
 ### 1. The actual Garmin login flow
 
@@ -165,6 +166,10 @@ Actual query on the live database (2026-11-01) shows:
 Rick's decision: acceptable to leave this 1 dev-DB row broken until merge to production, at which time it is rewritten. The alias was removed in INT-18-final because a 1-row dev-only deferral does not justify permanent code debt.
 
 Artifact retained: `scripts/migrations/int-18-rename-db-functions.sql` for use at merge time. It includes placeholder table names and must be adapted to the actual schema before running.
+
+### 7. Phase B: COMPLETE
+
+Phase B (INT-15..INT-36) is closed at HEAD `c990d6e`. Summary: "All shim retirements, migration coherence, root cleanup, PRD fail-loud guard, and pirate elimination complete". Date: 2026-11-02.
 
 ## Section 2 - Policy (applies to every task in section 4)
 
@@ -280,7 +285,9 @@ Artifact retained: `scripts/migrations/int-18-rename-db-functions.sql` for use a
 - **3.0.verify, 3.2.verify, 3.3.verify** - probe tasks for the unverified rows in section 1.
 - **3.4** - clean-room check, blocked on 3.api.
 - **4.1-4.4** - frontend flatten + features/ restructure.
+  Scope (not yet spec'd): 4.1-4.4 — frontend flatten + features/ restructure. Requires its own comprehensive discovery block before transforms can be written.
 - **5.1-5.4** - guardrails.
+  Scope (not yet spec'd): 5.1-5.4 — guardrails. Requires its own comprehensive discovery block.
 
 Each will be written in full task format once its predecessor is green. No partial-spec tasks.
 
@@ -306,3 +313,7 @@ After every task-commit:
 Runs after INT-29 (or after `3.finalize` if that phase activates first). Placeholder only - full task spec at that time.
 
 Scope: upgrade `.venv` to 3.15; verify FastAPI/libcst/cryptography; audit `open()` for `encoding=`; update `requires-python`; verify Pi 5 install path; regression test suite.
+
+## Pending compat shims (remove after PRD migration)
+
+- `extract_pirate_universal = extract_garmin_universal` in `backend/backend_functions/json_extractors.py` — added INT-35, remove after `deploy/migrations/INT35__repoint_pirate_dispatchers.sql` runs at PRD
