@@ -22,7 +22,7 @@ deploy/
 
 `INT<id>__<description>.sql`
 
-- `INT<id>` — the INT block tag from `docs/reorg/PLAN.md` (e.g., `INT19b`, `INT25`, `INT31d`)
+- `INT<id>` — the INT block tag from `docs/reorg/archive/PLAN_v2.md` (e.g., `INT19b`, `INT25`, `INT31d`)
 - `__` — double underscore separator
 - `<description>` — short `snake_case` label
 
