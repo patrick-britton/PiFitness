@@ -1,13 +1,7 @@
 """Spotify AuthProvider + implementation.
 
-INT-7b moved the 13-function spotify implementation cluster here from
-backend_functions.service_logins. This inverts the dependency direction:
-service_logins now imports these from provider, not the other way around.
-
-Functions moved: spotify_creds, get_spotify_client, sql_rate_limited,
-check_rate_limit_cached, log_rate_limitation, spotify_rate_limit_detection,
-sp_client, rate_limit_test, get_spotify_token, store_spotify_auth_metadata,
-clear_spotify_cache, get_spotify_token_expiry, insert_client.
+Canonical home for all Spotify integration code: credentials lookup,
+token acquisition and caching, client factory, and rate-limit handling.
 
 The class SpotifyProvider satisfies the AuthProvider protocol in
 pifitness.integrations.base and is validated by

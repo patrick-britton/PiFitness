@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 # Importing `backend.main` triggers `backend.config` to load `.env` (sets
-# KEY_PATH/SECRET_KEY etc.) *before* `service_logins`/`credential_management`
+# KEY_PATH/SECRET_KEY etc.) *before* `credential_management`
 # are imported, matching how the app boots. Importing `backend.api.config`
 # directly first would break because credential_management needs KEY_PATH.
 from backend.main import app

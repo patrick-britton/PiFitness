@@ -1,8 +1,7 @@
 """Shared primitives for provider integrations.
 
-Moved verbatim from backend/backend_functions/service_logins.py in INT-5.
-These helpers are re-exported from service_logins.py so existing importers
-keep working unchanged (shim pattern).
+DB-backed token cache, credential lookup, and cross-device session
+persistence used by every provider module under pifitness.integrations.
 """
 
 import json

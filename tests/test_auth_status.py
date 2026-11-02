@@ -5,8 +5,6 @@ Covers shape, ok / missing_credentials / rate_limited branches for Spotify,
 and the Garmin last_error branch. All DB and credential calls are mocked at
 the pifitness.auth.status namespace (Rule D).
 
-Contract-level coverage of the backend_functions.service_logins shim lives
-in tests/test_service_logins_auth_status.py.
 """
 
 from contextlib import ExitStack
