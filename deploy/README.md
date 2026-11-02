@@ -12,7 +12,9 @@ deploy/
 ├── list-sql.ps1         # review helper (lists files, checks pairing)
 └── migrations/          # production SQL migrations
     ├── INT19b__move_tokens_to_api_services.sql
-    └── INT25__repoint_get_spotify_client.sql
+    ├── INT25__repoint_get_spotify_client.sql
+    ├── INT31d__repoint_garmin_dispatchers.sql
+    └── INT31d__repoint_garmin_dispatchers_rollback.sql
 ```
 
 ## Naming convention

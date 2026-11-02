@@ -3,7 +3,10 @@
 -- to
 --   pifitness.integrations.spotify.provider.get_spotify_client.
 -- Unexecuted in dev; run at production merge (INT-18-live precedent).
--- Dev DB state as of INT-25: 1 api_service_list row, 4 vw_task_info rows.
+-- Dev DB state as of INT-31c: 1 api_service_list row (api_service_function column).
+-- The 4 vw_task_info rows are a projection of the same underlying row through
+-- the view -- updating api_service_list fixes both. See INT-31d for the same
+-- pattern applied to garmin.
 
 UPDATE api_services.api_service_list
 SET api_service_function = 'pifitness.integrations.spotify.provider.get_spotify_client'
