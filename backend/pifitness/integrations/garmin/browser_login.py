@@ -109,7 +109,7 @@ def login_via_browser(
         )
         captured_results: list[dict[str, Any]] = []
         context.expose_binding(
-            "pirateGarminCaptureLogin",
+            "garminCaptureLogin",
             lambda _source, payload: captured_results.append(payload),
         )
         page = context.new_page()
@@ -232,10 +232,10 @@ def _parse_captured_login_result(capture: Any) -> FreshLoginResult:
 def _login_capture_init_script() -> str:
     return """
 (() => {
-  if (window.__pirateGarminLoginHookInstalled) {
+  if (window.__garminLoginHookInstalled) {
     return;
   }
-  window.__pirateGarminLoginHookInstalled = true;
+  window.__garminLoginHookInstalled = true;
 
   const isLoginUrl = (url) => String(url || '').includes('/mobile/api/login');
   const setCapture = (status, url, text) => {
@@ -247,14 +247,14 @@ def _login_capture_init_script() -> str:
         payload = null;
       }
     }
-    window.__pirateGarminLoginCapture = {
+    window.__garminLoginCapture = {
       status,
       url: String(url || ''),
       text: String(text || ''),
       payload,
     };
-    if (typeof window.pirateGarminCaptureLogin === 'function') {
-      void window.pirateGarminCaptureLogin(window.__pirateGarminLoginCapture);
+    if (typeof window.garminCaptureLogin === 'function') {
+      void window.garminCaptureLogin(window.__garminLoginCapture);
     }
   };
 
@@ -269,14 +269,14 @@ def _login_capture_init_script() -> str:
         setCapture(response.status, url, text);
       }
     } catch (error) {
-      window.__pirateGarminLoginCapture = {
+      window.__garminLoginCapture = {
         status: 599,
         url: '',
         text: String(error),
         payload: null,
       };
-      if (typeof window.pirateGarminCaptureLogin === 'function') {
-        void window.pirateGarminCaptureLogin(window.__pirateGarminLoginCapture);
+      if (typeof window.garminCaptureLogin === 'function') {
+        void window.garminCaptureLogin(window.__garminLoginCapture);
       }
     }
     return response;
@@ -286,25 +286,25 @@ def _login_capture_init_script() -> str:
   const originalSend = XMLHttpRequest.prototype.send;
 
   XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-    this.__pirateGarminUrl = String(url || '');
+    this.__garminUrl = String(url || '');
     return originalOpen.call(this, method, url, ...rest);
   };
 
   XMLHttpRequest.prototype.send = function(...args) {
     this.addEventListener('loadend', function() {
       try {
-        if (isLoginUrl(this.__pirateGarminUrl)) {
-          setCapture(this.status, this.__pirateGarminUrl, this.responseText || '');
+        if (isLoginUrl(this.__garminUrl)) {
+          setCapture(this.status, this.__garminUrl, this.responseText || '');
         }
       } catch (error) {
-        window.__pirateGarminLoginCapture = {
+        window.__garminLoginCapture = {
           status: 599,
-          url: this.__pirateGarminUrl || '',
+          url: this.__garminUrl || '',
           text: String(error),
           payload: null,
         };
-        if (typeof window.pirateGarminCaptureLogin === 'function') {
-          void window.pirateGarminCaptureLogin(window.__pirateGarminLoginCapture);
+        if (typeof window.garminCaptureLogin === 'function') {
+          void window.garminCaptureLogin(window.__garminLoginCapture);
         }
       }
     }, { once: true });

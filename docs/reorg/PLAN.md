@@ -103,6 +103,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-31h | Align `deploy/README.md` with reality: fix naming convention (`INTxx__description.sql`, not `NNN-MMM`), update tree to 5 files, document `-- NO ROLLBACK:` marker convention | `[INT-31h]` |
 | INT-33 | PRD fail-loud guard for get_settings(): `_get_default_db_host('windows')` raises RuntimeError instead of returning 192.168.86.104; tests/test_no_prd_default.py proves the invariant | `[INT-33]` |
 | INT-34 | Root purpose cleanup: tokens to local_storage/, dumps to .db_restore/, CUTOVER.md to docs/, validate_endpoints.py promoted to tests/test_api_endpoint_contract.py; .gitignore directory ignores; sync-prod-to-dev.ps1 writes to .db_restore/ | `[INT-34]` |
+| INT-35 | Pirate elimination: rename get_pirate_data to get_garmin_data and extract_pirate_universal to extract_garmin_universal, replace pirateGarmin JS identifiers in browser_login.py, add INT35 migration repointing pirate_garmin_login and extract_pirate_universal dispatch values | `[INT-35]` |
 
 ### Notes carried into Phase B-E
 

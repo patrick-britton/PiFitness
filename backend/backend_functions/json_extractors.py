@@ -467,7 +467,7 @@ def extract_json_isrc_search(client=None, td=None, aid=None):
     return results
 
 
-def get_pirate_data(client, endpoint, path_params=None, query_params=None):
+def get_garmin_data(client, endpoint, path_params=None, query_params=None):
     """Fetch data from Garmin via the vendored integrations.garmin client.
     
     Uses the passed-in GarminClient directly instead of spinning up a
@@ -522,7 +522,7 @@ def gen_activity_list(aid=None):
         return [aid]
 
 
-def extract_pirate_universal(client=None, td=None, aid=None):
+def extract_garmin_universal(client=None, td=None, aid=None):
     """
     A single, metadata-driven orchestrator for all Garmin endpoints.
     """
@@ -582,10 +582,10 @@ def extract_pirate_universal(client=None, td=None, aid=None):
             for i, key in enumerate(query_keys):
                 if i < len(vals): current_query[key] = vals[i]
 
-        # Call get_pirate_data with the authenticated GarminClient
+        # Call get_garmin_data with the authenticated GarminClient
         # The client is passed from extract_load_flatten via the executioner's
         # single login call — no separate auth needed here
-        raw_json, error = get_pirate_data(
+        raw_json, error = get_garmin_data(
             client=client,
             endpoint=endpoint,
             path_params=current_path if current_path else None,
@@ -621,3 +621,8 @@ def extract_pirate_universal(client=None, td=None, aid=None):
             print(f"No JSON returned for {val}")
 
     return all_json
+
+
+# Compat shim for DB dispatch until INT-35 migration script runs at PRD.
+# Remove in a follow-up after migration confirmed.
+extract_pirate_universal = extract_garmin_universal

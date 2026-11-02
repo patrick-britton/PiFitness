@@ -13,7 +13,7 @@ def _noop(*args, **kwargs):
 def _task(**over):
     t = {'task_id': 19, 'task_name': 'Activity Details',
          'api_function_name': 'get_activity_details',
-         'python_extraction_function': 'extract_pirate_universal',
+         'python_extraction_function': 'extract_garmin_universal',
          'loop_strategy': 'activity',
          'api_service_name': 'Garmin'}
     t.update(over)
@@ -22,13 +22,13 @@ def _task(**over):
 
 @pytest.mark.regression
 def test_empty_iterator_raises_no_work(monkeypatch):
-    """extract_pirate_universal raises NoWorkToSync, with a message distinct from
+    """extract_garmin_universal raises NoWorkToSync, with a message distinct from
     API-failure text, when its work queue is empty.
     """
     monkeypatch.setattr(je, 'gen_activity_list', lambda aid=None: [])
     td = _task()
     try:
-        je.extract_pirate_universal(client=object(), td=td)
+        je.extract_garmin_universal(client=object(), td=td)
     except je.NoWorkToSync as e:
         msg = str(e)
     else:
@@ -71,7 +71,7 @@ def test_nonempty_all_failed_still_fails(monkeypatch):
     as one failure carrying the API error and reports the task as failed.
     """
     monkeypatch.setattr(je, 'gen_activity_list', lambda aid=None: [111, 222])
-    monkeypatch.setattr(je, 'get_pirate_data',
+    monkeypatch.setattr(je, 'get_garmin_data',
                         lambda **kw: (None, '401 unauthorized'))
     monkeypatch.setattr('backend_functions.json_extractors.log_app_event', _noop)
     monkeypatch.setattr(ute, 'log_app_event', _noop)
