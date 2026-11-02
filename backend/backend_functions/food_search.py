@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 import httpx
 
-from backend_functions.service_logins import load_api_credentials
+from pifitness.integrations._common import load_api_credentials
 
 logger = logging.getLogger("food_search")
 

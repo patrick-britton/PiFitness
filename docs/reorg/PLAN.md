@@ -92,7 +92,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-23 | Retire `check_rate_limit_cached` shim — repoint 2 live callers + drop 1 dead import to `pifitness.integrations.spotify.provider`; roadmap correction: function was never in `service_logins` | `[INT-23]` |
 | INT-24 | Retire `sql_rate_limited` shim — 2 live callers repointed, 2 dead imports dropped, service_logins + auth/router shims removed; auth/status already imported from provider | `[INT-24]` |
 | INT-25 | Repoint 5 code importers of `get_spotify_client` to `spotify.provider`; migration for 5 DB rows in `.features/migration_scripts/INT25__repoint_get_spotify_client.sql` (unexecuted; INT-18-live precedent); shim kept as compat alias | `[INT-25]` |
-| INT-26 | Retire `load_api_credentials` cluster (3 importers) |
+| INT-26 | Repoint 2 `load_api_credentials` importers to `pifitness.integrations._common` (definition already correct there); 0 DB rows; `service_logins.mapbox_token()` internal use preserved for INT-27 | `[INT-26]` |
 | INT-27 | Retire `mapbox_token` cluster (2 importers) |
 | INT-28 | Delete `service_logins.py` entirely |
 | INT-29 | `pytest.ini` `slow` description; `test_triage.yaml` header; stale comments in `router.py`; INT-T4 retirement note (already retired here, see section 1.6) |
