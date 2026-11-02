@@ -13,7 +13,7 @@ from backend_functions.helper_functions import list_to_dict_by_key
 # Load .env from project root and backend/ subdirectory.
 # load_dotenv() does NOT override already-set environment variables.
 load_dotenv()  # Try CWD (project root) first
-_load_dotenv_backend = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backend', '.env')
+_load_dotenv_backend = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
 if os.path.exists(_load_dotenv_backend):
     load_dotenv(_load_dotenv_backend, override=False)
 

@@ -90,7 +90,7 @@ def get_settings() -> Settings:
         Settings: Fully populated settings dataclass.
     """
     # Try to load .env from backend/ directory
-    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
     if os.path.exists(env_path):
         load_dotenv(env_path)
 
