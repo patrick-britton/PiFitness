@@ -80,8 +80,8 @@ $StagingDb     = 'pifitness_staging'
 
 # Anchor paths to the repo root, regardless of current directory
 $RepoRoot      = Split-Path -Parent $PSScriptRoot
-$LocalDump     = Join-Path $RepoRoot 'prod-latest.dump'
-$SanitizedDump = Join-Path $RepoRoot 'prod-sanitized.dump'
+$LocalDump     = Join-Path $RepoRoot '.db_restore' 'prod-latest.dump'
+$SanitizedDump = Join-Path $RepoRoot '.db_restore' 'prod-sanitized.dump'
 $LogFile       = Join-Path $PSScriptRoot 'sync-prod-to-dev.log'
 
 # ---- Logging ----
