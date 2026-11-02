@@ -39,7 +39,7 @@ from backend_functions.music_functions import (
     playlist_upload,
     playlist_to_db,
 )
-from backend_functions.ultimate_task_executioner_v2 import ultimate_task_executioner
+from pifitness.worker.ultimate_task_executioner_v2 import ultimate_task_executioner
 
 from pifitness.activities.schemas import (
     ProcessActivityRequest,

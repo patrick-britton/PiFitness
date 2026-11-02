@@ -2,8 +2,8 @@
 all fail still fails.
 """
 import pytest
-import backend_functions.json_extractors as je
-import backend_functions.ultimate_task_executioner_v2 as ute
+import pifitness.worker.json_extractors as je
+import pifitness.worker.ultimate_task_executioner_v2 as ute
 
 
 def _noop(*args, **kwargs):
@@ -43,7 +43,7 @@ def test_executioner_reconciles_no_work_as_success(monkeypatch):
     and reports the task as successful.
     """
     monkeypatch.setattr(je, 'gen_activity_list', lambda aid=None: [])
-    monkeypatch.setattr('backend_functions.json_extractors.log_app_event', _noop)
+    monkeypatch.setattr('pifitness.worker.json_extractors.log_app_event', _noop)
     monkeypatch.setattr(ute, 'log_app_event', _noop)
     calls = []
     monkeypatch.setattr(
@@ -73,7 +73,7 @@ def test_nonempty_all_failed_still_fails(monkeypatch):
     monkeypatch.setattr(je, 'gen_activity_list', lambda aid=None: [111, 222])
     monkeypatch.setattr(je, 'get_garmin_data',
                         lambda **kw: (None, '401 unauthorized'))
-    monkeypatch.setattr('backend_functions.json_extractors.log_app_event', _noop)
+    monkeypatch.setattr('pifitness.worker.json_extractors.log_app_event', _noop)
     monkeypatch.setattr(ute, 'log_app_event', _noop)
     calls = []
     monkeypatch.setattr(

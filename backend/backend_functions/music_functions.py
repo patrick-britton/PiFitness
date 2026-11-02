@@ -4,7 +4,7 @@ from backend_functions.database_functions import sql_to_list, elapsed_ms, qec, s
 from backend_functions.logging_functions import log_app_event, start_timer
 from pifitness.integrations.spotify.provider import get_spotify_client
 from pifitness.integrations.spotify.provider import check_rate_limit_cached
-from backend_functions.task_execution import json_loading, task_log
+from pifitness.worker.task_execution import json_loading, task_log
 from datetime import datetime, timedelta, timezone
 import time
 
@@ -85,7 +85,7 @@ def playlist_to_db(client=None, list_id=None):
             # 000-001 AC-8: fail-loud payload validation before staging load.
     # Lazy import to avoid circular dependency (json_extractors imports
     # get_playlist_list from this module at module load time).
-    from backend_functions.json_extractors import validate_playlist_payload
+    from pifitness.worker.json_extractors import validate_playlist_payload
     # Aborts (with log) when the payload is empty, incomplete, or yields a
     # non-22-char playlist id — preventing malformed rows from entering staging.
     td_stub = {'task_id': None, 'task_name': task_name, 'api_function_name': 'playlist_items'}

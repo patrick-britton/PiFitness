@@ -154,7 +154,7 @@ async def execute_task(task_name: str):
         Execution result or error
     """
     try:
-        from backend_functions.task_execution import execute_task_by_name
+        from pifitness.worker.task_execution import execute_task_by_name
         result = execute_task_by_name(task_name)
         return {"status": "ok", "result": result}
     except Exception as e:
@@ -239,7 +239,7 @@ def execute_task_v2_async(task_name: str, request: Optional[TaskExecuteRequest] 
         import threading
         def run_async():
             try:
-                from backend_functions.ultimate_task_executioner_v2 import ultimate_task_executioner
+                from pifitness.worker.ultimate_task_executioner_v2 import ultimate_task_executioner
                 result = ultimate_task_executioner(force_task_name=task_name)
                 
                 # Determine success/failure

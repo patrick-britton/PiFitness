@@ -509,9 +509,9 @@ def test_validate_playlist_payload_empty_aborts():
     """validate_playlist_payload returns False and logs once, without touching the
     database, when the payload is empty.
     """
-    from backend_functions.json_extractors import validate_playlist_payload
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
-            patch('backend_functions.json_extractors.qec') as mock_qec:
+    from pifitness.worker.json_extractors import validate_playlist_payload
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log, \
+            patch('pifitness.worker.json_extractors.qec') as mock_qec:
         result = validate_playlist_payload(None, HEADER_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -523,14 +523,14 @@ def test_validate_playlist_payload_incomplete_paging_aborts():
     """validate_playlist_payload returns False for a page that advertises a next page
     with no successor.
     """
-    from backend_functions.json_extractors import validate_playlist_payload
+    from pifitness.worker.json_extractors import validate_playlist_payload
     truncated_page = {
         'href': NORM0_HREF,
         'next': f"https://api.spotify.com/v1/playlists/{BARE_ID}/tracks?offset=50",
         'items': [{'track': {'id': 't1'}}],
     }
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
-            patch('backend_functions.json_extractors.qec') as mock_qec:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log, \
+            patch('pifitness.worker.json_extractors.qec') as mock_qec:
         result = validate_playlist_payload([truncated_page], DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -543,7 +543,7 @@ def test_validate_playlist_payload_truncated_chain_before_next_playlist_aborts()
     """validate_playlist_payload returns False when a paging chain is cut short by a
     page belonging to another playlist.
     """
-    from backend_functions.json_extractors import validate_playlist_payload
+    from pifitness.worker.json_extractors import validate_playlist_payload
     other_id = '7LPPIzdYgJZgj2QTSXCCNy'
     pages = [
         {'href': NORM0_HREF, 'next': 'offset=50 page',
@@ -551,7 +551,7 @@ def test_validate_playlist_payload_truncated_chain_before_next_playlist_aborts()
         {'href': f"https://api.spotify.com/v1/playlists/{other_id}/tracks?offset=0",
          'items': [{'track': {'id': 't2'}}]},
     ]
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log:
         result = validate_playlist_payload(pages, DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -563,7 +563,7 @@ def test_validate_playlist_payload_complete_paged_chain_passes():
     """validate_playlist_payload returns True for a fully fetched paging chain whose
     intermediate pages still carry next pointers.
     """
-    from backend_functions.json_extractors import validate_playlist_payload
+    from pifitness.worker.json_extractors import validate_playlist_payload
     pages = [
         {'href': NORM0_HREF, 'next': f".../playlists/{BARE_ID}/tracks?offset=50",
          'items': [{'track': {'id': 't1'}}]},
@@ -577,12 +577,12 @@ def test_validate_playlist_payload_malformed_href_id_aborts():
     """validate_playlist_payload returns False and names the offender when a page href
     yields an id that is not a bare 22-character playlist id.
     """
-    from backend_functions.json_extractors import validate_playlist_payload
+    from pifitness.worker.json_extractors import validate_playlist_payload
     bad_page = {
         'href': 'https://api.spotify.com/v1/playlists/abc/playlist/items',
         'items': [{'track': {'id': 't1'}}],
     }
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log:
         result = validate_playlist_payload([bad_page], DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -594,8 +594,8 @@ def test_validate_playlist_payload_detail_missing_href_aborts():
     """validate_playlist_payload returns False for a detail page whose href cannot yield
     a playlist id.
     """
-    from backend_functions.json_extractors import validate_playlist_payload
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+    from pifitness.worker.json_extractors import validate_playlist_payload
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log:
         result = validate_playlist_payload([{'items': [{'track': {'id': 't1'}}]}], DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -607,7 +607,7 @@ def test_validate_playlist_payload_detail_item_ids_are_not_playlist_ids():
     """validate_playlist_payload accepts a detail page whose item ids are not playlist
     ids, such as local files.
     """
-    from backend_functions.json_extractors import validate_playlist_payload
+    from pifitness.worker.json_extractors import validate_playlist_payload
     page = {
         'href': NORM0_HREF,
         'items': [{'id': 'spotify:local:artist:album:track:180', 'track': {'id': 't1'}}],
@@ -620,14 +620,14 @@ def test_validate_playlist_payload_unnormalized_items_href_aborts():
     """validate_playlist_payload returns False for an unnormalized items href that would
     persist a polluted playlist id.
     """
-    from backend_functions.json_extractors import (
+    from pifitness.worker.json_extractors import (
         derive_playlist_id_from_href,
         validate_playlist_payload,
     )
     assert derive_playlist_id_from_href(PAGE1_HREF) == f"{BARE_ID}/items"
     unnormalized_page = {'href': PAGE1_HREF, 'items': [{'track': {'id': 't2'}}]}
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
-            patch('backend_functions.json_extractors.qec') as mock_qec:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log, \
+            patch('pifitness.worker.json_extractors.qec') as mock_qec:
         result = validate_playlist_payload([unnormalized_page], DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -640,13 +640,13 @@ def test_validate_playlist_payload_malformed_item_id_aborts():
     """validate_playlist_payload returns False for a header payload whose item id is not
     a bare 22-character id.
     """
-    from backend_functions.json_extractors import validate_playlist_payload
+    from pifitness.worker.json_extractors import validate_playlist_payload
     bad_page = {
         'href': 'https://api.spotify.com/v1/users/someuser/playlists?offset=0&limit=50',
         'items': [{'id': 'not_22_chars', 'name': 'Bad Playlist'}],
     }
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
-            patch('backend_functions.json_extractors.qec') as mock_qec:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log, \
+            patch('pifitness.worker.json_extractors.qec') as mock_qec:
         result = validate_playlist_payload([bad_page], HEADER_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -659,7 +659,7 @@ def test_validate_playlist_payload_valid_header_payload_passes():
     """validate_playlist_payload returns True for a complete header chain whose item ids
     are 22-character playlist ids.
     """
-    from backend_functions.json_extractors import validate_playlist_payload
+    from pifitness.worker.json_extractors import validate_playlist_payload
     pages = [
         {'href': 'https://api.spotify.com/v1/users/someuser/playlists?offset=0&limit=50',
          'next': 'https://api.spotify.com/v1/users/someuser/playlists?offset=50&limit=50',
@@ -674,9 +674,9 @@ def test_validate_playlist_payload_valid_header_payload_passes():
 @pytest.mark.regression
 def test_validate_playlist_payload_all_pages_empty_aborts():
     """validate_playlist_payload returns False when every page has zero items."""
-    from backend_functions.json_extractors import validate_playlist_payload
+    from pifitness.worker.json_extractors import validate_playlist_payload
     empty_page = {'href': NORM0_HREF, 'items': []}
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log:
         result = validate_playlist_payload([empty_page], DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -688,8 +688,8 @@ def test_validate_playlist_payload_unexpected_type_aborts():
     """validate_playlist_payload returns False instead of raising when given a payload
     that is not a list of pages.
     """
-    from backend_functions.json_extractors import validate_playlist_payload
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+    from pifitness.worker.json_extractors import validate_playlist_payload
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log:
         result = validate_playlist_payload(object(), DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -717,7 +717,7 @@ def test_playlist_details_extractor_normalizes_hrefs_and_passes_guard():
     """extract_json_playlist_details rewrites every page href to the tracks form so the
     derived playlist id is the bare 22-character id and the payload passes validation.
     """
-    from backend_functions.json_extractors import (
+    from pifitness.worker.json_extractors import (
         derive_playlist_id_from_href,
         extract_json_playlist_details,
         validate_playlist_payload,
@@ -726,8 +726,8 @@ def test_playlist_details_extractor_normalizes_hrefs_and_passes_guard():
         {'href': PAGE0_HREF, 'next': 'page1', 'items': [{'track': {'id': 't1'}}]},
         {'href': PAGE1_HREF, 'next': None, 'items': [{'track': {'id': 't2'}}]},
     ]
-    with patch('backend_functions.json_extractors.time.sleep'), \
-            patch('backend_functions.json_extractors.log_app_event'):
+    with patch('pifitness.worker.json_extractors.time.sleep'), \
+            patch('pifitness.worker.json_extractors.log_app_event'):
         payload = extract_json_playlist_details(
             client=_FakeSpotifyClient(pages), list_id=BARE_ID, td=DETAIL_TD
         )
@@ -745,10 +745,10 @@ def test_playlist_details_extractor_no_client_aborts_loudly():
     """extract_json_playlist_details returns an empty list and logs a loud error,
     without listing playlists, when no usable Spotify client exists.
     """
-    from backend_functions.json_extractors import extract_json_playlist_details
-    with patch('backend_functions.json_extractors.get_spotify_client', return_value={}), \
-            patch('backend_functions.json_extractors.log_app_event') as mock_log, \
-            patch('backend_functions.json_extractors.get_playlist_list') as mock_list:
+    from pifitness.worker.json_extractors import extract_json_playlist_details
+    with patch('pifitness.worker.json_extractors.get_spotify_client', return_value={}), \
+            patch('pifitness.worker.json_extractors.log_app_event') as mock_log, \
+            patch('pifitness.worker.json_extractors.get_playlist_list') as mock_list:
         result = extract_json_playlist_details(client=None, list_id=None, td=DETAIL_TD)
     assert result == []
     mock_log.assert_called_once()

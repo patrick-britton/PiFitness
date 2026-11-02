@@ -5,7 +5,7 @@ or client does.
 import pytest
 from unittest.mock import MagicMock
 from pifitness.integrations.garmin.endpoints import resolve_endpoint
-from backend_functions.json_extractors import get_garmin_data
+from pifitness.worker.json_extractors import get_garmin_data
 
 
 @pytest.mark.contract

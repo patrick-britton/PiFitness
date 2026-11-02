@@ -16,7 +16,7 @@ static analysis.
 | 2 | `backend_functions/task_execution.py` | 108 | `importlib.import_module(module_name)` | `task.get("python_function").rsplit('.', 1)` — from task table `python_function` column | Runtime-resolved local task function |
 | 3 | `backend_functions/task_execution.py` | 146 | `importlib.import_module(module_name)` | `raw_api_function.rsplit('.', 1)` — `raw_api_function` from task table `api_service_function` column | Runtime-resolved API service client function |
 | 4 | `backend_functions/ultimate_task_executioner_v2.py` | 137 | `importlib.import_module(module_name)` | `module_function.rsplit('.', 1)` — `module_function` from task execution context | Runtime-resolved login function |
-| 5 | `backend_functions/ultimate_task_executioner_v2.py` | 275 | `importlib.import_module(module_name)` | `module_name = 'backend_functions.json_extractors'` (literal) | JSON extractor function; literal module name |
+| 5 | `pifitness/worker/ultimate_task_executioner_v2.py` | 275 | `importlib.import_module(module_name)` | `module_name = 'pifitness.worker.json_extractors'` (literal) | JSON extractor function; literal module name |
 | 6 | `backend_functions/ultimate_task_executioner_v2.py` | 453 | `importlib.import_module(module_name)` | `module_function.rsplit('.', 1)` — `module_function` from task execution context | Runtime-resolved Python execution function |
 
 ## Pinned modules
@@ -38,9 +38,9 @@ The following `[[dynamic_import]]` entries are pinned in
 | 1 | `backend_functions/service_logins.py` | 720 |
 | 2 | `backend_functions/task_execution.py` | 108 |
 | 3 | `backend_functions/task_execution.py` | 146 |
-| 4 | `backend_functions/ultimate_task_executioner_v2.py` | 137 |
-| 5 | `backend_functions/ultimate_task_executioner_v2.py` | 275 |
-| 6 | `backend_functions/ultimate_task_executioner_v2.py` | 453 |
+| 4 | `pifitness/worker/ultimate_task_executioner_v2.py` | 137 |
+| 5 | `pifitness/worker/ultimate_task_executioner_v2.py` | 275 |
+| 6 | `pifitness/worker/ultimate_task_executioner_v2.py` | 453 |
 
 These modules are targets of dynamic loading and must not be moved or renamed
 without updating this file, `audit.toml`, and every location where the module

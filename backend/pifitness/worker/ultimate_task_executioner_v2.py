@@ -12,7 +12,7 @@ from backend_functions.database_functions import sql_to_dict, qec, con_cur, get_
     get_conn, sql_to_list
 from backend_functions.helper_functions import get_sync_dates, get_last_date
 from backend_functions.logging_functions import start_timer, log_app_event, elapsed_ms
-from backend_functions.json_extractors import validate_playlist_payload
+from pifitness.worker.json_extractors import validate_playlist_payload
 
 def ultimate_task_executioner(force_task_name=None, force_task_id=None):
     """
@@ -267,7 +267,7 @@ def extract_load_flatten(cd, td):
         return error_msg, None
 
     extract_function_name = td.get('python_extraction_function')
-    module_name = 'backend_functions.json_extractors'
+    module_name = 'pifitness.worker.json_extractors'
 
     try:
         module = importlib.import_module(module_name)
@@ -296,7 +296,7 @@ def extract_load_flatten(cd, td):
                           data_event='Extract')
         print(f"Data Extraction Success for Task #{td.get('task_id')}: {td.get('task_name')}")
     except Exception as e:
-        from backend_functions.json_extractors import NoWorkToSync
+        from pifitness.worker.json_extractors import NoWorkToSync
         if isinstance(e, NoWorkToSync):
             # Empty work queue = successful no-op (004-005 OQ-4a / Bug 004-005-6):
             # nothing was requested, so no API calls were attempted and there is
