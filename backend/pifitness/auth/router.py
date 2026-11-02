@@ -19,16 +19,10 @@ from pydantic import BaseModel
 import spotipy
 from typing import Optional, Dict, Any
 
-from backend_functions.service_logins import (
-    get_spotify_token,
-    garmin_login,
-    garmin_creds,
-    spotify_creds,
-    get_service_list,
-    test_login,
-    get_auth_status,
-    save_token_to_db,
-)
+from pifitness.integrations.spotify.provider import get_spotify_token, spotify_creds
+from pifitness.integrations.garmin.provider import garmin_login
+from pifitness.auth.status import get_auth_status
+from pifitness.integrations._common import save_token_to_db
 
 from pifitness.integrations.spotify.provider import get_spotify_client
 from backend_functions.database_functions import sql_to_dict, one_sql_result

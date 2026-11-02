@@ -16,7 +16,7 @@ builds the long-lived OAuth object used by get_spotify_token for refresh flow.
 from dotenv import load_dotenv
 from spotipy import SpotifyOAuth
 
-from backend_functions.service_logins import spotify_creds
+from pifitness.integrations.spotify.provider import spotify_creds
 from pifitness.integrations.base import ProviderAuthError
 from pifitness.integrations.spotify.provider import (
     clear_spotify_cache,

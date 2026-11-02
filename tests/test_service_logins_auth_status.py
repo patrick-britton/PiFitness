@@ -3,7 +3,7 @@ serves.
 """
 
 import pytest
-from backend_functions.service_logins import get_auth_status
+from pifitness.auth.status import get_auth_status
 
 
 def _mock_db_returns(monkeypatch, sql_results):
