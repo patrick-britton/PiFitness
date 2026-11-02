@@ -89,8 +89,8 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-20 | Scrub `pirate-garmin` mentions from live code (11 sites, 6 files + plan row) | `[INT-20]` |
 | INT-21 | Untrack `.audit/` + `repo-tree.txt`; add to .gitignore; delete from disk | `[INT-21]` |
 | INT-22 | Remove redundant `pifitness-0.1.0` editable install; `_backend_root.pth` alone covers both packages; deploy script already correct (INT-10b) | `[INT-22]` |
-| INT-23 | Retire `check_rate_limit_cached` shim — repoint 2 live callers + drop 1 dead import to `pifitness.integrations.spotify.provider`; roadmap correction: function was never in `service_logins` | `[INT-23]` |
-| INT-24 | Retire `sql_rate_limited` shim — 2 live callers repointed, 2 dead imports dropped, service_logins + auth/router shims removed; auth/status already imported from provider | `[INT-24]` |
+| INT-23 | Retire `check_rate_limit_cached` shim â€” repoint 2 live callers + drop 1 dead import to `pifitness.integrations.spotify.provider`; roadmap correction: function was never in `service_logins` | `[INT-23]` |
+| INT-24 | Retire `sql_rate_limited` shim â€” 2 live callers repointed, 2 dead imports dropped, service_logins + auth/router shims removed; auth/status already imported from provider | `[INT-24]` |
 | INT-25 | Repoint 5 code importers of `get_spotify_client` to `spotify.provider`; migration for 5 DB rows in `deploy/migrations/INT25__repoint_get_spotify_client.sql` (view UPDATE removed at INT-31c); shim kept as compat alias | `[INT-25]` |
 | INT-26 | Repoint 2 `load_api_credentials` importers to `pifitness.integrations._common` (definition already correct there); 0 DB rows; `service_logins.mapbox_token()` internal use preserved for INT-27 | `[INT-26]` |
 | INT-27 | Move `mapbox_token` to `config/queries` (canonical home; tests + config/router re-import); delete from `service_logins` | `[INT-27]` |
@@ -99,6 +99,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-31c | Consolidate migrations to `deploy/migrations/`; fix INT-25 (drop non-updatable `vw_task_info` UPDATE); delete stale INT-18 | `[INT-31c]` |
 | INT-31d | Garmin dispatcher migration pair: repoint `get_garmin_client` + `pirate_garmin_login` from deleted `service_logins` to `pifitness.integrations.garmin.provider`; forward + rollback pair in `deploy/migrations/`; INT-25 stale comment fixed | `[INT-31d]` |
 | INT-31e | Create `deploy/list-sql.ps1` (review helper the README promised): lists migration files, checks forward/rollback pairing, `-Since` filter, `-Strict` exit-1 mode | `[INT-31e]` |
+| INT-31f | Write INT25 rollback pair (inverse repoint to `backend_functions.service_logins.get_spotify_client`; restore-only, not code-coherent). Fills `list-sql.ps1` pairing gap for INT25 | `[INT-31f]` |
 
 ### Notes carried into Phase B-E
 
@@ -154,8 +155,8 @@ INT-18-live was **skipped**. The pirate-garmin-report claimed 13 `tasks.vw_task_
 rows + 2 `api_services.api_service_list` rows referenced `pirate_garmin_login`.
 Actual query on the live database (2026-11-01) shows:
 
-- `tasks.task_configuration.python_execution_function` — **0 rows** reference the old name (15 rows total, all N/A or unrelated)
-- `api_services.api_service_list.api_service_function` — **1 row** references `backend_functions.service_logins.pirate_garmin_login`
+- `tasks.task_configuration.python_execution_function` â€” **0 rows** reference the old name (15 rows total, all N/A or unrelated)
+- `api_services.api_service_list.api_service_function` â€” **1 row** references `backend_functions.service_logins.pirate_garmin_login`
 
 Rick's decision: acceptable to leave this 1 dev-DB row broken until merge to production, at which time it is rewritten. The alias was removed in INT-18-final because a 1-row dev-only deferral does not justify permanent code debt.
 
