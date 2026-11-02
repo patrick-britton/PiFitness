@@ -94,7 +94,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-25 | Repoint 5 code importers of `get_spotify_client` to `spotify.provider`; migration for 5 DB rows in `.features/migration_scripts/INT25__repoint_get_spotify_client.sql` (unexecuted; INT-18-live precedent); shim kept as compat alias | `[INT-25]` |
 | INT-26 | Repoint 2 `load_api_credentials` importers to `pifitness.integrations._common` (definition already correct there); 0 DB rows; `service_logins.mapbox_token()` internal use preserved for INT-27 | `[INT-26]` |
 | INT-27 | Move `mapbox_token` to `config/queries` (canonical home; tests + config/router re-import); delete from `service_logins` | `[INT-27]` |
-| INT-28 | Delete `service_logins.py` entirely |
+| INT-28 | Delete `service_logins.py` (28a repointed callers; 28b removed file); 0 DB rows; test-file rename deferred to INT-29 | `[INT-28]` |
 | INT-29 | `pytest.ini` `slow` description; `test_triage.yaml` header; stale comments in `router.py`; INT-T4 retirement note (already retired here, see section 1.6) |
 
 ### Notes carried into Phase B-E
