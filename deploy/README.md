@@ -13,24 +13,25 @@ deploy/
 └── migrations/          # production SQL migrations
     ├── INT19b__move_tokens_to_api_services.sql
     ├── INT25__repoint_get_spotify_client.sql
+    ├── INT25__repoint_get_spotify_client_rollback.sql
     ├── INT31d__repoint_garmin_dispatchers.sql
     └── INT31d__repoint_garmin_dispatchers_rollback.sql
 ```
 
 ## Naming convention
 
-`NNN-MMM_description.sql`
+`INT<id>__<description>.sql`
 
-- `NNN` — feature number (matches `.features/` design docs)
-- `MMM` — sequential migration number within that feature (`001`, `002`, …)
-- `description` — short `snake_case` label
+- `INT<id>` — the INT block tag from `docs/reorg/PLAN.md` (e.g., `INT19b`, `INT25`, `INT31d`)
+- `__` — double underscore separator
+- `<description>` — short `snake_case` label
 
-Rollback files use the same `NNN-MMM` prefix with `rollback` in the description:
+Rollback files append `_rollback` to the description:
 
 | Forward | Rollback |
 |---|---|
-| `009-009_t17_fix_recency_bucket_ranks.sql` | `009-009_t17_rollback_restore_ranks.sql` |
-| `010-005_t02_recipe_box.sql` | `010-005_t02_rollback_recipe_box.sql` |
+| `INT25__repoint_get_spotify_client.sql` | `INT25__repoint_get_spotify_client_rollback.sql` |
+| `INT31d__repoint_garmin_dispatchers.sql` | `INT31d__repoint_garmin_dispatchers_rollback.sql` |
 
 Not every forward change needs a rollback — additive columns you would never remove are fine without one. Destructive changes (dropped columns, renamed tables, truncated data) **must** have a rollback.
 
@@ -44,6 +45,36 @@ Not every forward change needs a rollback — additive columns you would never r
 6. **Never edit a file after it has been applied to production.** If the applied SQL was wrong, write a new file that corrects it. Editing history makes it impossible to reason about what ran.
 
 The "same file, unmodified" rule is the entire point. A modified copy for production defeats the test you just ran in step 2.
+
+## Policy-accepted no-rollback
+
+Some migrations are irreversible by design — notably destructive schema
+retirements where the correct reversal is a `prod-latest.dump` restore, not a
+SQL file. These migrations declare their status inline in the file header:
+
+```
+-- NO ROLLBACK: <one-sentence reason>
+```
+
+The marker must appear in the first 20 lines of the forward migration file.
+`deploy/list-sql.ps1` recognizes it:
+
+- Marked forward files show green as `NO ROLLBACK (policy): <reason>`
+- `-Strict` exits 0 when the only unpaired forwards carry markers
+- An unmarked, unpaired forward still fails `-Strict` (yellow)
+
+When to use the marker:
+
+- **Destructive schema retirement.** Correct reversal is a restore, not a reverse-migration.
+- **One-way data normalization.** Rollback would corrupt data created after the migration.
+
+When NOT to use the marker:
+
+- **Simple repointing** (`UPDATE ... WHERE`). Write a real rollback; it is 5 lines.
+- **Additive schema changes** (`ADD COLUMN`, `CREATE TABLE`). The rollback is a DROP; write it.
+- **Data backfills.** Write a rollback that reverses the backfill, or use `prod-latest.dump` restore.
+
+Current marked migrations: `INT19b__move_tokens_to_api_services.sql`.
 
 ## Applying to production
 

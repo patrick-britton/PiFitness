@@ -100,6 +100,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-31d | Garmin dispatcher migration pair: repoint `get_garmin_client` + `pirate_garmin_login` from deleted `service_logins` to `pifitness.integrations.garmin.provider`; forward + rollback pair in `deploy/migrations/`; INT-25 stale comment fixed | `[INT-31d]` |
 | INT-31e | Create `deploy/list-sql.ps1` (review helper the README promised): lists migration files, checks forward/rollback pairing, `-Since` filter, `-Strict` exit-1 mode | `[INT-31e]` |
 | INT-31f | Write INT25 rollback pair (inverse repoint to `backend_functions.service_logins.get_spotify_client`; restore-only, not code-coherent). Fills `list-sql.ps1` pairing gap for INT25 | `[INT-31f]` |
+| INT-31h | Align `deploy/README.md` with reality: fix naming convention (`INTxx__description.sql`, not `NNN-MMM`), update tree to 5 files, document `-- NO ROLLBACK:` marker convention | `[INT-31h]` |
 
 ### Notes carried into Phase B-E
 
