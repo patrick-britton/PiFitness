@@ -98,6 +98,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-29 | Docs/comments cleanup: `pytest.ini` slow description, `audit.toml` stale dynamic_import entry, 4 stale `service_logins` docstrings/comments, rename `test_service_logins_auth_status.py` -> `test_auth_status_contract.py` | `[INT-29]` |
 | INT-31c | Consolidate migrations to `deploy/migrations/`; fix INT-25 (drop non-updatable `vw_task_info` UPDATE); delete stale INT-18 | `[INT-31c]` |
 | INT-31d | Garmin dispatcher migration pair: repoint `get_garmin_client` + `pirate_garmin_login` from deleted `service_logins` to `pifitness.integrations.garmin.provider`; forward + rollback pair in `deploy/migrations/`; INT-25 stale comment fixed | `[INT-31d]` |
+| INT-31e | Create `deploy/list-sql.ps1` (review helper the README promised): lists migration files, checks forward/rollback pairing, `-Since` filter, `-Strict` exit-1 mode | `[INT-31e]` |
 
 ### Notes carried into Phase B-E
 
