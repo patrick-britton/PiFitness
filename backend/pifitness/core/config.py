@@ -71,11 +71,16 @@ def _get_default_db_host(platform_name: str) -> str:
     """
     Return the sensible default DB host for the given platform.
 
-    On Windows (dev), the database lives on the Pi at a LAN IP.
     On Linux (Pi production), the database is localhost.
+    On Windows (dev), there is no safe default — PG_HOST must be configured
+    via backend/.env or environment variable. Silently falling through to
+    the production IP is a production-safety bug.
     """
     if platform_name == "windows":
-        return "192.168.86.104"
+        raise RuntimeError(
+            "PG_HOST not configured; is backend/.env present? "
+            "Refusing to default to production IP."
+        )
     return "localhost"
 
 
@@ -95,10 +100,13 @@ def get_settings() -> Settings:
         load_dotenv(env_path)
 
     platform_name = _detect_platform()
-    default_host = _get_default_db_host(platform_name)
+
+    pg_host = os.getenv("PG_HOST")
+    if pg_host is None:
+        pg_host = _get_default_db_host(platform_name)
 
     return Settings(
-        db_host=os.getenv("PG_HOST", default_host),
+        db_host=pg_host,
         db_port=int(os.getenv("PG_PORT", "5432")),
         db_name=os.getenv("PG_DB", "personal_fitness"),
         db_user=os.getenv("PG_USER", "devuser"),

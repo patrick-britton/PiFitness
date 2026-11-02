@@ -101,6 +101,7 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-31e | Create `deploy/list-sql.ps1` (review helper the README promised): lists migration files, checks forward/rollback pairing, `-Since` filter, `-Strict` exit-1 mode | `[INT-31e]` |
 | INT-31f | Write INT25 rollback pair (inverse repoint to `backend_functions.service_logins.get_spotify_client`; restore-only, not code-coherent). Fills `list-sql.ps1` pairing gap for INT25 | `[INT-31f]` |
 | INT-31h | Align `deploy/README.md` with reality: fix naming convention (`INTxx__description.sql`, not `NNN-MMM`), update tree to 5 files, document `-- NO ROLLBACK:` marker convention | `[INT-31h]` |
+| INT-33 | PRD fail-loud guard for get_settings(): `_get_default_db_host('windows')` raises RuntimeError instead of returning 192.168.86.104; tests/test_no_prd_default.py proves the invariant | `[INT-33]` |
 
 ### Notes carried into Phase B-E
 
