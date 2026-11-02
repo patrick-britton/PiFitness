@@ -68,10 +68,10 @@ kind = "importlib.import_module"
 note = "Runtime-resolved login function"
 
 [[dynamic_import]]
-file = "backend_functions/ultimate_task_executioner_v2.py"
+file = "pifitness/worker/ultimate_task_executioner_v2.py"
 line = 275
 kind = "importlib.import_module"
-note = "JSON extractor function; literal module backend_functions.json_extractors"
+note = "JSON extractor function; literal module pifitness.worker.json_extractors"
 
 [[dynamic_import]]
 file = "backend_functions/ultimate_task_executioner_v2.py"

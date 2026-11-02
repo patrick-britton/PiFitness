@@ -17,7 +17,8 @@ Fast-lane pytest: run `python -m pytest -q -m "not slow"`; expected `~223 passed
 
 ## Pending compat shims
 - `extract_pirate_universal = extract_garmin_universal` in `backend/backend_functions/json_extractors.py` — remove after `deploy/migrations/INT35__repoint_pirate_dispatchers.sql` runs at PRD
-- `backend_tasks` compat shim at `backend/backend_functions/backend_tasks.py` — re-exports `nightly_maintenance`, `backup_database`, `run_health_checks` from `pifitness.worker.backend_tasks` — remove after all callers import from `pifitness.worker.backend_tasks` directly
+- `backend/backend_functions/backend_tasks.py` shim re-exporting from `pifitness.worker.backend_tasks` — **load-bearing**: 2 DB rows in `tasks.task_config.python_function` still dispatch to `backend_functions.backend_tasks.*` (per INT-38b DB probe). Remove only after `deploy/migrations/INT38__repoint_worker_tasks.sql` runs at PRD.
+- Note: `task_execution` and `ultimate_task_executioner_v2` were also moved but have **zero** DB dispatch rows (verified via `SELECT COUNT(*) FROM tasks.task_config WHERE python_function LIKE '%backend_functions.{module}%'`). No shims or migration updates needed for those modules.
 
 ## Phase D/E status
 Deferred, not spec'd. Historical context archived at `docs/reorg/archive/PLAN_v2.md`.

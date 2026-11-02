@@ -9,7 +9,15 @@
 BEGIN;
 
 UPDATE tasks.task_config
-SET python_function = REPLACE(python_function, 'pifitness.worker.json_extractors', 'backend_functions.json_extractors')
-WHERE python_function LIKE '%pifitness.worker.json_extractors%';
+SET python_function = 'backend_functions.json_extractors'
+WHERE python_function = 'pifitness.worker.json_extractors';
+
+UPDATE tasks.task_config
+SET python_function = 'backend_functions.backend_tasks.backup_database'
+WHERE python_function = 'pifitness.worker.backend_tasks.backup_database';
+
+UPDATE tasks.task_config
+SET python_function = 'backend_functions.backend_tasks.nightly_maintenance'
+WHERE python_function = 'pifitness.worker.backend_tasks.nightly_maintenance';
 
 COMMIT;
