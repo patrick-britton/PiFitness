@@ -5,7 +5,7 @@ quarantined as manual gates.
 import pytest
 
 from backend_functions.database_functions import one_sql_result, sql_to_list
-from backend_functions.service_logins import get_spotify_client
+from pifitness.integrations.spotify.provider import get_spotify_client
 from backend.pifitness.activities.services import verify_spotify
 
 TARGET_PLAYLIST_ID = '7LPPIzdYgJZgj2QTSXCCNy'

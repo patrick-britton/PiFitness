@@ -9,7 +9,7 @@ from backend_functions.database_functions import sql_to_dict, qec, sql_to_list, 
 from backend_functions.helper_functions import get_sync_dates, random_sleep, safe_parse
 from backend_functions.logging_functions import log_app_event
 from backend_functions.music_functions import get_playlist_list
-from backend_functions.service_logins import get_spotify_client
+from pifitness.integrations.spotify.provider import get_spotify_client
 from pifitness.integrations.garmin.endpoints import resolve_endpoint
 
 

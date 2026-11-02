@@ -11,7 +11,7 @@ from backend_functions.database_functions import (
     sql_to_dict,
     sql_to_list,
 )
-from backend_functions.service_logins import get_spotify_client
+from pifitness.integrations.spotify.provider import get_spotify_client
 from pifitness.integrations.spotify.provider import check_rate_limit_cached
 
 
