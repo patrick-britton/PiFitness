@@ -10,7 +10,9 @@ It is **not** a migration framework. There is no tracking table, no automatic ru
 deploy/
 ├── README.md            # this file
 ├── list-sql.ps1         # review helper (lists files, checks pairing)
-└── sql/                 # forward + rollback SQL files
+└── migrations/          # production SQL migrations
+    ├── INT19b__move_tokens_to_api_services.sql
+    └── INT25__repoint_get_spotify_client.sql
 ```
 
 ## Naming convention

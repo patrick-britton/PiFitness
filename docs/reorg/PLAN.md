@@ -91,11 +91,12 @@ The INT-N reorg supersedes the phases-0-6 plan for the current codebase state. B
 | INT-22 | Remove redundant `pifitness-0.1.0` editable install; `_backend_root.pth` alone covers both packages; deploy script already correct (INT-10b) | `[INT-22]` |
 | INT-23 | Retire `check_rate_limit_cached` shim — repoint 2 live callers + drop 1 dead import to `pifitness.integrations.spotify.provider`; roadmap correction: function was never in `service_logins` | `[INT-23]` |
 | INT-24 | Retire `sql_rate_limited` shim — 2 live callers repointed, 2 dead imports dropped, service_logins + auth/router shims removed; auth/status already imported from provider | `[INT-24]` |
-| INT-25 | Repoint 5 code importers of `get_spotify_client` to `spotify.provider`; migration for 5 DB rows in `.features/migration_scripts/INT25__repoint_get_spotify_client.sql` (unexecuted; INT-18-live precedent); shim kept as compat alias | `[INT-25]` |
+| INT-25 | Repoint 5 code importers of `get_spotify_client` to `spotify.provider`; migration for 5 DB rows in `deploy/migrations/INT25__repoint_get_spotify_client.sql` (view UPDATE removed at INT-31c); shim kept as compat alias | `[INT-25]` |
 | INT-26 | Repoint 2 `load_api_credentials` importers to `pifitness.integrations._common` (definition already correct there); 0 DB rows; `service_logins.mapbox_token()` internal use preserved for INT-27 | `[INT-26]` |
 | INT-27 | Move `mapbox_token` to `config/queries` (canonical home; tests + config/router re-import); delete from `service_logins` | `[INT-27]` |
 | INT-28 | Delete `service_logins.py` (28a repointed callers; 28b removed file); 0 DB rows; test-file rename deferred to INT-29 | `[INT-28]` |
 | INT-29 | Docs/comments cleanup: `pytest.ini` slow description, `audit.toml` stale dynamic_import entry, 4 stale `service_logins` docstrings/comments, rename `test_service_logins_auth_status.py` -> `test_auth_status_contract.py` | `[INT-29]` |
+| INT-31c | Consolidate migrations to `deploy/migrations/`; fix INT-25 (drop non-updatable `vw_task_info` UPDATE); delete stale INT-18 | `[INT-31c]` |
 
 ### Notes carried into Phase B-E
 

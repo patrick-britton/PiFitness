@@ -1,4 +1,4 @@
-﻿-- INT-25 production migration: repoint DB dispatch references from
+-- INT-25 production migration: repoint DB dispatch references from
 --   backend_functions.service_logins.get_spotify_client
 -- to
 --   pifitness.integrations.spotify.provider.get_spotify_client.
@@ -9,6 +9,6 @@ UPDATE api_services.api_service_list
 SET api_service_function = 'pifitness.integrations.spotify.provider.get_spotify_client'
 WHERE api_service_function = 'backend_functions.service_logins.get_spotify_client';
 
-UPDATE tasks.vw_task_info
-SET python_login_function = 'pifitness.integrations.spotify.provider.get_spotify_client'
-WHERE python_login_function = 'backend_functions.service_logins.get_spotify_client';
+-- NOTE: tasks.vw_task_info is a complex (non-updatable) view over api_services.api_service_list
+-- and api_services.function_library. Updating api_services.api_service_list.api_service_function
+-- auto-reflects through the view. No UPDATE against the view is required.
