@@ -123,6 +123,16 @@ date | task | model | event | evidence
     $ (Get-Item .clinerules/interim-rules.md).Length
     778
 
+
+2026-11-03 | 1.5.7 | cline | DONE | Built tools/check_docs.py with cites (R2), headings (R3) and index subcommands plus ratchet baselines per Appendix A. Verified: py_compile OK; 'python tools/check_docs.py cites docs/ARCHITECTURE.md docs/REPO_MAP.md' exits 0 (no missing/invalid backticked paths, no factual bullets lacking citations); headings docs/ exits 0 (no duplicate headings); index subcommand runs (reports files not in docs/INDEX.md, pre-existing gaps documented in INDEX 'Not indexed'). Created empty baselines tools/baselines/cites.txt and tools/baselines/headings.txt (0 violations each). No TODO(cite) markers exist in REPO_MAP.md (only the definition on line 14), so nothing to fix there.
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools/check_docs.py cites docs/ARCHITECTURE.md docs/REPO_MAP.md
+    (no output; exit 0)
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe -m py_compile tools/check_docs.py
+    (no output; compile OK)
+    $ git grep -n "TODO(cite)" docs/REPO_MAP.md
+    docs/REPO_MAP.md:14 (definition only)
+
 2026-11-03 | 1.5.3 | cline | START | Create docs/workflow/GIT_MODEL.md; add INDEX rows for GIT_MODEL.md, PLAN.md, PROGRESS.md.
 
 2026-11-03 | 1.5.3 | cline | DONE (deferred verification) | GIT_MODEL.md created; INDEX rows added for GIT_MODEL.md, PLAN.md, PROGRESS.md; check_docs.py not yet built (1.5.7); artifacts produced; awaiting human review and later tool check.
@@ -158,3 +168,4 @@ date | task | model | event | evidence
     $ git grep -n "backlog_phase1" -- . ':!docs/workflow/PLAN.md' ':!docs/workflow/PROGRESS.md'
     (no output — empty)
     Pivot: B27-B31 not appended; D6 (PLAN section 5) reserves B27-B34, IDs continue from B35, file already has B35-B38.
+2026-11-03 | 1.5.7 | cline | START | Build tools/check_docs.py with cites (R2), headings (R3) and index subcommands; baseline per Appendix A; fix TODO(cite) in REPO_MAP
