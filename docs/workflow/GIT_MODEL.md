@@ -23,7 +23,7 @@ Rollback redeploys a `prd-` tag: `git checkout prd-YYYYMMDD` (or `git reset --ha
 
 ## Test flow (D3)
 
-`test-up ` swaps the Pi into test mode against a copy of the PRD database while PRD is stopped and untouched. `test-down` stops the test units, drops the test DB, and restarts PRD from its untouched directory; it is idempotent and safe after a half-finished `test-up`. Merge to `main` and deploy to PRD only after `test-down` succeeds.
+`test-up` swaps the Pi into test mode against a copy of the PRD database while PRD is stopped and untouched. `test-down` stops the test units, drops the test DB, and restarts PRD from its untouched directory; it is idempotent and safe after a half-finished `test-up`. Merge to `main` and deploy to PRD only after `test-down` succeeds.
 
 ## Script source (D16)
 
