@@ -23,7 +23,7 @@ Backend layers:
 - `backend/pifitness/worker/` — background task execution engine (`backend/pifitness/worker/task_execution.py:15-17`; `docs/REPO_MAP.md:73`).
 - `backend/backend_functions/` — legacy shared database/utility layer, e.g. `get_conn` (`backend/backend_functions/database_functions.py:45-62`; `docs/REPO_MAP.md:54`).
 
-Allowed import direction (G1-G6, `docs/REPO_MAP.md:18-23`): a folder may import its own subfolders (G1); every `backend/pifitness/` folder except `core/` may import `core/` (G2); `core/` imports nothing else in the repo (G3); nothing under `backend/` imports `tests/`, `tools/`, `deploy/`, `scripts/` or `agents/` (G4); domain modules never import `worker/` unless their row lists it (G5); `backend/backend_functions/` is legacy — `pifitness/` may import it and it may import only `core/` (G6). Deviations from these rules are recorded in `docs/REPO_MAP.md` "Known deviations" (`docs/REPO_MAP.md:149-156`) and tracked in `.audit/p1/backlog_phase1.md`; they are not restated here.
+Allowed import direction (G1-G6, `docs/REPO_MAP.md:18-23`): a folder may import its own subfolders (G1); every `backend/pifitness/` folder except `core/` may import `core/` (G2); `core/` imports nothing else in the repo (G3); nothing under `backend/` imports `tests/`, `tools/`, `deploy/`, `scripts/` or `agents/` (G4); domain modules never import `worker/` unless their row lists it (G5); `backend/backend_functions/` is legacy — `pifitness/` may import it and it may import only `core/` (G6). Deviations from these rules are recorded in `docs/REPO_MAP.md` "Known deviations" (`docs/REPO_MAP.md:149-156`) and tracked in `docs/workflow/BACKLOG.md`; they are not restated here.
 
 Frontend layers:
 - `src/app` — Next.js App Router pages and layouts (`frontend/pifitness/src/app/layout.tsx`, `frontend/pifitness/src/app/food/page.tsx`) (`docs/REPO_MAP.md:92,118`).
@@ -59,7 +59,7 @@ What runs in the background, based on `.audit/p1/backend.md` "Background work / 
 - Task executor / agents: `pifitness_agent.timer` fires every 30 minutes (`OnCalendar=*:0/30`, `deploy/systemd/pifitness_agent.timer:5`) → `pifitness_agent.service` (oneshot) → `python3 -m agents.background_task_execution` (`deploy/systemd/pifitness_agent.service:13`) → `agents/background_task_execution.py:17-19` runs `pifitness.worker.ultimate_task_executioner_v2.ultimate_task_executioner()`. The timer has `RuntimeMaxSec=28min` (`deploy/systemd/pifitness_agent.service:18`). Trigger: systemd timer; also on demand via `POST /api/admin/tasks/v2/{task_name}/execute`, which spawns a daemon thread running the same executioner (`backend/pifitness/admin/router.py:170-171,238-272`).
 - Hardware health: `pifitness-hw-health.timer` fires hourly (`OnCalendar=hourly`, `deploy/systemd/pifitness-hw-health.timer:5`) → `pifitness-hw-health.service` → `/usr/local/bin/pifitness-hw-health.py` (`deploy/systemd/pifitness-hw-health.service:5`), which captures `vcgencmd get_throttled`, `nvme smart-log`, and disk usage into `/home/god/Documents/PiFitness_Local/hardware_health.json` (`deploy/scripts/pifitness-hw-health.py:30-41`). Trigger: systemd timer, hourly.
 - Inline thread: `POST /api/admin/tasks/v2/{task_name}/execute` starts a daemon thread (`backend/pifitness/admin/router.py:238-272`) that updates `tasks.task_executions` (`:222-228`) as the task runs. Trigger: user request through the API.
-- Note: `deploy_react.sh` installs the auxiliary systemd units from `$SELF_DIR/health` and `$SELF_DIR/agent`, but `deploy/scripts/health/` and `deploy/scripts/agent/` do not exist under `deploy/` (`deploy/scripts/deploy_react.sh:132-152`; directory listing of `deploy/scripts/` shows neither folder) — tracked as backlog item B13 (`.audit/p1/backlog_phase1.md:19`).
+- Note: `deploy_react.sh` installs the auxiliary systemd units from `$SELF_DIR/health` and `$SELF_DIR/agent`, but `deploy/scripts/health/` and `deploy/scripts/agent/` do not exist under `deploy/` (`deploy/scripts/deploy_react.sh:132-152`; directory listing of `deploy/scripts/` shows neither folder) — tracked as backlog item B13 (`docs/workflow/BACKLOG.md:21`).
 
 ## 5. Deployment topology
 
@@ -117,11 +117,11 @@ No change recommendations are made here; the unbounded-read risk is logged as B2
 
 ## 7. Known deviations
 
-Recorded in `docs/REPO_MAP.md` "Known deviations" (`docs/REPO_MAP.md:149-156`); they are not restated here, and each names the backlog item in `.audit/p1/backlog_phase1.md` that fixes it:
-- K1, K2 — `backend/backend_functions/` reverse imports break G6 (backlog B1, `.audit/p1/backlog_phase1.md:7`).
-- K3 — redundant/vestigial folders `scripts/`, `agents/`, `backend/api/`, `.features/descriptions/` (backlog B3, B4, B8, `.audit/p1/backlog_phase1.md:9-11,15`).
-- K4 — empty folders `.features/designs_active/`, `docs/archive/` (backlog B7, `.audit/p1/backlog_phase1.md:14`).
-- K5 — dependency generator shows no imports for `backend/` although `backend/main.py` imports `pifitness.*` (backlog B11, `.audit/p1/backlog_phase1.md:18`).
+Recorded in `docs/REPO_MAP.md` "Known deviations" (`docs/REPO_MAP.md:149-156`); they are not restated here, and each names the backlog item in `docs/workflow/BACKLOG.md` that fixes it:
+- K1, K2 — `backend/backend_functions/` reverse imports break G6 (backlog B1, `docs/workflow/BACKLOG.md:9`).
+- K3 — redundant/vestigial folders `scripts/`, `agents/`, `backend/api/`, `.features/descriptions/` (backlog B3, B4, B8, `docs/workflow/BACKLOG.md:11,13,15`).
+- K4 — empty folders `.features/designs_active/`, `docs/archive/` (backlog B7, `docs/workflow/BACKLOG.md:15`).
+- K5 — dependency generator shows no imports for `backend/` although `backend/main.py` imports `pifitness.*` (backlog B11, `docs/workflow/BACKLOG.md:19`).
 
 ## 8. Unverified, human to confirm
 

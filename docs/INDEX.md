@@ -23,6 +23,7 @@ Statement R3 in `docs/workflow/TARGET_STATE.md`. One home per fact: each row nam
 | `docs/workflow/GIT_MODEL.md` | Human and agent git flow: trunk flow (D1, D2), tag naming (`prd-YYYYMMDD`, `pre-trunk-*`, `failsafe-react-ui`, `archive/*`), `react-ui` frozen as production failsafe (D19), rollback by redeploying a `prd-` tag, test flow (`test-up` / `test-down`, D3), script source (D16). | Trunk and allowlist/denylist — `.clinerules/default-rules.md`; human flow decisions — `docs/workflow/PLAN.md` section 2. | human+agent |
 | `docs/workflow/PLAN.md` | Phase task list (section 6), decisions D1–D19 (section 2), backlog dispositions (section 5), open questions (section 3), appendices A–D. | Human git flow detail — `docs/workflow/GIT_MODEL.md`; rule text — `.clinerules/`. | human |
 | `docs/workflow/PROGRESS.md` | Append-only task event log: START, DONE, BLOCKED, FORCED, REVIEW rows with evidence (Appendix B format). | Task definitions — `docs/workflow/PLAN.md` section 6; decisions — `docs/workflow/PLAN.md` section 2. | human |
+| `docs/workflow/BACKLOG.md` | Phase 1 backlog items B1–B26 and B35–B38 (out-of-scope findings, statement W7); IDs continue from B35 per D6; B27–B34 reserved by PLAN section 5. | Phase task list — `docs/workflow/PLAN.md` section 6; task event log — `docs/workflow/PROGRESS.md`. | human+agent |
 
 ## Not indexed
 

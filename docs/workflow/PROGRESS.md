@@ -148,3 +148,13 @@ date | task | model | event | evidence
      False
 
 2026-11-03 | 1.5.5 | human | REVIEW | Agent backlog rows B27-B30 renumbered to B35-B38 in .audit/p1/backlog_phase1.md (D6: B27-B34 are reserved by PLAN section 5).
+
+2026-11-03 | 1.5.6 | cline | START | Move .audit/p1/backlog_phase1.md to docs/workflow/BACKLOG.md; add Status and Phase columns; fix references in ARCHITECTURE/REPO_MAP/INDEX; stage BACKLOG.md.
+
+2026-11-03 | 1.5.6 | cline | DONE | Moved .audit/p1/backlog_phase1.md (untracked, gitignored, 8052 bytes) to docs/workflow/BACKLOG.md; added Status and Phase columns to all rows (B1-B26, B35-B38); pivot: did not append B27-B31 because D6 reserves B27-B34 and IDs continue from B35; deleted source file from disk; updated ARCHITECTURE.md (7 references), REPO_MAP.md (1 reference), INDEX.md (added BACKLOG.md row); staged BACKLOG.md.
+
+    $ git ls-files docs/workflow/BACKLOG.md
+    docs/workflow/BACKLOG.md
+    $ git grep -n "backlog_phase1" -- . ':!docs/workflow/PLAN.md' ':!docs/workflow/PROGRESS.md'
+    (no output — empty)
+    Pivot: B27-B31 not appended; D6 (PLAN section 5) reserves B27-B34, IDs continue from B35, file already has B35-B38.

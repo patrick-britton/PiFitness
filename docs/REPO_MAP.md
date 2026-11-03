@@ -148,7 +148,7 @@ Folder purposes live here. How the folders work together lives in `docs/ARCHITEC
 
 ## Known deviations
 
-Each deviation names the backlog item in `.audit/p1/backlog_phase1.md` that fixes it. They are recorded here so the map describes the target honestly; they are not fixed in Phase 1.
+Each deviation names the backlog item in `docs/workflow/BACKLOG.md` that fixes it. They are recorded here so the map describes the target honestly; they are not fixed in Phase 1.
 
 - **K1 (B1).** `backend/backend_functions/` imports `backend/pifitness/integrations/`, `backend/pifitness/integrations/spotify/` and `backend/pifitness/worker/`, while those folders import it back. This breaks G6 and creates three mutual dependencies.
 - **K2 (B1).** `pifitness/` importing `backend_functions/` is allowed only as a transition. It ends when the fold-in is done.
