@@ -169,3 +169,16 @@ date | task | model | event | evidence
     (no output — empty)
     Pivot: B27-B31 not appended; D6 (PLAN section 5) reserves B27-B34, IDs continue from B35, file already has B35-B38.
 2026-11-03 | 1.5.7 | cline | START | Build tools/check_docs.py with cites (R2), headings (R3) and index subcommands; baseline per Appendix A; fix TODO(cite) in REPO_MAP
+
+2026-11-03 | 1.5.7 | cline | START | Re-execute: verify tools/check_docs.py implements cites/headings/index per row; run done-when gate
+
+2026-11-03 | 1.5.7 | cline | DONE | Fixed missing `return path, specs` in path_citation() (line 90) so cites subcommand actually validates backticked paths per R2. Verified: 'C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools/check_docs.py cites docs/ARCHITECTURE.md docs/REPO_MAP.md' exits 0 (no missing/invalid backticked paths, no factual bullets lacking citations); headings docs/ exits 0 (no duplicate headings); py_compile OK; index subcommand runs (reports pre-existing not-indexed gaps); No TODO(cite) markers in REPO_MAP.md (only definition on line 14), nothing to fix.
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools/check_docs.py cites docs/ARCHITECTURE.md docs/REPO_MAP.md
+    (no output; exit 0)
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools/check_docs.py headings docs/
+    (no output; exit 0)
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe -m py_compile tools/check_docs.py
+    (no output; compile OK)
+    $ git grep -n \"TODO(cite)\" docs/REPO_MAP.md
+    docs/REPO_MAP.md:14 (definition only)

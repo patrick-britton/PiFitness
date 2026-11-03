@@ -87,6 +87,7 @@ def path_citation(s: str):
         specs = None
     if "." not in Path(path).name:
         return None
+    return path, specs
 
 
 
