@@ -182,3 +182,11 @@ date | task | model | event | evidence
     (no output; compile OK)
     $ git grep -n \"TODO(cite)\" docs/REPO_MAP.md
     docs/REPO_MAP.md:14 (definition only)
+
+2026-11-03 | 1.5.8 | cline | START | Write .audit/reviews/phase-1.5.md reviewer pack from section 8 template; record DONE (human review) in PROGRESS
+2026-11-03 | 1.5.8 | cline | DONE (human review) | Reviewer pack written to .audit/reviews/phase-1.5.md (gitignored, on disk only). Exit criteria copied from Phase 1.5 task rows (1.5.1b-1.5.7); files to attach listed. Independent model review pending; human records REVIEW phase 1.5: PASS | FAIL-fixed | FAIL-backlogged in PROGRESS.
+
+    $ Test-Path .audit/reviews/phase-1.5.md
+    True
+    $ git check-ignore -v .audit/reviews/phase-1.5.md
+    .gitignore:252:.audit/
