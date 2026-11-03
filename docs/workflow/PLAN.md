@@ -1,0 +1,291 @@
+# PiFitness Agentic Workflow: Plan
+
+**Status.** Phase 0 done (`.clinerules/environment.md`). Phase 1 drafted (ARCHITECTURE, REPO_MAP, UI_PRINCIPLES, INDEX, backlog). Phase 1.5 closes it and installs interim rules. Nothing past 1.5 starts until its reviewer pack (section 8) is run. Answers to Q1-Q6 are folded in. Open: the human security steps in 1.5.1 (Appendix D).
+
+---
+
+## 1. How an agent uses this plan
+
+1. You get one task ID. Read only that task's row, the files it lists, and `.clinerules/`. Do not read the rest of this plan.
+2. A task touches at most 3 files and has one verify command. Exception: a script-applied mechanical batch of up to 10 files with a deterministic check.
+3. State lives in files: append one line per task event to `docs/workflow/PROGRESS.md` (format in Appendix B). Never rely on chat memory.
+4. Done = you ran the verify command and pasted its command line and last 20 output lines into `PROGRESS.md`.
+5. Same failure twice with no new information: stop, write a `BLOCKED` line, end the session.
+6. Anything outside the task goes to `.features/backlog.md` as the next ID. Never fix it.
+7. Tasks tagged **[human]** are not for agents. Tasks tagged **[Qn]** wait for that open question (section 3).
+8. Model use: all models run at medium reasoning effort. Long context is available but is no substitute for small tasks.
+
+## 2. Decisions (resolved)
+
+Decisions marked *(planner)* are proposals made while rewriting this plan; they are reversible by the human.
+
+| # | Decision |
+|---|---|
+| D1 | **Trunk.** `main` is the deployable trunk. PRD is whatever commit the Pi runs, recorded by a `prd-YYYYMMDD` tag; it can lag `main` (the Pi checkout still has a `deployment/` folder, and 9 migrations are undeployed). `react-ui` is **frozen** at the last deployed commit as a production failsafe (D19) — not retired, and not mirrored from `main` until a `main`-based deploy succeeds or Phase 5.1 replaces bootstrap's branch fetch. |
+| D2 | **Agents and git.** Agents work on `agent/<task-id>-<slug>` branches cut from `main`, commit locally, and never push, merge, tag or touch `main`. The human reviews `git diff main...HEAD`, optionally runs the branch on the Pi with `test-up` (D3), squash-merges, pushes, tags `prd-YYYYMMDD`, and runs bootstrap. One task branch at a time; the human merges before the next starts. Allowlist and denylist live only in `.clinerules/default-rules.md`; the human flow lives only in `docs/workflow/GIT_MODEL.md`. *(planner)* |
+| D3 | **Test on the Pi is a swap, not a parallel stack.** Human-run `test-up <ref>`: refuses if the TEST and PRD DB names match; records the running PRD commit; dumps PRD to `DB_Backups`; stops the PRD services and both timers; creates `pifitness_test` from the stopped PRD DB (`CREATE DATABASE ... TEMPLATE`, fallback `pg_dump`/`pg_restore` with the TimescaleDB pre/post-restore calls); applies pending migrations to it; checks the ref out into a separate directory (`~/PiFitness-test`, own build and venv); starts test units on the same ports (nginx and the HTTPS name are unchanged, so PWA install is testable). `test-down` stops the test units, drops the test DB, and restarts PRD from its untouched directory, so restore needs no checkout or rebuild; it is idempotent and safe after a half-finished `test-up`. PRD data is never written while testing, and test units `Conflicts=` the PRD units so systemd cannot run both. Merge to `main` and deploy to PRD only after `test-down`. *(planner, from your Q3 answer)* |
+| D4 | **Migrations.** `deploy/migrations/` is the single home. Tool: dbmate, subject to the 3.1 spike (Windows dev plus Pi arm64, `transaction:false` for TimescaleDB continuous aggregates, baseline marking, its own schema dump disabled so `schema.generated.md` stays the only schema map). Fallback: Alembic with raw SQL. The 9 existing files in `deploy/migrations/` are not legacy: none has reached PRD, so after renaming to dbmate versions (order confirmed by the human, `-- migrate:up/down` headers) they are the first pending migrations and the payload of the first test deployment (5.6). The baseline is the current PRD schema, before them. Migrations are additive and backward compatible with the last released code (expand/contract), so rolling back code needs no DB restore. DEV applies via tool; PRD applied by the human after a `pg_dump`. *(planner)* |
+| D5 | **One home per kind.** Executables live in `tools/`; `.features/` holds data only. `fd.py` moves to `tools/workflow/fd.py` at task 4.0. |
+| D6 | **Backlog home** is `.features/backlog.md` (data, human+agent, append-only, IDs continue from B35). Not under `.audit/`, which is generated evidence only. |
+| D7 | **Ratchet, not rewrite.** V1, V3 and V4 pass against recorded baselines in `tools/baselines/`; only new violations fail; baselines only shrink (Appendix A). The comment-ID strip is the last Phase 2 step. |
+| D8 | **DEV safety (revised E1).** A host check cannot tell DEV from PRD (both are local). Use two layers: (a) `.env` is the only config source and the DEV `.env` only ever names the DEV database; (b) a database-level marker enforces it: `ALTER DATABASE <dev> SET pifitness.env = 'dev'`, stamped by dev reset and by the PRD-to-DEV refresh (a template clone and a restore do not carry it); the Pi test DB gets `'test'`, stamped by `test-up`, and `test-down` refuses to drop any database whose marker is not `test`. Tools (verify smoke, integration tests, reset, migrate, schema gen) refuse to run unless the marker is `dev`. The backend refuses to start when `APP_ENV=dev` and the marker is not `dev`, or when `APP_ENV` is `prod` or unset and the marker is `dev` or `test` (`APP_ENV=test` needs marker `test`). The Pi needs no change: unset means prod and PRD has no marker. Network reality: Postgres on the Pi listens on all interfaces and `pg_hba.conf` admits the whole LAN (B27), so the marker protects the tools only; closing that is B27. *(planner)* |
+| D9 | **Adopt, don't build.** import-linter (G1-G6), vulture (dead Python), knip (dead TypeScript), pytest markers (test classes), dbmate (migrations), shellcheck (deploy scripts), tbls or equivalent (schema map and comment coverage; 3.2 spike, fallback a short script). **Custom, small:** `tools/check_docs.py` (cites, duplicate headings, INDEX rows), folder-map check in `repo_health`, `tools/lint_comments.py`, SQL smell greps, and the workflow tool `fd.py`. |
+| D10 | **Legacy deletion.** A folder is deleted immediately once `git grep` (and for deploy-related folders `deploy/systemd/`, cron and the Pi, Q2) shows no references. History stays in git. No `archive/` or `legacy/` folders. |
+| D11 | **Reviewer step per phase.** The last task of each phase produces a reviewer pack (section 8) for an independent model. A phase is closed only when its failures are fixed or backlogged. |
+| D12 | **Forced closes.** `fd.py` cannot truly make force human-only (the agent runs as the same OS user). Forced closes are logged as `FORCED`, printed by `verify`, and listed in every reviewer pack. |
+| D13 | **No tests on the Pi at deploy.** The gate runs on the dev machine before merge; the Pi runs the post-deploy checklist (read-only smoke). Phase 5 removes the test step from `deploy_react.sh` full mode. *(planner)* |
+| D14 | **Citation form.** `path` or `path:line-line`. `check_docs.py cites` verifies the path exists and any line range is inside the file. Line drift is accepted; prefer `path` plus a symbol name in new text. |
+| D16 | **Script source.** One source: the ref being deployed. `origin` has `deployment_script`, `main`, `react-ui`, `reorg` and `streamlit-prd`; it has no `deploy_merge`, although `bootstrap.sh` at HEAD names it (B32). The Pi keeps a stub of about 30 lines, rarely changed, that fetches the ref and runs `deploy/scripts/deploy.sh` from it. `test-up` therefore runs the scripts of the branch under test, and rollback to a `prd-` tag uses the scripts that tag shipped with. `deployment_script` is deleted only after the stub is live (5.1), because the Pi's current bootstrap most likely fetches from it. *(planner, replaces Q1)* |
+| D17 | **Test mode and integrations.** `INT19b__move_tokens_to_api_services` appears to move API tokens into the database, so assume the PRD copy holds them. A refresh-token rotation in the test instance could invalidate PRD's tokens. Test mode therefore disables Garmin and Spotify calls and keeps the agent and hw-health timers off. Enabling integrations in a test run is a human decision per run. *(planner)* |
+| D18 | **Package hygiene.** Deploy syncs the Pi venv to the runtime requirements (pip-tools `pip-sync` or `uv pip sync`; spike in 5.2; keep the editable `pifitness` install), so anything not listed is uninstalled and the removals are printed. Requirements are split into runtime and dev. First removals: streamlit, pytest, pytest-asyncio, pathlib, and httpx2 unless code imports it. *(from your answer)* |
+| D15 | Kept from v1: evolve `fd.py`; Chrome PWA first, APK later; human acceptance via generated UAT page; module-by-module stabilization sweep instead of ad hoc bug fixes; workflow targets the weakest likely model. |
+| D19 | **`react-ui` frozen as production failsafe.** Until a `main`-based deploy succeeds on the Pi and `test-up` (Phase 5.5) exists, `origin/react-ui` stays at the last deployed commit (`d19c5898a4389783f8a3bfcddef8cbe9be81e680`, tagged `failsafe-react-ui`) and is not fast-forwarded to `main`. Bootstrap and `deploy_react.sh` still fetch it, so an accidental bootstrap is a no-op redeploy of the current PRD, not a jump to untested code. `main` remains the trunk (D1). To deploy a `main`-based release before 5.1, the human first runs `git push origin main:react-ui`; from 5.1 onward bootstrap fetches the ref being deployed (D16) and the freeze ends naturally. Current PRD is recorded as `prd-YYYYMMDD`. *(human, 2026-11-03)* |
+
+## 3. Open questions
+
+No open questions. The human steps in 1.5.1 are tasks, not questions.
+
+## 4. Ratchet and baseline rules (summary; full spec Appendix A)
+
+Checks emit stable keys (`check|path|rule|hash`, no line numbers). Baselines: `tools/baselines/<check>.txt`. Gate fails on keys not in the baseline; warns on baseline keys that no longer occur. `--update-baseline` may remove keys only; growing a baseline needs `--allow-grow`, human only. Quarantined tests go in `tools/baselines/tests_quarantine.txt` and are deselected and counted. `verify` prints each baseline's size so the trend is visible.
+
+## 5. Backlog dispositions (input to task 1.5.4; delete this section afterwards)
+
+| ID | Disposition |
+|---|---|
+| B1 | Phase 8 roadmap pilot. Needs the gate and characterization tests first. |
+| B2 | Closed by D4. The 9 files stay (Q4) and are renamed in 3.1. |
+| B3, B6, B8 | Delete in 1.5.5 after `git grep` shows no references (scripts/, `frontend/pifitness/*.out` plus `.gitignore`, `backend/api/`). |
+| B4 | Phase 5. Grep systemd, cron and `deploy/scripts/` first; consider renaming. |
+| B5, B14, B15 | Closed by 1.5.5 (delete `.features/descriptions/`) and the REPO_MAP fix. One defect, not three findings. |
+| B7 | Closed by 1.5.5 (delete empty folders; recreate with content if a tool needs them). |
+| B9 | Phase 2.6 (vulture and the dead-file check find it). |
+| B10 | Closed by D5. |
+| B11 | Superseded by import-linter (2.5). |
+| B12 | Closed; W9 exists in TARGET_STATE. |
+| B13 | Human check at HEAD: `git grep -n "health\|agent" deploy/scripts/deploy_react.sh` against the folders it expects; fix Phase 5. |
+| B16, B17, B18 | Phase 5 (B16 via D16). B17: collapse five blocks with Pi rollback steps. B18: delete with the branch-choice rewrite. |
+| B19 | The PRD venv has `httpx2 2.5.0` (identified by the human as the Pydantic Services fork of httpx; its SSE-parser advisory is noted, and the human accepts it for a personal app), `pathlib 1.0.1`, `streamlit 1.58.0`, `pytest` and `pytest-asyncio`; `setup.py` lists pytest as a runtime requirement. Decision: `git grep -n httpx2` decides it; keep and pin a patched version only if code imports it, otherwise remove. Package hygiene is a deploy feature (D18). `pathlib` on PyPI is dead weight on Python 3.13. Clean up in 2.6 and 5.2. |
+| B20 | Measure in 3.7; fix in Phase 8. |
+| B21, B22 | Phase 5 (B22 with B4). |
+| B23 | Phase 8, probably one global `:active` style. |
+| B24 + B25 | Phase 8 together: shared BottomSheet owning back-gesture handling. Medium or Large, not Small. |
+| B26 | Phase 8 PWA pilot (E5). |
+| B27 | Postgres on the Pi: `listen_addresses = '*'`, `pg_hba.conf` admits `192.168.86.0/24` with password auth, no host firewall (`ufw` not installed). Port 5432 is closed from outside (canyouseeme.org), so exposure is LAN-only. The human connects with DataGrip over the LAN; move DataGrip to an SSH tunnel, then bind to `localhost` and drop the LAN line (Appendix D walkthrough). Human, now. |
+| B28 | uvicorn binds `0.0.0.0:8000` though nginx proxies to `127.0.0.1`; bind loopback unless LAN access is wanted. Phase 5. |
+| B29 | Installed `pifitness-fastapi.service` has duplicate `ReadWritePaths`, a drop-in `override.conf`, and `EnvironmentFile=/home/god/PiFitness/.env`; reconcile with the repo unit so one file is the truth. Phase 5. |
+| B30 | Mostly closed: the unit and `deployment/deploy_react.sh` and `bootstrap.sh` on the Pi all use `/home/god/PiFitness/venv`. `~/venv` and `~/venvs/pifitness-react-backend` look unreferenced; the human deletes them once `grep -rn venvs /etc/systemd ~/.pm2 /etc/cron*` is empty. At HEAD, confirm with `git grep -n VENV_DIR deploy/`. |
+| B31 | Closed: the human confirmed no tokens are committed to git. |
+| B32 | `bootstrap.sh` at HEAD names `deploy_merge`, which does not exist on `origin`; it would fail on first use. Fixed by 5.1. |
+| B33 | `frontend/pifitness/next-env.d.ts` shows as modified on the Pi (generated by the build); ignore or commit it so `git pull` stays clean. Phase 5. |
+| B34 | Stale remote branches `streamlit-prd` and `reorg`: tag as `archive/<name>`, then delete (1.5.1b). `deployment_script` waits for 5.1. |
+
+## 6. Phases
+
+Order: 1.5, then 2; 3 and 4 in parallel after 2.4; 5.1-5.4 can run alongside 2 to 4, 5.5-5.7 need 3.1; then 6, 7, 8, 9. Each phase ends with a reviewer-pack task.
+
+### Phase 1.5: Close Phase 1 and install interim rules
+
+| ID | Task | Files | Done when |
+|---|---|---|---|
+| 1.5.0a | **[human]** Commit DEV working tree to `reorg` before tagging. `git switch reorg`; confirm `git stash list` shows `stash@{0}: On reorg: wip pre-1.5.0`; `git stash pop`; `git status --short` (expect the Phase 1 files from the stash); `git add -A`; `git commit -m "Phase 1 drafts; retire docs/reorg and stale audit script"`; `git status --short` (must be empty). Resolve conflicts manually only if the pop reports them; otherwise stop and ask. | git | `git status --short` empty; `git rev-parse reorg` is a new tip (was `03086c62a3b16b381487bea42add3de4b3f27d93`); `docs/ARCHITECTURE.md`, `docs/REPO_MAP.md`, `docs/INDEX.md`, `docs/UI_PRINCIPLES.md` and `docs/workflow/` are in the commit |
+| 1.5.0 | **[human]** Tag and set trunk (D19: `react-ui` frozen). On the Pi: `cd ~/PiFitness && git rev-parse HEAD` — currently `d19c5898a4389783f8a3bfcddef8cbe9be81e680`. On DEV: `git tag prd-YYYYMMDD d19c5898a4389783f8a3bfcddef8cbe9be81e680` (current PRD per D1; substitute today's date, e.g. `prd-20261103`); `git tag pre-trunk-main main`, `git tag pre-trunk-origin-react-ui origin/react-ui`, `git tag pre-trunk-reorg 03086c62a3b16b381487bea42add3de4b3f27d93`, `git tag failsafe-react-ui origin/react-ui`; `git switch main`; `git merge --ff-only reorg`; `git push origin --tags`; `git push origin main`. **Do not push `reorg:react-ui`** — the freeze is deliberate (D19). | git | `git rev-parse main origin/main` prints the same hash (= post-`1.5.0a` reorg tip); `git rev-parse origin/react-ui` unchanged at `d19c5898a4389783f8a3bfcddef8cbe9be81e680`; `prd-YYYYMMDD` exists on origin and equals the Pi's HEAD |
+| 1.5.1 | **[human]** Security steps from Appendix D, in order: (a) Postgres: DataGrip over an SSH tunnel first, then bind to `localhost` and drop the LAN `pg_hba` line (B27); (b) run `git grep -nE "httpx2" -- '*.py' '*.txt'` and record whether anything imports it (B19). | none | `sudo ss -ltnp \| grep 5432` shows 127.0.0.1 only; app and DataGrip still work |
+| 1.5.1b | **[human, after 1.5.0]** Prune branches (B34): `git branch -r --merged origin/main`, then for `reorg` and `streamlit-prd`: `git tag archive/<name> origin/<name>`, `git push origin archive/<name> :<name>`. Leave `deployment_script` until 5.1. | git | `git ls-remote --heads origin` lists only main, react-ui, deployment_script |
+| 1.5.2 | Create `.clinerules/interim-rules.md` from Appendix C. Replace the "no git commands" line in `.clinerules/default-rules.md` with the D2 allowlist and denylist. | 2 | `git diff --stat` shows only those two files; interim file is 1 KB or less |
+| 1.5.3 | Write `docs/workflow/GIT_MODEL.md` (one page: D1 and D2 flow, tag naming, interim `react-ui` mirror, rollback by redeploying a `prd-` tag, the D3 swap from `test-up` through `test-down` to merge and deploy). Add INDEX rows for it, `PLAN.md` and `PROGRESS.md`. | 2 | `python tools/check_docs.py index` once it exists (1.5.7); until then human review |
+| 1.5.4 | **[human]** Move this plan to `docs/workflow/PLAN.md`; create `docs/workflow/PROGRESS.md` with the Appendix B header. | 2 | files exist |
+| 1.5.5 | Delete legacy per D10, one folder per sub-step, each with its `git grep` output in PROGRESS: `.features/description_draft/`, `.features/descriptions/`, empty folders (`.features/designs_active/`, `.features/designs_complete/`, `docs/archive/`, `.clinerules/hooks/`), `frontend/pifitness/*.out` plus a `.gitignore` pattern, `backend/api/`, `scripts/`, `docs/reorg/` and `.features/zz_workfow_archive/` (human confirmed; if still present). Remove their rows and references from REPO_MAP, INDEX and ARCHITECTURE. | batches of 3 | `git grep -n "<name>"` empty; folder gone |
+| 1.5.5b | Scrub, do not delete, the legacy skills and workflows: `git grep -nE "\.features/(migrations|tools|description)|description_draft|zz_workfow|docs/reorg" .agents .clinerules`; fix or remove dead references and any rule that contradicts D2 (git) or D4 (migrations path). | 3 | grep empty |
+| 1.5.6 | Move `.audit/p1/backlog_phase1.md` to `.features/backlog.md`; add `Status` and `Phase` columns; apply section 5 and append B27-B31; fix references (`git grep -n "backlog_phase1"`). Update REPO_MAP and INDEX rows. | 3 | `git grep -n "backlog_phase1"` empty |
+| 1.5.7 | Build `tools/check_docs.py` with subcommands `cites` (R2: backticked paths exist, line ranges valid, factual bullets carry a path), `headings` (duplicate-heading scan, R3) and `index` (one INDEX row per file in `docs/` and `.clinerules/`). Baseline with the ratchet rules (use the Appendix A format by hand until `tools/ratchet.py` exists in 2.1). Fix every `TODO(cite)` in REPO_MAP. | 3 | `python tools/check_docs.py cites docs/ARCHITECTURE.md docs/REPO_MAP.md` exits 0 |
+| 1.5.8 | Reviewer pack for Phase 1.5 (section 8). Human runs it on an independent model. | pack | review recorded in PROGRESS |
+
+### Phase 2: Verify gate, repo health, DEV reset
+
+| ID | Task | Files | Done when |
+|---|---|---|---|
+| 2.1 | `tools/ratchet.py` (compare, prune, shrink-only update) per Appendix A; add a `tools/baselines/` row to REPO_MAP. | 2 | its own tests pass; a planted new key fails, a removed key warns |
+| 2.2 | `tools/lint_comments.py`: flags feature, bug and task IDs and change-history comments (V3). Baseline it. | 2 | `python tools/lint_comments.py` exits 0 against baseline |
+| 2.3 | `tools/verify.py` skeleton. Scopes: `backend`, `frontend`, `docs`, `deploy`, `db`, `all`. Steps in cost order, stop at first failure: compile, tsc, lint, shellcheck, comment lint, pytest, vitest, API smoke against DEV. Use the working commands in `.clinerules/environment.md`. Each step uses ratchet baselines. Ends with `VERIFY <scope> exit=<n>` and prints `FORCED` count and baseline sizes. Fix the `.env` path problem and root-page issues here only if they block a step; otherwise quarantine and backlog. | 3 | `python tools/verify.py --scope all` exits 0 on the current red baseline |
+| 2.4 | **DEV safety and reset (moved from v1 Phase 5).** (a) Marker and guard per D8 in `backend/pifitness/core/` plus a shared tool guard; extend `tests/test_no_prd_default.py`. (b) Template database and `tools/db/dev_reset.py` (drop DEV, `CREATE DATABASE ... TEMPLATE`, stamp marker; later also replay migrations, 3.6). Spike first: confirm TimescaleDB survives a template clone and measure reset time. (c) Human patches `tools/db/sync-prod-to-dev.ps1` to re-snapshot the template and re-stamp the marker. | 3 per sub-step | guard tests pass; `dev_reset.py` then `verify --scope db` exits 0; reset time recorded |
+| 2.5 | `tools/repo_health.py`. (a) Folder-vs-REPO_MAP check (R1) plus import-linter contracts for G1-G6, with K1 imports listed as `ignore_imports` (this replaces the broken generator, B11). (b) vulture, knip and deptry (unused and missing Python dependencies), baselined. (c) SQL smell greps: `SELECT *`, unbounded queries, OFFSET, pandas in `backend/pifitness/`, baselined. N+1 is not statically detectable; it is a review item, not a script check. | 3 per sub-step | `python tools/repo_health.py` exits 0 against baselines |
+| 2.6 | Red-baseline triage. First task: record counts (tsc errors, failing tests, vulture hits) in PROGRESS. Then one small task per cluster, 3 files max, each shrinking a baseline: B9, B19 cleanup (split runtime and dev requirements; declare runtime dependencies in one place, not both `setup.py` and the requirements file), pre-existing tsc errors, failing tests. | 3 each | the named baseline shrank; verify exits 0 |
+| 2.7 | Test classification. Register markers `invariant`, `contract`, `smoke`, `journey` in `pytest.ini` with `--strict-markers`. Classify in batches of 15 tests into `tests/manifest.tsv` (test, class, Keep/Quarantine/Delete, one-line reason); script applies it. Rules for new tests: purpose docstring, no mocking the unit under test, no IDs. | 3 per batch | `pytest --collect-only -q` shows every test with a class marker |
+| 2.8 | Comment sweep, last. Tier A: `lint_comments.py --fix-tier-a` deletes comments that consist only of an ID or history note. Tier B: agent rewrites mixed comments in batches of at most 10 files to say what and how. Baseline shrinks each batch. | 10 per batch | `lint_comments` baseline reaches 0 |
+| 2.9 | Exit check and reviewer pack. | pack | `python tools/dev_reset.py` then `python tools/verify.py --scope all` exits 0; review recorded |
+
+### Phase 3: Data layer
+
+| ID | Task | Files | Done when |
+|---|---|---|---|
+| 3.1 | Migration spike and baseline (D4). (a) Inventory the 9 files in `deploy/migrations/`: apply order from names and `git log`, dependencies between them, which are already applied to DEV (schema diff); human confirms the order. (b) Rename to dbmate versions with up/down headers; SQL unchanged. (c) `tools/db/migrate.*`; baseline version = current PRD schema, recorded on DEV; human records it on PRD. DEV is rebuilt from a fresh PRD copy and the 9 replayed, never patched in place. | 3 per step | status shows baseline applied and 9 pending; replay on a fresh DEV copy succeeds |
+| 3.2 | Schema map: generate `docs/data/schema.generated.md` (tables, columns, comments, FKs, indexes, views; exclude TimescaleDB internal schemas). Spike tbls; fall back to a short script. Add the regenerate-and-diff check to `verify --scope db`. Add `docs/data/` to REPO_MAP and INDEX. | 3 | regeneration produces no diff |
+| 3.3 | COMMENT backfill, one migration per domain batch (comments are DDL, so they go through 3.1). Agent drafts from code usage, human reviews per domain. Coverage check baselined and shrinking. | 3 per batch | coverage baseline shrank; human applies to PRD |
+| 3.4 | `docs/data/dictionary.md` per domain: grain of key tables, canonical source per concept, rules marked enforced or convention with a one-line why. | 3 per domain | domain section present; human reviewed |
+| 3.5 | `tools/db/dd.py find <term>`: thin search over dictionary, names and comments. D4 check: designs adding a table or column paste its output. | 2 | `dd.py find <known term>` returns the right table |
+| 3.6 | Make `dev_reset.py` replay pending migrations after the template clone and after a PRD restore. | 2 | a deliberate test migration survives `dev_reset.py` |
+| 3.7 | Measure B20 with `EXPLAIN ANALYZE` on DEV for row counts and plan shape; human runs one read-only `EXPLAIN` on PRD for Pi timing (dev timings do not transfer). Overlap audit findings go to the backlog. | 2 | numbers recorded in backlog item B20 |
+| 3.8 | Exit check and reviewer pack. | pack | review recorded |
+
+### Phase 4: Workflow engine (strong model for 4.1 and 4.3)
+
+| ID | Task | Files | Done when |
+|---|---|---|---|
+| 4.0 | Move `fd.py` to `tools/workflow/fd.py`; fix references in `.clinerules/workflows/*.md` (separate task per 3 files) and REPO_MAP. | 3 per step | `git grep -n ".features/tools"` empty; existing commands still run |
+| 4.1 | Evidence gate: `done T##` runs the task's verify command, records exit code and output tail, refuses without a matching `start`; `--force` writes `FORCED` (D12). Structured log lines tied to task and AC IDs. | 2 | synthetic fixture: gate fires |
+| 4.2 | `backlog add` (next ID, append-only). Import B1-B26 as-is. | 2 | `fd.py backlog add` appends B27 |
+| 4.3 | `brief T##` and `resume` (brief, recent log, `git status --porcelain`, current branch, commits since task start, a verify run). Depends on D2. | 2 | an interrupted fixture task resumes with no human input |
+| 4.4 | Slim bug schema (symptom, root cause, fix, check added) linked to task or AC, with duplicate check. Defer if 4.1-4.3 overran. | 2 | duplicate fixture rejected |
+| 4.5 | Synthetic fixture feature with deliberate flaws (task closed without start, unticked AC, duplicate bug, anchor to a missing file). | 3 | each gate fires |
+| 4.6 | Exit check and reviewer pack. UAT HTML (`uat build`, `uat import`) is not built here; it is task 8.0. | pack | scripted fake feature runs start, done, interruption, resume |
+
+### Phase 5: Environments and deployment
+
+| ID | Task | Files | Done when |
+|---|---|---|---|
+| 5.1 | **[Q2]** Per D16: reduce bootstrap to a stub of about 30 lines that fetches a ref (default `main`) and runs `deploy/scripts/deploy.sh` from it; print a change summary before applying; remove branch-choice code (B16, B18); delete the extra scripts branch. Add `--dry-run`. Tag the previous scripts for rollback. | 3 | `shellcheck` clean against baseline; `--dry-run` on the Pi prints the plan |
+| 5.2 | Collapse the five duplicated systemd-install blocks (B17); resolve B13; add package sync (D18); remove the test step from full mode (D13); rename scripts and nginx conf that still say `react` when safe. | 3 per step | human runs full deploy on the Pi; service health OK; rollback steps written |
+| 5.3 | Pi post-deploy checklist (service health, `/api/health`, timers, build-time env vars, two heavy queries, one feature spot check). | 1 | human runs it once |
+| 5.4 | Fix B21 (`frontend/DEPLOYMENT_GUIDE.md`), B4 and B22 (with rename). Confirm the HTTPS certificate for `pifitness.duckdns.org` is valid. | 3 | cert expiry date recorded |
+| 5.5a | Test-mode units and config (D3, D17): `pifitness-fastapi-test.service` and a pm2 entry `pifitness-next-test` running from `~/PiFitness-test` with its own venv, `Conflicts=pifitness-fastapi.service` and `ReadWritePaths` that include `~/PiFitness-test` (the PRD unit runs with `ProtectHome=read-only`); test env template with `APP_ENV=test`, test DB name, integrations off. | 3 | `systemd-analyze verify` passes on the Pi |
+| 5.5b | `test-up <ref>` per D3. Refuses on: equal DB names, failed dump, already in test mode, dirty state. Writes `~/.pifitness-test-state` (PRD commit, dump path). Prints each step before running; `--dry-run`. Spike the TimescaleDB template clone first; fall back to dump and restore. **Needs 3.1.** | 2 | `--dry-run` prints the plan; shellcheck clean |
+| 5.5c | `test-down`: idempotent; stops test units, drops the test DB (`--keep-db` optional, marker check from D8), restarts PRD units and timers, calls `/api/health`. | 2 | shellcheck clean |
+| 5.5d | **[human]** Run test-up then test-down. Then inject a failure mid-`test-up`, run `test-down`, confirm PRD is healthy and its row counts match before and after. | none | counts recorded in PROGRESS |
+| 5.6 | **[human]** First test deployment: `test-up` the branch carrying the 9 migrations; apply and time them; walk the changed features on the phone over HTTPS; `test-down`. Failures go to the backlog and are the first Fix-tier work after the merge. The fresh test venv also exposes undeclared dependencies. Expect a large jump, not just 9 migrations: PRD runs the 16 Oct commit with the old layout (`deployment/`, root `backend_functions/`), so also confirm the editable install (`pip install -e`) resolves `pifitness` at the new layout. | none | migrations applied cleanly to the PRD copy |
+| 5.7 | Exit check and reviewer pack. | pack | full deploy from `main` after the test run; rollback steps written |
+
+### Phase 6: Templates (strong model plus human)
+
+Each fact appears once. Feature brief (human, small): intent, numbered problems P1.., out of scope, constraints by link, what done looks like. Design (agent): AC list is the only place ACs live (ID, intent, `auto` line, `human` line, mobile flag); one-line decisions; risks separate. Tasks: ID, dependencies, AC IDs only, tool-verified anchors, change, one verify command, at most 3 files. Log, bugs, backlog: tool-written. Intake tiers: Fix (one-page brief), Feature (full flow), Roadmap (architect splits). Traceability: every P# maps to an AC or an out-of-scope line, checked at review.
+
+| ID | Task | Done when |
+|---|---|---|
+| 6.1 | Write the three templates; replace the old `_DESCRIPTION_TEMPLATE.md` and `_DESIGN_TEMPLATE.md`; rewrite the five legacy workflows as thin wrappers over `fd.py`, or delete them. | new feature shorter than an old one; every P# maps to an AC |
+| 6.2 | Reviewer pack. | review recorded |
+
+### Phase 7: Rules, skills, model notes
+
+| ID | Task | Done when |
+|---|---|---|
+| 7.1 | Merge `interim-rules.md` into `default-rules.md`; the file is about 2 KB or less. | size check |
+| 7.2 | Collapse the seven skills in `.agents/skills/` to four or fewer: requirements (from business-analyst), design (from code-architect), implement (from backend-engineer, frontend-dev, sql-expert and deployment-engineer, sections by task tag), review. Decide block-executor's fate (superseded by `fd.py` tasks). | at most 4 `SKILL.md` files |
+| 7.3 | Ablation: run a benchmark task with and without each skill; delete any skill that does not help. | results recorded |
+| 7.4 | Write `docs/workflow/model-notes.md`: each model (Nemotron 3.5 Super VL, Sonnet 5.5, DeepSeek), usable-for, quirks, reasoning effort (medium for all), date verified. Run the three-task benchmark (frontend tweak, backend endpoint with DB write, SQL change). | benchmark completes on the best current model |
+| 7.5 | Reviewer pack. | review recorded |
+
+### Phase 8: Stabilization sweep and pilots
+
+| ID | Task | Done when |
+|---|---|---|
+| 8.0 | Build `uat build` and `uat import` (self-contained phone HTML from the design file, pass or fail per item, note field, exported results). Built only now, because the sweep is its first user. | fixture round trip |
+| 8.1 | **Sweep.** Per module (food, activities, weight, music, ...) a strong model drafts acceptance criteria from code and dictionary; human edits; human walks it on the phone; failures go to the backlog as Fix-tier items grouped by module and are worked through the gates. Auto-checkable steps become journey tests. Satisfies W9. | every finding in the backlog |
+| 8.2 | **Pilot: PWA install** (B26, E5): manifest, service worker, icons, safe areas. Exercises UAT and mobile checks (V5). | installs from Chrome over HTTPS |
+| 8.3 | **Pilot: BottomSheet** (B24 + B25, R6, R7). Shared component owning back-gesture handling; global pressed style (B23, R3). | R3, R6, R7 pass |
+| 8.4 | **Pilot: DB feature with a migration.** Exercises `dd find`, the migration flow, D4 and `verify --scope db`. | migration applied DEV then PRD by human |
+| 8.5 | **Roadmap pilot: B1** (fold `backend_functions/` into `core/` and domain modules). First break the three reverse imports (K1), and write characterization tests; architect splits it into features. Then fix B20. | `repo_health` K1 baseline empty |
+| 8.6 | Record metrics (section 7). Reviewer pack. | review recorded |
+
+### Phase 9: Freeze and retro
+
+Convert recurring lessons into checks and prune what did not earn its place. Finalize `TARGET_STATE.md`, store the evergreen prompt in `docs/workflow/`, tag the repo.
+
+## 7. Metrics and review triggers
+
+`docs/workflow/metrics.md`, one line per feature: bugs, tasks, first-pass UAT result, sessions, whether the model changed mid-feature. Starting targets, adjusted after the sweep: at most 0.3 bugs per task; at least 80 percent of ACs pass human UAT first time. No baseline exists; the first month of sweep results becomes it. Re-run the evergreen prompt when the architecture changes significantly, the default model changes, two consecutive features miss the bug target, a production problem traces to an agent change, or a quarter passes.
+
+## 8. Reviewer pack (D11)
+
+The last task of each phase writes `.audit/reviews/phase-<N>.md` from the template below, filling the bracketed parts. The human pastes it into an independent model (a different one from the builder where possible) together with the listed files, then records `REVIEW phase N: PASS | FAIL-fixed | FAIL-backlogged` in PROGRESS.
+
+```
+You are an independent reviewer. You did not build this. Do not edit any file.
+Repo: PiFitness. Phase [N] of docs/workflow/PLAN.md. Read only the files attached.
+1. For each exit criterion below, run the command yourself and paste the last 20 lines of output.
+   Do not trust PROGRESS.md claims.
+2. Check: any baseline growth (git diff main -- tools/baselines, added lines only), any FORCED lines
+   in PROGRESS.md, any file touched outside its task's listed files, any new fact stated in two places.
+3. Report PASS or FAIL per criterion with the evidence. List defects as: file, problem, severity.
+   Out-of-scope observations go in backlog-line format (see .features/backlog.md).
+4. Stop. Do not propose redesigns beyond the criteria.
+Exit criteria and commands: [copied from the phase]
+Files to attach: [PLAN.md task rows for this phase, PROGRESS.md, files changed (git diff main --stat), TARGET_STATE.md statements it touches]
+```
+
+## 9. TARGET_STATE amendments (human applies; the file is human-owned)
+
+- **E1:** "DEV runs locally and the agent environment holds no PRD credentials. DEV and TEST databases carry a database-level marker (`pifitness.env=dev` or `test`); tools refuse to run without it, and the backend refuses to start when its `APP_ENV` and the marker disagree."
+- **E3:** "Bootstrap is a minimal stub that fetches the ref being deployed (default `main`) and runs that ref's deployment scripts, showing what will change before applying."
+- **E6 (new):** "`main` is the deployable trunk. Agents work on `agent/*` branches and never push or merge; the human merges, tags `prd-YYYYMMDD` and deploys (`docs/workflow/GIT_MODEL.md`)."
+- **E7 (new):** "`test-up <ref>` and `test-down` run a branch on the Pi against a copy of the PRD database while PRD is stopped and untouched, and have been run end to end."
+- **E8 (new):** "Until Phase 5.1 replaces bootstrap's branch fetch, `origin/react-ui` is frozen at the last deployed commit (`failsafe-react-ui`). `main` is the trunk; an accidental bootstrap from the frozen `react-ui` is a no-op redeploy of current PRD, not a jump to untested code. To deploy a `main`-based release before 5.1, the human first runs `git push origin main:react-ui`. From 5.1 onward, bootstrap fetches the ref being deployed (D16) and the freeze ends (D19)."
+- **W10 (new):** "Every phase closes with an independent reviewer pack run; its failures are fixed or backlogged."
+- **V1, V3, V4:** "passes against the recorded baselines in `tools/baselines/`; any new violation fails; baselines only shrink." V3's baseline must reach zero by task 2.8. V4: remove N+1 from the scripted checks (review item).
+- **W1:** replace "Force is human-only" with "Forced closes are logged as FORCED and listed in every reviewer pack."
+- **W2:** add "except script-applied mechanical batches of up to 10 files with a deterministic check."
+- **D3:** "DDL changes only through numbered migration files in `deploy/migrations/`, additive and backward compatible with the last released code. The tool applies them to DEV; the human applies them to PRD after a backup and a clean run on the TEST copy; the DEV reset replays pending migrations."
+- **R2/R3 checks:** name `tools/check_docs.py`.
+
+---
+
+## Appendix A: Ratchet spec
+
+Key format: `check|path|rule-or-symbol|8-char hash of the normalized message`. Never include line numbers. One baseline file per check, sorted, one key per line. Exit codes: 0 no new violations; 1 new violations; stale baseline keys print `PRUNE` but do not fail. `--update-baseline` removes stale keys only; `--allow-grow` is for the human. Test failures: node id lines in `tests_quarantine.txt` with a backlog ID in a trailing field.
+
+## Appendix B: PROGRESS.md
+
+Header: `date | task | model | event | evidence`. Events: `START`, `DONE`, `BLOCKED`, `FORCED`, `REVIEW`. `DONE` evidence is the command and the last 20 output lines (indented under the row). Append only.
+
+## Appendix C: `.clinerules/interim-rules.md` (1 KB or less)
+
+```
+# Interim rules (merged into default-rules.md in Phase 7)
+1. One task per session. Read only your task row in docs/workflow/PLAN.md. Touch only its listed files.
+2. Loop-breaker: same failure twice with no new information -> append BLOCKED to docs/workflow/PROGRESS.md and stop.
+3. Flag, do not expand: out-of-scope findings go to .features/backlog.md as the next ID. Never fix them.
+4. Done = run the verify command; paste command and last 20 lines into PROGRESS.md.
+5. Git: see default-rules.md. Work only on agent/<task-id>-<slug>. Start from a clean tree or stop and ask.
+6. Never ssh, scp, rsync or connect to any database host other than localhost.
+7. Comments say what and how. No task, bug or feature IDs.
+8. Plan tasks do not use skills or /feature-* workflows.
+```
+
+## Appendix D: Pi security walkthrough (human, do in order)
+
+Why: Postgres listens on all interfaces and admits the whole LAN. It is closed from the internet, so this is defense in depth. Do it at a quiet time (the app drops for a few seconds). Keep a second SSH session open throughout.
+
+# Status : Done
+- Steps 1 through 4 completed and verified.
+
+**Step 1: add the SSH tunnel to DataGrip first, so you keep access.** In DataGrip open the PRD data source, go to the SSH/SSL tab, tick "Use SSH tunnel", add an SSH configuration (host `192.168.86.104`, port 22, user `god`, authentication by key pair, your passphrase-protected key). On the General tab set Host to `localhost`, Port `5432` (this is the Pi's localhost, through the tunnel). Test Connection. Do not continue until it succeeds.
+
+**Step 2: back up the config (on the Pi).**
+```
+PGV=$(ls /etc/postgresql); echo $PGV
+sudo cp /etc/postgresql/$PGV/main/postgresql.conf ~/postgresql.conf.bak
+sudo cp /etc/postgresql/$PGV/main/pg_hba.conf ~/pg_hba.conf.bak
+```
+`echo` must print a single version number. If it prints more than one, stop.
+
+**Step 3: bind to localhost and drop the LAN rule.**
+```
+sudo sed -i "s/^listen_addresses = .*/listen_addresses = 'localhost'/" /etc/postgresql/$PGV/main/postgresql.conf
+sudo sed -i '/192.168.86.0\/24/d' /etc/postgresql/$PGV/main/pg_hba.conf
+grep listen_addresses /etc/postgresql/$PGV/main/postgresql.conf
+sudo grep 192.168 /etc/postgresql/$PGV/main/pg_hba.conf
+```
+The first grep must show `'localhost'`; the second must print nothing.
+
+**Step 4: restart and verify.**
+```
+sudo systemctl restart postgresql
+sudo systemctl restart pifitness-fastapi
+sudo ss -ltnp | grep 5432
+```
+`ss` must show only `127.0.0.1` and `::1`. Then load the app on your phone and connect with DataGrip through the tunnel.
+
+**Rollback:** `sudo cp ~/postgresql.conf.bak /etc/postgresql/$PGV/main/postgresql.conf`, the same for `pg_hba.conf`, then restart both services.
+
+**Not now:** uvicorn (8000) and Next.js (3000) also listen on all interfaces (B28). They are fixed in the repo's deploy files in Phase 5, not by hand, because the installed unit has already drifted from the repo (B29). A firewall is optional once everything but nginx binds to loopback.
+
+**Dev machine:** Cline has no auto-approve for terminal commands, so each command needs your approval; deny any `ssh`, `scp` or `psql` to a non-local host. Do not leave the SSH key loaded in an unlocked agent while Cline runs, or load it with `ssh-add -c`.
