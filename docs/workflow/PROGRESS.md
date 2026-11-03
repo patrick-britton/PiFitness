@@ -98,6 +98,8 @@ date | task | model | event | evidence
     $ Test-Path docs/workflow\PROGRESS.md
     True
 
+2026-11-03 | 1.5.3 | human | REVIEW | GIT_MODEL.md reviewed (6 sections, D-IDs cited); INDEX rows placed in main table; formatting fixed (code-span space, table spacing, trailing newlines). check_docs.py deferred to 1.5.7 per done-when.
+
 ---
 
 ## Deviations and observations (for the 1.5.8 reviewer pack)
