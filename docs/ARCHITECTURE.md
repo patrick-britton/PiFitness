@@ -120,7 +120,7 @@ No change recommendations are made here; the unbounded-read risk is logged as B2
 Recorded in `docs/REPO_MAP.md` "Known deviations" (`docs/REPO_MAP.md:149-156`); they are not restated here, and each names the backlog item in `.audit/p1/backlog_phase1.md` that fixes it:
 - K1, K2 — `backend/backend_functions/` reverse imports break G6 (backlog B1, `.audit/p1/backlog_phase1.md:7`).
 - K3 — redundant/vestigial folders `scripts/`, `agents/`, `backend/api/`, `.features/descriptions/` (backlog B3, B4, B8, `.audit/p1/backlog_phase1.md:9-11,15`).
-- K4 — empty folders `.features/designs_active/`, `.features/designs_complete/`, `docs/archive/` (backlog B7, `.audit/p1/backlog_phase1.md:14`).
+- K4 — empty folders `.features/designs_active/`, `docs/archive/` (backlog B7, `.audit/p1/backlog_phase1.md:14`).
 - K5 — dependency generator shows no imports for `backend/` although `backend/main.py` imports `pifitness.*` (backlog B11, `.audit/p1/backlog_phase1.md:18`).
 
 ## 8. Unverified, human to confirm

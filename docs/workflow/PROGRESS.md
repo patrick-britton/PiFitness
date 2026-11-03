@@ -131,3 +131,18 @@ date | task | model | event | evidence
     can't open file 'tools/check_docs.py': [Errno 2] No such file or directory
 
 - **`DONE (deferred verification)` event variant.** Used when a task's done-when names a tool that doesn't exist yet (e.g., `check_docs.py` before 1.5.7). The variant records the attempted command and its not-found output, and marks the task as awaiting human review. Formal acceptance arrives via a follow-up `REVIEW` line. Appendix B's event list is a minimum, not an exhaustive set — this variant should be added to Appendix B at the next plan revision.
+2026-11-03 | 1.5.5 | cline | START | Delete legacy per D10: classify .features/description_draft/, .features/descriptions/, .features/designs_active/, .features/designs_complete/, .clinerules/hooks/, backend/api/; git rm --cached + gitignore scripts/schema_cache.json; scripts/*.log already covered by .gitignore *.log; remove stale refs from REPO_MAP/INDEX/ARCHITECTURE; backlog rows for kept targets and scripts/repo_audit/ removal at 2.5
+2026-11-03 | 1.5.5 | cline | DONE | Deleted .features/description_draft/, .features/designs_complete/, .clinerules/hooks/ (untracked, zero external refs); git rm --cached + gitignore scripts/schema_cache.json; scripts/*.log already covered by .gitignore *.log; kept (external refs, backlog rows B27-B29): .features/descriptions/, .features/designs_active/, backend/api/; backlog B30 scripts/repo_audit/ removal at 2.5; removed stale refs from REPO_MAP/INDEX/ARCHITECTURE
+    $ git status --short; git grep -nE "description_draft|designs_complete|clinerrules/hooks" docs/REPO_MAP.md docs/INDEX.md docs/ARCHITECTURE.md; git check-ignore -v scripts/schema_cache.json scripts/sync-prod-to-dev.log; Test-Path .features/description_draft .features/designs_complete .clinerules/hooks; git ls-files scripts/schema_cache.json
+     M .gitignore
+     M docs/ARCHITECTURE.md
+     M docs/INDEX.md
+     M docs/REPO_MAP.md
+     M docs/workflow/PROGRESS.md
+     D  scripts/schema_cache.json
+     (grep done)
+     .gitignore:67:scripts/schema_cache.json	scripts/schema_cache.json
+     .gitignore:65:*.log	scripts/sync-prod-to-dev.log
+     False
+     False
+     False

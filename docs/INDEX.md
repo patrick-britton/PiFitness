@@ -18,7 +18,7 @@ Statement R3 in `docs/workflow/TARGET_STATE.md`. One home per fact: each row nam
 | `.clinerules/workflows/feature-design.md` | Feature design stage 1 (`/feature-design`): human description → design file via `fd.py`, then stop; do not resolve open questions or implement. | Skill definitions — `.agents/skills/*/SKILL.md`; templates — `.features/_DESCRIPTION_TEMPLATE.md` and `_DESIGN_TEMPLATE.md`. | human |
 | `.clinerules/workflows/feature-implementation.md` | Feature implementation stage 3 (`/feature-implementation`): one task per invocation, status transitions reviewed → in-progress → complete, design file is the only state. | Skill definitions — `.agents/skills/*/SKILL.md`. | human |
 | `.clinerules/workflows/feature-review.md` | Feature review stage 2 (`/feature-review`): process human answers to open questions, advance draft → reviewed, do not implement. | Skill definitions — `.agents/skills/*/SKILL.md`; templates — `.features/_DESCRIPTION_TEMPLATE.md` and `_DESIGN_TEMPLATE.md`. | human |
-| `.features/` (grouped: `_DESCRIPTION_TEMPLATE.md`, `_DESIGN_TEMPLATE.md`, `description_draft/*.md`, `zz_workfow_archive/*.md`, `tools/*`) | Feature material: description and design templates; four draft descriptions (008-006 Playlist Sync, 009-004 Run Predictions, 009-005 Training Cycle, 009-008 Activity Report Leaderboards); archived workflows; `fd.py` workflow tooling. | Workflow rule text — `.clinerules/workflows/*.md`; folder purposes — `docs/REPO_MAP.md`. | human+agent |
+| `.features/` (grouped: `_DESCRIPTION_TEMPLATE.md`, `_DESIGN_TEMPLATE.md`, `zz_workfow_archive/*.md`, `tools/*`) | Feature material: description and design templates; archived workflows; `fd.py` workflow tooling. | Workflow rule text — `.clinerules/workflows/*.md`; folder purposes — `docs/REPO_MAP.md`. | human+agent |
 
 | `docs/workflow/GIT_MODEL.md` | Human and agent git flow: trunk flow (D1, D2), tag naming (`prd-YYYYMMDD`, `pre-trunk-*`, `failsafe-react-ui`, `archive/*`), `react-ui` frozen as production failsafe (D19), rollback by redeploying a `prd-` tag, test flow (`test-up` / `test-down`, D3), script source (D16). | Trunk and allowlist/denylist — `.clinerules/default-rules.md`; human flow decisions — `docs/workflow/PLAN.md` section 2. | human+agent |
 | `docs/workflow/PLAN.md` | Phase task list (section 6), decisions D1–D19 (section 2), backlog dispositions (section 5), open questions (section 3), appendices A–D. | Human git flow detail — `docs/workflow/GIT_MODEL.md`; rule text — `.clinerules/`. | human |
@@ -30,7 +30,7 @@ Seen during inventory but not in the table above, with reason:
 
 - `docs/archive/` — empty folder, no files.
 - `docs/sample_json_food_payloads/*.json` (11 files) — reference JSON payloads for the food diary module; data fixtures, not documentation.
-- `.clinerules/hooks/` — empty folder.
+
 - `.audit/p1/*.md` and `.audit/evergreen_plan/*.md` — generated Phase 1 evidence, owned by `.audit/p1/README.md`; generated evidence must not be copied into other documents. (`.audit/p1/comments_hits.tsv` is TSV, not markdown.)
 - `.agents/skills/*/SKILL.md` (7 files) — agent skill definitions owned under `.agents/` (`docs/REPO_MAP.md` row), outside `docs/` and `.clinerules/`.
 - `README.md` — repo-root project summary, outside `docs/` and `.clinerules/`.
