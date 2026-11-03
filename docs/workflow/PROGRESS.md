@@ -146,3 +146,5 @@ date | task | model | event | evidence
      False
      False
      False
+
+2026-11-03 | 1.5.5 | human | REVIEW | Agent backlog rows B27-B30 renumbered to B35-B38 in .audit/p1/backlog_phase1.md (D6: B27-B34 are reserved by PLAN section 5).
