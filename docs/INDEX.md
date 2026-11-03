@@ -1,0 +1,32 @@
+# docs/INDEX.md
+
+Statement R3 in `docs/workflow/TARGET_STATE.md`. One home per fact: each row names what a document owns exclusively and what it must not repeat, with a pointer to the owning file. One row per file in `docs/` and `.clinerules/`; files under `.features/` and `docs/architecture/` that are not workflow documents are grouped into a single row each (feature material, decision records). Generated audit evidence under `.audit/` is intentionally excluded — see "Not indexed".
+
+| File | Owns (what facts live only here) | Must not repeat (what belongs elsewhere, with pointer) | Written by |
+|---|---|---|---|
+| `docs/ARCHITECTURE.md` | How the parts work together (statement R2): backend and frontend layers, read/write request flow (nginx → FastAPI on 8000 / Next.js on 3000), deployment topology on Pi 5, Pi performance constraints; import-direction rules G1–G6 with pointers; known deviations; the unverified-items list. | Folder purposes, write permissions, allowed dependencies — `docs/REPO_MAP.md`; endpoint and table lists — `.audit/p1/backend.md` and `.audit/p1/deps.md` (points to them, does not copy them). | human |
+| `docs/PI_SPECS.md` | Raspberry Pi 5 hardware and performance specification: SoC, CPU, GPU, memory, storage, networking, peripherals, electrical/thermal — the hardware-facts source for the Pi performance constraints (statement R2). | Deployment topology — `docs/ARCHITECTURE.md` §5; repo-visible constraints — `docs/ARCHITECTURE.md` §6(b). | human |
+| `docs/REPO_MAP.md` | Folder purpose, who writes there, must-not-contain, allowed folder dependencies for every repo folder; dependency rules G1–G6; known deviations K1–K5 (statement R1). | How the parts work together — `docs/ARCHITECTURE.md`; observed imports — `.audit/p1/deps.md` (generated, not copied here). | human |
+| `docs/UI_PRINCIPLES.md` | UI rules R1–R13, why each applies, and how each is checked (auto / human / auto-candidate) at viewports 448×875 and 360×740 (statement R4, V5). | None — each rule and its check lives only here. | human |
+| `docs/workflow/TARGET_STATE.md` | The verifiable target statements: Principles and R1–R4, D1–D4, V1–V5, W1–W9, E1–E5, A1–A3 (statement R3's subject). | None — statements live only here; other documents point to it. | human |
+| `docs/architecture/` (grouped: `dynamic-targets.md`, `garmin-login.md`, `test-strategy.md`) | Architecture decision records: dynamic import/module targets pinned in `audit.toml` (`dynamic-targets.md`); Garmin login flow implementation and its three protection layers (`garmin-login.md`); test tiers and pytest commands (`test-strategy.md`). | Folder purposes — `docs/REPO_MAP.md`; how the parts work together — `docs/ARCHITECTURE.md`. | human |
+| `.clinerules/00-tool-constraints.md` | Mandated Cline tool identifiers (forbidden hallucination → required runtime tool table) and the dynamic tool fallback protocol. | Global rules — `.clinerules/default-rules.md`. | human |
+| `.clinerules/default-rules.md` | Global rules: no git commands, no production deployment, no database modifications, Cline-tool usage, dependency registration files, PowerShell console, venv Python interpreter path; project facts and skills list. | Tool signatures — `.clinerules/00-tool-constraints.md`. | human |
+| `.clinerules/environment.md` | Verified environment facts (DEV Docker DB on localhost:15432, `backend/.env` values), commands that work (backend, frontend, DB and browser probes), known issues with phases, agent rules (DEV-only, local `PG_HOST`, throwaway probe rows). | None — environment facts live only here. | human |
+| `.clinerules/workflows/bug-analysis.md` | Post-implementation bug-analysis workflow: invoke, input, output, recommendations-only rule, tool constraint. | Skill definitions — `.agents/skills/*/SKILL.md`; templates — `.features/_DESCRIPTION_TEMPLATE.md` and `_DESIGN_TEMPLATE.md`. | human |
+| `.clinerules/workflows/execute-block.md` | Execute-block workflow: run exactly one tracked block spec, produce a report, stop; never chain blocks. | Skill definitions — `.agents/skills/*/SKILL.md`. | human |
+| `.clinerules/workflows/feature-design.md` | Feature design stage 1 (`/feature-design`): human description → design file via `fd.py`, then stop; do not resolve open questions or implement. | Skill definitions — `.agents/skills/*/SKILL.md`; templates — `.features/_DESCRIPTION_TEMPLATE.md` and `_DESIGN_TEMPLATE.md`. | human |
+| `.clinerules/workflows/feature-implementation.md` | Feature implementation stage 3 (`/feature-implementation`): one task per invocation, status transitions reviewed → in-progress → complete, design file is the only state. | Skill definitions — `.agents/skills/*/SKILL.md`. | human |
+| `.clinerules/workflows/feature-review.md` | Feature review stage 2 (`/feature-review`): process human answers to open questions, advance draft → reviewed, do not implement. | Skill definitions — `.agents/skills/*/SKILL.md`; templates — `.features/_DESCRIPTION_TEMPLATE.md` and `_DESIGN_TEMPLATE.md`. | human |
+| `.features/` (grouped: `_DESCRIPTION_TEMPLATE.md`, `_DESIGN_TEMPLATE.md`, `description_draft/*.md`, `zz_workfow_archive/*.md`, `tools/*`) | Feature material: description and design templates; four draft descriptions (008-006 Playlist Sync, 009-004 Run Predictions, 009-005 Training Cycle, 009-008 Activity Report Leaderboards); archived workflows; `fd.py` workflow tooling. | Workflow rule text — `.clinerules/workflows/*.md`; folder purposes — `docs/REPO_MAP.md`. | human+agent |
+
+## Not indexed
+
+Seen during inventory but not in the table above, with reason:
+
+- `docs/archive/` — empty folder, no files.
+- `docs/sample_json_food_payloads/*.json` (11 files) — reference JSON payloads for the food diary module; data fixtures, not documentation.
+- `.clinerules/hooks/` — empty folder.
+- `.audit/p1/*.md` and `.audit/evergreen_plan/*.md` — generated Phase 1 evidence, owned by `.audit/p1/README.md`; generated evidence must not be copied into other documents. (`.audit/p1/comments_hits.tsv` is TSV, not markdown.)
+- `.agents/skills/*/SKILL.md` (7 files) — agent skill definitions owned under `.agents/` (`docs/REPO_MAP.md` row), outside `docs/` and `.clinerules/`.
+- `README.md` — repo-root project summary, outside `docs/` and `.clinerules/`.
