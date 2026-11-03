@@ -129,3 +129,5 @@ date | task | model | event | evidence
 
     $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools/check_docs.py index
     can't open file 'tools/check_docs.py': [Errno 2] No such file or directory
+
+- **`DONE (deferred verification)` event variant.** Used when a task's done-when names a tool that doesn't exist yet (e.g., `check_docs.py` before 1.5.7). The variant records the attempted command and its not-found output, and marks the task as awaiting human review. Formal acceptance arrives via a follow-up `REVIEW` line. Appendix B's event list is a minimum, not an exhaustive set — this variant should be added to Appendix B at the next plan revision.
