@@ -113,3 +113,10 @@ date | task | model | event | evidence
 - **1.5.6 backlog source file (`.audit/p1/backlog_phase1.md`):** may not exist on disk (removed by INT-21 as tracked); verify before running 1.5.6, do not create it from an agent task.
 
 - **`deployment_script` branch intentionally not pruned.** Waits for 5.1 per D16.
+
+2026-11-03 | 1.5.2 | cline | START | Create .clinerules/interim-rules.md from Appendix C; replace the 'No git commands' line in .clinerules/default-rules.md with the D2 allowlist and denylist.
+
+2026-11-03 | 1.5.2 | cline | DONE | interim-rules.md created from Appendix C; 'No git commands' line replaced with D2 allowlist/denylist in default-rules.md.
+
+    $ (Get-Item .clinerules/interim-rules.md).Length
+    778
