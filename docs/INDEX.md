@@ -20,6 +20,10 @@ Statement R3 in `docs/workflow/TARGET_STATE.md`. One home per fact: each row nam
 | `.clinerules/workflows/feature-review.md` | Feature review stage 2 (`/feature-review`): process human answers to open questions, advance draft → reviewed, do not implement. | Skill definitions — `.agents/skills/*/SKILL.md`; templates — `.features/_DESCRIPTION_TEMPLATE.md` and `_DESIGN_TEMPLATE.md`. | human |
 | `.features/` (grouped: `_DESCRIPTION_TEMPLATE.md`, `_DESIGN_TEMPLATE.md`, `description_draft/*.md`, `zz_workfow_archive/*.md`, `tools/*`) | Feature material: description and design templates; four draft descriptions (008-006 Playlist Sync, 009-004 Run Predictions, 009-005 Training Cycle, 009-008 Activity Report Leaderboards); archived workflows; `fd.py` workflow tooling. | Workflow rule text — `.clinerules/workflows/*.md`; folder purposes — `docs/REPO_MAP.md`. | human+agent |
 
+| `docs/workflow/GIT_MODEL.md` | Human and agent git flow: trunk flow (D1, D2), tag naming (`prd-YYYYMMDD`, `pre-trunk-*`, `failsafe-react-ui`, `archive/*`), `react-ui` frozen as production failsafe (D19), rollback by redeploying a `prd-` tag, test flow (`test-up` / `test-down`, D3), script source (D16). | Trunk and allowlist/denylist — `.clinerules/default-rules.md`; human flow decisions — `docs/workflow/PLAN.md` section 2. | human+agent |
+| `docs/workflow/PLAN.md` | Phase task list (section 6), decisions D1–D19 (section 2), backlog dispositions (section 5), open questions (section 3), appendices A–D. | Human git flow detail — `docs/workflow/GIT_MODEL.md`; rule text — `.clinerules/`. | human |
+| `docs/workflow/PROGRESS.md` | Append-only task event log: START, DONE, BLOCKED, FORCED, REVIEW rows with evidence (Appendix B format). | Task definitions — `docs/workflow/PLAN.md` section 6; decisions — `docs/workflow/PLAN.md` section 2. | human |
+
 ## Not indexed
 
 Seen during inventory but not in the table above, with reason:

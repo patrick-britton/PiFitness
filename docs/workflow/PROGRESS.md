@@ -120,3 +120,10 @@ date | task | model | event | evidence
 
     $ (Get-Item .clinerules/interim-rules.md).Length
     778
+
+2026-11-03 | 1.5.3 | cline | START | Create docs/workflow/GIT_MODEL.md; add INDEX rows for GIT_MODEL.md, PLAN.md, PROGRESS.md.
+
+2026-11-03 | 1.5.3 | cline | DONE (deferred verification) | GIT_MODEL.md created; INDEX rows added for GIT_MODEL.md, PLAN.md, PROGRESS.md; check_docs.py not yet built (1.5.7); artifacts produced; awaiting human review and later tool check.
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools/check_docs.py index
+    can't open file 'tools/check_docs.py': [Errno 2] No such file or directory
