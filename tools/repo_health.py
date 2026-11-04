@@ -82,7 +82,7 @@ def gate(violations, baseline, check_name):
 # R1: folder-vs-REPO_MAP check
 # ---------------------------------------------------------------------------
 
-_SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv"}
+_SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", ".cline", ".clinerules"}
 
 
 def parse_repo_map_folders():
