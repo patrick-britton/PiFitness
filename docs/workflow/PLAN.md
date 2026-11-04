@@ -1,6 +1,6 @@
 # PiFitness Agentic Workflow: Plan
 
-**Status.** Phase 0 done (`.clinerules/environment.md`). Phase 1 drafted (ARCHITECTURE, REPO_MAP, UI_PRINCIPLES, INDEX, backlog). Phase 1.5 closes it and installs interim rules. Nothing past 1.5 starts until its reviewer pack (section 8) is run and the phase is closed (every failure resolved under section 8).
+**Status.** Phase 1.5 is done. Phase 2 has not started.
 
 ---
 
