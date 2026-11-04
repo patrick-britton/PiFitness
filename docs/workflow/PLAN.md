@@ -114,6 +114,7 @@ Order: 1.5, then 2; 3 and 4 in parallel after 2.4; 5.1-5.4 can run alongside 2 t
 | 2.7 | Test classification. Register markers `invariant`, `contract`, `smoke`, `journey` in `pytest.ini` with `--strict-markers`. Classify in batches of 15 tests into `tests/manifest.tsv` (test, class, Keep/Quarantine/Delete, one-line reason); script applies it. Rules for new tests: purpose docstring, no mocking the unit under test, no IDs. | 3 per batch | `pytest --collect-only -q` shows every test with a class marker |
 | 2.8 | Comment sweep, last. Tier A: `lint_comments.py --fix-tier-a` deletes comments that consist only of an ID or history note. Tier B: agent rewrites mixed comments in batches of at most 10 files to say what and how. Baseline shrinks each batch. | 10 per batch | `lint_comments` baseline reaches 0 |
 | 2.9 | Exit check and reviewer pack. | pack | `python tools/dev_reset.py` then `python tools/verify.py --scope all` exits 0; review recorded |
+| 2.10 | Remediation from Phase 2 reviewer: make `verify.py` and `dev_reset.py` set/use `APP_ENV=dev` against the stamped DEV DB; baseline `tools/workflow/` in REPO_MAP and the new SQL smells in `repo_health`; remove throwaway outputs (`_dev_*`, `_verify_*`, `_violations.txt`, `tools/_tmp_*`); refresh the 2.9 review record after verify exits 0. | 3 | `python tools/db/dev_reset.py` then `python tools/verify.py --scope all` exits 0; `python tools/repo_health.py` exits 0; `git status --short` clean of throwaway files |
 
 ### Phase 3: Data layer
 
