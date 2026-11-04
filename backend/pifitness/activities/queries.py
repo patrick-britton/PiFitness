@@ -458,7 +458,7 @@ def get_segment_leaderboard(segment_id: int) -> List[Dict[str, Any]]:
     Also projects `cycle_name` — the view's pre-computed recency bucket
     ('Current Cycle' | 'Last 365' | 'All Time'). It is the ONLY
     membership signal for the lollipop buckets and the Range window: the rank
-    columns stay window-scoped ORDERING values (live check 2026-09-16: both
+    columns stay window-scoped ORDERING values (live check: both
     remaining rank columns are non-NULL for every row, so null-checks cannot
     express membership).
 
@@ -765,7 +765,7 @@ def run_find_matches(segment_id: int) -> Dict[str, Any]:
     match_activities -> pair_generation -> matches_all_polygon ->
     mass_confirmation(1). Synchronous blocking CALLs; frontend shows a spinner
     per OQ-1. Parameterized; no pandas; shares the step table with
-    run_find_step (T20) so the split and all-in-one flows cannot drift.
+    run_find_step so the split and all-in-one flows cannot drift.
     """
     seg = sql_to_dict(
         "SELECT segment_id FROM activities.segments WHERE segment_id = %s",
@@ -919,8 +919,8 @@ def bulk_reject_matches(
     segment_id: int, confidence_over: Optional[float] = None
 ) -> Dict[str, Any]:
     """
-    Reject every current candidate of a segment (009-003, T31/AC-20, AC-22;
-    T37/Bug 009-003-36-1: atomic single-connection mass write).
+    Reject every current candidate of a segment (009-003, AC-20, AC-22;
+    atomic single-connection mass write).
 
     Reads the pending rows from activities.vw_temp_segment_matches_downselect
     for the segment (optionally only rows with confidence > confidence_over —
@@ -933,7 +933,7 @@ def bulk_reject_matches(
     nothing internally (verified against its definition: INSERT ... ON
     CONFLICT + downselect DELETE only), so the whole pass is atomic; the
     legacy qec-per-row loop cost N connection setups per request on the Pi.
-    No staging.update_segment_details call (approval-only per the T06 legacy
+    No staging.update_segment_details call (approval-only per the legacy
     flow). No DDL, no SP change.
 
     Args:

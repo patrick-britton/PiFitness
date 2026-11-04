@@ -158,8 +158,8 @@ def ultimate_task_executioner(force_task_name=None, force_task_id=None):
 
                 task_fail, client_dict = extract_load_flatten(client_dict, task_dict)
                 if task_fail:
-                    # Detailed message surfaced by the helper (T02 pattern for
-                    # the extract/load/SPROC paths — Bug 004-005-4); the single
+                    # Detailed message surfaced by the helper for the extract/
+                    # load/SPROC paths; the single
                     # outer reconcile below writes it.
                     fail_msg = task_fail if isinstance(task_fail, str) else None
 
@@ -237,7 +237,7 @@ def extract_load_flatten(cd, td):
         (ultimate_task_executioner) reconciles the task unconditionally, so no
         reconcile happens here — this avoids the double consecutive_failures
         increment and keeps the detailed message as the final
-        last_failure_message (Bug 004-005-4; T02 pattern).
+        last_failure_message for the reconcile path.
     """
     # Ensure client is established
     if not cd:
@@ -375,8 +375,7 @@ def execute_sproc(d, sproc_type):
     Returns:
         None on success, or the failure message (str) on failure. The caller
         (ultimate_task_executioner, via extract_load_flatten) reconciles the
-        task unconditionally, so no reconcile happens here (Bug 004-005-4;
-        T02 pattern).
+        task unconditionally, so no reconcile happens here.
     """
     print(f"Starting SPROC {sproc_type} for #{d.get('task_id')}: {d.get('task_name')}")
     retrieval_key = f"{sproc_type}_sproc"
@@ -576,7 +575,7 @@ def metric_interpolation(task_dict):
     """
     Perform metric interpolation with enhanced error handling.
 
-    NOTE (004-005 T09): dead code — no callers (verified by repo-wide search).
+    NOTE (004-005): dead code — no callers (verified by repo-wide search).
     Left untouched: it still reconciles internally, but since nothing calls
     it, it cannot double-reconcile. Delete on a future cleanup pass.
 

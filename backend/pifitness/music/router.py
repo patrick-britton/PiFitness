@@ -306,7 +306,7 @@ async def get_isrc_dupe_count_endpoint():
 @router.get("/isrc-dupes/match")
 async def get_isrc_dupe_match_endpoint():
     """
-    One reviewable duplicate-ISRC pair (FR-2).
+    One reviewable duplicate-ISRC pair detected by the matcher.
 
     Returns {match: IsrcDupeMatch | None} — match is None when the
     queue is empty.

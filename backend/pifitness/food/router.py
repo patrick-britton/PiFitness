@@ -22,8 +22,8 @@ Endpoints (shapes served exactly):
     GET    /api/food/recipes/{recipe_id}/cook -> CookState (empty = no session)
     PUT    /api/food/recipes/{recipe_id}/cook -> CookStateUpdate -> CookState
     DELETE /api/food/recipes/{recipe_id}/cook -> { success: true } (idempotent)
-    POST   /api/food/persist                    -> { food_id } (persist-only, NO
-    diary write — recipe-create picks, 010-005 T12 / OQ-3)
+    POST   /api/food/persist                    -> { food_id } (persist-only, no
+    diary write when recipe-create picks, 010-005 / OQ-3)
 """
 
 from datetime import date, datetime
@@ -200,7 +200,7 @@ async def combined_search(
     New optional fields (match_pct/match_band/quality_percent/
     is_single_ingredient/ingredient_count/kcal_delta_pct/
     excluded_kcal_mismatch/food_category/serving_unit_facet) ride on each
-    hit; T02 populates them for USDA hits, saved rows carry nulls.
+    hit; the step populates them for USDA hits, saved rows carry nulls.
 
     Hits carry fdcId + the raw USDA hit body so confirm can
     persist via the normalizer path without a re-fetch; USDA hits whose
@@ -464,7 +464,7 @@ async def food_by_barcode(barcode: str = Query(..., description="packaging barco
             "name": row.get("name"),
             "source": row.get("source"), "fdc_id": row.get("fdc_id"),
             "barcode": row.get("barcode"), "nutrients": nuts,
-            # T10 (OQ-8): scan-DB picks default + panel from the row serving.
+            # scan-DB picks default + panel from the row serving (OQ-8).
             "serving_size": row.get("serving_size"),
             "serving_unit": row.get("serving_unit"),
             "serving_text": row.get("serving_text")}

@@ -64,8 +64,8 @@ def extract_json_playlist_details(client=None, td=None, list_id=None):
 
     if not client:
         # get_spotify_client() returns a client *dict* ({'client': <spotipy>, ...})
-        # while this extractor needs the raw spotipy client. (Before 000-001 T08
-        # this assigned the function object itself, so the no-client path raised
+        # while this extractor needs the raw spotipy client. Previously this
+        # assigned the function object itself, so the no-client path raised
         # AttributeError: 'function' object has no attribute 'playlist_items'.)
         client = (get_spotify_client() or {}).get('client')
 
@@ -111,13 +111,13 @@ def extract_json_playlist_details(client=None, td=None, list_id=None):
             results = client.next(results)
             time.sleep(1)
 
-    # 000-001 AC-8 (T08): normalize paging hrefs before the staging load.
+    # normalize paging hrefs before the staging load.
     # Spotify's playlist_items paging href uses "/items?offset=.." for page 2+,
     # but staging.flatten_playlist_details derives playlist_id as
     # split_part(split_part(href,'/playlists/',2),'/tracks',1) — so an
     # un-normalized href persists "{id}/items?offset=..&limit=.." into
-    # music.playlist_isrcs.playlist_id (Bug 000-001-T01-1). This mirrors the
-    # rewrite in music_functions.playlist_to_db (004-004 Bug T10-7).
+    # music.playlist_isrcs.playlist_id. This mirrors the
+    # rewrite in music_functions.playlist_to_db.
     for page in all_items:
         if isinstance(page, dict):
             href = page.get('href') or ''
@@ -137,7 +137,7 @@ def derive_playlist_id_from_href(href):
     ``split_part(split_part(href, '/playlists/', 2), '/tracks', 1)``; with an
     un-normalized paging href (``.../playlists/{id}/items?offset=50&limit=50``)
     that yields ``{id}/items?offset=50&limit=50`` and pollutes
-    ``music.playlist_isrcs.playlist_id`` (Bug 000-001-T01-1). This helper mirrors
+    ``music.playlist_isrcs.playlist_id``. This helper mirrors
     the SPROC derivation and trims any query string, so a caller can tell whether
     the payload would persist a bare 22-char id.
 
