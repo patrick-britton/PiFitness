@@ -214,3 +214,13 @@ date | task | model | event | evidence
     $ C:\users\rickb\vsprojects\\pifitness\.venv\Scripts\python.exe tools\\verify.py --scope all
     VERIFY all exit=0
     FORCED=4
+
+2026-11-03 | 2.4 | cline | DONE | guard tests pass (11/11 in tests/test_no_prd_default.py); dev_reset.py ran: template clone + drop + recreate + stamp pifitness.env='dev' in 76.53s, TimescaleDB survived; verify --scope db exits 0 (FORCED=0); reset time recorded 76.53s
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe -m pytest tests/test_no_prd_default.py -v
+    11 passed in 2.79s
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\db\dev_reset.py
+    dev_reset: complete in 76.53s
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\verify.py --scope db
+    VERIFY db exit=0
+    FORCED=0
