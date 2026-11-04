@@ -190,6 +190,23 @@ date | task | model | event | evidence
 
 2026-11-03 | 2.1 | cline | DONE | Created tools/ratchet.py with compare, prune, and --update-baseline subcommands per Appendix A; added tools/baselines/ row to docs/REPO_MAP.md. All 7 unit tests pass; planted new key exits 1; removed key prints PRUNE warning.
 
+2026-11-03 | 2.9 | cline | START | DEV reset via python tools\db\dev_reset.py, then python tools\verify.py --scope all, then phase-2 reviewer pack (.audit\reviews\phase-2.md) written per section 8
+2026-11-03 | 2.9 | cline | DONE (human review) | reset: `python tools\db\dev_reset.py` exit 0, `dev_reset: complete in 104.01s` (template clone + drop + recreate + stamp pifitness.env='dev'); `python tools\verify.py --scope all` exit=1: compile error in backend/pifitness/admin/services.py line 9 (`004` parsed as octal integer; malformed 6-quote docstring); reviewer pack `.audit\reviews\phase-2.md` written per section 8
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\db\dev_reset.py
+    dev_reset: resetting pifitness_dev on localhost:15432
+      dropped stale template pifitness_dev_template
+      created template pifitness_dev_template from pifitness_dev
+      dropped pifitness_dev
+      created pifitness_dev from template
+      dropped template pifitness_dev_template
+      stamped pifitness.env = 'dev' on pifitness_dev
+    dev_reset: complete in 104.01s
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\verify.py --scope all
+    C:/Users/rickb/vsProjects/PiFitness/backend/pifitness/admin/services.py: compile error: SyntaxError: leading zeros in decimal integer literals are not permitted; use an 0o prefix for octal integers
+    VERIFY all exit=1
+    FORCED=0
     $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe -m pytest tests/test_ratchet.py -v
     PASSED tests/test_ratchet.py::test_compare_no_new_violations_exits_0
     PASSED tests/test_ratchet.py::test_compare_planted_new_key_fails
