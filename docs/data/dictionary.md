@@ -346,59 +346,59 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 ## food
 
 ### food.diary_entries (table)
-- **Grain:** one row per diary entries (table); see schema.generated.md for columns.
+- **Grain:** one row per food diary entry (meal log), keyed by entry id.
 - **Canonical source:** `food.diary_entries`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `enforced` PK; `convention` links to foods/recipes; timestamps UTC.
 
 ### food.foods (table)
-- **Grain:** one row per foods (table); see schema.generated.md for columns.
+- **Grain:** one row per food item (canonical food catalog).
 - **Canonical source:** `food.foods`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `enforced` PK `food_id`; `convention` is_deleted/deleted_at soft-delete; source tracking.
 
 ### food.recipe_cook_states (table)
-- **Grain:** one row per recipe cook states (table); see schema.generated.md for columns.
+- **Grain:** one row per recipe cook state (checked steps/foods, timers).
 - **Canonical source:** `food.recipe_cook_states`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `enforced` PK/FK recipe_id -> recipes.
 
 ### food.recipe_ingredients (table)
-- **Grain:** one row per recipe ingredients (table); see schema.generated.md for columns.
+- **Grain:** one row per ingredient line in a recipe.
 - **Canonical source:** `food.recipe_ingredients`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `enforced` PK (recipe_id, ingredient_id); FKs to foods/recipes.
 
 ### food.recipe_step_foods (table)
-- **Grain:** one row per recipe step foods (table); see schema.generated.md for columns.
+- **Grain:** one row per food used in a recipe step.
 - **Canonical source:** `food.recipe_step_foods`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `enforced` PK (recipe_id, step_id, food_id, unit); FKs.
 
 ### food.recipe_steps (table)
-- **Grain:** one row per recipe steps (table); see schema.generated.md for columns.
+- **Grain:** one row per step in a recipe.
 - **Canonical source:** `food.recipe_steps`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `enforced` PK step_id; unique (recipe_id, step_no).
 
 ### food.recipes (table)
-- **Grain:** one row per recipes (table); see schema.generated.md for columns.
+- **Grain:** one row per recipe.
 - **Canonical source:** `food.recipes`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `enforced` PK recipe_id; soft-delete via is_deleted/deleted_at; FK food_id.
 
 ### food.tri_tip_events (table)
-- **Grain:** one row per tri tip events (table); see schema.generated.md for columns.
+- **Grain:** one row per tri-tip cooking event.
 - **Canonical source:** `food.tri_tip_events`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` event metadata.
 
 ### food.tri_tip_readings (table)
-- **Grain:** one row per tri tip readings (table); see schema.generated.md for columns.
+- **Grain:** one row per temperature reading during tri-tip cook.
 - **Canonical source:** `food.tri_tip_readings`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` time-series readings.
 
 ### food.vw_food_search (view)
-- **Grain:** one row per vw food search (view); see schema.generated.md for columns.
-- **Canonical source:** `food.vw_food_search`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per searchable food.
+- **Canonical source:** derived from `food.foods`.
+- **Rules:** `convention` read-only view.
 
 ### food.vw_usual_foods (view)
-- **Grain:** one row per vw usual foods (view); see schema.generated.md for columns.
-- **Canonical source:** `food.vw_usual_foods`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per frequently used food.
+- **Canonical source:** derived from `food.diary_entries`/`food.foods`.
+- **Rules:** `convention` read-only view.
 
 ## health
 
