@@ -2,7 +2,7 @@
 
 ## Trunk flow (D1, D2)
 
-`main` is the deployable trunk. Agents work on `agent/<task-id>-<slug>` branches cut from `main`, commit locally, and never push, merge, tag, or touch `main` (D2). The human reviews `git diff main...HEAD`, optionally runs the branch on the Pi with `test-up` (D3), squash-merges, pushes, tags `prd-YYYYMMDD`, and runs bootstrap. One task branch at a time; the human merges before the next starts.
+`main` is the deployable trunk. Agents work on a long-lived `agent/phase-<N>` branch cut from main at phase start, make one commit per task directly on it, and never push, tag, merge, switch branches, or touch `main` (D2). The human reviews flagged tasks with git show <hash> and the whole phase with the reviewer pack, optionally runs the branch on the Pi with test-up (D3), merges the phase branch to main with --no-ff, pushes, tags prd-YYYYMMDD, and runs bootstrap. One task at a time.
 
 PRD is whatever commit the Pi runs, recorded by a `prd-YYYYMMDD` tag; it can lag `main` (D1).
 

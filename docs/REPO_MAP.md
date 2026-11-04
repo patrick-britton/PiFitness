@@ -40,11 +40,11 @@ Folder purposes live here. How the folders work together lives in `docs/ARCHITEC
 | .clinerules/ | Always-loaded agent rules and verified environment facts (.clinerules/environment.md) | human | skill definitions or feature-specific designs | - |
 | .clinerules/workflows/ | Step-by-step agent workflow procedures (.clinerules/workflows/feature-design.md) | human | global rules or skill definitions | - |
 | .features/ | Feature lifecycle files: designs, descriptions, workflow tooling (.features/tools/fd.py) | human+agent | production application code | - |
-| .features/description_draft/ | Draft feature descriptions pending review (.features/description_draft/008-006--deprecate.md) | human+agent | approved designs or implementation code | - |
+
 | .features/descriptions/ | Legacy home of feature descriptions and food JSON copies; food payloads now live in docs/sample_json_food_payloads/ (.features/descriptions/json_food_responses/almond_responses.json) | human | production source code or approved designs | - |
 | .features/descriptions/json_food_responses/ | Legacy copy of food API JSON samples, superseded by docs/sample_json_food_payloads/ (.features/descriptions/json_food_responses/almond_responses.json) | human | implementation code or schema definitions | - |
 | .features/designs_active/ | Designs for features in progress (empty today; kept only if the Phase 4 workflow uses it) (.features/tools/fd.py) | human+agent | implementation code or approved designs | - |
-| .features/designs_complete/ | Designs for finished features (empty today; kept only if the Phase 4 workflow uses it) (.features/tools/fd.py) | human+agent | in-progress designs | - |
+
 | .features/tools/ | Feature workflow tooling (.features/tools/fd.py) | human+agent | feature designs or description files | - |
 | .features/zz_workfow_archive/ | Archived documents from earlier workflows, kept for reference (.features/zz_workfow_archive/bug-analysis.md) | human | active feature designs or current workflow rules | - |
 | .vscode/ | VS Code workspace settings and extension recommendations (.vscode/extensions.json) | human | application source code or build output | - |
@@ -148,10 +148,10 @@ Folder purposes live here. How the folders work together lives in `docs/ARCHITEC
 
 ## Known deviations
 
-Each deviation names the backlog item in `.audit/p1/backlog_phase1.md` that fixes it. They are recorded here so the map describes the target honestly; they are not fixed in Phase 1.
+Each deviation names the backlog item in `docs/workflow/BACKLOG.md` that fixes it. They are recorded here so the map describes the target honestly; they are not fixed in Phase 1.
 
 - **K1 (B1).** `backend/backend_functions/` imports `backend/pifitness/integrations/`, `backend/pifitness/integrations/spotify/` and `backend/pifitness/worker/`, while those folders import it back. This breaks G6 and creates three mutual dependencies.
 - **K2 (B1).** `pifitness/` importing `backend_functions/` is allowed only as a transition. It ends when the fold-in is done.
 - **K3 (B3, B4, B8).** Four folders look redundant or vestigial and need a keep-or-delete decision: `scripts/` (legacy), `agents/` (duplicates what `worker/` does), `backend/api/` (marker only), and `.features/descriptions/` (old home).
-- **K4 (B7).** `.features/designs_active/`, `.features/designs_complete/` and `docs/archive/` are empty and will not exist in a fresh clone unless they hold a placeholder file.
+- **K4 (B7).** `.features/designs_active/` and `docs/archive/` are empty and will not exist in a fresh clone unless they hold a placeholder file.
 - **K5 (B11).** The generated observed-dependency list shows no imports for `backend/`, although `backend/main.py` imports `pifitness.*`. The generator likely misses package-root imports, so repo_health must not trust it until that is checked.
