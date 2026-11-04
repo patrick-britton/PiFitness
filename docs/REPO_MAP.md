@@ -82,6 +82,7 @@ Folder purposes live here. How the folders work together lives in `docs/ARCHITEC
 | docs/reorg/ | Reorganization plan status and scratch notes (docs/reorg/STATUS.md) | human | application source code or anything the app imports | - |
 | docs/reorg/archive/ | Archived reorganization plans, blockers and handoff notes (docs/reorg/archive/README.md) | human | active project documentation or application code | - |
 | docs/sample_json_food_payloads/ | Reference JSON payloads for the food diary module; reference material only, not test fixtures (docs/sample_json_food_payloads/almond_responses.json) | human | application code or test fixtures | - |
+| docs/data/ | Generated schema map (docs/data/schema.generated.md) | generated | application source code | - |
 | docs/workflow/ | Workflow contract and target state (docs/workflow/TARGET_STATE.md) | human | application code or architecture docs | - |
 | frontend/ | Next.js frontend project root (frontend/pifitness/package.json) | human+agent | backend code or database files | - |
 | frontend/pifitness/ | Next.js application source and configuration (frontend/pifitness/next.config.ts) | human+agent | backend code, database dumps or build output | - |

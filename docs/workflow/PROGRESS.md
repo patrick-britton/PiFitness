@@ -266,3 +266,5 @@ date | task | model | event | evidence
 2026-11-04 | 3.0 | cline | GROOM-ESCALATE | B1: Size Large (split into features - fold backend/backend_functions into backend/pifitness/core/); cannot fit <=3 files; deferred past Phase 4
 2026-11-04 | 3.1 | cline | START | Migration spike and baseline (D4): inventory 9 deploy/migrations files, rename to dbmate format, create tools/db/migrate.*, set baseline on DEV
 2026-11-04 | 3.1 | cline | DONE | migrate.py status exit=0; baseline version 0 recorded on DEV; all 5 dbmate migrations pending; migrations 002-005 verified applying cleanly on DEV with rollback; migration 001 targets PRD pre-INT19b schema (_migration exists), correctly unavailable on current DEV (post-INT19b)
+2026-11-04 | 3.2 | cline | START | schema map generator and verify check
+2026-11-04 | 3.2 | cline | DONE | verify --scope db exit=0

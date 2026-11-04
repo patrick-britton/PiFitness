@@ -40,7 +40,7 @@ SCOPE_STEPS = {
     "frontend": ["tsc", "vitest"],
     "docs": [],
     "deploy": ["shellcheck"],
-    "db": [],
+    "db": ["schema-map"],
     "all": STEP_ORDER,
 }
 
@@ -201,6 +201,16 @@ def step_api_smoke():
     return True, [], 0, 1
 
 
+
+def step_schema_map():
+    rc,out,err=run_cmd([str(PYTHON),"tools/db/schema_map.py"])
+    if rc!=0:
+        print("schema_map generation failed:",err or out);return False,[],0,0
+    rc2,out2,_=run_cmd(["git","diff","--exit-code","docs/data/schema.generated.md"])
+    if rc2!=0:
+        print("schema.generated.md is out of date");return False,[],0,0
+    return True,[],0,0
+
 STEP_FUNCS = {
     "compile": step_compile,
     "tsc": step_tsc,
@@ -210,6 +220,7 @@ STEP_FUNCS = {
     "pytest": step_pytest,
     "vitest": step_vitest,
     "api-smoke": step_api_smoke,
+    "schema-map": step_schema_map,
 }
 
 

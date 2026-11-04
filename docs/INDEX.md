@@ -40,4 +40,4 @@ Seen during inventory but not in the table above, with reason:
 
 - `.audit/p1/*.md` and `.audit/evergreen_plan/*.md` — generated Phase 1 evidence, owned by `.audit/p1/README.md`; generated evidence must not be copied into other documents. (`.audit/p1/comments_hits.tsv` is TSV, not markdown.)
 - `.agents/skills/*/SKILL.md` (7 files) — agent skill definitions owned under `.agents/` (`docs/REPO_MAP.md` row), outside `docs/` and `.clinerules/`.
-- `README.md` — repo-root project summary, outside `docs/` and `.clinerules/`.
+- `README.md` — repo-root project summary, outside `docs/` and `.clinerules/`.| `docs/data/` (grouped: `schema.generated.md`) | Generated database schema map | generated |
