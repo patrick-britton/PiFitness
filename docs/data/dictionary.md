@@ -490,74 +490,74 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 ## logging
 
 ### logging.api_logins (table)
-- **Grain:** one row per api logins (table); see schema.generated.md for columns.
+- **Grain:** one row per API login event.
 - **Canonical source:** `logging.api_logins`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` audit log.
 
 ### logging.application_events (table)
-- **Grain:** one row per application events (table); see schema.generated.md for columns.
+- **Grain:** one row per application event.
 - **Canonical source:** `logging.application_events`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` event log.
 
 ### logging.db_size_log (table)
-- **Grain:** one row per db size log (table); see schema.generated.md for columns.
+- **Grain:** one row per DB size snapshot.
 - **Canonical source:** `logging.db_size_log`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` monitoring log.
 
 ### logging.db_stats (table)
-- **Grain:** one row per db stats (table); see schema.generated.md for columns.
+- **Grain:** one row per DB stats snapshot.
 - **Canonical source:** `logging.db_stats`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` monitoring log.
 
 ### logging.health_checks (table)
-- **Grain:** one row per health checks (table); see schema.generated.md for columns.
+- **Grain:** one row per health check result.
 - **Canonical source:** `logging.health_checks`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` monitoring log.
 
 ### logging.music_db_info (table)
-- **Grain:** one row per music db info (table); see schema.generated.md for columns.
+- **Grain:** one row per music DB info snapshot.
 - **Canonical source:** `logging.music_db_info`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` monitoring log.
 
 ### logging.task_executions (table)
-- **Grain:** one row per task executions (table); see schema.generated.md for columns.
+- **Grain:** one row per task execution record.
 - **Canonical source:** `logging.task_executions`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` execution log.
 
 ### logging.vw_all_event_history (view)
-- **Grain:** one row per vw all event history (view); see schema.generated.md for columns.
-- **Canonical source:** `logging.vw_all_event_history`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per event across history.
+- **Canonical source:** derived view.
+- **Rules:** `convention` read-only view.
 
 ### logging.vw_db_biggest_table_chart (view)
-- **Grain:** one row per vw db biggest table chart (view); see schema.generated.md for columns.
-- **Canonical source:** `logging.vw_db_biggest_table_chart`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per table size entry.
+- **Canonical source:** derived view.
+- **Rules:** `convention` read-only view.
 
 ### logging.vw_db_size (view)
-- **Grain:** one row per vw db size (view); see schema.generated.md for columns.
-- **Canonical source:** `logging.vw_db_size`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per DB size reading.
+- **Canonical source:** derived view.
+- **Rules:** `convention` read-only view.
 
 ### logging.vw_db_size_chart (view)
-- **Grain:** one row per vw db size chart (view); see schema.generated.md for columns.
-- **Canonical source:** `logging.vw_db_size_chart`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per DB size chart point.
+- **Canonical source:** derived view.
+- **Rules:** `convention` read-only view.
 
 ### logging.vw_event_analysis (view)
-- **Grain:** one row per vw event analysis (view); see schema.generated.md for columns.
-- **Canonical source:** `logging.vw_event_analysis`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per event analysis.
+- **Canonical source:** derived view.
+- **Rules:** `convention` read-only view.
 
 ### logging.vw_last_login (view)
-- **Grain:** one row per vw last login (view); see schema.generated.md for columns.
-- **Canonical source:** `logging.vw_last_login`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per last login.
+- **Canonical source:** derived view.
+- **Rules:** `convention` read-only view.
 
 ### logging.vw_task_analysis (view)
-- **Grain:** one row per vw task analysis (view); see schema.generated.md for columns.
-- **Canonical source:** `logging.vw_task_analysis`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per task analysis.
+- **Canonical source:** derived view.
+- **Rules:** `convention` read-only view.
 
 ## music
 
