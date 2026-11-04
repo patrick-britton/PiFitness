@@ -102,7 +102,7 @@ date | task | model | event | evidence
 
 2026-11-03 | 1.5 | human | REVIEW | phase 1.5 round 1 (reviewed at 13442f9): PASS 1.5.1b, 1.5.4, 1.5.5, 1.5.6, 1.5.7. FAIL 1.5.2 (class C), FAIL 1.5.3 (class T+W, task 1.5.9).
 2026-11-03 | 1.5.2 | human | REVIEW | criterion 1.5.2 amended: .clinerules is gitignored so git diff --stat cannot show it; replaced with size and content checks (reviewer measured 860 bytes).
-
+2026-11-03 | REVIEW phase 1.5: PASS | FAIL-fixed | FAIL-backlogged
 ---
 
 ## Deviations and observations (for the 1.5.8 reviewer pack)
