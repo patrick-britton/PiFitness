@@ -81,10 +81,10 @@ def run_step(step_id: str, fn, *args, **kwargs) -> ProcessStepResult:
 
 
 def verify_spotify(playlist_id: str) -> None:
-    """FR-8.6: after a successful send, re-pull the target playlist from Spotify
+    """After a successful send, re-pull the target playlist from Spotify
     and refresh the stored track order in music.playlist_isrcs.
 
-    FR-10: this step actively verifies its effect. playlist_to_db can silently
+    This step actively verifies its effect. playlist_to_db can silently
     no-op (early return) when no usable Spotify client is available, so we
     (1) require a working client up front and (2) confirm
     music.playlist_isrcs was actually refreshed before reporting success.
@@ -98,7 +98,7 @@ def verify_spotify(playlist_id: str) -> None:
 
     playlist_to_db(client, list_id=playlist_id)
 
-    # FR-10: confirm the re-pull actually refreshed the stored order in the DB.
+    # Confirm the re-pull actually refreshed the stored order in the DB.
     fresh = one_sql_result(
         "SELECT max(updated_at_utc) >= (CURRENT_TIMESTAMP - interval '5 minutes') "
         "FROM music.playlist_isrcs WHERE playlist_id = %s",

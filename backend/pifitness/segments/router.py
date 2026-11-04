@@ -3,7 +3,7 @@ Segments API Endpoints
 ======================
 
 FastAPI endpoints for segment data (courses/routes).
-Includes the Segment Management list endpoints (009-003, T02).
+Includes the Segment Management list endpoints.
 """
 
 from decimal import Decimal
@@ -53,7 +53,7 @@ router = APIRouter(prefix="/api", tags=["segments"])
 
 
 # ---------------------------------------------------------------------------
-# Segment Management list endpoints (009-003, T02)
+# Segment Management list endpoints
 # ---------------------------------------------------------------------------
 
 VALID_SEGMENT_KINDS = ('course', 'segment')
@@ -67,7 +67,7 @@ async def get_segment_activities_route(
     offset: int = 0,
 ):
     """
-    Source-activity selection list for Create Segment mode (009-003, FR-1).
+    Source-activity selection list for Create Segment mode.
 
     One row per activity (newest first) with type, start time, distance,
     child course/segment counts, and matched counts, per the
@@ -104,7 +104,7 @@ async def get_segment_list_route(
     activity_type: Optional[str] = None,
 ):
     """
-    Filterable segment/course picker list for Match Activities mode (009-003, FR-7).
+    Filterable segment/course picker list for Match Activities mode.
 
     Thin handler over the 009-002 get_leaderboard_segments helper (same
     vw_segments_effort_stats view, same legacy activity-type semantics), shaped
@@ -159,7 +159,7 @@ async def get_segment_courses_route(
     page_size: int = 20,
 ):
     """
-    Paginated course-review list (009-003, FR-15) matching the CoursesResponse
+    Paginated course-review list matching the CoursesResponse
     contract (total/total_pages for pager, is_new flag for new-course counts).
 
     Rows are enriched (T02c/OQ-4) with the course's reference-geometry
@@ -205,7 +205,7 @@ async def get_segment_courses_route(
             detail=f"Failed to fetch courses: {str(e)}",
         )
 # ---------------------------------------------------------------------------
-# Map styles (009-003, T04/FR-3)
+# Map styles
 # ---------------------------------------------------------------------------
 
 # Static basemap catalogue mirroring LeaderboardVisuals.buildStyleOptions:
@@ -229,7 +229,7 @@ _MAP_STYLES = [
 @router.get("/segments/map-styles")
 async def get_segment_map_styles():
     """
-    Available basemap styles for the Create Segment map selector (FR-3).
+    Available basemap styles for the Create Segment map selector.
 
     Returns the static catalogue plus satellite_available (Mapbox token
     present). No DB call — static list + one credential lookup, matching
@@ -246,7 +246,7 @@ async def get_segment_map_styles():
 @router.post("/segments/create", response_model=CreateSegmentResponse)
 async def create_segment_route(request: CreateSegmentRequest):
     """
-    Create a course/segment from an activity range (009-003, FR-5).
+    Create a course/segment from an activity range.
 
     Calls activities.segment_matching_segment_creation via the create_segment
     helper (creation → finalize → scoped update_segment_details, mirroring the
@@ -275,7 +275,7 @@ async def create_segment_route(request: CreateSegmentRequest):
 @router.post("/segments/reset", response_model=ResetResponse)
 async def reset_match_tables_route(request: ResetMatchTablesRequest):
     """
-    Destructive reset of matching state (009-003, FR-14).
+    Destructive reset of matching state.
 
     Truncates segment_matches, segment_match_exclusions, distinct_segments and
     segments_details, then resets activities.segments (RESTART IDENTITY
@@ -300,13 +300,13 @@ async def get_activity_route_endpoint(
     end_m: Optional[float] = None,
 ):
     """
-    Activity route + elevation for Create Segment mode (009-003, FR-2/FR-4).
+    Activity route + elevation for Create Segment mode.
 
     Returns path_coords ([lon, lat] pairs), elevations (1:1 aligned) and
-    elapsed_s (1:1 elapsed seconds, 009-003 T38/OQ-6) from
+    elapsed_s (1:1 elapsed seconds) from
     activities.activity_details, plus the activity distance_m, matching
     the RouteResponse contract. Optional start_m/end_m trims the range
-    (trim gates, FR-4). Declared before the legacy /segments/{segment_id}
+    (trim gates). Declared before the legacy /segments/{segment_id}
     routes below; static /activities, /list, /courses stay above so no
     path collision.
     """
@@ -352,13 +352,13 @@ async def get_all_segments():
 
 
 # ---------------------------------------------------------------------------
-# Matching pipeline (009-003, T06/FR-9..FR-12)
+# Matching pipeline
 # ---------------------------------------------------------------------------
 
 @router.post("/segments/{segment_id}/matches/find")
 async def find_matches_route(segment_id: int):
     """
-    Trigger the find-matches pipeline (FR-9): match_activities ->
+    Trigger the find-matches pipeline: match_activities ->
     pair_generation -> matches_all_polygon -> mass_confirmation(1).
     Synchronous blocking CALLs; the UI shows a spinner (OQ-1).
     Returns the refreshed candidate set (ScoringResponse shape).
@@ -375,7 +375,7 @@ async def find_matches_route(segment_id: int):
 @router.post("/segments/{segment_id}/matches/find/{step}")
 async def find_matches_step_route(segment_id: int, step: int):
     """
-    Run one step of the find-matches pipeline (009-003, T20/FR-9).
+    Run one step of the find-matches pipeline.
 
     The UI calls steps 1..4 in sequence and renders a per-step progress
     checklist; the SPs, order, and parameterization are identical to the
@@ -395,7 +395,7 @@ async def find_matches_step_route(segment_id: int, step: int):
 
 @router.get("/segments/{segment_id}/matches/candidates")
 async def get_candidates_route(segment_id: int):
-    """Candidate efforts with confidence/deviation metrics (FR-9, FR-10)."""
+    """Candidate efforts with confidence/deviation metrics."""
     try:
         seg = sql_to_dict(
             "SELECT segment_id FROM activities.segments WHERE segment_id = %s",
@@ -412,7 +412,7 @@ async def get_candidates_route(segment_id: int):
 
 @router.post("/segments/{segment_id}/matches/confirm")
 async def confirm_match_route(segment_id: int, request: ConfirmMatchRequest):
-    """Confirm one candidate effort (FR-11) via finalize_match(TRUE, ...)."""
+    """Confirm one candidate effort via finalize_match(TRUE, ...)."""
     try:
         return finalize_candidate_match(int(segment_id), int(request.activity_id), True)
     except ValueError as e:
@@ -424,7 +424,7 @@ async def confirm_match_route(segment_id: int, request: ConfirmMatchRequest):
 
 @router.post("/segments/{segment_id}/matches/reject")
 async def reject_match_route(segment_id: int, request: RejectMatchRequest):
-    """Reject one candidate effort (FR-11) via finalize_match(FALSE, ...)."""
+    """Reject one candidate effort via finalize_match(FALSE, ...)."""
     try:
         return finalize_candidate_match(int(segment_id), int(request.activity_id), False)
     except ValueError as e:
@@ -436,7 +436,7 @@ async def reject_match_route(segment_id: int, request: RejectMatchRequest):
 
 @router.post("/segments/{segment_id}/matches/bulk-confirm")
 async def bulk_confirm_route(segment_id: int, request: BulkConfirmRequest):
-    """Mass-approve remaining candidates (FR-11); requires confirm_all=true."""
+    """Mass-approve remaining candidates; requires confirm_all=true."""
     try:
         return bulk_confirm_matches(int(segment_id), bool(request.confirm_all))
     except ValueError as e:
@@ -448,7 +448,7 @@ async def bulk_confirm_route(segment_id: int, request: BulkConfirmRequest):
 
 @router.post("/segments/{segment_id}/matches/bulk-reject", response_model=BulkRejectResponse)
 async def bulk_reject_route(segment_id: int, request: Request):
-    """Reject every remaining candidate (009-003, T31/AC-20, AC-22).
+    """Reject every remaining candidate.
 
     Optional body {"confidence_over": n} rejects only rows with confidence
     strictly greater than n. Empty body / empty set -> 200 {"rejected": 0}.
@@ -478,7 +478,7 @@ async def bulk_reject_route(segment_id: int, request: Request):
 
 @router.post("/segments/{segment_id}/scoring/hausdorff")
 async def hausdorff_scoring_route(segment_id: int, request: HausdorffScoringRequest):
-    """Run Hausdorff scoring over the candidate set (FR-12); requires run_scoring=true."""
+    """Run Hausdorff scoring over the candidate set; requires run_scoring=true."""
     if not request.run_scoring:
         raise HTTPException(status_code=422, detail="run_scoring must be true")
     try:
@@ -492,7 +492,7 @@ async def hausdorff_scoring_route(segment_id: int, request: HausdorffScoringRequ
 
 @router.post("/segments/{segment_id}/scoring/frechet")
 async def frechet_scoring_route(segment_id: int, request: FrechetScoringRequest):
-    """Run Freschet scoring over the candidate set (FR-12); requires run_scoring=true."""
+    """Run Freschet scoring over the candidate set; requires run_scoring=true."""
     if not request.run_scoring:
         raise HTTPException(status_code=422, detail="run_scoring must be true")
     try:
@@ -505,13 +505,13 @@ async def frechet_scoring_route(segment_id: int, request: FrechetScoringRequest)
 
 
 # ---------------------------------------------------------------------------
-# Segment maintenance (009-003, T07/FR-13, FR-16)
+# Segment maintenance
 # ---------------------------------------------------------------------------
 
 @router.patch("/segments/{segment_id}/name", response_model=RenameResponse)
 async def rename_segment_route(segment_id: int, request: RenameSegmentRequest):
     """
-    Rename a course/segment (FR-16) from the course-review view.
+    Rename a course/segment from the course-review view.
 
     Single parameterized UPDATE (legacy update_course_name semantics).
     Blank name -> 422; unknown segment -> 404.
@@ -528,7 +528,7 @@ async def rename_segment_route(segment_id: int, request: RenameSegmentRequest):
 @router.delete("/segments/{segment_id}", response_model=DeleteSegmentResponse)
 async def delete_segment_route(segment_id: int):
     """
-    Delete a segment together with its match rows and detail records (FR-13).
+    Delete a segment together with its match rows and detail records.
 
     Also clears the segment's exclusion and distinct-segment rows (NO ACTION
     FK would otherwise block the parent DELETE). Transactional; unknown

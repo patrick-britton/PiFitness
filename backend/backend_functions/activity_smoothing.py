@@ -309,7 +309,7 @@ def activity_post_processing_steps(activity_id: int):
     # Segment matching (running, trail_running, treadmill_running, walking, hiking only)
     # The DB layer enforces same-activity-type matching (segment_matching_match_segments:
     # "Rule 1: Match the activity_type_id of the target segment"), so widening this
-    # gate to include walks/hikes is safe (OQ-6 / Bug T10-2 fix). Per the feature
+    # gate to include walks/hikes is safe. Per the feature
     # owner: walk = 'walking'(9)/'hiking'(3); run = 'running'(1)/'trail_running'(4)/
     # 'treadmill_running'(18).
     do_segment_matching = False

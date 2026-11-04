@@ -84,7 +84,7 @@ def _skip_step(step_id: str) -> ProcessStepResult:
 
 
 # ---------------------------------------------------------------------------
-# In-process concurrency guard (FR-1, OQ-4): one processing run at a time.
+# In-process concurrency guard: one processing run at a time.
 # A second concurrent run is rejected immediately.
 # ---------------------------------------------------------------------------
 _process_lock = threading.Lock()
@@ -124,7 +124,7 @@ def _run_step_data(step_id: str, fn, *args, **kwargs) -> ProcessStepResult:
 
 
 def _resolve_activity_id(activity_type: str) -> Optional[int]:
-    """Resolve the target activity via activities.vw_last_activity_id_by_type (T03/T04).
+    """Resolve the target activity via activities.vw_last_activity_id_by_type.
 
     activity_type is 'Walk' (last_walk mode) or 'Run' (last_run mode). The view
     bakes in most-recent selection (max activity_id) and distance constraints.
@@ -155,7 +155,7 @@ def _step_to_dict(step: ProcessStepResult) -> dict:
         try:
             # exclude_none: ProcessStepResultData carries several optional
             # fields; emitting them as null made the UI render stubs like
-            # "songs heard." on steps that never produced them (Bug T10-8).
+            # "songs heard." on steps that never produced them.
             d["result"] = step.result.model_dump(mode="json", exclude_none=True)
         except Exception:
             try:
@@ -176,12 +176,12 @@ def process_generator(req: ProcessActivityRequest):
     final terminal event with `complete: true`.
 
     Fixed order (AC-5): sync_activities → sync_details → resolve_activity →
-    [FR-8.1–8.7 shuffle sequence, only last_run + not no_music] → activity
+    [shuffle sequence, only last_run + not no_music] → activity
     post-processing (on the resolved activity_id) → summary.
-    Halts on first error (FR-9); every executed step emits a start (running)
-    event and exactly one terminal complete/error event (Bug #2 / FR-12).
+    Halts on first error; every executed step emits a start (running)
+    event and exactly one terminal complete/error event.
     """
-    # FR-1 / OQ-4: reject a concurrent second run.
+    # Reject a concurrent second run.
     if not _process_lock.acquire(blocking=False):
         yield json.dumps({
             "complete": True,
@@ -218,7 +218,7 @@ def process_generator(req: ProcessActivityRequest):
                 has_error = True
 
         # -------------------------------------------------------------------
-        # Step 3: Resolve Activity (FR-5/FR-6 — view-based, OQ-1/OQ-2)
+        # Step 3: Resolve Activity (view-based)
         # -------------------------------------------------------------------
         if not has_error:
             yield json.dumps(_start_event("resolve_activity")) + "\n"
@@ -258,8 +258,8 @@ def process_generator(req: ProcessActivityRequest):
                 has_error = True
 
         # -----------------------------------------------------------------------
-        # Step 4: FR-8 playlist shuffle sequence (only last_run + not no_music)
-        # Sub-steps in FR-8 order; each emits start + terminal events (Bug #2).
+        # Step 4: Playlist shuffle sequence (only last_run + not no_music)
+        # Sub-steps in order; each emits start + terminal events (Bug #2).
         # Runs BEFORE post-processing per AC-5.
         # -----------------------------------------------------------------------
         playlist_id: Optional[str] = None
@@ -276,7 +276,7 @@ def process_generator(req: ProcessActivityRequest):
                 ):
                     yield json.dumps(_step_to_dict(_skip_step(sid))) + "\n"
             else:
-                # FR-8.1: query heard songs for the target playlist (playlist_name
+                # Query heard songs for the target playlist (playlist_name
                 # scoped; the view derives its own time window — OQ-3).
                 yield json.dumps(_start_event("lookup_playlist")) + "\n"
                 t0 = time.perf_counter()
@@ -296,7 +296,7 @@ def process_generator(req: ProcessActivityRequest):
                 elif lookup_result.result:
                     playlist_id = lookup_result.result.playlist_id
 
-                # FR-8.2: insert listening history from the heard songs.
+                # Insert listening history from the heard songs.
                 if not has_error:
                     yield json.dumps(_start_event("insert_history")) + "\n"
                     result = run_step("insert_history", _insert_listening_history, playlist_name)
@@ -304,7 +304,7 @@ def process_generator(req: ProcessActivityRequest):
                     if result.status == "error":
                         has_error = True
 
-                # FR-8.4: read the target playlist order (default_new_order asc).
+                # Read the target playlist order (default_new_order asc).
                 if not has_error:
                     yield json.dumps(_start_event("query_isrc_stats")) + "\n"
                     t0 = time.perf_counter()
@@ -329,8 +329,8 @@ def process_generator(req: ProcessActivityRequest):
                     if result.status == "error":
                         has_error = True
 
-                # FR-8.5: send the compiled order to Spotify (halt on failure —
-                # never report success unverified, FR-10).
+                # Send the compiled order to Spotify (halt on failure —
+                # never report success unverified).
                 if not has_error:
                     yield json.dumps(_start_event("send_to_spotify")) + "\n"
                     result = run_step("send_to_spotify", _send_to_spotify, playlist_id, track_ids)
@@ -338,7 +338,7 @@ def process_generator(req: ProcessActivityRequest):
                     if result.status == "error":
                         has_error = True
 
-                # FR-8.6 (Bug #1 fix): re-pull from Spotify and refresh the
+                # (Bug #1 fix): re-pull from Spotify and refresh the
                 # stored order so future vw_watch_music_heard runs are correct.
                 if not has_error:
                     yield json.dumps(_start_event("verify_spotify")) + "\n"
@@ -347,7 +347,7 @@ def process_generator(req: ProcessActivityRequest):
                     if result.status == "error":
                         has_error = True
 
-                # FR-8.7: report the shuffled song count.
+                # Report the shuffled song count.
                 if not has_error:
                     yield json.dumps(_start_event("report_shuffle")) + "\n"
                     result = _run_step_data("report_shuffle", _report_shuffle, playlist_id)
@@ -426,7 +426,7 @@ def process_generator(req: ProcessActivityRequest):
                         break
 
         # -----------------------------------------------------------------------
-        # End-of-run summary (AC-11/FR-14)
+        # End-of-run summary
         # -----------------------------------------------------------------------
         summary_payload = None
         if not has_error:
@@ -442,7 +442,7 @@ def process_generator(req: ProcessActivityRequest):
     except Exception as e:
         yield json.dumps({"complete": True, "success": False, "error": f"Internal server error: {str(e)}"}) + "\n"
     finally:
-        # FR-1/OQ-4: always release the guard so future runs are not locked out.
+        # Always release the guard so future runs are not locked out.
         _process_lock.release()
 
 
@@ -451,14 +451,14 @@ async def process_activity(req: ProcessActivityRequest):
     """
     Run the activity processing pipeline (NDJSON stream).
 
-    Fixed order (AC-5), halting on first error (FR-9):
+    Fixed order (AC-5), halting on first error:
       sync_activities → sync_details → resolve_activity →
-      [FR-8.1–8.7 shuffle sequence, only last_run + not no_music] →
+      [shuffle sequence, only last_run + not no_music] →
       activity post-processing substeps (on the resolved activity_id) →
       summary + terminal event.
 
     Every executed step emits a start (running) event and exactly one terminal
-    complete/error event (Bug #2 / FR-12). One run at a time (FR-1).
+    complete/error event. One run at a time.
     """
     return StreamingResponse(
         process_generator(req),
@@ -541,10 +541,10 @@ def _insert_listening_history(playlist_name: str) -> Optional[ProcessStepResultD
 
 
 def _query_isrc_stats(playlist_id: str) -> list:
-    """FR-8.4: track send order from music.vw_playlist_isrc_stats (default_new_order asc).
+    """Track send order from music.vw_playlist_isrc_stats (default_new_order asc).
 
     Filter on the view's `playlist_id` column using the resolved target_playlist_id
-    (Bug T10-5 fix). `playlist_id` here is the target (child) playlist passed in from
+    (fix). `playlist_id` here is the target (child) playlist passed in from
     _lookup_playlist.
     """
     sql = (
@@ -559,16 +559,16 @@ def _query_isrc_stats(playlist_id: str) -> list:
 
 
 def _send_to_spotify(playlist_id: str, track_ids: list) -> None:
-    """FR-8.5: atomically replace the target playlist with the compiled track list."""
+    """Atomically replace the target playlist with the compiled track list."""
     client = get_spotify_client()
     playlist_upload(client, list_id=playlist_id, track_list=track_ids)
 
 
 def verify_spotify(playlist_id: str) -> None:
-    """FR-8.6 (Bug #1 fix): after a successful send, re-pull the target playlist
+    """After a successful send, re-pull the target playlist
     from Spotify and refresh the stored track order in music.playlist_isrcs.
 
-    FR-10: this step actively verifies its effect. playlist_to_db can silently
+    This step actively verifies its effect. playlist_to_db can silently
     no-op (early return) when no usable Spotify client is available, so we
     (1) require a working client up front and (2) confirm music.playlist_isrcs
     was actually refreshed before reporting success.
@@ -582,7 +582,7 @@ def verify_spotify(playlist_id: str) -> None:
 
     playlist_to_db(client, list_id=playlist_id)
 
-    # FR-10: confirm the re-pull actually refreshed the stored order in the DB.
+    # Confirm the re-pull actually refreshed the stored order in the DB.
     fresh = one_sql_result(
         "SELECT max(updated_at_utc) >= (CURRENT_TIMESTAMP - interval '5 minutes') "
         "FROM music.playlist_isrcs WHERE playlist_id = %s",
@@ -597,7 +597,7 @@ def verify_spotify(playlist_id: str) -> None:
 
 
 def _report_shuffle(playlist_id: str) -> ProcessStepResultData:
-    """FR-8.7: report the number of tracks sent to Spotify (target playlist)."""
+    """Report the number of tracks sent to Spotify (target playlist)."""
     count = one_sql_result(
         "SELECT count(*) FROM music.playlist_isrcs WHERE playlist_id = %s",
         (playlist_id,),
@@ -615,7 +615,7 @@ def _build_process_summary(
     activity_id: Optional[int],
     total_elapsed_ms: Optional[int] = None,
 ) -> ProcessSummaryData:
-    """Build the end-of-run summary (AC-11, FR-14).
+    """Build the end-of-run summary.
 
     Read-only DB reads; any failure degrades the affected fields to null so the
     summary can never convert a successful run into an error.
@@ -723,14 +723,14 @@ def _safe_int_default(value, default: int = 0) -> int:
 @router.get("/report")
 async def get_activity_report(activity_id: Optional[int] = None):
     """
-    Get the Recent Activity Report (004-006 T03).
+    Get the Recent Activity Report.
 
     Resolves the target via activities.f_report_header: no id = newest
     qualifying activity (run/walk/hike/trail, >1000 m, non-null path —
     resolved OQ-1 B); an explicit activity_id selects that qualifying
     activity and returns its prev/next nav ids. Header displays + HR come
     from the same single call; charts, course path, and efforts are separate
-    activity-scoped queries (~1 ms each, T02). Read-only; no writes.
+    activity-scoped queries (~1 ms each). Read-only; no writes.
 
     Args:
         activity_id: Optional qualifying activity id; default = newest.
@@ -813,7 +813,7 @@ async def get_activity_report(activity_id: Optional[int] = None):
             ))
 
         # Efficiency bullets (004-006): only run/trail-run efforts on a course;
-        # current values + prior-10 means come from the T02 view row.
+        # current values + prior-10 means come from the view row.
         efficiency = None
         if course_row and is_runish:
             def _metric(current_key: str, avg_key: str) -> ActivityEfficiencyMetric:
@@ -890,9 +890,9 @@ async def get_leaderboard_segments_route(
     activity_type: Optional[str] = None,
 ):
     """
-    Get the filterable segment/course list for the Leaderboards page (009-002, FR-1/FR-2).
+    Get the filterable segment/course list for the Leaderboards page.
 
-    Thin handler: validate -> call the T02 SQL helper (all filtering is
+    Thin handler: validate -> call the SQL helper (all filtering is
     server-side in `activities.vw_segments_effort_stats`) -> return rows.
     Returns a bare JSON array matching the SegmentListRow[] contract consumed
     by `API.activities.getLeaderboardSegments`.
@@ -939,14 +939,14 @@ async def get_leaderboard_segments_route(
 @router.get("/leaderboard/{segment_id}")
 async def get_leaderboard_route(segment_id: int):
     """
-    Get the ranked effort leaderboard for one segment/course (009-002, FR-4..FR-8).
+    Get the ranked effort leaderboard for one segment/course.
 
     Serves the live `activities.vw_segment_leaderboard` view directly (OQ-2:
     the legacy leaderboard_update is a no-write on-demand SELECT, so no refresh
     call is made; "refresh" for the client is simply re-fetching this endpoint).
-    gap_s is computed server-side by the T02 helper; all four rank columns are
-    returned so range/type switching stays client-side (FR-6/FR-7). `cycle_name`
-    (009-009 OQ-4/T17) carries the view's recency bucket, which is the client's
+    gap_s is computed server-side by the helper; all four rank columns are
+    returned so range/type switching stays client-side. `cycle_name`
+    carries the view's recency bucket, which is the client's
     authoritative membership signal for the lollipop buckets and the Range window.
 
     Args:
@@ -1024,9 +1024,9 @@ async def get_leaderboard_route(segment_id: int):
 
 def _map_visual_row(row: dict) -> SegmentVisualEffort:
     """
-    Map one aggregated view row to the SegmentVisualEffort contract (009-002, T05).
+    Map one aggregated view row to the SegmentVisualEffort contract.
 
-    The T02 telemetry helper returns parallel array columns (one sample per
+    The telemetry helper returns parallel array columns (one sample per
     canonical elapsed second). Zip them into the series point list — pure Python,
     no pandas. psycopg2 returns PG arrays as Python lists and the json path_coords column as a native list,
     so no per-element coercion is required beyond None-safety.
@@ -1079,11 +1079,11 @@ def _map_visual_row(row: dict) -> SegmentVisualEffort:
 @router.post("/leaderboard/visuals")
 async def post_leaderboard_visuals(request: LeaderboardVisualsRequest):
     """
-    Stage selected efforts and return generated replay + telemetry visuals (009-002, T05/FR-10).
+    Stage selected efforts and return generated replay + telemetry visuals.
 
     Transactionally TRUNCATEs + bulk-inserts the selected (activity_id, start/end
     point) rows into activities.temp_activity_segment_metas, then reads the
-    aggregated telemetry via the T02 helper and returns the SegmentVisuals
+    aggregated telemetry via helper and returns the SegmentVisuals
     contract (per-effort path_coords + zipped telemetry series). No pandas, no
     per-row loop inserts; range/type switching stays client-side so no re-fetch.
     """

@@ -1,5 +1,5 @@
 """
-Food Module Contract (010-002 T01, frozen).
+Food Module Contract (frozen).
 
 Mirrors frontend/pifitness/src/lib/types/food-contract.ts.
 Module map: exactly 5 tabs (Diary, Recipe Box, Food Database, Tri-tip
@@ -78,7 +78,7 @@ class FoodRow(BaseModel):
     food_id: int
     name: str
     nutrients: NutrientSnapshot
-    # T10 (OQ-8): feed standard serving for popup defaults/panels
+    # Feed standard serving for popup defaults/panels
     # (NULL = the row carries no usable serving).
     serving_size: Optional[float] = Field(None, gt=0)
     serving_unit: Optional[str] = None
@@ -248,7 +248,7 @@ class CombinedSearchResult(BaseModel):
     rank: int = Field(..., ge=0)
     result_source: str
     usda_score: Optional[float] = None
-    # T08 (OQ-6): natural keys + raw upstream hit body carried on the hit so
+    # Natural keys + raw upstream hit body carried on the hit so
     # the confirm popup can persist without a re-fetch, and combined_search
     # can suppress already-saved API duplicates. nutrients_raw is the raw
     # USDA hit (foodNutrients + servingSize) or raw OFF product, matching
@@ -257,7 +257,7 @@ class CombinedSearchResult(BaseModel):
     fdcId: Optional[int] = None
     barcode: Optional[str] = None
     nutrients_raw: Optional[dict] = None
-    # T10 (OQ-8): normalized per-100g nutrients + the feed's standard
+    # Normalized per-100g nutrients + the feed's standard
     # serving so the confirm popup can default + show exactly what will be
     # saved without a re-fetch (db rows from foods columns, usda from the
     # ranking mapper; null = unknown/failed-closed).
@@ -306,7 +306,7 @@ class LogApiEntryRequest(BaseModel):
     result_source: Optional[str] = None
 
 
-# T07: partial update request for food rows
+# Partial update request for food rows
 class UpdateFoodRequest(BaseModel):
     """Partial update request for food row fields."""
 
@@ -326,7 +326,7 @@ class UpdateFoodRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# 010-005 T12 (OQ-3) additions — persist-only pick; mirrors food-contract.ts.
+# 010-005 additions — persist-only pick; mirrors food-contract.ts.
 # ---------------------------------------------------------------------------
 
 

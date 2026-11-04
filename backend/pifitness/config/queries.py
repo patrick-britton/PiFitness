@@ -1,5 +1,5 @@
 """
-App-wide configuration endpoints (009-002 T08).
+App-wide configuration endpoints.
 
 Serves client-safe configuration the React frontend needs to render
 interactive surfaces. Currently exposes the Mapbox access token so the

@@ -98,7 +98,7 @@ def get_last_date(date_list):
 
 def col_value(df, col, return_type):
     # returns the specified values of a column if it exists in the dataframe
-    # Lazy pandas/numpy (009-010 T09, Pi-5): module-level imports were loading
+    # Lazy pandas/numpy: module-level imports were loading
     # pandas into the FastAPI process via database_functions; the only React
     # API caller needs list_to_dict_by_key, never these df helpers (legacy
     # Streamlit admin_module is the sole caller).
@@ -147,7 +147,7 @@ def col_value(df, col, return_type):
 
 def format_time_ago(timestamp):
     """Convert timestamp to human-readable time ago format"""
-    # Lazy pandas (009-010 T09): only pd.isna needs it here; keep the import
+    # Lazy pandas: only pd.isna needs it here; keep the import
     # local so the FastAPI process never loads pandas on import.
     import pandas as pd
 
@@ -198,7 +198,7 @@ def add_time_ago_column(df, timestamp_col, new_col_name='time_ago'):
 
 
 def convert_to_json_serializable(x):
-    # Lazy numpy (009-010 T09): isinstance checks only; keep local so the
+    # Lazy numpy: isinstance checks only; keep local so the
     # FastAPI process never loads numpy on import.
     import numpy as np
 

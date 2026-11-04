@@ -281,7 +281,7 @@ def add_point(
 ) -> Dict[str, Any]:
     """
     Record one point for a team, optionally carrying a notable-play
-    event_type written at creation (006-002, Bug T08-3: the UI holds a
+    event_type written at creation (the UI holds a
     selected event and writes it alongside the next point). Only valid
     while the game is 'active'. The point's recorded_at is server-assigned
     (DEFAULT now()); started_at is kept equal to MIN(recorded_at) of the

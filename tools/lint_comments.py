@@ -14,6 +14,7 @@ Exit codes: 0 no new violations; 1 new violations; stale baseline keys print PRU
 import argparse
 import hashlib
 import re
+import string
 import sys
 from pathlib import Path
 
@@ -108,6 +109,138 @@ def extract_comment_spans(text: str):
                 yield (i, stripped)
 
 
+_PUNCT_TABLE = str.maketrans("", "", string.punctuation + " ")
+
+
+def _strip_markers(comment: str) -> str:
+    """Remove every ID / change-history marker from a comment, then all punctuation."""
+    cleaned = BUG_TASK_RE.sub("", comment)
+    cleaned = FEATURE_ID_RE.sub("", cleaned)
+    cleaned = BUG_ID_RE.sub("", cleaned)
+    cleaned = TASK_ID_RE.sub("", cleaned)
+    cleaned = PLAN_TASK_ID_RE.sub("", cleaned)
+    cleaned = DATE_RE.sub("", cleaned)
+    cleaned = CHANGE_HISTORY_RE.sub("", cleaned)
+    return cleaned.translate(_PUNCT_TABLE)
+
+
+def _has_marker(comment: str) -> bool:
+    """True when the comment contains at least one ID / change-history marker."""
+    return any(pat.search(comment)
+               for pat in (BUG_TASK_RE, FEATURE_ID_RE, BUG_ID_RE, TASK_ID_RE,
+                           PLAN_TASK_ID_RE, DATE_RE, CHANGE_HISTORY_RE))
+
+
+def is_tier_a(comment: str) -> bool:
+    """True when a comment consists only of IDs / change-history notes.
+
+    Such a comment carries no "what and how" content and may be deleted
+    outright (tier A). A comment that also holds substantive wording is
+    tier B and must be rewritten by hand. Pure decorative dividers or
+    plain comments with no marker are NOT tier A.
+    """
+    if not comment.strip():
+        return False
+    return _has_marker(comment) and _strip_markers(comment) == ""
+
+
+def _line_offsets(text: str):
+    lines = text.splitlines(keepends=True)
+    offsets = []
+    o = 0
+    for ln in lines:
+        offsets.append(o)
+        o += len(ln)
+    return lines, offsets
+
+
+def comment_spans(text: str):
+    """Yield (start, end, line_number, comment_text) for each comment span."""
+    lines, offsets = _line_offsets(text)
+    in_docstring = False
+    docstring_quote = None
+    docstring_start_line = None
+    docstring_start_offset = None
+    for i, line in enumerate(lines):
+        line_no = i + 1
+        line_start = offsets[i]
+        stripped = line.strip()
+        if in_docstring:
+            idx = stripped.find(docstring_quote)
+            if idx >= 0:
+                end_offset = line_start + idx + len(docstring_quote)
+                yield (docstring_start_offset, end_offset, docstring_start_line,
+                       text[docstring_start_offset:end_offset])
+                in_docstring = False
+                docstring_quote = None
+            continue
+        dq_start = -1
+        dq_quote = None
+        for quote in ('"""', "'''"):
+            idx = stripped.find(quote)
+            if idx >= 0:
+                after = stripped[idx + len(quote):]
+                if quote not in after:
+                    dq_start = idx
+                    dq_quote = quote
+                    break
+        if dq_start >= 0:
+            content = stripped[dq_start + len(dq_quote):]
+            if dq_quote in content:
+                close_idx = content.find(dq_quote)
+                end_offset = line_start + dq_start + len(dq_quote) + close_idx + len(dq_quote)
+                yield (line_start + dq_start, end_offset, line_no, content[:close_idx])
+            else:
+                in_docstring = True
+                docstring_quote = dq_quote
+                docstring_start_line = line_no
+                docstring_start_offset = line_start + dq_start
+            continue
+        cidx = stripped.find("#")
+        if cidx >= 0:
+            yield (line_start + cidx, line_start + len(stripped), line_no,
+                   stripped[cidx + 1:].strip())
+
+
+def _line_start_offset(text: str, offset: int) -> int:
+    return text.rfind("\n", 0, offset) + 1
+
+
+def _line_end_offset(text: str, offset: int) -> int:
+    nl = text.find("\n", offset)
+    return nl if nl >= 0 else len(text)
+
+
+def fix_tier_a(path: Path) -> int:
+    """Delete tier-A comments (IDs / change-history only) from one file."""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    spans = list(comment_spans(text))
+    new_text = text
+    removed = 0
+    for start, end, _line_no, comment in reversed(spans):
+        if not is_tier_a(comment):
+            continue
+        line_start = _line_start_offset(new_text, start)
+        line_end = _line_end_offset(new_text, end)
+        before = new_text[line_start:start]
+        if before.strip() == "":
+            # Full-line comment: drop the line and its terminator.
+            cut_start = line_start
+            cut_end = line_end
+            if cut_end < len(new_text) and new_text[cut_end] == "\r":
+                cut_end += 1
+            if cut_end < len(new_text) and new_text[cut_end] == "\n":
+                cut_end += 1
+            new_text = new_text[:cut_start] + new_text[cut_end:]
+        else:
+            # Inline comment: drop from the '#' to end of line.
+            new_text = new_text[:start] + new_text[line_end:]
+        removed += 1
+    if removed:
+        path.write_text(new_text, encoding="utf-8")
+    return removed
+
+
 def scan_file(path: Path):
     """Scan a file for comment violations. Returns list of (key, detail) tuples."""
     violations = []
@@ -199,6 +332,7 @@ def main():
     ap.add_argument("--baseline", default=None, help="baseline file path")
     ap.add_argument("--update-baseline", action="store_true", help="write current violations to the baseline")
     ap.add_argument("--allow-grow", action="store_true", help="allow growing the baseline (human only)")
+    ap.add_argument("--fix-tier-a", action="store_true", help="delete comments that consist only of an ID or history note")
     args = ap.parse_args()
 
     baseline_path = Path(args.baseline) if args.baseline else (BASELINE_DIR / "lint_comments.txt")
@@ -213,6 +347,13 @@ def main():
     all_violations = []
     for f in files:
         all_violations.extend(scan_file(f))
+
+    if args.fix_tier_a:
+        total = 0
+        for f in files:
+            total += fix_tier_a(f)
+        print(f"lint_comments: removed {total} tier-A comment(s)")
+        return 0
 
     if args.update_baseline:
         write_baseline(baseline_path, [key for key, _ in all_violations], args.allow_grow)

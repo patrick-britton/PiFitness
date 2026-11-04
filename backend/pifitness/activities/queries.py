@@ -205,7 +205,7 @@ def get_activity_stats(activity_id: int) -> Optional[Dict[str, Any]]:
 
 def get_activity_report_target(activity_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
     """
-    Resolve the report target + header + prev/next nav in ONE call (004-006 T03).
+    Resolve the report target + header + prev/next nav in ONE call.
 
     Calls activities.f_report_header(p_activity_id): NULL resolves the newest
     qualifying activity (run/walk/hike/trail, >1000 m, non-null path — OQ-1 B);
@@ -228,10 +228,10 @@ def get_activity_report_charts(activity_id: int) -> List[Dict[str, Any]]:
     """
     Per-minute elevation + heartrate series for an activity (009-006),
     extended 004-006 with the bucket's cumulative `distance_m`
-    (max(distance_mm)/1000) so charts share a distance x-axis. T09 narrowed
+    (max(distance_mm)/1000) so charts share a distance x-axis. narrowed
     the select: pace/speed columns and the minute key were dropped with the
     removed pace chart (final contract: distance_m/elevation_m/heartrate_bpm).
-    The aggregate filters on the (activity_id, ts_utc) PK prefix (T02 EXPLAIN:
+    The aggregate filters on the (activity_id, ts_utc) PK prefix (EXPLAIN:
     ~7 ms; no seq scans, no spills).
 
     Args:
@@ -302,9 +302,9 @@ def get_activity_course_path(activity_id: int) -> List[List[float]]:
 
 def get_activity_report_efforts(activity_id: int) -> List[Dict[str, Any]]:
     """
-    Retrieve course + crossed-segment comparison rows for the report (004-006 T03).
+    Retrieve course + crossed-segment comparison rows for the report.
 
-    Reads activities.vw_report_segment_efforts (T02): per-segment efforts for
+    Reads activities.vw_report_segment_efforts: per-segment efforts for
     this activity with best-excluding-current deltas, prior attempt, RANK-style
     all-time rank, scoped total_attempts, the current attempt's efficiency
     metrics, and prior-10 averages. Replaces the old vw_activity_summary +
@@ -326,7 +326,7 @@ def get_activity_report_efforts(activity_id: int) -> List[Dict[str, Any]]:
     return result if result else []
 
 
-# Legacy activity-type filter semantics (FR-2): Run matches '%run%' but excludes
+# Legacy activity-type filter semantics: Run matches '%run%' but excludes
 # trail-run types; every other type matches by its type-name pattern.
 _ACTIVITY_TYPE_PATTERNS = {
     'Run': "activity_type_name ILIKE %s AND activity_type_name NOT ILIKE %s",
@@ -354,13 +354,13 @@ def get_leaderboard_segments(
     activity_type: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Retrieve the filterable segment/course list for the Leaderboards page (009-002, FR-1/FR-2).
+    Retrieve the filterable segment/course list for the Leaderboards page.
 
     Reads `activities.vw_segments_effort_stats` (per-segment; OQ-1) and applies:
-    - name: case-insensitive substring on segment_name (FR-2)
-    - kind: 'course' -> is_course, 'segment' -> NOT is_course, None -> both (FR-2)
-    - min_distance: distance_mi >= min_distance (FR-2)
-    - activity_type: legacy type-name patterns; Run excludes trail types (FR-2)
+    - name: case-insensitive substring on segment_name
+    - kind: 'course' -> is_course, 'segment' -> NOT is_course, None -> both
+    - min_distance: distance_mi >= min_distance
+    - activity_type: legacy type-name patterns; Run excludes trail types
 
     All filters are server-side (AC-1); SQL is parameterized (no string interpolation).
 
@@ -447,17 +447,16 @@ def get_segment_reference_windows(
 
 def get_segment_leaderboard(segment_id: int) -> List[Dict[str, Any]]:
     """
-    Retrieve the ranked effort leaderboard for one segment/course (009-002, FR-4..FR-8).
+    Get the ranked effort leaderboard for one segment/course.
 
     Serves the live `activities.vw_segment_leaderboard` view directly (OQ-2: the legacy
     leaderboard_update is a no-write on-demand SELECT, so no refresh call is made).
     Computes server-side:
-    - gap_s: seconds behind the segment's fastest effort (FR-8)
-    - rank:  row_number by all_time_rank (client re-filters by range via the
-             four rank columns; FR-6/AC-5)
+    - gap_s: seconds behind the segment's fastest effort
+    - rank: row_number by all_time_rank (client re-filters by range via the four rank columns)
 
     Also projects `cycle_name` — the view's pre-computed recency bucket
-    ('Current Cycle' | 'Last 365' | 'All Time', 009-009 OQ-4/T17). It is the ONLY
+    ('Current Cycle' | 'Last 365' | 'All Time'). It is the ONLY
     membership signal for the lollipop buckets and the Range window: the rank
     columns stay window-scoped ORDERING values (live check 2026-09-16: both
     remaining rank columns are non-NULL for every row, so null-checks cannot
@@ -532,10 +531,10 @@ def get_segment_leaderboard(segment_id: int) -> List[Dict[str, Any]]:
 
 def get_segment_visuals_telemetry() -> List[Dict[str, Any]]:
     """
-    Retrieve the generated comparison telemetry for the staged efforts (009-002, FR-10).
+    Retrieve the generated comparison telemetry for the staged efforts.
 
     Reads `activities.vw_activity_segments_aggregated`, built off `vw_segment_comps`
-    joining the `temp_activity_segment_metas` staging table (staged by the T05 visuals
+    joining the `temp_activity_segment_metas` staging table (staged by the visuals
     endpoint before this helper runs). Projects only the columns the SegmentVisuals
     contract consumes; the view downsamples to one sample per canonical elapsed second.
 
@@ -570,7 +569,7 @@ def get_segment_visuals_telemetry() -> List[Dict[str, Any]]:
 def stage_leaderboard_visuals(segment_id: int, efforts: List[Dict[str, Any]]) -> None:
     """
     Transactionally TRUNCATE + set-based multi-row INSERT of the selected efforts
-    into activities.temp_activity_segment_metas (009-002, T05).
+    into activities.temp_activity_segment_metas.
 
     A single parameterized execute_values statement replaces the legacy per-row
     f-string loop, so the
@@ -615,14 +614,14 @@ def get_activity_route(
     end_m: Optional[float] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    Retrieve route geometry + elevation for Segment Management (009-003, T03/FR-2, FR-4).
+    Retrieve route geometry + elevation for Segment Management.
 
     Single activity-meta lookup plus ONE ordered GPS scan of
     activities.activity_details (lat/lon non-null, ordered by ts_utc):
     path_coords as [lon, lat] pairs, elevations aligned 1:1 with path points,
     and elapsed_s (per-point elapsed seconds from elapsed_duration_s, 1:1
-    aligned — 009-003 T38/OQ-6; elapsed seconds only, never a timestamp).
-    Optional start_m/end_m trims by distance_mm (trim-gate support, FR-4);
+    aligned — elapsed seconds only, never a timestamp).
+    Optional start_m/end_m trims by distance_mm (trim-gate support);
     None = full range. Parameterized, no pandas, no in-memory rollups.
 
     Args:
@@ -664,8 +663,7 @@ def get_activity_route(
 
 def get_match_candidates(segment_id: int) -> Dict[str, Any]:
     """
-    Retrieve candidate efforts + existing match count for Match Activities mode
-    (009-003, T06/FR-9, FR-10).
+    Retrieve candidate efforts + existing match count for Match Activities mode.
 
     Reads the live activities.vw_temp_segment_matches_downselect rows for the
     segment and joins per-activity distance/elevation. ONE query for
@@ -723,7 +721,7 @@ def get_match_candidates(segment_id: int) -> Dict[str, Any]:
         start = r.get("start_time_utc")
         data.append({
             "activity_id": int(r["activity_id"]),
-            # Matched effort window inside the candidate activity (T06b/OQ-3).
+            # Matched effort window inside the candidate activity.
             # The columns are already fetched above; the UI needs them to draw
             # the candidate's own route instead of the whole activity.
             "best_start_dist": int(r["best_start_dist"]) if r["best_start_dist"] is not None else 0,
@@ -747,7 +745,7 @@ def get_match_candidates(segment_id: int) -> Dict[str, Any]:
     return {"data": data, "count": len(data), "existing_match_count": existing_match_count}
 
 
-# The four legacy find-matches pipeline steps, in order (009-003, T06/T20/FR-9).
+# The four legacy find-matches pipeline steps, in order.
 # `uses_segment_id` marks the SPs that take the segment id parameter; the split
 # (run_find_step) and all-in-one (run_find_matches) flows share this table so
 # they cannot drift.
@@ -761,7 +759,7 @@ _FIND_STEPS: Dict[int, tuple] = {
 
 def run_find_matches(segment_id: int) -> Dict[str, Any]:
     """
-    Run the legacy find-matches pipeline for a segment (009-003, T06/FR-9).
+    Run the legacy find-matches pipeline for a segment.
 
     Exact legacy sequence from segment_creation.py::render_segment_matches:
     match_activities -> pair_generation -> matches_all_polygon ->
@@ -785,7 +783,7 @@ def run_find_matches(segment_id: int) -> Dict[str, Any]:
 
 def run_find_step(segment_id: int, step: int) -> Dict[str, Any]:
     """
-    Run ONE step of the find-matches pipeline (009-003, T20/FR-9).
+    Run ONE step of the find-matches pipeline.
 
     The match view runs steps 1..4 in sequence (same SPs, same order as
     run_find_matches — no algorithm change) so the UI can show a per-step
@@ -825,7 +823,7 @@ def finalize_candidate_match(
     segment_id: int, activity_id: int, approved: bool
 ) -> Dict[str, Any]:
     """
-    Confirm or reject one candidate effort (009-003, T06/FR-11).
+    Confirm or reject one candidate effort.
 
     Looks up best_start/end_dist + confidence from
     vw_temp_segment_matches_downselect, CALLs
@@ -884,7 +882,7 @@ def finalize_candidate_match(
 
 def bulk_confirm_matches(segment_id: int, confirm_all: bool) -> Dict[str, Any]:
     """
-    Mass-approve remaining candidates (009-003, T06/FR-11).
+    Mass-approve remaining candidates.
 
     Legacy flow: segment_matching_mass_confirmation(4) +
     staging.update_segment_details(NULL). Requires confirm_all=True.
@@ -1008,7 +1006,7 @@ def bulk_reject_matches(
 
 def run_extra_scoring(segment_id: int, kind: str) -> Dict[str, Any]:
     """
-    Run Hausdorff or Freschet scoring over the candidate set (009-003, T06/FR-12).
+    Run Hausdorff or Freschet scoring over the candidate set.
 
     Legacy: segment_matches_all_hausdorff() / segment_matches_all_freschet().
     Returns the refreshed candidate set (ScoringResponse shape).
@@ -1040,7 +1038,7 @@ def create_segment(
     is_course: bool,
 ) -> int:
     """
-    Create a course/segment from an activity range (009-003, T05/FR-5).
+    Create a course/segment from an activity range.
 
     Mirrors the legacy frontend_functions/segment_creation.py::new_segment_creation
     flow exactly: CALL activities.segment_matching_segment_creation, resolve the
@@ -1112,7 +1110,7 @@ def create_segment(
 
 def delete_segment(segment_id: int) -> Dict[str, Any]:
     """
-    Delete a segment with its match rows and detail records (009-003, T07/FR-13).
+    Delete a segment with its match rows and detail records.
 
     Mirrors the legacy Streamlit delete flow (segment_matches -> segments ->
     segments_details) but adds the child tables that reference the segment, in
@@ -1124,7 +1122,7 @@ def delete_segment(segment_id: int) -> Dict[str, Any]:
     - activities.distinct_segments: derived pair rows keyed by segment_id /
       match_seg_id; removed so no orphan pairing rows survive.
     - activities.segment_matches, activities.segments_details: match + effort
-      records for the segment (FR-13).
+      records for the segment.
     - activities.segments: the segment row itself.
 
     Five parameterized single-row DELETEs on a single connection (Pi-5: no
@@ -1197,7 +1195,7 @@ def delete_segment(segment_id: int) -> Dict[str, Any]:
 
 def reset_match_tables(confirm_reset: bool) -> Dict[str, Any]:
     """
-    Destructive reset of matching data (009-003, T07/FR-14).
+    Destructive reset of matching data.
 
     Legacy sequence (segment_creation.py reset button): TRUNCATE
     segment_matches -> segment_match_exclusions -> distinct_segments ->
@@ -1207,7 +1205,7 @@ def reset_match_tables(confirm_reset: bool) -> Dict[str, Any]:
     segment_id identity, so surviving effort rows would re-attach to newly
     created segments that recycle those ids (phantom efforts / leaderboard
     rows). Legacy left them behind; resetting them keeps the wipe consistent
-    with the per-segment delete in delete_segment (FR-13).
+    with the per-segment delete in delete_segment.
 
     All five TRUNCATEs run in ONE transaction on a single connection, so a
     failure leaves the matching data untouched. TRUNCATE does not scan rows
@@ -1257,7 +1255,7 @@ def reset_match_tables(confirm_reset: bool) -> Dict[str, Any]:
 
 def rename_segment(segment_id: int, new_name: str) -> Dict[str, Any]:
     """
-    Rename a course/segment (009-003, T07/FR-16).
+    Rename a course/segment.
 
     Args:
         segment_id: The course/segment to rename.
@@ -1291,7 +1289,7 @@ def rename_segment(segment_id: int, new_name: str) -> Dict[str, Any]:
 
 def get_segment_name(segment_id: int) -> str:
     """
-    Resolve the segment_name for a segment_id (009-002, T05).
+    Resolve the segment_name for a segment_id.
 
     Used by the visuals endpoint to populate the SegmentVisuals.segment_name
     contract field from the request's segment_id. Falls back to "" when unknown.
@@ -1311,7 +1309,7 @@ def get_segment_activities(
     offset: int = 0,
 ) -> List[Dict[str, Any]]:
     """
-    Retrieve the source-activity selection list for Segment Management (009-003, T02/FR-1).
+    Retrieve the source-activity selection list for Segment Management.
 
     One row per activity in activities.activities (newest first) with:
     - child_segment_count: segments created FROM this activity
@@ -1381,7 +1379,7 @@ def get_courses_page(
     page_size: int = 20,
 ) -> Dict[str, Any]:
     """
-    Retrieve the paginated course-review list for Segment Management (009-003, T02/FR-15).
+    Retrieve the paginated course-review list for Segment Management.
 
     Reads activities.vw_segments_effort_stats filtered to is_course rows and
     projects the CourseInfo contract shape (segment_id -> course_id,
@@ -1462,14 +1460,14 @@ __all__ = [
     'get_segment_visuals_telemetry',
     'stage_leaderboard_visuals',
     'get_segment_name',
-    # 009-003 Segment Management (T02)
+    # 009-003 Segment Management
     'get_segment_activities',
     'get_courses_page',
-    # 009-003 Segment Management (T02b)
+    # 009-003 Segment Management
     'get_segment_reference_windows',
-    # 009-003 Segment Management (T03)
+    # 009-003 Segment Management
     'get_activity_route',
-    # 009-003 Segment Management (T06)
+    # 009-003 Segment Management
     'get_match_candidates',
     'run_find_matches',
     'run_find_step',
@@ -1477,9 +1475,9 @@ __all__ = [
     'bulk_confirm_matches',
     'bulk_reject_matches',
     'run_extra_scoring',
-    # 009-003 Segment Management (T05)
+    # 009-003 Segment Management
     'create_segment',
-    # 009-003 Segment Management (T07)
+    # 009-003 Segment Management
     'delete_segment',
     'reset_match_tables',
     'rename_segment',

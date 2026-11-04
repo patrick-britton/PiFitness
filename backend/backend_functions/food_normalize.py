@@ -1,6 +1,6 @@
-"""Normalize USDA/OFF payloads to per-100g NULL-safe rows (010-002 T03).
+"""Normalize USDA/OFF payloads to per-100g NULL-safe rows.
 
-T12 (Bug 010-003-T12-1): BOTH branded and survey/legacy search payloads carry
+BOTH branded and survey/legacy search payloads carry
 foodNutrients ALREADY per-100g (derivationCode LCCS = label per-serving value
 converted upstream by USDA; proven on the almond fixture where 36/37 branded
 rows have P+F+C grams exceeding serving grams — a per-serving basis is
@@ -25,7 +25,7 @@ USDA_TO_COL = {
     "theobromine": None,  # tracked upstream but not a foods column
 }
 
-# T12 (Bug 010-003-T12-1): Foundation energy fallback by nutrientId —
+# Foundation energy fallback by nutrientId —
 # prefer 1008 (Energy), else 2048 (Atwater Specific Factors, e.g. almond
 # flour fdcId 2261420 = 578), else 2047 (Atwater General Factors = 622).
 # By-id so the two Atwater rows never both map to kcal with last-wins.
@@ -65,14 +65,14 @@ def parse_serving_grams(size: Any, unit: Any) -> Optional[float]:
     return grams * factor
 
 
-# T10 (OQ-8): unit families the AmountPicker knows; anything else fails closed.
+# Unit families the AmountPicker knows; anything else fails closed.
 _SERVING_G_FAMILY = {"g", "gram", "grams", "grm"}
 _SERVING_ML_FAMILY = {"ml", "mlt", "milliliter", "millilitre"}
 
 
 def serving_fields(size: Any, unit: Any,
                    text: Any = None) -> Tuple[Optional[float], Optional[str], Optional[str]]:
-    """T10 (OQ-8): parse a feed serving into foods.foods serving columns.
+    """Parse a feed serving into foods.foods serving columns.
 
     Returns (size, unit, text): size via `parse_serving_grams` (fail-closed),
     unit = 'g' | 'ml' (what the picker/kcal table understands), text = the
@@ -99,7 +99,7 @@ def serving_fields(size: Any, unit: Any,
 def normalize_usda_branded(food: Dict[str, Any]) -> Tuple[Dict[str, Any], bool, str]:
     """Normalize a branded FDC food dict to per-100g columns (NULL-safe).
 
-    T12 (Bug 010-003-T12-1): search-payload foodNutrients are ALREADY per-100g
+    search-payload foodNutrients are ALREADY per-100g
     — pass values through with NO serving rescale (the old 100/grams factor
     manufactured phantom kcal, e.g. raw 571 on a 28 g row -> 2039).
     Unparseable serving no longer NULLs nutrients (they are usable as-is);
@@ -130,7 +130,7 @@ def normalize_usda_branded(food: Dict[str, Any]) -> Tuple[Dict[str, Any], bool, 
 def normalize_usda_survey(food: Dict[str, Any]) -> Dict[str, Any]:
     """Survey/Legacy/Foundation rows are already per-100g: extract, NULL when absent.
 
-    T12: energy resolved by nutrientId — 1008 first, else 2048 (Atwater
+    energy resolved by nutrientId — 1008 first, else 2048 (Atwater
     Specific), else 2047 (Atwater General). Foundation rows (e.g. almond
     flour fdcId 2261420) carry energy ONLY under the Atwater ids.
     """

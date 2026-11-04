@@ -9,7 +9,7 @@ Usage:
     from backend.config import get_settings
 
     settings = get_settings()
-    print(settings.db_host)  # '192.168.86.104' on Windows, 'localhost' on Linux
+    print(settings.db_host)  # on Windows, 'localhost' on Linux
 """
 
 import os

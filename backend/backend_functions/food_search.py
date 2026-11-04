@@ -1,4 +1,4 @@
-"""010-003 T04 — backend search/suggest/persist-on-log (FastAPI + queries).
+"""Backend search/suggest/persist-on-log (FastAPI + queries).
 
 USDA candidate fetch (2 parallel + fallback) + OQ-4 tiered ranking, a ~1-day
 normalized-query cache, and the pick-logging tuning hook. Payloads are trimmed
@@ -116,7 +116,7 @@ def _relevance_tier(name: str, query_words: List[str]) -> int:
 
 
 def name_bonus(name: str, query: str) -> int:
-    """T09 (OQ-7): exact/word-boundary/start bonus for USDA ranking.
+    """Exact/word-boundary/start bonus for USDA ranking.
 
     0 = name equals query (case-insensitive); 1 = name starts with the
     query string; 2 = every query word is a whole word in the name;
@@ -161,7 +161,7 @@ def _plausibility_penalty(nuts: Dict[str, Any],
     return pen
 
 
-# T12 (Bug 010-003-T12-1): consensus / outlier / density checks.
+# Consensus / outlier / density checks.
 # Pure-Python, O(n) over the fetched hits, stdlib only (no pandas).
 # All outcomes are penalty/review_reason annotations — never a block.
 
@@ -299,7 +299,7 @@ _PANEL_EXTRA = ("satfat", "transfat", "cholesterol", "sodium", "fiber",
 
 
 def quality_label(extra_present: int) -> str:
-    # T09 (OQ-7): survey/SR-Legacy rows top out at 6/11 extras, so High
+    # Survey/SR-Legacy rows top out at 6/11 extras, so High
     # starts at 6 — the old 8/4 made High unattainable for the best dtypes.
     if extra_present >= 6:
         return "High"
@@ -437,12 +437,12 @@ def map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
         present = sum(1 for v in extra.values() if v is not None)
     gate_ok = all(nuts.get(k) is not None
                   for k in ("kcal_per_100g", "protein_g", "fat_g", "carbs_g"))
-    # T10 (OQ-8): feed serving for popup defaults + persistence (fail-closed;
+    # Feed serving for popup defaults + persistence (fail-closed;
     # survey/legacy rows carry no servingSize -> all-None, 100 g fallback).
     sv_size, sv_unit, sv_text = serving_fields(
         fd.get("servingSize"), fd.get("servingSizeUnit"),
         fd.get("householdServingFullText"))
-    # T12: annotation-only quality flags (penalty/review_reason, never a block).
+    # Annotation-only quality flags (penalty/review_reason, never a block).
     t12_notes = []
     dens = _density_flag(fd)
     if dens:
@@ -501,17 +501,17 @@ def map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
 
 def rank_usda_hits(hits: Sequence[Dict[str, Any]],
                    query: str) -> List[Dict[str, Any]]:
-    """Tiered rank (OQ-4, T09 name bonus, T12 annotations, 010-004 fields).
+    """Tiered rank (OQ-4, 010-004 fields).
 
     010-004 sort within USDA hits: match_band desc, is_single_ingredient,
     quality_percent desc, ingredient_count asc (nulls last) — ahead of the
     legacy tier/dtype/prior keys, which remain as tiebreaks. The kcal gate
     is a hard filter: excluded_kcal_mismatch hits are dropped (never merely
     sunk). Gate, name bonus, relevance tier, then anchor/data-type prior
-    (T12: Foundation/SR Legacy lab-analysed rows outrank branded *within*
-    the same tier — implemented as a (tier, prior) pair so the T09 tier
+    (Foundation/SR Legacy lab-analysed rows outrank branded *within*
+    the same tier — implemented as a (tier, prior) pair so the tier
     order that existing tests pin is preserved), completeness, penalty,
-    freshness, USDA score tiebreak. T12 consensus/outlier +
+    freshness, USDA score tiebreak. Consensus/outlier +
     category-mismatch flags add +1 penalty and a review_reason note each —
     annotation only, never a block.
     """
@@ -527,7 +527,7 @@ def rank_usda_hits(hits: Sequence[Dict[str, Any]],
         m["is_single_ingredient"] = is_single
     # 010-004 kcal gate: hard filter (drop), never a sink.
     mapped = [m for m in mapped if not m.get("excluded_kcal_mismatch")]
-    # T12: consensus + category-mismatch pass over the mapped hits.
+    # Consensus + category-mismatch pass over the mapped hits.
     consensus = _consensus_flags(mapped, query)
     for m in mapped:
         extra_pen = 0
