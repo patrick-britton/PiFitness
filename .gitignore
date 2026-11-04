@@ -282,3 +282,4 @@ docs/reorg/blocks/*-report.md
 
 # INT-21: untrack reorg audit artifacts and stale tree dumps
 repo-tree.txt
+.cline/
