@@ -103,21 +103,6 @@ date | task | model | event | evidence
 2026-11-03 | 1.5 | human | REVIEW | phase 1.5 round 1 (reviewed at 13442f9): PASS 1.5.1b, 1.5.4, 1.5.5, 1.5.6, 1.5.7. FAIL 1.5.2 (class C), FAIL 1.5.3 (class T+W, task 1.5.9).
 2026-11-03 | 1.5.2 | human | REVIEW | criterion 1.5.2 amended: .clinerules is gitignored so git diff --stat cannot show it; replaced with size and content checks (reviewer measured 860 bytes).
 2026-11-03 | REVIEW phase 1.5: PASS | FAIL-fixed | FAIL-backlogged
----
-
-## Deviations and observations (for the 1.5.8 reviewer pack)
-
-- **2026-11-03 Pi redeploy before test-up existed.** PRD moved from `2c52e7c` (pre-rewrite tree = `66d4fb1`) to `d19c589` mid-session, per the human's decision. Rationale: `d19c589` = `66d4fb1` + deployment tooling only; no runtime backend/frontend impact. Next redeploy is gated on Phase 5.5 `test-up`. Pi is currently running `d19c589` on branch `react-ui`.
-
-- **Origin history rewrite observed at fetch.** `origin/main`, `origin/react-ui`, `origin/streamlit-prd` had forced updates. `2c52e7c` (PRD at session start) is orphaned from origin's branches; content is preserved in `66d4fb1` (which is an ancestor of `d19c589`). Pi-local tag `prd-baseline` (created but never pushed; Pi push auth is broken) records `2c52e7c` as a historical marker only.
-
-- **Pi push auth broken (HTTPS, no PAT).** Pi cannot push to origin. Per D2 the Pi never pushes; no action taken. Backlog candidate only if Pi-initiated pushes are ever needed.
-
-- **`prd-YYYYMMDD` tag convention applied** as `prd-20261103` at `d19c589` (current PRD per D1), not at `2c52e7c`. The historical `2c52e7c` is recorded by Pi-local `prd-baseline` only.
-
-- **1.5.6 backlog source file (`.audit/p1/backlog_phase1.md`):** may not exist on disk (removed by INT-21 as tracked); verify before running 1.5.6, do not create it from an agent task.
-
-- **`deployment_script` branch intentionally not pruned.** Waits for 5.1 per D16.
 
 2026-11-03 | 1.5.2 | cline | START | Create .clinerules/interim-rules.md from Appendix C; replace the 'No git commands' line in .clinerules/default-rules.md with the D2 allowlist and denylist.
 
