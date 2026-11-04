@@ -214,3 +214,12 @@ date | task | model | event | evidence
     PASSED tests/test_ratchet.py::test_update_baseline_removes_stale_only
     PASSED tests/test_ratchet.py::test_update_baseline_with_allow_grow_adds_new_keys
     7 passed (exit code 1 from known pytest teardown PermissionError on Windows, not a test failure)
+
+2026-11-03 | 2.2 | cline | START | Create tools/lint_comments.py to flag feature, bug and task IDs and change-history comments (V3); baseline it.
+
+2026-11-03 | 2.2 | cline | DONE | Created tools/lint_comments.py (flags FR-N feature IDs, BUG-N / Bug TNN-M bug IDs, TNN / plan task IDs, change-history dates and keywords) and baseline tools/baselines/lint_comments.txt with 310 current violations. `python tools/lint_comments.py` exits 0 against baseline.
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\lint_comments.py
+    (no output; exit 0)
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\lint_comments.py backend\
+    (no output; exit 0)
