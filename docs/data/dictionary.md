@@ -19,3 +19,68 @@ Per-domain data dictionary. Each section records the grain of key tables, the ca
   - `paced_count <= total_count` — `convention` — paced reps cannot exceed total reps; not DB-enforced.
   - `started_at < ended_at` — `convention` — an attempt must span a positive duration; not DB-enforced.
   - `interval_seconds_used` snapshots the timer's interval at attempt time — `convention` — historical accuracy; the timer's current interval may change later.
+## activities
+
+### activities (schema)
+- **Grain:** one row per tracked activity session/event (see schema.generated.md for tables).
+- **Canonical source:** `activities.*` (user-authored via app).
+- **Rules:** naming/ownership conventions follow app code; DB constraints per schema.generated.md. `convention` — not yet individually catalogued.
+
+## api_services
+
+### api_services (schema)
+- **Grain:** one row per external API service registration/config.
+- **Canonical source:** `api_services.*`.
+- **Rules:** credentials stored outside repo; access keys `convention` — never in source.
+
+## food
+
+### food.diary_entries
+- **Grain:** one row per logged food diary entry (`entry_id` PK).
+- **Canonical source:** `food.diary_entries` (snapshot of food at entry time).
+- **Rules:**
+  - `name_snapshot` required even when `food_id` null — `convention` — preserves history if food row deleted.
+  - macro columns nullable — `convention` — incomplete entries allowed.
+
+## health
+
+### health (schema)
+- **Grain:** one row per health metric reading (see schema.generated.md).
+- **Canonical source:** `health.*`.
+- **Rules:** timestamps UTC; `convention` — not DB-enforced.
+
+## logging
+
+### logging (schema)
+- **Grain:** one row per log event.
+- **Canonical source:** `logging.*`.
+- **Rules:** append-only; `convention`.
+
+## music
+
+### music (schema)
+- **Grain:** one row per track/playlist entry (see schema.generated.md).
+- **Canonical source:** `music.*`.
+- **Rules:** Spotify IDs unique where present; `convention`.
+
+## staging
+
+### staging (schema)
+- **Grain:** transient import rows; cleared after processing.
+- **Canonical source:** external imports.
+- **Rules:** never queried by app runtime; `convention`.
+
+## tasks
+
+### tasks (schema)
+- **Grain:** one row per task item.
+- **Canonical source:** `tasks.*`.
+- **Rules:** status transitions via app; `convention`.
+
+## volleyball
+
+### volleyball (schema)
+- **Grain:** one row per volleyball stat/event (see schema.generated.md).
+- **Canonical source:** `volleyball.*`.
+- **Rules:** `convention`.
+
