@@ -11,8 +11,10 @@
       5. Truncate live OAuth tables (sanitization)
       6. Dump the sanitized staging database to disk
       7. Restore the sanitized dump into pifitness_dev
-      8. Verify tables/views/row counts
-      9. Drop staging, clean container temp files
+      8. Re-stamp the pifitness.env marker on dev
+      9. Re-snapshot pifitness_dev_template from dev
+     10. Verify tables/views/row counts
+     11. Drop staging, clean container temp files
 
     The dev database is preserved on failure: it is only dropped after
     staging has been successfully restored and sanitized.
@@ -244,8 +246,21 @@ Write-Info "Restoring into $DevDb (several minutes)"
 if ($LASTEXITCODE -ne 0) { throw 'pg_restore into dev failed' }
 Write-Ok 'Dev restore complete'
 
-# ============================== Step 7: Verify ==============================
-Write-Step 'Step 7: Verify dev database'
+# ============================== Step 8: Re-stamp marker ==============================
+Write-Step 'Step 8: Re-stamp pifitness.env marker on dev'
+Write-Info "Stamping pifitness.env = 'dev' on $DevDb"
+Invoke-Psql -Database $DevDb -Sql "ALTER DATABASE $DevDb SET pifitness.env = 'dev'" | Out-Null
+Write-Ok 'Marker pifitness.env = dev stamped'
+
+# ============================== Step 9: Re-snapshot template ==============================
+Write-Step 'Step 9: Re-snapshot pifitness_dev_template from dev'
+Write-Info "Re-snapshot template database from $DevDb"
+Invoke-Psql -Database $LocalAdminDb -Sql "DROP DATABASE IF EXISTS pifitness_dev_template WITH (FORCE)" | Out-Null
+Invoke-Psql -Database $LocalAdminDb -Sql "CREATE DATABASE pifitness_dev_template TEMPLATE = pifitness_dev" | Out-Null
+Write-Ok 'Template pifitness_dev_template re-snapshotted from dev'
+
+# ============================== Step 10: Verify ==============================
+Write-Step 'Step 10: Verify dev database'
 Invoke-Psql -Database $DevDb -Sql @'
 SELECT 'tables' AS metric, count(*)::text AS value FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema')
 UNION ALL SELECT 'views', count(*)::text FROM pg_views WHERE schemaname NOT IN ('pg_catalog','information_schema')
@@ -253,8 +268,8 @@ UNION ALL SELECT 'api_tokens', count(*)::text FROM api_services.api_tokens
 UNION ALL SELECT 'spotify_auth_metadata', count(*)::text FROM api_services.spotify_auth_metadata
 '@
 
-# ============================== Step 8: Cleanup ==============================
-Write-Step 'Step 8: Cleanup'
+# ============================== Step 11: Cleanup ==============================
+Write-Step 'Step 11: Cleanup'
 
 Write-Info "Dropping $StagingDb"
 Invoke-Psql -Database $LocalAdminDb -Sql "DROP DATABASE IF EXISTS $StagingDb WITH (FORCE)" | Out-Null

@@ -60,7 +60,7 @@ class ProcessStepStartEvent(BaseModel):
 
 
 class ProcessSummaryData(BaseModel):
-    """End-of-run summary embedded in the terminal NDJSON event (FR-14)."""
+    """End-of-run summary embedded in the terminal NDJSON event."""
     total_elapsed_ms: Optional[int] = Field(
         None,
         description="Total execution time of the whole run in milliseconds (FR-14)",

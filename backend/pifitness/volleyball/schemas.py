@@ -68,5 +68,5 @@ class VolleyballMessageRequest(BaseModel):
     @field_validator("message", mode="before")
     @classmethod
     def _trim_message(cls, value: str) -> str:
-        """Trim so a blank-after-trim message fails min_length -> 422 (T04 verify / AC-3)."""
+        """Trim so a blank-after-trim message fails min_length -> 422."""
         return value.strip() if isinstance(value, str) else value

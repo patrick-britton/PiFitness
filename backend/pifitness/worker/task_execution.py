@@ -462,9 +462,11 @@ def reset_and_reload():
     for task_dict in task_list:
         task_name = task_dict.get("task_name")
         print(task_name)
-        reset_sql = f"""UPDATE tasks.task_config
-        	    SET updated_through_date = '2020-01-01'
-        	    WHERE task_name = '{task_name}';"""
+        reset_sql = (
+            f"UPDATE tasks.task_config "
+            f"SET updated_through_date = '2020-01-01' "
+            f"WHERE task_name = '{task_name}';"
+        )
         qec(reset_sql)
 
     stg_sql = """SELECT relname AS table_name

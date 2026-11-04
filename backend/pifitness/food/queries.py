@@ -1,10 +1,10 @@
-"""Food query functions (010-002 T03, stub-backed).
+"""Food query functions.
 
-Read paths hit the T02 serve views / typed tables only. Writes snapshot
+Read paths hit the serve views / typed tables only. Writes snapshot
 name + nutrients at write time (NULL = unknown, never 0). All SQL
 parameterized; keyset pagination, no OFFSET.
 
-Every public function returns EXACTLY the T01 contract shape
+Every public function returns EXACTLY the contract shape
 (UsualFood[] / DayEntry[] / RecipeSummary[] / FoodListResponse /
 DayEntry / RecipeSummary) so the router and consumers trust the wire format
 without reshaping. Nutrient fields are nested under `nutrients` (FoodRow) /
@@ -116,7 +116,7 @@ def _to_food_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "food_id": row["food_id"],
         "name": row["name"],
         "nutrients": _nutrients(row),
-        # T10 (OQ-8): serving travels on the row for popup defaults/panels.
+        # Serving travels on the row for popup defaults/panels.
         "serving_size": row.get("serving_size"),
         "serving_unit": row.get("serving_unit"),
         "serving_text": row.get("serving_text"),
@@ -199,7 +199,7 @@ def get_usual_foods(
                  FROM food.vw_usual_foods"""
         )
     except Exception:
-        # Pre-T02 DDL view has no mode columns — fall back, NULL them out.
+        # Pre-DDL view has no mode columns — fall back, NULL them out.
         food_rows = sql_to_dict(
             """SELECT food_id, name, source, kcal_per_100g, quality_score,
                       times_eaten, hour_weight
@@ -269,7 +269,7 @@ def search_saved_foods(q: str, limit: int = 30) -> List[Dict[str, Any]]:
     """Local-first saved-food hits for the combined search (OQ-4 tier 0).
 
     Single query: name match, alive rows only, snapshot nutrients attached.
-    T08 (OQ-6): also returns source/fdc_id/barcode so combined_search can
+    also returns source/fdc_id/barcode so combined_search can
     suppress already-saved API duplicates.
     """
     qq = (q or "").strip()
@@ -287,7 +287,7 @@ def search_saved_foods(q: str, limit: int = 30) -> List[Dict[str, Any]]:
 
 
 def get_food_by_barcode(barcode: str) -> Optional[Dict[str, Any]]:
-    """T08 (OQ-6): alive food row by barcode for the scan-first DB check."""
+    """Alive food row by barcode for the scan-first DB check."""
     code = (barcode or "").strip()
     if not code:
         return None
@@ -312,14 +312,14 @@ def persist_api_food(provider: str, name: str, fdc_id: Optional[int],
                      serving_text: Optional[str] = None) -> Dict[str, Any]:
     """Persist-on-log: normalize an API hit into foods.foods, return the row.
 
-    Idempotent on natural keys (fdc_id / barcode). T09 (OQ-7): confirming
+    Idempotent on natural keys (fdc_id / barcode). Confirming
     a pick IS the review, so the fresh-INSERT path writes needs_review=false
     + review_reason=NULL (suggestion-eligible immediately, zero-kcal
     included). The duplicate-key path returns the existing row untouched.
     normalized_from must satisfy the foods CHECK
     (usda_branded/usda_survey/usda_legacy/off/manual/recipe); defaults to
     'off' for provider 'off', else 'usda_survey'.
-    T10 (OQ-8): serving_size/unit/text record the feed's standard serving
+    serving_size/unit/text record the feed's standard serving
     (parsed fail-closed by `serving_fields`) so the `serving` unit resolves.
     """
     from backend_functions.food_normalize import NUTRIENT_COLS
@@ -361,7 +361,7 @@ def persist_api_food(provider: str, name: str, fdc_id: Optional[int],
 
 
 def get_food_by_id(food_id: int) -> Optional[Dict[str, Any]]:
-    """T10 (OQ-8): one alive food row as FoodRow (suggestion-pick hydration)."""
+    """One alive food row as FoodRow (suggestion-pick hydration)."""
     rows = sql_to_dict(
         f"""SELECT {FOOD_COLS} FROM food.foods
             WHERE food_id = %s AND NOT is_deleted""", (food_id,))
@@ -551,7 +551,7 @@ def update_food(
     serving_text: Optional[str] = None,
     quality_score: Optional[float] = None,
 ) -> Dict[str, Any]:
-    """Update a food row's fields (T07)."""
+    """Update a food row's fields."""
 
     # Build SET clause dynamically from provided fields
     cols: List[str] = []
@@ -638,7 +638,7 @@ def _fetch_food(food_id: int) -> Optional[Dict[str, Any]]:
 def _fetch_foods(food_ids: Sequence[Optional[int]]) -> Dict[int, Dict[str, Any]]:
     """Batched multi-food lookup: ONE query for the whole ingredient list.
 
-    Replaces the old per-ingredient `_fetch_food` N+1 (010-005 T03).
+    Replaces the old per-ingredient `_fetch_food` N+1.
     """
     ids = sorted({int(i) for i in food_ids if i is not None})
     if not ids:
@@ -675,7 +675,7 @@ def _grams_for(qty: float, unit: str, food: Dict[str, Any]) -> Optional[float]:
 def _combine_ingredients(
     ingredients: Sequence[Dict[str, Any]],
 ) -> Tuple[Dict[str, Any], bool, str, Optional[float]]:
-    """Gram-weighted per-100g snapshot from the ingredient list (T03).
+    """Gram-weighted per-100g snapshot from the ingredient list.
 
     ONE batched foods fetch for the whole list. Amounts convert through
     `_grams_for` (unit table + each food's own serving unit). Fail closed:
@@ -1071,7 +1071,7 @@ def delete_recipe(recipe_id: int) -> Optional[Dict[str, Any]]:
 
 
 def get_cook_state(recipe_id: int) -> Dict[str, Any]:
-    """CookState for one recipe; empty lists = no active session (T04).
+    """CookState for one recipe; empty lists = no active session.
 
     One indexed PK lookup; JSONB columns come back as native Python
     lists/dicts (psycopg2 parses jsonb), so timers keep their absolute
@@ -1139,7 +1139,7 @@ def save_cook_state(
 
 
 def clear_cook_state(recipe_id: int) -> bool:
-    """Discard the session (idempotent: no row is not an error, T04)."""
+    """Discard the session (idempotent: no row is not an error)."""
     err = qec("DELETE FROM food.recipe_cook_states WHERE recipe_id = %s",
               (recipe_id,))
     if err:

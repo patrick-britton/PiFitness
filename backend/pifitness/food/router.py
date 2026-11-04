@@ -1,10 +1,10 @@
-"""Food skeleton API (010-002 T03, stub-backed Option B).
+"""Food skeleton API.
 
-Reads serve the T01 contract shapes from the T02 views/tables; writes
-snapshot NULL-safe. Search/scan stay on the 010-001 raw-passthrough proxy
+Reads serve the contract shapes from the views/tables; writes
+snapshot NULL-safe. Search/scan stay on the raw-passthrough proxy
 (food_lookup.py) — this router never duplicates them.
 
-Endpoints (contract from T01; shapes served exactly):
+Endpoints (shapes served exactly):
     GET  /api/food/usuals?at=ISO-8601        -> UsualFood[]
     GET  /api/food/diary?day=YYYY-MM-DD      -> DayEntry[]
     GET  /api/food/recipes                   -> RecipeSummary[]
@@ -13,7 +13,7 @@ Endpoints (contract from T01; shapes served exactly):
     POST /api/food/recipes                   -> RecipeSummary (snapshot write)
     POST /api/food/foods/{id}/delete         -> soft-delete
     POST /api/food/foods/{id}/restore        -> restore
-010-005 (Recipe Box, contract from 010-005 design T01):
+010-005 (Recipe Box):
     GET    /api/food/recipes/{recipe_id}       -> RecipeDetail
     PUT    /api/food/recipes/{recipe_id}       -> SaveRecipeRequest -> RecipeSummary
     DELETE /api/food/recipes/{recipe_id}       -> { success, recipe_id, food_id }
@@ -22,8 +22,8 @@ Endpoints (contract from T01; shapes served exactly):
     GET    /api/food/recipes/{recipe_id}/cook -> CookState (empty = no session)
     PUT    /api/food/recipes/{recipe_id}/cook -> CookStateUpdate -> CookState
     DELETE /api/food/recipes/{recipe_id}/cook -> { success: true } (idempotent)
-    POST   /api/food/persist                    -> { food_id } (persist-only, NO
-    diary write — recipe-create picks, 010-005 T12 / OQ-3)
+    POST   /api/food/persist                    -> { food_id } (persist-only, no
+    diary write when recipe-create picks, 010-005 / OQ-3)
 """
 
 from datetime import date, datetime
@@ -79,7 +79,7 @@ router = APIRouter(prefix="/api/food", tags=["food-skeleton"])
 
 
 def _nonneg(nuts: dict) -> dict:
-    """T10: NutrientSnapshot is ge=0 — sink invalid values to None (never 0)."""
+    """NutrientSnapshot is ge=0 — sink invalid values to None (never 0)."""
     return {k: (v if v is None or (isinstance(v, (int, float)) and not isinstance(
         v, bool) and v >= 0) else None) for k, v in nuts.items()}
 
@@ -200,9 +200,9 @@ async def combined_search(
     New optional fields (match_pct/match_band/quality_percent/
     is_single_ingredient/ingredient_count/kcal_delta_pct/
     excluded_kcal_mismatch/food_category/serving_unit_facet) ride on each
-    hit; T02 populates them for USDA hits, saved rows carry nulls.
+    hit; the step populates them for USDA hits, saved rows carry nulls.
 
-    T08 (OQ-6): hits carry fdcId + the raw USDA hit body so confirm can
+    Hits carry fdcId + the raw USDA hit body so confirm can
     persist via the normalizer path without a re-fetch; USDA hits whose
     fdcId is already saved are suppressed (single saved DB row, ranked
     first). Raw bodies never reach the UI beyond nutrients_raw passthrough.
@@ -241,13 +241,13 @@ async def combined_search(
             "usda_score": None,
             "fdcId": row.get("fdc_id"),
             "barcode": row.get("barcode"),
-            # T10 (OQ-8): per-100g panel + feed serving (foods columns).
+            # Per-100g panel + feed serving (foods columns).
             "nutrients": _nonneg(nuts),
             "serving_size": row.get("serving_size"),
             "serving_unit": row.get("serving_unit"),
             "serving_text": row.get("serving_text"),
-            # 010-004 T01: ranked-search fields are null on saved rows
-            # (T02 populates USDA hits; facets derive client-side).
+            # Ranked-search fields are null on saved rows
+            # (Populates USDA hits; facets derive client-side).
             "quality_percent": None,
             "match_pct": None,
             "match_band": None,
@@ -288,12 +288,12 @@ async def combined_search(
             # + servingSize; a flattened per-100g map would fail closed).
             "nutrients_raw": m.get("raw") if isinstance(
                 m.get("raw"), dict) else None,
-            # T10 (OQ-8): normalized per-100g panel + feed serving default.
+            # Normalized per-100g panel + feed serving default.
             "nutrients": _nonneg(m["nuts"]),
             "serving_size": m.get("serving_size"),
             "serving_unit": m.get("serving_unit"),
             "serving_text": m.get("serving_text"),
-            # 010-004 T01: mapped fields pass through when T02 provides
+            # Mapped fields pass through when provides
             # them; legacy/trimmed maps land as null (no re-fetch).
             "quality_percent": m.get("quality_percent"),
             "match_pct": m.get("match_pct"),
@@ -353,7 +353,7 @@ async def combined_search(
 
 
 def _persist_api_payload(payload) -> dict:
-    """Normalize one API hit and persist it into foods.foods (010-005 T12).
+    """Normalize one API hit and persist it into foods.foods.
 
     Shared by POST /diary/from-api (persist-then-log) and POST /persist
     (persist-only recipe-create picks) so the normalizer lives in exactly
@@ -365,7 +365,7 @@ def _persist_api_payload(payload) -> dict:
         serving_fields)
     provider = payload.provider
     raw = payload.nutrients_raw or {}
-    # T10 (OQ-8): the feed's standard serving (fail-closed; survey rows
+    # The feed's standard serving (fail-closed; survey rows
     # carry none). Display text is kept, never parsed.
     if provider == "usda":
         dtype = (raw.get("dataType") or "") if isinstance(raw, dict) else ""
@@ -421,7 +421,7 @@ async def log_api_entry(req: LogApiEntryRequest):
 
 @router.post("/persist", status_code=201, response_model=PersistApiFoodResponse)
 async def persist_food(req: PersistApiFoodRequest):
-    """010-005 T12 (OQ-3): persist-only — NO diary write.
+    """Persist-only — NO diary write.
 
     The recipe-create flow calls this when an unsaved usda/off hit (or a
     barcode-miss OFF scan) is picked, so the pick becomes a real food_id
@@ -443,7 +443,7 @@ async def persist_food(req: PersistApiFoodRequest):
 
 @router.get("/by-barcode")
 async def food_by_barcode(barcode: str = Query(..., description="packaging barcode")):
-    """T08 (OQ-6): alive food row by barcode for the scan-first DB check.
+    """Alive food row by barcode for the scan-first DB check.
 
     Returns the food row shape (with source/fdc_id/barcode) or
     `{found: false}` when unknown — the frontend then does the OFF lookup.
@@ -464,7 +464,7 @@ async def food_by_barcode(barcode: str = Query(..., description="packaging barco
             "name": row.get("name"),
             "source": row.get("source"), "fdc_id": row.get("fdc_id"),
             "barcode": row.get("barcode"), "nutrients": nuts,
-            # T10 (OQ-8): scan-DB picks default + panel from the row serving.
+            # scan-DB picks default + panel from the row serving (OQ-8).
             "serving_size": row.get("serving_size"),
             "serving_unit": row.get("serving_unit"),
             "serving_text": row.get("serving_text")}
@@ -637,7 +637,7 @@ async def discard_cook_session(recipe_id: int):
 
 @router.get("/foods/{food_id}", response_model=FoodRow)
 async def food_by_id(food_id: int):
-    """T10 (OQ-8): one alive food row — hydrates suggestion-pick panels.
+    """One alive food row — hydrates suggestion-pick panels.
 
     Single pk lookup (one indexed query); soft-deleted rows 404 like every
     other pick surface.
@@ -673,7 +673,7 @@ async def restore_food(food_id: int):
 
 @router.put("/foods/{food_id}", response_model=FoodRow)
 async def update_food(food_id: int, req: UpdateFoodRequest):
-    """Update a food row's fields (T07)."""
+    """Update a food row's fields."""
     from pifitness.food.queries import update_food as _update_food
     try:
         row = _update_food(

@@ -55,7 +55,7 @@ def get_isrc_dupe_match() -> Sequence[Dict[str, Any]]:
 
 def _run_in_transaction(work: Callable[[Any], None]) -> None:
     """
-    Run ``work(cursor)`` on one connection inside a single transaction (008-005, T08).
+    Run ``work(cursor)`` on one connection inside a single transaction.
 
     Opens one connection, lets ``work`` issue all of its statements on one
     cursor, commits once, and always closes the connection. Any failure rolls
@@ -88,7 +88,7 @@ def _run_in_transaction(work: Callable[[Any], None]) -> None:
 
 def process_isrc_dupe_decision(isrc1: str, isrc2: str, preferred_isrc: str, accept: bool) -> None:
     """
-    Persist one ISRC-dupe review decision (008-005, OQ-2/T08).
+    Persist one ISRC-dupe review decision.
 
     ACCEPT inserts both ISRCs into music.isrc_swaps mapped to the preferred
     ISRC with valid_mapping = TRUE (arbiter: PK on original_isrc).
@@ -99,7 +99,7 @@ def process_isrc_dupe_decision(isrc1: str, isrc2: str, preferred_isrc: str, acce
 
     Both ISRCs (one multi-row statement) and the pool delete run on a single
     connection in a single transaction, so a decision is all-or-nothing; any
-    failure rolls back, raises, and the endpoint surfaces a 500 (T08).
+    failure rolls back, raises, and the endpoint surfaces a 500.
 
     Args:
         isrc1: First ISRC of the pair.
@@ -154,7 +154,7 @@ def process_isrc_dupe_decision(isrc1: str, isrc2: str, preferred_isrc: str, acce
 
 def run_isrc_duplicate_finder() -> None:
     """
-    Re-run the duplicate-search stored procedure (008-005, FR-6/T08).
+    Re-run the duplicate-search stored procedure.
 
     The procedure rebuilds the candidate-pair staging data (~25 s);
     this wrapper only invokes it — heuristics live in the database. The CALL
@@ -218,7 +218,7 @@ def get_playlist_isrc_stats(playlist_id: str) -> Sequence[Dict[str, Any]]:
 
 def get_recent_plays(limit: int = 20) -> Sequence[Dict[str, Any]]:
     """
-    Get recent play history with per-set scale anchors (feature 008-001, FR-7).
+    Get recent play history with per-set scale anchors.
 
     Reads the canonical sources behind music.vw_recent_plays directly so each
     row can also carry `isrc` (the view does not project it) and so the scale
@@ -229,7 +229,7 @@ def get_recent_plays(limit: int = 20) -> Sequence[Dict[str, Any]]:
     (isrc, lastPlayedAtUtc, trackName, artistName, playlistName, rating,
     playcountLast30, playcountTotal) plus the per-set anchors (minRating,
     maxRating, maxPlaycountLast30, maxPlaycountTotal) repeated on every row;
-    the API layer (T05) splits them into {plays, scale}. `rating` is the
+    the API layer splits them into {plays, scale}. `rating` is the
     ELO (1500 baseline); the UI renders the rating bar on the fixed
     1300–1700 range rather than these per-set anchors.
 
@@ -786,7 +786,7 @@ def score_matchup(
     }
 def get_playlist_config_view() -> Sequence[Dict[str, Any]]:
     """
-    Get the playlist selection grid for Playlist Shuffle (feature 008-003, FR-1).
+    Get the playlist selection grid for Playlist Shuffle.
 
     Reads `music.vw_playlist_config` (parent-only: child/shuffle-target playlists
     are excluded). Each row carries the six fields needed by the selection grid and
@@ -818,14 +818,14 @@ def compute_shuffle_order(
     minutes_to_sync: int,
 ) -> Dict[str, Any]:
     """
-    Compute the weighted shuffle order for a playlist (feature 008-003, FR-3/FR-4).
+    Compute the weighted shuffle order for a playlist.
 
     Fetches the playlist's per-track stats via `get_playlist_isrc_stats`, scores
     each row as ``play_score = ratings_pct*ratings_weight + recency_pct*recency_weight
-    + random_pct*(random_weight/10)`` (FR-3), sorts descending (stable, so equal scores
+    + random_pct*(random_weight/10)`` sorts descending (stable, so equal scores
     keep their input order), re-indexes 0..n-1, and when ``minutes_to_sync != 9999``
     keeps rows only while the cumulative playback duration (duration_s summed in the
-    new order, divided by 60) is at or below the minute cap (FR-4).
+    new order, divided by 60) is at or below the minute cap.
 
     No Pandas: operates on the plain dict rows returned by `get_playlist_isrc_stats`.
     Callable with no Spotify/network requirement.

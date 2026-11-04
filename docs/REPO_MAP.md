@@ -137,9 +137,11 @@ Folder purposes live here. How the folders work together lives in `docs/ARCHITEC
 | tests/integration/ | Integration tests against DEV (tests/integration/conftest.py) | human+agent | unit tests or application code | backend/** |
 | tools/ | Developer and maintenance tooling (tools/db/sync-prod-to-dev.ps1) | human+agent | application source code or stored credentials | backend/** |
 | tools/audit/ | Repo audit and fact-extraction tooling used by the restructuring plan (tools/audit/p1_facts.py) | human+agent | application source code | - |
+| tools/baselines/ | Ratchet baseline files, one per check (tools/baselines/cites.txt) | generated+agent | non-baseline files | - |
 | tools/db/ | Database maintenance scripts; the PRD-to-DEV refresh is run by the human only (tools/db/sync-prod-to-dev.ps1) | human | application source code or stored PRD credentials | backend/** |
 | tools/diagnostics/ | Diagnostic and analysis scripts (tools/diagnostics/schema_cache.py) | human+agent | application source code | backend/** |
 | tools/probe/ | Capability probes for DEV identity, write round trip and headless browser (tools/probe/probe_db.py) | human+agent | application source code | backend/** |
+| tools/workflow/ | Workflow helper scripts (tools/workflow/append_progress.ps1) | human+agent | application source code | - |
 | tools/refactor/ | Code refactoring utilities (tools/refactor/tests/fixture/manifest.json) | human+agent | application source code | - |
 | tools/refactor/tests/ | Refactor tool tests (tools/refactor/tests/fixture/manifest.json) | human+agent | application source code | - |
 | tools/refactor/tests/fixture/ | Refactor tool fixtures (tools/refactor/tests/fixture/manifest.json) | human+agent | application source code | - |

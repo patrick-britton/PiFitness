@@ -66,7 +66,7 @@ def playlist_to_db(client=None, list_id=None):
     # splitting on "/tracks". Without this normalization the SPROC writes
     # music.playlist_isrcs rows under a malformed id
     # ("{id}/items?offset=..&limit=..&additional_types=track") and the real
-    # playlist's stored order is never refreshed (Bug T10-7).
+    # playlist's stored order is never refreshed.
     for page in all_items:
         href = page.get('href') or ''
         if '/items?' in href:
@@ -187,8 +187,8 @@ def playlist_upload(client=None, list_id=None, track_list=None):
 
 def ensure_playlist_relationships(client):
     # 000-001 AC-5/AC-8: non-destructive — NO blanket DELETE of relationships.
-    # Row removal for retired children is the SPROC's responsibility (T05 S2
-    # correctness gate) and the repair script's (T12), never a side effect of
+    # Row removal for retired children is the SPROC's responsibility
+    # correctness gate and the repair script are never a side effect of
     # a partial/empty input here.
     sql = """SELECT playlist_id, playlist_name, needs_auto, needs_manual, needs_recs
              FROM music.missing_relationships"""
@@ -266,9 +266,9 @@ def auto_shuffle_playlists(list_id=None, limit_minutes=False):
     # The target_playlist_id returned is the child autoshuffle version of that playlist.
     for l in playlists:
         print(f'Pulling new order for list: {l}')
-        # 000-001 T11: parameterized (%s) instead of f-string interpolation,
+        # Parameterized (%s) instead of f-string interpolation,
         # and the limit_minutes branch now has its filter applied — the
-        # pre-T11 string was missing the f-prefix so playlist_id was compared
+        # that string was missing the f-prefix so playlist_id was compared
         # to the literal '{l}' and that path never returned rows.
         if limit_minutes:
             sql = """SELECT target_playlist_id,
@@ -290,7 +290,7 @@ def auto_shuffle_playlists(list_id=None, limit_minutes=False):
                 default_new_order
                 FROM music.vw_playlist_isrc_stats WHERE playlist_id = %s
                 ORDER BY default_new_order asc;"""
-        # 000-001 T11: dataframe library removed — sql_to_dict returns a list
+        # Dataframe library removed — sql_to_dict returns a list
         # of dicts in result order, which preserves default_new_order for the
         # track list.
         rows = sql_to_dict(sql, params=[l])
@@ -451,11 +451,11 @@ def resolve_now_playing():
     """
     Resolve the Now Playing contract for GET /api/music/now-playing (008-001).
 
-    Order of operations (design T03):
+    Order of operations:
       1. Rate-limit gate - a rate-limited service loads no content (AC-12).
       2. Fetch current playback from Spotify.
-      3. Persist the raw poll to staging and flatten it (FR-1/AC-9); a poll
-         that cannot be recorded resolves to the idle response (FR-2).
+      3. Persist the raw poll to staging and flatten it; a poll
+         that cannot be recorded resolves to the idle response.
       4. Resolve ISRC -> best track -> album display data; any miss resolves
          to the idle response (contract display fields are non-null, AC-8).
       5. Resolve playlist context, family relationship, and rating source
@@ -574,7 +574,7 @@ def resolve_now_playing():
             parent_id = family[0].get("parent_playlist_id")
             ctype = family[0].get("child_playlist_type")
             relationship_type = 'recommendation' if ctype == 'recommendation' else 'regular'
-            # Fetch parent playlist name for the context line label (FR-6 design notes)
+            # Fetch parent playlist name for the context line label.
             if parent_id:
                 parent_name = one_sql_result(
                     """SELECT playlist_name

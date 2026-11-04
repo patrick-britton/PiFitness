@@ -162,7 +162,7 @@ async def update_timer(exercise_id: int, req: ExerciseUpdateRequest):
 async def delete_timer(exercise_id: int):
     """
     Permanently delete a timer and ALL of its attempt history (OQ-1).
-    Always returns 200 on success; the cascade runs in one transaction (T02).
+    Always returns 200 on success; the cascade runs in one transaction.
     """
     try:
         delete_exercise(exercise_id)
@@ -179,7 +179,7 @@ async def delete_timer(exercise_id: int):
 async def save_attempt(exercise_id: int, req: ExerciseAttemptCreateRequest):
     """
     Save one confirmed attempt. Only user-confirmed paced_count/total_count and
-    the interval snapshot are written (FR-8, FR-10).
+    the interval snapshot are written.
     """
     try:
         attempt = create_attempt(

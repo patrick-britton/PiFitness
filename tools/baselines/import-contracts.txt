@@ -1,0 +1,5 @@
+imports|C:/Users/rickb/vsProjects/PiFitness/backend/pifitness/activities/router.py|G5|54f17524
+imports|C:/Users/rickb/vsProjects/PiFitness/backend/pifitness/admin/router.py|G5|32eb4667
+imports|C:/Users/rickb/vsProjects/PiFitness/backend/pifitness/admin/router.py|G5|6f0e6b66
+imports|C:/users/rickb/vsprojects/pifitness/backend/pifitness/activities/router.py|G5|7b98d401
+imports|C:/users/rickb/vsprojects/pifitness/backend/pifitness/admin/router.py|G5|f05c3c1a

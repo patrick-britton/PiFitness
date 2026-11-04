@@ -310,7 +310,7 @@ def create_attempt(
     prompt — the in-progress run lives entirely in the client, never here.
 
     Persists the `interval_seconds_used` snapshot so later edits to the timer's
-    interval cannot re-pace historical attempts (FR-10).
+    interval cannot re-pace historical attempts.
 
     Raises:
         ExerciseNotFoundError: timer does not exist.

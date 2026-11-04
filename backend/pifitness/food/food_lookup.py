@@ -3,7 +3,7 @@
 
 Dev-only diagnostic endpoints that forward a query straight to the upstream
 external API and return the raw response body unmodified. No local database
-lookup (besides the FR-5 USDA credential read), no persistence, no flattening.
+lookup, no persistence, no flattening.
 
 Endpoints (contract from .features/designs_active/010-001_design.md):
     GET /api/food/lookup/usda?query=<text>&pageSize=<n>&dataType=<csv>

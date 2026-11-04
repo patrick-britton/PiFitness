@@ -34,8 +34,8 @@ class ExerciseAttemptCreateRequest(BaseModel):
     Request body for POST /api/exercises/{id}/attempts (save a confirmed attempt).
 
     Only user-confirmed paced_count and total_count are sent — the client-side
-    countdown/count-up defaults are never persisted (FR-8). `interval_seconds_used`
-    snapshots the interval in effect during the run (FR-10).
+    countdown/count-up defaults are never persisted. `interval_seconds_used`
+    snapshots the interval in effect during the run.
     """
     started_at: str = Field(..., description="ISO timestamp when the run started (after the 5→1 countdown)")
     ended_at: str = Field(..., description="ISO timestamp when Stop was pressed")

@@ -179,7 +179,7 @@ async def get_matchup_endpoint(
     playlist_id: Optional[str] = Query(default=None, description="Optional playlist to scope the matchup"),
 ):
     """
-    Get a head-to-head matchup for rating (FR-3/FR-5).
+    Get a head-to-head matchup for rating.
 
     Returns the primary track plus the challenger (closest score in the same
     playlist). When the playlist has only one rateable track, challenger is
@@ -207,7 +207,7 @@ async def score_matchup_endpoint(
     margin: int = Query(ge=-5, le=5, description="Rating margin -5..-1 or +1..+5 (no zero)"),
 ):
     """
-    Score a matchup and return the next one (FR-6/FR-7).
+    Score a matchup and return the next one.
 
     Validates that margin is non-zero, recomputes both scores, writes history,
     updates standings, and returns the next matchup.
@@ -279,7 +279,7 @@ def _shape_isrc_dupe_match(row: dict) -> dict:
 
 
 class IsrcDupeDecisionBody(BaseModel):
-    """Decision body for POST /isrc-dupes/decision (FR-3/FR-4)."""
+    """Decision body for POST /isrc-dupes/decision."""
     isrc1: str = Field(..., min_length=1, description="First ISRC of the pair")
     isrc2: str = Field(..., min_length=1, description="Second ISRC of the pair")
     preferredIsrc: str = Field(..., min_length=1, description="Precomputed merge target")
@@ -289,7 +289,7 @@ class IsrcDupeDecisionBody(BaseModel):
 @router.get("/isrc-dupes/count")
 async def get_isrc_dupe_count_endpoint():
     """
-    Pending duplicate-ISRC pair count (FR-1/FR-7).
+    Pending duplicate-ISRC pair count.
 
     Returns pairs = floor(COUNT(*) / 2) per OQ-1.
     """
@@ -306,7 +306,7 @@ async def get_isrc_dupe_count_endpoint():
 @router.get("/isrc-dupes/match")
 async def get_isrc_dupe_match_endpoint():
     """
-    One reviewable duplicate-ISRC pair (FR-2).
+    One reviewable duplicate-ISRC pair detected by the matcher.
 
     Returns {match: IsrcDupeMatch | None} — match is None when the
     queue is empty.
@@ -328,7 +328,7 @@ async def get_isrc_dupe_match_endpoint():
 @router.post("/isrc-dupes/decision")
 async def decide_isrc_dupe_endpoint(body: IsrcDupeDecisionBody):
     """
-    Persist one review decision (FR-3/FR-4/FR-5).
+    Persist one review decision.
 
     ACCEPT maps both ISRCs to the preferred ISRC; REJECT marks both
     as explicitly not-a-match; both remove the pair from the pool.
@@ -352,15 +352,14 @@ async def decide_isrc_dupe_endpoint(body: IsrcDupeDecisionBody):
 @router.post("/isrc-dupes/rescan")
 def rescan_isrc_dupes_endpoint():
     """
-    Re-run the duplicate-search procedure and reload the queue (FR-6).
+    Re-run the duplicate-search procedure and reload the queue.
 
     Long-running (~25 s); the frontend shows a progress indicator.
 
     Deliberately a SYNC handler (not `async def`, unlike the rest of this
     module): it calls the blocking ~25 s `CALL music.isrc_duplicate_finder()`
     over psycopg2. FastAPI dispatches sync handlers to its threadpool, so the
-    re-scan cannot stall the event loop and freeze unrelated requests
-    (T09 / Bug 008-005-T08-1).
+    re-scan cannot stall the event loop and freeze unrelated requests.
     """
     try:
         run_isrc_duplicate_finder()
@@ -390,7 +389,7 @@ async def list_recent_plays(
     limit: int = Query(default=20, ge=10, le=100, multiple_of=10),
 ):
     """
-    Get recent play history with per-set scale anchors (FR-7).
+    Get recent play history with per-set scale anchors.
 
     Args:
         limit: Row count (10-100, step 10, default 20)
@@ -441,7 +440,7 @@ async def list_recent_plays(
 @router.get("/service-status")
 async def service_status():
     """
-    Report Spotify service status (FR-9/AC-12).
+    Report Spotify service status.
 
     Returns:
         {spotify: {rateLimited, rateLimitClearedUtc}}
@@ -478,7 +477,7 @@ async def get_now_playing():
     """
     Get current Spotify playback state (008-001 contract).
 
-    Persists the raw poll to staging (FR-1/AC-9), then resolves track,
+    Persists the raw poll to staging, then resolves track,
     playlist-family context, and rating. A rate-limited service loads no
     content (AC-12); anything unresolvable returns the idle response (AC-8).
 
@@ -502,7 +501,7 @@ async def get_now_playing():
 @router.post("/now-playing/skip")
 async def now_playing_skip():
     """
-    Advance Spotify playback to the next track (FR-6).
+    Advance Spotify playback to the next track.
 
     The view re-fetches on the next GET /now-playing poll.
     """
@@ -519,7 +518,7 @@ async def now_playing_skip():
 @router.post("/now-playing/promote")
 async def now_playing_promote():
     """
-    Promote the current recommendation to its parent playlist (FR-6/AC-5).
+    Promote the current recommendation to its parent playlist.
 
     Adds the track locally and on Spotify, records the promotion decision,
     removes it from the recommendation set, and seeds a rating.
@@ -568,7 +567,7 @@ async def now_playing_promote():
 @router.post("/now-playing/soft-reject")
 async def now_playing_soft_reject():
     """
-    Soft-reject the current recommendation (FR-6/AC-5).
+    Soft-reject the current recommendation.
 
     Writes a recommendation exclusion carrying the predicted rating and
     removes the track from the recommendation set.
@@ -598,7 +597,7 @@ async def now_playing_soft_reject():
 @router.post("/now-playing/hard-reject")
 async def now_playing_hard_reject():
     """
-    Hard-reject the current recommendation (FR-6/AC-5).
+    Hard-reject the current recommendation.
 
     Records the rejection decision, removes the track from the recommendation
     set, and advances to the next track.
@@ -635,7 +634,7 @@ async def now_playing_hard_reject():
 @router.post("/now-playing/remove")
 async def now_playing_remove():
     """
-    Remove the current track from its playlist family (FR-6/AC-7, OQ-4).
+    Remove the current track from its playlist family.
 
     Implements the resolved OQ-4 guard contract:
     - Family miss -> "the playlist cannot be found"
@@ -681,7 +680,7 @@ async def now_playing_remove():
     messages = []
     removed_any = False
     # Collect family playlists where the track was found locally so we can
-    # also remove from each on Spotify (FR-6: "locally and on Spotify").
+    # also remove from each on Spotify.
     spotify_playlist_ids = []
 
     for fid in family_ids:
@@ -708,7 +707,7 @@ async def now_playing_remove():
         spotify_playlist_ids.append(fid)
 
     # Spotify removal for every family playlist where the track was found locally
-    # (FR-6/AC-7: "every playlist in the current family locally and on Spotify").
+    # ("every playlist in the current family locally and on Spotify").
     track_list = sql_to_list(
         "SELECT DISTINCT track_id FROM music.all_tracks WHERE track_isrc = %s",
         (isrc,),
@@ -734,7 +733,7 @@ async def now_playing_remove():
 @router.post("/now-playing/rank-up")
 async def now_playing_rank_up():
     """
-    Bump up the current track's rating against a straw man (FR-6/AC-7).
+    Bump up the current track's rating against a straw man.
 
     Records the matchup in ratings_history and merges the new rating.
     """
@@ -767,7 +766,7 @@ async def now_playing_rank_up():
 @router.post("/now-playing/rank-down")
 async def now_playing_rank_down():
     """
-    Bump down the current track's rating against a straw man (FR-6/AC-7).
+    Bump down the current track's rating against a straw man.
 
     Records the matchup in ratings_history and merges the new rating.
     """
@@ -800,7 +799,7 @@ async def now_playing_rank_down():
 @router.post("/now-playing/add-to-playlist")
 async def now_playing_add_to_playlist(playlist_id: str):
     """
-    Add the current track to the specified playlist (FR-6/AC-6).
+    Add the current track to the specified playlist.
 
     Adds locally and on Spotify.
     """
@@ -831,7 +830,7 @@ async def now_playing_add_to_playlist(playlist_id: str):
 @router.get("/now-playing/add-targets")
 async def now_playing_add_targets():
     """
-    List playlists eligible to add the current track to (FR-6/AC-6).
+    List playlists eligible to add the current track to.
 
     Returns playlists that are configured (auto-shuffle, recommendations, or
     manual-shuffle) and don't already contain the track.
@@ -855,7 +854,7 @@ async def now_playing_add_targets():
 @router.get("/album-art/{album_id}")
 async def get_album_art(album_id: str):
     """
-    Serve album art from the local cache, downloading on first need (FR-1/OQ-1).
+    Serve album art from the local cache, downloading on first need.
 
     Resolves the JPEG path via the ported ``album_image_retrieval`` helper.
     The response is a ``FileResponse``; if no image can be obtained a 404 is
@@ -873,7 +872,7 @@ async def get_album_art(album_id: str):
 
 
 class ShuffleConfigBody(BaseModel):
-    """Weights/minutes for a preview or config reconcile (FR-3/FR-6, OQ-1)."""
+    """Weights/minutes for a preview or config reconcile."""
     ratingsWeight: int = Field(ge=0, le=50, description="Ratings weight 0-50")
     recencyWeight: int = Field(ge=0, le=50, description="Recency weight 0-50")
     randomWeight: int = Field(ge=0, le=50, description="Randomness weight 0-50")
@@ -889,7 +888,7 @@ class ShuffleFlagsBody(BaseModel):
 
 
 class ShuffleSendRequest(BaseModel):
-    """Send-to-Spotify request body (FR-5/FR-6, OQ-1)."""
+    """Send-to-Spotify request body."""
     playlistId: str = Field(..., description="Source playlist id")
     ratingsWeight: int = Field(ge=0, le=50)
     recencyWeight: int = Field(ge=0, le=50)
@@ -900,7 +899,7 @@ class ShuffleSendRequest(BaseModel):
 @router.get("/shuffle/playlists")
 async def shuffle_playlists():
     """
-    Selection grid of parent (child-excluded) playlists for Playlist Shuffle (FR-1).
+    Selection grid of parent (child-excluded) playlists for Playlist Shuffle.
 
     Reads `music.vw_playlist_config`. Each row carries the fields needed by the
     selection grid plus the saved tuning defaults. Returns `{data, count}`.
@@ -918,7 +917,7 @@ async def shuffle_playlists():
 @router.get("/shuffle")
 async def shuffle_data(playlist_id: str):
     """
-    Playlist shuffle data for a selected playlist (FR-1/FR-2).
+    Playlist shuffle data for a selected playlist.
 
     Returns the source playlist's saved config (weights/minutes), the resolved
     target (shuffle-child) playlist id, and the raw per-track stats rows needed
@@ -961,7 +960,7 @@ async def shuffle_preview(
     playlist_id: str,
 ):
     """
-    Compute the weighted shuffle order for the live preview (FR-3/FR-4).
+    Compute the weighted shuffle order for the live preview.
 
     Delegates to ``compute_shuffle_order``, the single source of truth shared
     with ``/shuffle/send``. When the playlist has no rows, returns an empty
@@ -1068,7 +1067,7 @@ async def shuffle_flags(
 @router.post("/shuffle/send")
 async def shuffle_send(body: ShuffleSendRequest):
     """
-    Push the shuffled order to the target Spotify playlist (FR-5/FR-6/FR-7).
+    Push the shuffled order to the target Spotify playlist.
 
     Recomputes the order via ``compute_shuffle_order``, uploads it to the
     shuffle-child target via ``playlist_upload`` (atomic replace first 100 +
