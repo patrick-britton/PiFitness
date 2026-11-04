@@ -6,8 +6,8 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 ### activities.activities (table)
 - **Grain:** one row per recorded activity (workout), keyed by `activity_id`.
-- **Canonical source:** `activities.activities` (Garmin-derived activity summary).
-- **Rules:** `enforced` PK on `activity_id`; `convention` one row per activity; `activity_path`/`is_downloaded` track GPX ingestion; timestamps UTC.
+- **Canonical source:** `activities.activities`; populated by the activity sync/import worker from Garmin data (staging.api_imports flow); `activity_path`/`is_downloaded` set later by `backend/backend_functions/activity_smoothing.build_activity_path` from `activities.activity_details_distance`.
+- **Rules:** `enforced` PK on `activity_id`; `convention` one row per activity; `activity_path` nullable until GPX downloaded; timestamps UTC.
 
 ### activities.activity_details (table)
 - **Grain:** one row per timestamp sample within an activity (`activity_id`, `ts_utc`).
