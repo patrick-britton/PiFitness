@@ -208,7 +208,8 @@ Convert recurring lessons into checks and prune what did not earn its place. Fin
 The last task of each phase writes `.audit/reviews/phase-<N>.md` from the template below, filling the bracketed parts. The human pastes it into an independent model (a different one from the builder where possible) together with the listed files, then records the result in PROGRESS and handles any failure under "Failure handling" below.
 
 ```
-You are an independent reviewer. You did not build this. Do not edit any file.
+You are an independent reviewer. You did not build this. 
+You are forbidden from using the editor/create/delete tools. You may read any file needed to run or interpret a command. If completing a step appears to require a file edit, stop and report it as a tooling defect (T) instead.
 Repo: PiFitness. Phase [N] of docs/workflow/PLAN.md. Read only the files attached.
 1. For each exit criterion below, run the command yourself and paste the last 20 lines of output.
    Do not trust PROGRESS.md claims.
@@ -216,6 +217,9 @@ Repo: PiFitness. Phase [N] of docs/workflow/PLAN.md. Read only the files attache
    in PROGRESS.md, any file touched outside its task's listed files, any new fact stated in two places.
 3. Report PASS or FAIL per criterion with the evidence. List defects as: file, problem, severity. For each FAIL, say whether it looks like a work defect (W), a criterion defect (C) or a tool defect (T), and why.
 4. Stop. Do not propose redesigns beyond the criteria.
+
+verify.py --scope all may take 60–120 s; if your runner times out at 30 s, use the provided long-command launcher with its existing presets, or report a tooling defect.
+
 Exit criteria and commands: [copied from the phase]
 Files to attach: [PLAN.md task rows for this phase, PROGRESS.md, files changed (git diff main --stat), TARGET_STATE.md statements it touches]
 ```
