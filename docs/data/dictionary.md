@@ -307,29 +307,29 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 ## api_services
 
 ### api_services.api_service_list (table)
-- **Grain:** one row per api service list (table); see schema.generated.md for columns.
+- **Grain:** one row per registered API service.
 - **Canonical source:** `api_services.api_service_list`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` service registry.
 
 ### api_services.api_tokens (table)
-- **Grain:** one row per api tokens (table); see schema.generated.md for columns.
-- **Canonical source:** `api_services.api_tokens`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per API token.
+- **Canonical source:** `api_services.api_tokens` (moved from elsewhere per INT19b).
+- **Rules:** `enforced` PK; `convention` token storage.
 
 ### api_services.credentials (table)
-- **Grain:** one row per credentials (table); see schema.generated.md for columns.
+- **Grain:** one row per credential set.
 - **Canonical source:** `api_services.credentials`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` credential storage.
 
 ### api_services.function_library (table)
-- **Grain:** one row per function library (table); see schema.generated.md for columns.
+- **Grain:** one row per reusable function.
 - **Canonical source:** `api_services.function_library`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` function registry.
 
 ### api_services.spotify_auth_metadata (table)
-- **Grain:** one row per spotify auth metadata (table); see schema.generated.md for columns.
+- **Grain:** one row per Spotify auth metadata.
 - **Canonical source:** `api_services.spotify_auth_metadata`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` auth metadata.
 
 ## exercises
 
