@@ -75,6 +75,7 @@ prod-schema-reference.dump
 prod-latest.dump
 backend/.env
 .env
+.audit/evergreen_plan
 
 # --- OAuth tokens (must never be read by Cline) ---
 garmin_tokens.json
