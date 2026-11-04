@@ -72,12 +72,13 @@ def gate(violations, baseline, check_name):
     return (len(new_violations) == 0, new_violations, len(baseline))
 
 
-def run_cmd(cmd, cwd=None):
+def run_cmd(cmd, cwd=None, env=None):
     """Run a command, return (returncode, stdout, stderr)."""
     try:
         result = subprocess.run(
             cmd,
             cwd=cwd,
+            env=env,
             capture_output=True,
             text=True,
             timeout=300,
@@ -158,9 +159,14 @@ def step_pytest():
     check = "pytest"
     baseline_path = BASELINE_DIR / f"{check}.txt"
     baseline = load_baseline(baseline_path)
+    import os
+
+    env = dict(os.environ)
+    env["APP_ENV"] = "dev"
     rc, out, _err = run_cmd(
         [str(PYTHON), "-m", "pytest", "tests/", "-m", "not slow and not integration and not live", "-q"],
         cwd=REPO_ROOT,
+        env=env,
     )
     violations = []
     for line in out.splitlines():

@@ -240,4 +240,5 @@ folder-map|tools/refactor/tests/fixture/pkg_b/|unmapped|f50ec690
 folder-map|tools/refactor/tests/fixture/|unmapped|39743861
 folder-map|tools/refactor/tests/|unmapped|693e467d
 folder-map|tools/refactor/|unmapped|3930c8be
+folder-map|tools/workflow/|unmapped|5a9ed444
 folder-map|tools/|unmapped|189eed6e

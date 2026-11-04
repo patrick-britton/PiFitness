@@ -21,6 +21,10 @@ import os
 import sys
 import time
 
+# DEV-only: tools must run with APP_ENV=dev (D8). Set before config import so
+# load_dotenv does not override it.
+os.environ.setdefault("APP_ENV", "dev")
+
 # Ensure backend/ is importable for config
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
 
