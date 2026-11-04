@@ -193,3 +193,10 @@ date | task | model | event | evidence
     True
     $ git check-ignore -v .audit/reviews/phase-1.5.md
     .gitignore:252:.audit/
+2026-11-03 | 1.5.9 | cline | START | Make python tools/check_docs.py index exit 0; add INDEX rows for 5 files and a docs/sample_json_food_payloads/ directory row
+2026-11-03 | 1.5.9 | cline | DONE | `python tools/check_docs.py index` exits 0 (no violations: docs/INDEX.md skipped; directory-prefix rows cover files beneath `/`-ended rows) and `python tools/check_docs.py cites docs/ARCHITECTURE.md docs/REPO_MAP.md` still exits 0.
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools/check_docs.py index
+    (no output; exit 0)
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools/check_docs.py cites docs/ARCHITECTURE.md docs/REPO_MAP.md
+    (no output; exit 0)

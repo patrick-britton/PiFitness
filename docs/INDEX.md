@@ -24,6 +24,12 @@ Statement R3 in `docs/workflow/TARGET_STATE.md`. One home per fact: each row nam
 | `docs/workflow/PLAN.md` | Phase task list (section 6), decisions D1–D19 (section 2), backlog dispositions (section 5), open questions (section 3), appendices A–D. | Human git flow detail — `docs/workflow/GIT_MODEL.md`; rule text — `.clinerules/`. | human |
 | `docs/workflow/PROGRESS.md` | Append-only task event log: START, DONE, BLOCKED, FORCED, REVIEW rows with evidence (Appendix B format). | Task definitions — `docs/workflow/PLAN.md` section 6; decisions — `docs/workflow/PLAN.md` section 2. | human |
 | `docs/workflow/BACKLOG.md` | Phase 1 backlog items B1–B26 and B35–B38 (out-of-scope findings, statement W7); IDs continue from B35 per D6; B27–B34 reserved by PLAN section 5. | Phase task list — `docs/workflow/PLAN.md` section 6; task event log — `docs/workflow/PROGRESS.md`. | human+agent |
+| `docs/architecture/dynamic-targets.md` | Architecture decision record: dynamic import/module targets pinned in `audit.toml`. | Folder purposes — `docs/REPO_MAP.md`; how the parts work together — `docs/ARCHITECTURE.md`. | human |
+| `docs/architecture/garmin-login.md` | Architecture decision record: Garmin login flow implementation and its three protection layers. | Folder purposes — `docs/REPO_MAP.md`; how the parts work together — `docs/ARCHITECTURE.md`. | human |
+| `docs/architecture/test-strategy.md` | Architecture decision record: test tiers and pytest commands. | Folder purposes — `docs/REPO_MAP.md`; how the parts work together — `docs/ARCHITECTURE.md`. | human |
+| `.clinerules/interim-rules.md` | Interim rules for Phase 1.5 (one task per session, loop-breaker, backlog, done gate, git rules); merged into `.clinerules/default-rules.md` in Phase 7. | Global rule text — `.clinerules/default-rules.md`; tool signatures — `.clinerules/00-tool-constraints.md`. | human |
+| `.clinerules/workflows/plan-task.md` | Plan task executor workflow: read one task row from `docs/workflow/PLAN.md`, run its done-when, record START/DONE/BLOCKED in `docs/workflow/PROGRESS.md`, commit once. | Task definitions — `docs/workflow/PLAN.md` section 6; rule text — `.clinerules/`. | human |
+| `docs/sample_json_food_payloads/` | Reference JSON payloads for the food diary module (data fixtures, not documentation). | Folder purposes — `docs/REPO_MAP.md`. | human |
 
 ## Not indexed
 

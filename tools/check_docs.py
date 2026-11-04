@@ -162,6 +162,8 @@ def check_index(baseline, update=False, grow=False):
         return 1
     index_text = index_path.read_text(encoding="utf-8", errors="replace")
     indexed = set(BACKTICK.findall(index_text))
+    # INDEX rows whose backticked path ends in "/" cover every file beneath them.
+    dir_prefixes = {item for item in indexed if item.endswith("/")}
     not_indexed_section = False
     not_indexed = []
     for line in index_text.splitlines():
@@ -183,10 +185,15 @@ def check_index(baseline, update=False, grow=False):
             if p.is_file():
                 actual.add(p.relative_to(REPO_ROOT).as_posix())
     for rel in sorted(actual):
+        # docs/INDEX.md is the index itself; it is not required to index itself.
+        if rel == "docs/INDEX.md":
+            continue
         if f"`{rel}`" in indexed or rel in indexed:
             continue
         name = Path(rel).name
         if f"`{name}`" in indexed:
+            continue
+        if any(rel.startswith(d) for d in dir_prefixes):
             continue
         if any(rel.startswith(ni.rstrip("*")) or ni.rstrip("*") in rel for ni in not_indexed):
             continue
