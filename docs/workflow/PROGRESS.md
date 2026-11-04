@@ -269,4 +269,4 @@ date | task | model | event | evidence
 2026-11-04 | 3.2 | cline | START | schema map generator and verify check
 2026-11-04 | 3.2 | cline | DONE | verify --scope db exit=0
 2026-11-04 | 3.3.0 | cline | START | COMMENT backfill draft for exercises domain
-2026-11-04 | 3.3.0 | cline | DONE | migration 006 applied; coverage 0->15 commented (883 missing); PRD apply via dbmate protocol
+2026-11-04 | 3.3.0 | cline | DONE | human has approved all comments -- though these will need to be revised in the future.
