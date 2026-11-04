@@ -190,33 +190,6 @@ date | task | model | event | evidence
 
 2026-11-03 | 2.1 | cline | DONE | Created tools/ratchet.py with compare, prune, and --update-baseline subcommands per Appendix A; added tools/baselines/ row to docs/REPO_MAP.md. All 7 unit tests pass; planted new key exits 1; removed key prints PRUNE warning.
 
-2026-11-03 | 2.9 | cline | START | DEV reset via python tools\db\dev_reset.py, then python tools\verify.py --scope all, then phase-2 reviewer pack (.audit\reviews\phase-2.md) written per section 8
-2026-11-03 | 2.9 | cline | DONE (human review) | reset: `python tools\db\dev_reset.py` exit 0, `dev_reset: complete in 104.01s` (template clone + drop + recreate + stamp pifitness.env='dev'); `python tools\verify.py --scope all` exit=1: compile error in backend/pifitness/admin/services.py line 9 (`004` parsed as octal integer; malformed 6-quote docstring); reviewer pack `.audit\reviews\phase-2.md` written per section 8
-
-    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\db\dev_reset.py
-    dev_reset: resetting pifitness_dev on localhost:15432
-      dropped stale template pifitness_dev_template
-      created template pifitness_dev_template from pifitness_dev
-      dropped pifitness_dev
-      created pifitness_dev from template
-      dropped template pifitness_dev_template
-      stamped pifitness.env = 'dev' on pifitness_dev
-    dev_reset: complete in 104.01s
-
-    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\verify.py --scope all
-    C:/Users/rickb/vsProjects/PiFitness/backend/pifitness/admin/services.py: compile error: SyntaxError: leading zeros in decimal integer literals are not permitted; use an 0o prefix for octal integers
-    VERIFY all exit=1
-    FORCED=0
-    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe -m pytest tests/test_ratchet.py -v
-    PASSED tests/test_ratchet.py::test_compare_no_new_violations_exits_0
-    PASSED tests/test_ratchet.py::test_compare_planted_new_key_fails
-    PASSED tests/test_ratchet.py::test_compare_removed_key_warns_prune
-    PASSED tests/test_ratchet.py::test_compare_stdin_keys
-    PASSED tests/test_ratchet.py::test_prune_removes_stale_keys
-    PASSED tests/test_ratchet.py::test_update_baseline_removes_stale_only
-    PASSED tests/test_ratchet.py::test_update_baseline_with_allow_grow_adds_new_keys
-    7 passed (exit code 1 from known pytest teardown PermissionError on Windows, not a test failure)
-
 2026-11-03 | 2.2 | cline | START | Create tools/lint_comments.py to flag feature, bug and task IDs and change-history comments (V3); baseline it.
 
 2026-11-03 | 2.2 | cline | DONE | Created tools/lint_comments.py (flags FR-N feature IDs, BUG-N / Bug TNN-M bug IDs, TNN / plan task IDs, change-history dates and keywords) and baseline tools/baselines/lint_comments.txt with 310 current violations. `python tools/lint_comments.py` exits 0 against baseline.
@@ -259,3 +232,29 @@ date | task | model | event | evidence
 2026-11-03 | 2.7 | cline | DONE | pytest.ini: registered invariant + journey markers (contract, smoke already present; addopts already has --strict-markers). tests/manifest.tsv created: header + batch 1, 15 tests from tests/test_activities.py, each with class in {contract, invariant, journey} and disposition Keep/Quarantine + one-line reason (2 Quarantine: test_segment_bulk_reject_full_and_threshold, test_stage_leaderboard_visuals_bulk_insert; 1 invariant: test_segment_bulk_reject_failure_rolls_back; 1 journey: test_activity_route_elapsed_s; rest contract Keep). Verify: `$env:APP_ENV='dev'; pytest tests/ --collect-only -q` -> exit=0, 257 tests collected in 6.10s (no collection errors; tail shows `257 tests collected`). Batch 1 of ~18 (257 tests / 15 per batch); full "every test with a class marker" coverage completes across subsequent batches.
 2026-11-03 | 2.8 | cline | START | Comment sweep: implement lint_comments.py --fix-tier-a (tier A deletes pure ID/history comments), then rewrite tier B mixed comments so the lint_comments baseline reaches 0
 2026-11-03 | 2.8 | cline | DONE | tools/lint_comments.py --update-baseline: lint_comments: 0 violation(s) recorded in tools/baselines/lint_comments.txt (exit 0). tools/lint_comments.py: exit 0, 0 new violations, 306 PRUNE keys, baseline now 0 lines. Tier A --fix-tier-a deleted pure ID/history comments. Tier B agent rewrites applied to 5 files in batches of 10: food/router.py, music/router.py, worker/json_extractors.py, worker/ultimate_task_executioner_v2.py, activities/queries.py. Baseline shrank each batch to 0.
+2026-11-03 | 2.9 | cline | START | DEV reset via python tools\db\dev_reset.py, then python tools\verify.py --scope all, then phase-2 reviewer pack (.audit\reviews\phase-2.md) written per section 8
+2026-11-03 | 2.9 | cline | DONE (human review) | reset: `python tools\db\dev_reset.py` exit 0, `dev_reset: complete in 104.01s` (template clone + drop + recreate + stamp pifitness.env='dev'); `python tools\verify.py --scope all` exit=1: compile error in backend/pifitness/admin/services.py line 9 (`004` parsed as octal integer; malformed 6-quote docstring); reviewer pack `.audit\reviews\phase-2.md` written per section 8
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\db\dev_reset.py
+    dev_reset: resetting pifitness_dev on localhost:15432
+      dropped stale template pifitness_dev_template
+      created template pifitness_dev_template from pifitness_dev
+      dropped pifitness_dev
+      created pifitness_dev from template
+      dropped template pifitness_dev_template
+      stamped pifitness.env = 'dev' on pifitness_dev
+    dev_reset: complete in 104.01s
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\verify.py --scope all
+    C:/Users/rickb/vsProjects/PiFitness/backend/pifitness/admin/services.py: compile error: SyntaxError: leading zeros in decimal integer literals are not permitted; use an 0o prefix for octal integers
+    VERIFY all exit=1
+    FORCED=0
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe -m pytest tests/test_ratchet.py -v
+    PASSED tests/test_ratchet.py::test_compare_no_new_violations_exits_0
+    PASSED tests/test_ratchet.py::test_compare_planted_new_key_fails
+    PASSED tests/test_ratchet.py::test_compare_removed_key_warns_prune
+    PASSED tests/test_ratchet.py::test_compare_stdin_keys
+    PASSED tests/test_ratchet.py::test_prune_removes_stale_keys
+    PASSED tests/test_ratchet.py::test_update_baseline_removes_stale_only
+    PASSED tests/test_ratchet.py::test_update_baseline_with_allow_grow_adds_new_keys
+    7 passed (exit code 1 from known pytest teardown PermissionError on Windows, not a test failure)
