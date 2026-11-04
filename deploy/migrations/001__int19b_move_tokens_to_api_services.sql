@@ -8,6 +8,8 @@
 -- Mirrors the dev-DB migration done in INT-19b, with sequence rewire
 -- included inline (LIKE INCLUDING ALL leaves id defaults pointing at
 -- _migration.*_id_seq, which blocks the DROP SCHEMA at the end).
+--
+-- migrate:up
 
 BEGIN;
 
@@ -81,3 +83,7 @@ DROP SCHEMA _migration;
 SELECT count(*) AS _migration_present FROM information_schema.schemata WHERE schema_name = '_migration';
 
 COMMIT;
+
+-- migrate:down
+-- NO ROLLBACK: destructive schema retirement. Reverse via prod-latest.dump
+-- restore per deploy/README.md section "destructive changes."
