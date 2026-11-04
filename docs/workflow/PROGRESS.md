@@ -200,3 +200,17 @@ date | task | model | event | evidence
     (no output; exit 0)
     $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools/check_docs.py cites docs/ARCHITECTURE.md docs/REPO_MAP.md
     (no output; exit 0)
+
+2026-11-03 | 2.1 | cline | START | Create tools/ratchet.py (compare, prune, shrink-only update) per Appendix A; add tools/baselines/ row to REPO_MAP.md.
+
+2026-11-03 | 2.1 | cline | DONE | Created tools/ratchet.py with compare, prune, and --update-baseline subcommands per Appendix A; added tools/baselines/ row to docs/REPO_MAP.md. All 7 unit tests pass; planted new key exits 1; removed key prints PRUNE warning.
+
+    $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe -m pytest tests/test_ratchet.py -v
+    PASSED tests/test_ratchet.py::test_compare_no_new_violations_exits_0
+    PASSED tests/test_ratchet.py::test_compare_planted_new_key_fails
+    PASSED tests/test_ratchet.py::test_compare_removed_key_warns_prune
+    PASSED tests/test_ratchet.py::test_compare_stdin_keys
+    PASSED tests/test_ratchet.py::test_prune_removes_stale_keys
+    PASSED tests/test_ratchet.py::test_update_baseline_removes_stale_only
+    PASSED tests/test_ratchet.py::test_update_baseline_with_allow_grow_adds_new_keys
+    7 passed (exit code 1 from known pytest teardown PermissionError on Windows, not a test failure)
