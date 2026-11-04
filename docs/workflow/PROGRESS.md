@@ -268,5 +268,5 @@ date | task | model | event | evidence
 2026-11-04 | 3.1 | cline | DONE | migrate.py status exit=0; baseline version 0 recorded on DEV; all 5 dbmate migrations pending; migrations 002-005 verified applying cleanly on DEV with rollback; migration 001 targets PRD pre-INT19b schema (_migration exists), correctly unavailable on current DEV (post-INT19b)
 2026-11-04 | 3.2 | cline | START | schema map generator and verify check
 2026-11-04 | 3.2 | cline | DONE | verify --scope db exit=0
-2026-11-04 | 3.3 | cline | START | COMMENT backfill draft for exercises domain
-2026-11-04 | 3.3 | cline | DONE | migration 006 applied; coverage 0->15 commented (883 missing); PRD apply via dbmate protocol
+2026-11-04 | 3.3.0 | cline | START | COMMENT backfill draft for exercises domain
+2026-11-04 | 3.3.0 | cline | DONE | migration 006 applied; coverage 0->15 commented (883 missing); PRD apply via dbmate protocol
