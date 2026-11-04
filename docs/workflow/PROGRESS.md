@@ -226,3 +226,7 @@ date | task | model | event | evidence
     FORCED=0
 
 2026-11-03 | 2.4c | cline | DONE | Patched tools/db/sync-prod-to-dev.ps1: after dev restore, re-stamp pifitness.env='dev' marker (Step 8) and re-snapshot pifitness_dev_template from dev (Step 9); renumbered Verify to Step 10 and Cleanup to Step 11; updated .DESCRIPTION step list. PowerShell syntax OK; DEV marker confirmed as 'dev'; verify --scope db exits 0 (FORCED=0).
+
+2026-11-03 | 2.5 | cline | START | Create tools/repo_health.py: folder-vs-REPO_MAP check (R1), import-linter contracts G1-G6 with K1 ignore_imports, vulture/knip/deptry forced (tools absent), SQL smell greps (SELECT *, unbounded, OFFSET, pandas) in backend/pifitness/; baselines for each check.
+
+2026-11-03 | 2.5 | cline | DONE | Created tools/repo_health.py with three checks: folder-map (R1: 236 unmapped + 7 missing folders baselined), imports (G1-G6: 3 G5 worker-import violations baselined; K1 ignore_imports for backend_functions->integrations/spotify/worker), sql-smells (75 SELECT*/OFFSET/pandas violations baselined). vulture/knip/deptry forced (not installed). `python tools/repo_health.py` exits 0 against baselines.
