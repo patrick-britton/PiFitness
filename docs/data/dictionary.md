@@ -403,89 +403,89 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 ## health
 
 ### health.body_battery_raw (table)
-- **Grain:** one row per body battery raw (table); see schema.generated.md for columns.
-- **Canonical source:** `health.body_battery_raw`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per body-battery sample.
+- **Canonical source:** `health.body_battery_raw` (Garmin import).
+- **Rules:** `convention` raw time-series; PK app-level.
 
 ### health.body_composition_raw (table)
-- **Grain:** one row per body composition raw (table); see schema.generated.md for columns.
-- **Canonical source:** `health.body_composition_raw`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per body-composition measurement.
+- **Canonical source:** `health.body_composition_raw` (Garmin import).
+- **Rules:** `convention` raw measurement.
 
 ### health.body_dimensions (table)
-- **Grain:** one row per body dimensions (table); see schema.generated.md for columns.
+- **Grain:** one row per body dimension record.
 - **Canonical source:** `health.body_dimensions`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` dimension data.
 
 ### health.fitness_age_raw (table)
-- **Grain:** one row per fitness age raw (table); see schema.generated.md for columns.
-- **Canonical source:** `health.fitness_age_raw`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per fitness-age sample.
+- **Canonical source:** `health.fitness_age_raw` (Garmin import).
+- **Rules:** `convention` raw sample.
 
 ### health.heartrate_raw (table)
-- **Grain:** one row per heartrate raw (table); see schema.generated.md for columns.
-- **Canonical source:** `health.heartrate_raw`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per heart-rate sample (ts_utc).
+- **Canonical source:** `health.heartrate_raw`; populated by `activity_smoothing.insert_heartrate_for_activity` from `activities.activity_details`.
+- **Rules:** `enforced` PK ts_utc; upsert on conflict.
 
 ### health.hrv_raw (table)
-- **Grain:** one row per hrv raw (table); see schema.generated.md for columns.
-- **Canonical source:** `health.hrv_raw`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per HRV sample.
+- **Canonical source:** `health.hrv_raw` (Garmin import).
+- **Rules:** `convention` raw sample.
 
 ### health.photo_metadata (table)
-- **Grain:** one row per photo metadata (table); see schema.generated.md for columns.
+- **Grain:** one row per photo metadata.
 - **Canonical source:** `health.photo_metadata`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` metadata.
 
 ### health.respiration_raw (table)
-- **Grain:** one row per respiration raw (table); see schema.generated.md for columns.
-- **Canonical source:** `health.respiration_raw`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per respiration sample.
+- **Canonical source:** `health.respiration_raw` (Garmin import).
+- **Rules:** `convention` raw sample.
 
 ### health.sleep_movement_raw (table)
-- **Grain:** one row per sleep movement raw (table); see schema.generated.md for columns.
-- **Canonical source:** `health.sleep_movement_raw`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per sleep movement sample.
+- **Canonical source:** `health.sleep_movement_raw` (Garmin import).
+- **Rules:** `convention` raw sample.
 
 ### health.sleep_totals (table)
-- **Grain:** one row per sleep totals (table); see schema.generated.md for columns.
+- **Grain:** one row per night sleep summary.
 - **Canonical source:** `health.sleep_totals`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` nightly summary.
 
 ### health.spo2_raw (table)
-- **Grain:** one row per spo2 raw (table); see schema.generated.md for columns.
-- **Canonical source:** `health.spo2_raw`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per SpO2 sample.
+- **Canonical source:** `health.spo2_raw` (Garmin import).
+- **Rules:** `convention` raw sample.
 
 ### health.stress_raw (table)
-- **Grain:** one row per stress raw (table); see schema.generated.md for columns.
-- **Canonical source:** `health.stress_raw`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per stress sample.
+- **Canonical source:** `health.stress_raw` (Garmin import).
+- **Rules:** `convention` raw sample.
 
 ### health.training_status_raw (table)
-- **Grain:** one row per training status raw (table); see schema.generated.md for columns.
-- **Canonical source:** `health.training_status_raw`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per training status sample.
+- **Canonical source:** `health.training_status_raw` (Garmin import).
+- **Rules:** `convention` raw sample.
 
 ### health.vw_activity_weights (view)
-- **Grain:** one row per vw activity weights (view); see schema.generated.md for columns.
-- **Canonical source:** `health.vw_activity_weights`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per activity weight.
+- **Canonical source:** derived from health data.
+- **Rules:** `convention` read-only view.
 
 ### health.vw_body_comp_interpolation_precalc (view)
-- **Grain:** one row per vw body comp interpolation precalc (view); see schema.generated.md for columns.
-- **Canonical source:** `health.vw_body_comp_interpolation_precalc`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per precomputed body-comp interpolation.
+- **Canonical source:** derived view.
+- **Rules:** `convention` read-only view.
 
 ### health.vw_heart_rates (view)
-- **Grain:** one row per vw heart rates (view); see schema.generated.md for columns.
-- **Canonical source:** `health.vw_heart_rates`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Grain:** one row per heart-rate reading.
+- **Canonical source:** derived from `health.heartrate_raw`.
+- **Rules:** `convention` read-only view.
 
 ### health.weight_target (table)
-- **Grain:** one row per weight target (table); see schema.generated.md for columns.
+- **Grain:** one row per weight target setting.
 - **Canonical source:** `health.weight_target`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` user setting.
 
 ## logging
 
