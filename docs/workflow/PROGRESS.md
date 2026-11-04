@@ -224,3 +224,5 @@ date | task | model | event | evidence
     $ C:\users\rickb\vsprojects\pifitness\.venv\Scripts\python.exe tools\verify.py --scope db
     VERIFY db exit=0
     FORCED=0
+
+2026-11-03 | 2.4c | cline | DONE | Patched tools/db/sync-prod-to-dev.ps1: after dev restore, re-stamp pifitness.env='dev' marker (Step 8) and re-snapshot pifitness_dev_template from dev (Step 9); renumbered Verify to Step 10 and Cleanup to Step 11; updated .DESCRIPTION step list. PowerShell syntax OK; DEV marker confirmed as 'dev'; verify --scope db exits 0 (FORCED=0).
