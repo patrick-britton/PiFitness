@@ -1,0 +1,16 @@
+test	class	disposition	reason
+tests/test_activities.py::test_activity_report_contract_shape	contract	Keep	GET /api/activities/report response shape matches the ActivityReport contract.
+tests/test_activities.py::test_activity_report_invalid_type	contract	Keep	Invalid report type is rejected at the API boundary.
+tests/test_activities.py::test_leaderboard_segments_contract_shape	contract	Keep	Leaderboard segments payload conforms to the expected shape.
+tests/test_activities.py::test_leaderboard_segments_filters_forwarded	contract	Keep	Query filters are forwarded to the backend per the endpoint contract.
+tests/test_activities.py::test_leaderboard_segments_invalid_params	contract	Keep	Invalid segment parameters are rejected at the boundary.
+tests/test_activities.py::test_segment_bulk_reject_full_and_threshold	contract	Quarantine	Asserts the exact TRUNCATE string and execute_values template; brittle to SQL changes.
+tests/test_activities.py::test_segment_bulk_reject_failure_rolls_back	invariant	Keep	On failure the transaction always rolls back (data-safety invariant).
+tests/test_activities.py::test_segment_bulk_reject_empty_404_422	contract	Keep	Empty reject returns 404/422 per the endpoint contract.
+tests/test_activities.py::test_activity_route_elapsed_s	journey	Keep	Live end-to-end elapsed_s check against the activities route.
+tests/test_activities.py::test_leaderboard_contract_shape	contract	Keep	Leaderboard payload conforms to the expected shape.
+tests/test_activities.py::test_leaderboard_not_found	contract	Keep	Missing leaderboard returns 404 per the endpoint contract.
+tests/test_activities.py::test_leaderboard_visuals_contract_shape	contract	Keep	Leaderboard visuals payload conforms to the expected shape.
+tests/test_activities.py::test_leaderboard_visuals_not_found	contract	Keep	Missing leaderboard visuals returns 404 per the endpoint contract.
+tests/test_activities.py::test_stage_leaderboard_visuals_bulk_insert	contract	Quarantine	Asserts the exact TRUNCATE string and execute_values template; brittle to SQL changes.
+tests/test_activities.py::test_activity_report_walk_no_placeholder	contract	Keep	Walk activity returns null efficiency/course with no placeholder per contract.
