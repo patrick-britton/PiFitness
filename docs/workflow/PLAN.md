@@ -131,6 +131,17 @@ ing tests. | 3 each | the named baseline shrank; verify exits 0 |
 | 3.6 | Make `dev_reset.py` replay pending migrations after the template clone and after a PRD restore. | 2 | a deliberate test migration survives `dev_reset.py` |
 | 3.7 | Measure B20 with `EXPLAIN ANALYZE` on DEV for row counts and plan shape; human runs one read-only `EXPLAIN` on PRD for Pi timing (dev timings do not transfer). Overlap audit findings go to the backlog. | 2 | numbers recorded in backlog item B20 |
 | 3.8 | Exit check and reviewer pack. | pack | review recorded |
+| 3.9 | (B2) Record `deploy/migrations/` as the single migration home in Phase 3 text; check INT19b__-style naming vs D3 "numbered files". | docs/workflow/PLAN.md | `git grep -n "single home" docs/workflow/PLAN.md` exits 0; migration naming reviewed vs D3 |
+| 3.10 | (B3) Decide fate of `scripts/` and `scripts/repo_audit/`: retool useful parts into `tools/audit/` or delete; check overlap with `tools/audit/p1_facts.py`. | scripts/repo_audit, tools/audit | `git ls-files scripts/repo_audit` exits 0; decision recorded in PROGRESS |
+| 3.11 | (B5) Hash-compare `.features/descriptions/json_food_responses/` to `docs/sample_json_food_payloads/`; decide what `.features/descriptions/` still holds. | .features/descriptions, docs/sample_json_food_payloads | `test -d .features/descriptions` exits 0; comparison recorded in PROGRESS |
+| 3.12 | (B9) Confirm whether `backend/pifitness/config/queries.py` is dead or wired indirectly. | backend/pifitness/config/queries.py | `git grep -n "queries" backend/main.py` runs; wiring status recorded in PROGRESS |
+| 3.13 | (B12) Add missing statement W9 (module walkthrough checklist) to `docs/workflow/TARGET_STATE.md`. | docs/workflow/TARGET_STATE.md | `git grep -n "W9" docs/workflow/TARGET_STATE.md` exits 0 |
+| 3.14 | (B14) Fix REPO_MAP rows citing absent `.features/descriptions/json_food_responses/almond_responses.json`. | docs/REPO_MAP.md | `git grep -n "json_food_responses" docs/REPO_MAP.md` runs; citations reviewed |
+| 3.15 | (B15) Resolve `.features/descriptions/` citation to absent `almond_responses.json` (folder is empty). | docs/REPO_MAP.md | `git grep -n "almond_responses" docs/REPO_MAP.md` runs; citation resolved |
+| 3.16 | (B35) Confirm `.features/descriptions/` keep decision; external refs in backend/pifitness/tri_tip/queries.py:8 and frontend files. | docs/REPO_MAP.md, backend/pifitness/tri_tip/queries.py | `git grep -n "json_food_responses" -- '*.py' '*.ts' '*.tsx'` runs; keep recorded |
+| 3.17 | (B36) Confirm `.features/designs_active/` keep decision; Phase 4 workflow may use it. | docs/REPO_MAP.md | `git grep -n "designs_active" -- '*.py' '*.ts' '*.tsx'` runs; keep recorded |
+| 3.18 | (B37) Confirm `backend/api/` keep decision; marker `__init__.py` referenced in comments, nothing imports it. | backend/api | `git grep -n "backend/api" -- '*.py' '*.ts' '*.tsx'` runs; keep recorded |
+| 3.19 | (B38) Schedule `scripts/repo_audit/` removal (superseded by tools/repo_health.py at 2.5); references in docs/REPO_MAP.md and docs/architecture/dynamic-targets.md. | scripts/repo_audit, docs/REPO_MAP.md | `git ls-files scripts/repo_audit` exits 0; removal scheduled in PROGRESS |
 
 ### Phase 4: Workflow engine (strong model for 4.1 and 4.3)
 
