@@ -213,21 +213,21 @@ def check_imports(baseline, update=False, grow=False):
 
             if file_folder == "backend/pifitness/core/":
                 violations.append((violation_key("imports", py_file.as_posix(), "G3",
-                                                 f"{imported_folder}@{line_no}"),
-                                   f"G3: core/ imports repo folder {imported_folder} in {py_file.as_posix()}:{line_no}"))
+                                                 f"{imported_folder}"),
+                                   f"G3: core/ imports repo folder {imported_folder} in {py_file.as_posix()}"))
                 continue
 
             if imported_folder in G4_FORBIDDEN:
                 violations.append((violation_key("imports", py_file.as_posix(), "G4",
-                                                 f"{imported_folder}@{line_no}"),
-                                   f"G4: {file_folder} imports {imported_folder} in {py_file.as_posix()}:{line_no}"))
+                                                 f"{imported_folder}"),
+                                   f"G4: {file_folder} imports {imported_folder} in {py_file.as_posix()}"))
                 continue
 
             if imported_folder == "backend/pifitness/worker/":
                 if any(file_folder.startswith(f"backend/pifitness/{dm}") for dm in DOMAIN_MODULES):
                     violations.append((violation_key("imports", py_file.as_posix(), "G5",
-                                                     f"worker/@{line_no}"),
-                                       f"G5: {file_folder} imports worker/ in {py_file.as_posix()}:{line_no}"))
+                                                     "worker/"),
+                                       f"G5: {file_folder} imports worker/ in {py_file.as_posix()}"))
                     continue
 
             if file_folder == "backend/backend_functions/":
@@ -236,8 +236,8 @@ def check_imports(baseline, update=False, grow=False):
                     if key in K1_IGNORE:
                         continue
                     violations.append((violation_key("imports", py_file.as_posix(), "G6",
-                                                     f"{imported_folder}@{line_no}"),
-                                       f"G6: backend_functions imports {imported_folder} in {py_file.as_posix()}:{line_no}"))
+                                                     f"{imported_folder}"),
+                                       f"G6: backend_functions imports {imported_folder} in {py_file.as_posix()}"))
                     continue
 
     if update:
@@ -269,14 +269,14 @@ def check_sql_smells(baseline, update=False, grow=False):
             continue
         for i, line in enumerate(text.splitlines(), 1):
             if select_star.search(line):
-                violations.append((violation_key("sql-smells", py_file.as_posix(), "select-star", f"line {i}"),
-                                   f"SQL smell: SELECT * in {py_file.as_posix()}:{i}"))
+                violations.append((violation_key("sql-smells", py_file.as_posix(), "select-star", ""),
+                                   f"SQL smell: SELECT * in {py_file.as_posix()}"))
             if offset_re.search(line):
-                violations.append((violation_key("sql-smells", py_file.as_posix(), "offset", f"line {i}"),
-                                   f"SQL smell: OFFSET in {py_file.as_posix()}:{i}"))
+                violations.append((violation_key("sql-smells", py_file.as_posix(), "offset", ""),
+                                   f"SQL smell: OFFSET in {py_file.as_posix()}"))
             if pandas_re.search(line):
-                violations.append((violation_key("sql-smells", py_file.as_posix(), "pandas", f"line {i}"),
-                                   f"SQL smell: pandas in {py_file.as_posix()}:{i}"))
+                violations.append((violation_key("sql-smells", py_file.as_posix(), "pandas", ""),
+                                   f"SQL smell: pandas in {py_file.as_posix()}"))
 
     if update:
         write_baseline(BASELINE_DIR / "sql-smells.txt", [key for key, _ in violations], grow)
