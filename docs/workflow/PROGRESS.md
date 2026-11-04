@@ -230,3 +230,11 @@ date | task | model | event | evidence
 2026-11-03 | 2.5 | cline | START | Create tools/repo_health.py: folder-vs-REPO_MAP check (R1), import-linter contracts G1-G6 with K1 ignore_imports, vulture/knip/deptry forced (tools absent), SQL smell greps (SELECT *, unbounded, OFFSET, pandas) in backend/pifitness/; baselines for each check.
 
 2026-11-03 | 2.5 | cline | DONE | Created tools/repo_health.py with three checks: folder-map (R1: 236 unmapped + 7 missing folders baselined), imports (G1-G6: 3 G5 worker-import violations baselined; K1 ignore_imports for backend_functions->integrations/spotify/worker), sql-smells (75 SELECT*/OFFSET/pandas violations baselined). vulture/knip/deptry forced (not installed). `python tools/repo_health.py` exits 0 against baselines.
+
+2026-11-03 | 2.6 | cline | START | Red-baseline triage: record counts (tsc errors, failing tests, vulture hits), then shrink baselines B9, B19, tsc, tests
+
+    Baseline recorded:
+    - tsc errors: 0 (`npx tsc --noEmit` clean in frontend/pifitness)
+    - failing tests: 0 (`pytest tests/ -m "not slow and not integration and not live" -q` with APP_ENV=dev: all pass/skipped; known Windows teardown PermissionError exits 1, not a real failure)
+    - vulture hits: unmeasured (`vulture` not installed)
+2026-11-03 | 2.6 | cline | DONE | B19 cleanup: removed streamlit, pathlib, httpx2, pytest, pytest-asyncio from deploy/scripts/library_requirements.txt (git grep confirmed pathlib/httpx/pytest imported as stdlib/runtime, streamlit/httpx2/pytest-asyncio not imported in code); split backend/pyproject.toml into runtime deps (fastapi, uvicorn, psycopg2-binary, python-dotenv, sqlalchemy, pandas, numpy, requests, httpx) plus [project.optional-dependencies] dev (pytest, pytest-asyncio). `python tools/verify.py --scope all`: VERIFY all exit=0, FORCED=4.

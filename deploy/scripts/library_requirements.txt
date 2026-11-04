@@ -1,4 +1,3 @@
-streamlit
 psycopg2-binary
 sqlalchemy
 pandas
@@ -7,7 +6,6 @@ requests
 spotipy
 python-dotenv
 cryptography
-pathlib
 garminconnect
 matplotlib
 plotly
@@ -17,11 +15,8 @@ scipy
 playwright
 typer
 httpx
-httpx2
 pytz
 fastapi
 uvicorn
 pydantic
 starlette
-pytest
-pytest-asyncio
