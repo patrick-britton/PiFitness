@@ -31,14 +31,14 @@
       "activities.vw_activity_header_stats": 2,
       "activities.vw_activity_summary": 2
     },
-    "placeholder_count": 145,
-    "replacement_character_count": 145,
+    "placeholder_count": 140,
+    "replacement_character_count": 140,
     "schema_duplicates": []
   },
   "column_coverage": {
-    "documented_column_count": 0,
+    "documented_column_count": 69,
     "expected_column_count": 1817,
-    "objects_with_missing_columns": 222,
+    "objects_with_missing_columns": 212,
     "missing_columns": {
       "activities.activities": [
         "activity_id",
@@ -729,66 +729,6 @@
         "track_id",
         "track_name_clean",
         "track_order"
-      ],
-      "api_services.api_service_list": [
-        "api_credential_requirements",
-        "api_service_function",
-        "api_service_name",
-        "rate_limit_cleared_utc",
-        "rate_limit_detected_utc"
-      ],
-      "api_services.api_tokens": [
-        "created_at_utc",
-        "id",
-        "is_active",
-        "refresh_token_expires_at_utc",
-        "service_name",
-        "token_data",
-        "updated_at_utc"
-      ],
-      "api_services.credentials": [
-        "api_credentials",
-        "api_service_name"
-      ],
-      "api_services.function_library": [
-        "api_function_name",
-        "api_service_name",
-        "flatten_sproc",
-        "friendly_name",
-        "iter_path_keys",
-        "iter_query_keys",
-        "loop_strategy",
-        "python_extraction_function",
-        "static_path_params",
-        "static_query_params",
-        "value_recency"
-      ],
-      "api_services.spotify_auth_metadata": [
-        "authorized_at_utc",
-        "created_at",
-        "expires_at_utc",
-        "id",
-        "is_active",
-        "refresh_token_hash"
-      ],
-      "exercises.exercise_attempts": [
-        "attempt_id",
-        "created_at",
-        "ended_at",
-        "exercise_id",
-        "interval_seconds_used",
-        "notes",
-        "paced_count",
-        "started_at",
-        "total_count"
-      ],
-      "exercises.exercise_timers": [
-        "created_at",
-        "exercise_id",
-        "interval_seconds",
-        "name",
-        "notes",
-        "updated_at"
       ],
       "food.diary_entries": [
         "caffeine_mg",
@@ -2271,35 +2211,6 @@
         "total_ms",
         "value_recency",
         "value_recency_minutes_ago"
-      ],
-      "volleyball.game_events": [
-        "created_at",
-        "event_id",
-        "game_id",
-        "kind",
-        "message",
-        "recorded_at"
-      ],
-      "volleyball.games": [
-        "completed_at",
-        "created_at",
-        "first_entry_at",
-        "game_id",
-        "label",
-        "notes",
-        "partner_name",
-        "partner_number",
-        "started_at",
-        "status",
-        "team_b_name"
-      ],
-      "volleyball.points": [
-        "created_at",
-        "event_type",
-        "game_id",
-        "point_id",
-        "recorded_at",
-        "scoring_team"
       ]
     }
   },
@@ -2313,6 +2224,6 @@
     "generic_count": 0,
     "line_count": 0
   },
-  "dictionary_line_count": 1063,
+  "dictionary_line_count": 1216,
   "ready_for_completion": false
 }

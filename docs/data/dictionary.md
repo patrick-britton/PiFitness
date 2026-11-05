@@ -306,42 +306,148 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 ## api_services
 
+## api_services
+
+API service registry and OAuth/credential store for third-party integrations (Spotify, Garmin, etc.). Tables are maintained by `backend/pifitness/admin/queries.py` (admin CRUD) and written/read by the integration providers; tokens and Spotify auth metadata were moved here from `_migration` by `deploy/migrations/001__int19b__move_tokens_to_api_services.sql` (INT19b).
+
 ### api_services.api_service_list (table)
-- **Grain:** one row per registered API service.
-- **Canonical source:** `api_services.api_service_list`.
-- **Rules:** `convention` service registry.
+- **Purpose:** registry of configured external API services, including their function name, credential requirements, and rate-limit state.
+- **Grain:** one row per registered API service, keyed by `api_service_name`.
+- **Primary/candidate key:** `api_service_list_pkey` on `api_service_name` (enforced). No other declared unique key.
+- **Canonical source and lifecycle:** inserted/updated/deleted via admin endpoints backed by `backend/pifitness/admin/queries.py` (`INSERT` line 53, `UPDATE` line 67, `DELETE` line 80); read by `SELECT *` (line 28) and `SELECT DISTINCT api_service_name` (line 39).
+- **Consumers:** `backend/backend_functions/music_service.py:50` and `backend/pifitness/auth/status.py:48` read `rate_limit_cleared_utc` for Spotify to determine rate-limit state; `backend/pifitness/music/router.py:454` and `backend/pifitness/integrations/spotify/provider.py:73` read from the table; projected through `tasks.vw_task_info`.
+- **Relationships:** `api_service_name` referenced by `api_services.function_library.api_service_name` (FK `fk_svc_function_to_service`).
+- **Rules:** `enforced` PK on `api_service_name`; `convention` service registry; `rate_limit_cleared_utc` is a future UTC timestamp — while now() < cleared, the service is rate-limited; timestamps UTC.
+- **Evidence/confidence:** `backend/pifitness/admin/queries.py`, `backend/backend_functions/music_service.py`, `backend/pifitness/auth/status.py`; `schema.generated.md` lines 881-891. Structural facts confirmed; rate-lift semantics inferred from consumer reads (medium).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `api_service_name` | text | NO | Registered service name (e.g. 'Spotify', 'Garmin') | Identifier, PK | admin create | api_service_list_pkey | confirmed |
+| `api_service_function` | text | YES | Backend function name used for the service | free text | admin create/update | queries.py | confirmed |
+| `api_credential_requirements` | text | YES | Description of credentials needed for the service | free text | admin create/update | queries.py | confirmed |
+| `rate_limit_detected_utc` | timestamp with time zone | YES | When a rate limit was detected | UTC timestamptz | provider/write path | queries.py/music_service.py | confirmed |
+| `rate_limit_cleared_utc` | timestamp with time zone | YES | When the rate limit clears (future); service rate-limited until then | UTC timestamptz | provider/write path | music_service.py:50; auth/status.py:48 | confirmed |
 
 ### api_services.api_tokens (table)
-- **Grain:** one row per API token.
-- **Canonical source:** `api_services.api_tokens` (moved from elsewhere per INT19b).
-- **Rules:** `enforced` PK; `convention` token storage.
+- **Purpose:** OAuth/API access+refresh tokens per external service, used for cross-device session sync (DB tier) with a local file-cache mirror.
+- **Grain:** one row per (service, active token) — `id` is the row key; the active token for a service is the row with `is_active=true` having the latest `updated_at_utc`.
+- **Primary/candidate key:** `api_tokens_pkey` on `id` (enforced, identity sequence). Index `api_tokens_service_name_is_active_idx` on (`service_name`, `is_active`).
+- **Canonical source and lifecycle:** written by `backend/pifitness/integrations/_common.py` (`save_token_to_db`: `INSERT ... CURRENT_TIMESTAMP`, lines 110-115; deactivate prior active token via `UPDATE ... SET is_active=false`, line 99); Garmin and Spotify providers load/save through it. A token row is never deleted — it is superseded by deactivating (`is_active=false`) when refreshed.
+- **Consumers:** `_common.py:48` reads the latest active `token_data` for a service; `backend/pifitness/auth/status.py:83` reads Garmin `refresh_token_expires_at_utc`; `backend/pifitness/integrations/garmin/provider.py` bridges DB and file cache.
+- **Relationships:** none declared (no FK); `service_name` is a loose reference to `api_services.api_service_list.api_service_name` (application convention).
+- **Rules:** `enforced` PK on `id`; `convention` `is_active` boolean (only one active per service at a time, enforced by app logic not DB), `token_data` is JSONB-ish encrypted/opaque token payload treated as secret (table truncated in dev sync per `tools/db/sync-prod-to-dev.ps1`), timestamps UTC (`created_at_utc`, `updated_at_utc`, `refresh_token_expires_at_utc`).
+- **Evidence/confidence:** `backend/pifitness/integrations/_common.py`, `backend/pifitness/auth/status.py`, `backend/pifitness/integrations/garmin/provider.py`, `deploy/migrations/001__int19b__move_tokens_to_api_services.sql`; `schema.generated.md` lines 893-906. Structural facts confirmed; "one active per service" is app convention (not a DB constraint).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `id` | integer | NO | Surrogate row identifier | Identifier, identity (sequence) | insert-assigned | schema_only.sql identity; api_tokens_pkey | confirmed |
+| `service_name` | text | NO | External service the token belongs to | free text | insert request | _common.py | confirmed |
+| `token_data` | text | NO | Opaque/encrypted token payload (secret) | secret | insert (save_token_to_db) | _common.py | confirmed |
+| `created_at_utc` | timestamp with time zone | YES | Row creation time | UTC timestamptz | insert-assigned | schema.generated.md | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Last refresh/update time | UTC timestamptz | update on refresh | _common.py | confirmed |
+| `is_active` | boolean | NO | Whether this is the current active token | true/false; only one active per service (app convention) | insert=true; deactivate=false | _common.py | confirmed |
+| `refresh_token_expires_at_utc` | timestamp with time zone | YES | Refresh token expiry | UTC timestamptz | insert-assigned | _common.py; auth/status.py:83 | confirmed |
 
 ### api_services.credentials (table)
-- **Grain:** one row per credential set.
-- **Canonical source:** `api_services.credentials`.
-- **Rules:** `convention` credential storage.
+- **Purpose:** encrypted API credentials per registered service — the single server-side source of truth for secrets (no duplicate secret in the frontend build).
+- **Grain:** one row per service, keyed by `api_service_name`.
+- **Primary/candidate key:** `credentials_pkey` on `api_service_name` (enforced). No FK declared.
+- **Canonical source and lifecycle:** upserted via `backend/pifitness/admin/queries.py` (`INSERT ... ON CONFLICT (api_service_name)`, line 170); deleted via `DELETE WHERE api_service_name` (line 187).
+- **Consumers:** `backend/pifitness/integrations/_common.py:20` reads `api_credentials` for a service; `backend/pifitness/config/queries.py` and `backend/pifitness/config/router.py` resolve it from the encrypted store for the browser.
+- **Relationships:** `api_service_name` is a loose reference to `api_services.api_service_list.api_service_name` (application convention; no DB FK).
+- **Rules:** `enforced` PK on `api_service_name`; `convention` `api_credentials` holds an encrypted secret (never logged/exported); no soft-delete (hard delete only).
+- **Evidence/confidence:** `backend/pifitness/admin/queries.py`, `backend/pifitness/integrations/_common.py`, `backend/pifitness/config/queries.py`; `schema.generated.md` lines 908-915. Structural facts confirmed; encryption treatment is app convention (code comment).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `api_service_name` | text | NO | Service the credentials belong to | Identifier, PK | admin upsert | credentials_pkey | confirmed |
+| `api_credentials` | text | YES | Encrypted service credentials (secret) | secret | admin upsert | config/queries.py; _common.py:20 | confirmed |
 
 ### api_services.function_library (table)
-- **Grain:** one row per reusable function.
-- **Canonical source:** `api_services.function_library`.
-- **Rules:** `convention` function registry.
+- **Purpose:** registry of callable API functions / data-extraction functions used by the task executioner, including how each function is invoked (loop strategy, iteration keys, static params) and how freshness is tracked.
+- **Grain:** one row per registered function, keyed by `friendly_name`.
+- **Primary/candidate key:** `function_library_pkey` on `friendly_name` (enforced). FK `fk_svc_function_to_service` (`api_service_name` -> `api_services.api_service_list.api_service_name`, enforced).
+- **Canonical source and lifecycle:** created/updated/deleted via admin endpoints backed by `backend/pifitness/admin/queries.py` (`get_function_library` line 91, `INSERT` line 110, `UPDATE` line 126, `DELETE` line 139); `value_recency` touched by `backend/pifitness/worker/ultimate_task_executioner_v2.py:512`.
+- **Consumers:** `backend/backend_functions/database_functions.py:213` reads `friendly_name`/`api_service_name`; `tasks.vw_task_info` view joins `function_library` (projects `python_extraction_function`); deploy migrations note that updates auto-reflect through the non-updatable `vw_task_info` view.
+- **Relationships:** enforced FK to `api_services.api_service_list`; consumed by `tasks.vw_task_info` (view lineage).
+- **Rules:** `enforced` PK + FK; `convention` function registry; `value_recency` timestamptz tracks freshness (compared to CURRENT_DATE in the executioner); no soft-delete.
+- **Evidence/confidence:** `backend/pifitness/admin/queries.py`, `backend/backend_functions/database_functions.py`, `backend/pifitness/worker/ultimate_task_executioner_v2.py`; `schema.generated.md` lines 917-936. Structural facts confirmed; exact business meaning of `loop_strategy`/`iter_path_keys`/`static_*_params` not established in inspected code (low).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `friendly_name` | text | NO | Function display/key name | Identifier, PK | admin create | function_library_pkey | confirmed |
+| `api_service_name` | text | YES | Owning service | FK -> api_services.api_service_list.api_service_name | admin create | fk_svc_function_to_service | confirmed |
+| `api_function_name` | text | YES | Underlying API function name | free text | admin create/update | queries.py | confirmed |
+| `python_extraction_function` | text | YES | Python extraction function invoked | free text | admin create/update | queries.py | confirmed |
+| `flatten_sproc` | text | YES | Stored procedure used to flatten results | free text | admin create/update | queries.py | confirmed |
+| `value_recency` | timestamp with time zone | YES | Freshness watermark for the function's values | UTC timestamptz | updated by executioner | ultimate_task_executioner_v2.py:512 | confirmed |
+| `loop_strategy` | text | YES | How results are iterated/paged | free text | admin create/update | queries.py | low |
+| `iter_path_keys` | text | YES | JSON path keys for iteration | free text | admin create/update | queries.py | low |
+| `iter_query_keys` | text | YES | Query keys for iteration | free text | admin create/update | queries.py | low |
+| `static_path_params` | text | YES | Static path parameters | free text | admin create/update | queries.py | low |
+| `static_query_params` | text | YES | Static query parameters | free text | admin create/update | queries.py | low |
 
 ### api_services.spotify_auth_metadata (table)
-- **Grain:** one row per Spotify auth metadata.
-- **Canonical source:** `api_services.spotify_auth_metadata`.
-- **Rules:** `convention` auth metadata.
+- **Purpose:** Spotify OAuth authorization metadata — one row per authorization, recording when it was authorized, a hashed refresh token, and when it expires (6 months).
+- **Grain:** one row per Spotify authorization, keyed by `id`.
+- **Primary/candidate key:** `spotify_auth_metadata_pkey` on `id` (enforced, identity sequence). Unique index `spotify_auth_metadata_refresh_token_hash_key` on `refresh_token_hash`.
+- **Canonical source and lifecycle:** inserted by `backend/pifitness/integrations/spotify/provider.py` (`store_spotify_auth_metadata`, line 324: `authorized_at_utc = CURRENT_TIMESTAMP`, `refresh_token_hash = sha256(refresh_token)`, `expires_at_utc = CURRENT_TIMESTAMP + 6 months`); rows are never updated — a new authorization inserts a new row. Moved here from `_migration.spotify_auth_metadata` by `deploy/migrations/001__int19b__move_tokens_to_api_services.sql`.
+- **Consumers:** `backend/pifitness/auth/status.py:68` and `provider.py:351` read `MAX(expires_at_utc) WHERE is_active = true` to surface Spotify token expiry.
+- **Relationships:** none declared (no FK).
+- **Rules:** `enforced` PK on `id` + unique `refresh_token_hash`; `convention` `refresh_token_hash` is a SHA-256 hash (never the raw token — secret), `expires_at_utc` fixed at +6 months from authorization, `is_active` boolean marks the current authorization, timestamps UTC.
+- **Evidence/confidence:** `backend/pifitness/integrations/spotify/provider.py`, `backend/pifitness/auth/status.py`; `deploy/migrations/001__int19b__move_tokens_to_api_services.sql`; `schema.generated.md` lines 938-950. Structural facts confirmed; `is_active` semantics (single active row?) inferred (medium).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `id` | integer | NO | Surrogate row identifier | Identifier, identity (sequence) | insert-assigned | schema_only.sql identity; spotify_auth_metadata_pkey | confirmed |
+| `authorized_at_utc` | timestamp with time zone | NO | Authorization time | UTC timestamptz | insert = CURRENT_TIMESTAMP | provider.py:324 | confirmed |
+| `refresh_token_hash` | text | YES | SHA-256 hash of the refresh token (secret) | secret, unique | insert = sha256(refresh_token) | provider.py:324 | confirmed |
+| `expires_at_utc` | timestamp with time zone | NO | Token expiry | UTC timestamptz | insert = now + 6 months | provider.py:324 | confirmed |
+| `is_active` | boolean | YES | Marks the current authorization | true/false; single-active semantics inferred | insert-assigned | auth/status.py:68 | medium |
+| `created_at` | timestamp with time zone | YES | Row creation time | UTC timestamptz | insert-assigned | schema.generated.md | confirmed |
 
 ## exercises
 
 ### exercises.exercise_attempts (table)
-- **Grain:** one row per exercise attempts (table); see schema.generated.md for columns.
-- **Canonical source:** `exercises.exercise_attempts`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** one row per confirmed Start/Stop exercise cycle — the attempt history for a timer.
+- **Grain:** one row per attempt, keyed by `attempt_id`; scoped to one timer via `exercise_id`.
+- **Primary/candidate key:** `exercise_attempts_pkey` on `attempt_id` (enforced). FK `exercise_attempts_exercise_id_fkey` (`exercise_id` -> `exercises.exercise_timers.exercise_id`, enforced, `ON DELETE RESTRICT`).
+- **Canonical source and lifecycle:** `create_attempt` writes exactly one row per user-confirmed Start/Stop cycle (the in-progress run lives entirely in the client until confirmed). Deleted together with its timer on DELETE `/api/exercises/{id}` — attempts deleted first (RESTRICT), then the timer, in a single transaction scoped by `exercise_id` (OQ-1).
+- **Consumers:** GET `/api/exercises/{exercise_id}` (last_attempt for the live progress bar), list summaries; serializer `_serialize_attempt`.
+- **Relationships:** enforced FK to `exercises.exercise_timers` with `ON DELETE RESTRICT`.
+- **Rules:** `enforced` PK + FK (RESTRICT); `convention` CHECK `paced_count >= 0` and `total_count >= paced_count` (code-evidenced `ExerciseValidationError`), `interval_seconds_used` CHECK > 0 (snapshot of the timer's interval in effect during the run — editing a timer later does NOT re-pace historical attempts), `started_at`/`ended_at` UTC timestamptz, `notes` unused in v1.
+- **Evidence/confidence:** `backend/pifitness/exercises/queries.py` (create_attempt/delete_exercise docstrings), `router.py`, `schemas.py` (`ExerciseAttemptCreateRequest`); `schema.generated.md` lines 954-972. Structural facts confirmed; check constraints code-evidenced (not in generated inventory).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `attempt_id` | integer | NO | Surrogate identifier for the attempt | Identifier | assigned on insert | queries.py create_attempt; exercise_attempts_pkey | confirmed |
+| `exercise_id` | integer | NO | Parent timer | FK -> exercises.exercise_timers.exercise_id (ON DELETE RESTRICT) | create_attempt | exercise_attempts_exercise_id_fkey | confirmed |
+| `interval_seconds_used` | numeric | NO | Snapshot of the timer's pacing interval during this run | seconds, > 0 (CHECK) | snapshotted at run time | schemas.py ExerciseAttemptCreateRequest | confirmed |
+| `started_at` | timestamp with time zone | NO | Run start time (after the 5→1 countdown) | UTC timestamptz | create_attempt request | schemas.py ExerciseAttemptCreateRequest | confirmed |
+| `ended_at` | timestamp with time zone | NO | Run stop time (Stop pressed) | UTC timestamptz | create_attempt request | schemas.py ExerciseAttemptCreateRequest | confirmed |
+| `paced_count` | integer | NO | User-confirmed on-pace reps | count, >= 0 (CHECK) | create_attempt request | schemas.py ExerciseAttemptCreateRequest | confirmed |
+| `total_count` | integer | NO | User-confirmed total reps | count, >= paced_count (CHECK) | create_attempt request | schemas.py ExerciseAttemptCreateRequest | confirmed |
+| `notes` | text | YES | Optional notes | free text | unused in v1 | schemas.py ExerciseAttemptCreateRequest | confirmed |
+| `created_at` | timestamp with time zone | NO | Row creation time | UTC timestamptz | insert-assigned | schema.generated.md | confirmed |
 
 ### exercises.exercise_timers (table)
-- **Grain:** one row per exercise timers (table); see schema.generated.md for columns.
-- **Canonical source:** `exercises.exercise_timers`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** master data for exercise timer definitions — a named pacing interval that users can create, edit, and delete.
+- **Grain:** one row per exercise timer, keyed by `exercise_id`.
+- **Primary/candidate key:** `exercise_timers_pkey` on `exercise_id` (enforced). Unique index `idx_exercise_timers_name` on `lower(name)` (enforced, case-insensitive unique name).
+- **Canonical source and lifecycle:** created via POST `/api/exercises` (`create_exercise`), updated via PUT `/api/exercises/{id}` (`update_exercise`), hard-deleted via DELETE `/api/exercises/{id}` (`delete_exercise`, which first deletes that timer's attempts due to FK `ON DELETE RESTRICT`, all in one transaction — OQ-1). Independently editable; no soft-delete column.
+- **Consumers:** GET `/api/exercises` (list with per-timer attempt aggregates, ordered by name), GET `/api/exercises/{exercise_id}`; frontend contract `frontend/pifitness/src/lib/types/exercises.ts`; serializers `_serialize_timer`, `_serialize_summary`.
+- **Relationships:** `exercise_id` referenced by `exercises.exercise_attempts.exercise_id` (FK `ON DELETE RESTRICT` — attempts must be deleted before the timer).
+- **Rules:** `enforced` PK + unique `lower(name)` index; `convention` name unique case-insensitively (DB unique index, pre-checked by app -> `ExerciseNameConflictError`), `interval_seconds` CHECK > 0 (code-evidenced; check constraints are not enumerated in the generated inventory — confirm against live catalog if needed), timestamps UTC (`timestamptz`), `notes` unused in v1.
+- **Evidence/confidence:** `backend/pifitness/exercises/queries.py` (master-data lifecycle + delete_exercise docstrings), `router.py`, `schemas.py`; `schema.generated.md` lines 973-985. Structural facts confirmed; check constraints code-evidenced (not in generated inventory).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `exercise_id` | integer | NO | Surrogate identifier for the timer | Identifier | assigned on insert | queries.py create_exercise; exercise_timers_pkey | confirmed |
+| `name` | text | NO | Display name, unique case-insensitively | free text, min 1 char | create/update request | schemas.py ExerciseCreateRequest | confirmed |
+| `interval_seconds` | numeric | NO | Pacing interval | seconds, > 0 (CHECK) | create/update request | schemas.py (gt=0); queries.py | confirmed |
+| `notes` | text | YES | Optional notes | free text | unused in v1 | schemas.py | confirmed |
+| `created_at` | timestamp with time zone | NO | Row creation time | UTC timestamptz | insert-assigned | schema.generated.md | confirmed |
+| `updated_at` | timestamp with time zone | NO | Row last-update time | UTC timestamptz | update-assigned | schema.generated.md | confirmed |
 
 ## food
 
@@ -1048,16 +1154,63 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 ## volleyball
 
 ### volleyball.game_events (table)
-- **Grain:** one row per game events (table); see schema.generated.md for columns.
-- **Canonical source:** `volleyball.game_events`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** scorekeeper's log of non-score events (timeouts and messages) for an active game; event-sourced alongside `volleyball.points`.
+- **Grain:** one row per recorded game event, keyed by `event_id`; scoped to one game via `game_id`.
+- **Primary/candidate key:** `game_events_pkey` on `event_id` (enforced). FK `game_events_game_id_fkey` (`game_id` -> `volleyball.games.game_id`, enforced).
+- **Canonical source and lifecycle:** inserted only by `insert_game_event` (POST `/{id}/timeout`, POST `/{id}/message`), active-only (409 if not active); read by `list_game_events` / GET `/{id}` detail. Events are not deleted individually; removed with the game on abandon (cascade).
+- **Consumers:** GET `/api/sports/volleyball/{id}` detail (events list); router serializer `_serialize_event`.
+- **Relationships:** enforced FK to `volleyball.games`; cascade on game delete per code comment (confirm ON DELETE clause against live catalog if needed).
+- **Rules:** `enforced` PK + FK; `convention` `kind` open set {'timeout','message'} (app-enforced `VALID_GAME_EVENT_KINDS`), `message` max 240 chars and blank->422, `message` NULL for timeouts, timestamps UTC. No score is stored here.
+- **Evidence/confidence:** `backend/pifitness/volleyball/queries.py` (insert_game_event/list_game_events docstrings), `router.py`, `schemas.py` (`VALID_GAME_EVENT_KINDS`, `GAME_EVENT_MESSAGE_MAX`); `schema.generated.md` lines 3066-3081. Structural facts confirmed; app-enforced sets confirmed from code.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `event_id` | integer | NO | Surrogate identifier for the event | Identifier | assigned on insert | queries.py insert_game_event; game_events_pkey | confirmed |
+| `game_id` | integer | NO | Parent game | FK -> volleyball.games.game_id | insert_game_event | game_events_game_id_fkey | confirmed |
+| `kind` | text | NO | Event type | 'timeout' or 'message' (open set, app-enforced) | insert_game_event | queries.py VALID_GAME_EVENT_KINDS | confirmed |
+| `message` | text | YES | Scorekeeper text ('Scorekeeper: {text}'); NULL for timeout | <=240 chars, blank->422 | insert_game_event | schemas.py VolleyballMessageRequest | confirmed |
+| `recorded_at` | timestamp with time zone | NO | Event time | UTC timestamptz | insert-assigned | schema.generated.md | confirmed |
+| `created_at` | timestamp with time zone | NO | Row creation time | UTC timestamptz | insert-assigned | schema.generated.md | confirmed |
 
 ### volleyball.games (table)
-- **Grain:** one row per games (table); see schema.generated.md for columns.
-- **Canonical source:** `volleyball.games`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** one row per beach volleyball match; holds match metadata and lifecycle state (active -> completed, or hard-deleted on abandon).
+- **Grain:** one row per game, keyed by `game_id`. Team A ("SR") is implicit and not stored; `team_b_name` is the opponent.
+- **Primary/candidate key:** `games_pkey` on `game_id` (enforced, unique index). No other declared unique key.
+- **Canonical source and lifecycle:** inserted by `create_game` (POST `/api/sports/volleyball`) with `status='active'` under a single-active guard (`VolleyballActiveGameExistsError`); updated by `end_game` (`status='completed'`, `completed_at = MAX(points.recorded_at)`) and by `add_point`/`remove_last_point` (maintain `started_at = MIN(points.recorded_at)`; `first_entry_at` set-once, never cleared by undo); hard-deleted by `abandon_game` (DELETE; points and game_events cascade per code comment). No soft-delete column; no is_deleted.
+- **Consumers:** GET `/api/sports/volleyball` (history), GET `/api/sports/volleyball/active`, GET `/api/sports/volleyball/{id}` (detail); frontend contract `frontend/pifitness/src/lib/types/volleyball.ts`; router serializer `_serialize_game`.
+- **Relationships:** `game_id` referenced by `volleyball.game_events.game_id` (`game_events_game_id_fkey`) and `volleyball.points.game_id` (`points_game_id_fkey`); abandon cascades to points and game_events (code-evidenced; DB ON DELETE clause not shown in generated inventory — confirm against live catalog if needed).
+- **Rules:** `enforced` PK on `game_id`; `convention` single-active guard, `status` open set {'active','completed'} (app-enforced, no DB check constraint), timestamps UTC (`timestamptz`), `completed_at` NULL when a game ends 0-0.
+- **Evidence/confidence:** `backend/pifitness/volleyball/queries.py` (create_game/end_game/add_point/remove_last_point/abandon_game docstrings), `router.py` endpoints, `schemas.py`; `schema.generated.md` lines 3083-3099. Structural facts confirmed; app-enforced sets confirmed from code; `label`/`notes` purpose not established in inspected code (low confidence).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `game_id` | integer | NO | Surrogate identifier for the game | Identifier | assigned on insert | queries.py create_game; games_pkey | confirmed |
+| `team_b_name` | text | NO | Opponent (Team B) name; Team A = 'SR' not stored | free text, 1-120 chars | create_game request | schemas.py VolleyballCreateGameRequest | confirmed |
+| `status` | text | NO | Game lifecycle state | 'active' or 'completed' (open set, app-enforced) | create_game='active'; end_game='completed' | queries.py | confirmed |
+| `started_at` | timestamp with time zone | YES | First point time of the game | UTC timestamptz | MIN(points.recorded_at), maintained by add_point/remove_last_point | queries.py | confirmed |
+| `completed_at` | timestamp with time zone | YES | Time the game ended | UTC timestamptz; NULL if ended 0-0 | MAX(points.recorded_at) at end_game | queries.py end_game | confirmed |
+| `label` | text | YES | Free-text game label | free text | not established in inspected code | queries.py/router.py (searched) | low |
+| `notes` | text | YES | Free-text game notes | free text | not established in inspected code | queries.py/router.py (searched) | low |
+| `created_at` | timestamp with time zone | NO | Row creation time | UTC timestamptz | server/insert-assigned | schema.generated.md | confirmed |
+| `partner_number` | integer | YES | SR side's partner jersey number | integer >= 0 (Pydantic ge=0) | create_game request | schemas.py | confirmed |
+| `partner_name` | text | YES | SR side's partner name (optional; null when absent) | free text, 1-120 chars | create_game request | schemas.py | confirmed |
+| `first_entry_at` | timestamp with time zone | YES | Time of first point entry; set-once, undo never clears | UTC timestamptz | set once on first point | queries.py add_point | confirmed |
 
 ### volleyball.points (table)
-- **Grain:** one row per points (table); see schema.generated.md for columns.
-- **Canonical source:** `volleyball.points`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** one row per point scored by either team in a game; the score is never stored — it is derived by counting `points` rows per team.
+- **Grain:** one row per point, keyed by `point_id`; scoped to one game via `game_id`.
+- **Primary/candidate key:** `points_pkey` on `point_id` (enforced). FK `points_game_id_fkey` (`game_id` -> `volleyball.games.game_id`, enforced).
+- **Canonical source and lifecycle:** inserted by `add_point` (POST `/{id}/points`; `recorded_at = now()` server-assigned); deleted by `remove_last_point` (most recent point of ONE team only); tagged/overwritten by `tag_last_point` (`event_type`); removed on game abandon (cascade). `end_game` derives `completed_at = MAX(points.recorded_at)`.
+- **Consumers:** GET `/api/sports/volleyball/active` and `/{id}` (derived score); frontend contract `frontend/pifitness/src/lib/types/volleyball.ts`; serializers `_serialize_point`, `_serialize_detail`.
+- **Relationships:** enforced FK to `volleyball.games`; cascade on game delete per code comment (confirm ON DELETE clause against live catalog if needed).
+- **Rules:** `enforced` PK + FK; `convention` `scoring_team` open set {'SR','OPPONENT'} (`VALID_SCORING_TEAMS`), `event_type` open set {'Ace','Block','Spike','Dive'} optional and overwritable on re-tag, `recorded_at` server now() UTC, score derived (not stored) — remove/re-tag recalculates it.
+- **Evidence/confidence:** `backend/pifitness/volleyball/queries.py` (add_point/remove_last_point/tag_last_point/end_game docstrings); `schemas.py` (`VALID_SCORING_TEAMS`, `VALID_EVENT_TYPES`); `router.py`; `schema.generated.md` lines 3101-3116. Structural facts confirmed; app-enforced sets confirmed from code.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `point_id` | integer | NO | Surrogate identifier for the point | Identifier | assigned on insert | queries.py add_point; points_pkey | confirmed |
+| `game_id` | integer | NO | Parent game | FK -> volleyball.games.game_id | add_point | points_game_id_fkey | confirmed |
+| `scoring_team` | text | NO | Team that scored the point | 'SR' or 'OPPONENT' (open set, app-enforced) | add_point request | queries.py VALID_SCORING_TEAMS | confirmed |
+| `recorded_at` | timestamp with time zone | NO | Time the point was scored | UTC timestamptz | server-assigned now() | queries.py add_point | confirmed |
+| `created_at` | timestamp with time zone | NO | Row creation time | UTC timestamptz | insert-assigned | schema.generated.md | confirmed |
+| `event_type` | text | YES | Optional notable-play tag on the point | 'Ace'/'Block'/'Spike'/'Dive' or NULL; overwritable | add_point or tag_last_point | schemas.py VolleyballEventType | confirmed |
