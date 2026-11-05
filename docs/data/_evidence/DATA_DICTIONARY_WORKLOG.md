@@ -130,4 +130,16 @@
 - Unresolved: none in staging domain.
 - Audit result (`audit.py`, exit 1 expected): headings 222/222 unique; `schema_only` []; duplicates {}; `placeholder_count` 573; replacement chars 0; documented columns 1417 -> 1706/1817; `objects_with_missing_columns` 81 -> 12 (all excluded system/scratch objects: 7 PostGIS/system + 5 public scratch); `ready_for_completion` false (expected; remaining placeholders are activities domain).
 - Tooling: 9/9 tests pass with venv interpreter.
-- Next batch: `activities` domain — exclude `activities.temp_*` scratch tables with reason (per worklog), then document `activities.vw_*` views and any remaining activities tables with placeholder grain text.
+## Batch (activities duplicate-block cleanup) - 2026-11-05
+
+- Removed duplicate Unknown placeholder column table in `activities.segment_matches` (second table block, 8 columns) that was leftover after the earlier confirmed-column table. Placeholders 364 -> 354; column coverage unchanged (1706/1817); ready_for_completion still false (remaining excluded system/scratch objects).
+- Audit: `python tools/data_dictionary/audit.py ...` exit 1 expected; placeholder_count 354; documented_column_count 1706/1817; objects_with_missing_columns 12 (all excluded).
+- Next batch: activities steps_raw / race_predictions_raw / segment_match_exclusions tables and remaining views with Unknown placeholders.
+
+- **Batch (activities race_predictions_raw / segment_match_exclusions / steps_raw)** - upgraded 7 columns (race_predictions_raw 5, segment_match_exclusions 2; steps_raw already complete). placeholders 350 -> 343. Audit exit 1 expected (remaining excluded objects). tests 9/9 pass.
+- Next batch: remaining activities Unknown placeholders (views + elevation_reference + activity_resampled_1m etc.).
+
+- Upgraded 4 columns of `activities.metric_list` (activity_type_id, metric_name, metric_unit, last_seen_utc) from Unknown placeholders to inferred meanings.
+- Audit: placeholder_count 369 -> 365; documented_column_count 1706/1817; objects_with_missing_columns 12 (all excluded system/scratch).
+- Next batch: continue activities domain placeholders (views and remaining tables).
+

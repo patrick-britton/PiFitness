@@ -7,7 +7,7 @@
     "schema_only": [],
     "dictionary_only": [],
     "duplicate_dictionary_headings": {},
-    "placeholder_count": 573,
+    "placeholder_count": 343,
     "replacement_character_count": 0,
     "schema_duplicates": []
   },
@@ -163,6 +163,6 @@
     "generic_count": 0,
     "line_count": 0
   },
-  "dictionary_line_count": 3901,
+  "dictionary_line_count": 24167,
   "ready_for_completion": false
 }
