@@ -276,49 +276,71 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `elapsed_duration_s` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_header_stats (view)
-- **Grain:** one row per activity with formatted header stats.
-- **Canonical source:** derived from `activities.activities`.
-- **Rules:** `convention` read-only view.
+- **Purpose:** per-activity header stats for run/walk/hike activities > 1000 m with a path: basic activity type, distance in miles, pace, max/median HR, and path.
+- **Grain:** one row per activity type (run | walk | other) — `GROUP BY activity_type_basic`, picking `max(activity_id)` per type.
+- **Canonical source:** derived view over `activities.activities` (CTE `most_recent`) joined to `activities.activity_details` (CTE `hr_values`).
+- **Derived logic:** `activity_type_basic` = 'run' if type like %run% else 'walk' if like %walk%/hik% else 'other'; `distance_mi = m2mi(distance_m)::text || ' mi'`; `pace_spm = duration_elapsed_s / m2mi(distance_m)`; `hr_maximum = max(heartrate_bpm)`; `hr_median = percentile_disc(0.5)` of heartrate_bpm.
+- **Dependencies:** `activities.activities`, `activities.activity_details`; uses `m2mi()`, `pace_as_text()`.
+- **Consumers:** activity header display.
+- **Rules:** read-only view; `most_recent` filters walk/hike/run with distance > 1000 m and path NOT NULL, grouped by type.
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_type_basic` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `distance_mi` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `duration_display` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `pace_display` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `start_time_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `hr_median` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `hr_maximum` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Activity id | id | `max(activities.activity_id)` per type | schema_only.sql:9104 | inferred |
+| `activity_type_basic` | text | YES | Basic activity type | 'run' | 'walk' | 'other' | CASE on activity_type_name | schema_only.sql:9105-9109 | inferred |
+| `distance_mi` | text | YES | Distance | miles text | `m2mi(distance_m) || ' mi'` | schema_only.sql:9129 | inferred |
+| `duration_display` | text | YES | Duration display | text | formatted duration | schema.generated.md | inferred |
+| `pace_display` | text | YES | Pace display | text | `pace_as_text(...)` | schema.generated.md | inferred |
+| `start_time_utc` | timestamp with time zone | YES | Activity start | UTC timestamptz | `activities.start_time_utc` | schema.generated.md | confirmed |
+| `activity_path` | USER-DEFINED | YES | Activity path | USER-DEFINED | `activities.activity_path` | schema.generated.md | confirmed |
+| `hr_median` | smallint | YES | Median heart rate | bpm | `percentile_disc(0.5)` of heartrate_bpm | schema_only.sql:9122 | inferred |
+| `hr_maximum` | smallint | YES | Max heart rate | bpm | `max(heartrate_bpm)` | schema_only.sql:9121 | inferred |
 
 ### activities.vw_activity_summary (view)
-- **Grain:** one row per activity summary.
-- **Canonical source:** derived from `activities.activities`.
-- **Rules:** `convention` read-only view.
+- **Purpose:** per-activity summary: distance/pace, segment context (name/id/course), activity time, segment distance, all-time/best/prior ranks and deltas, and segment pace.
+- **Grain:** one row per activity.
+- **Canonical source:** derived view over `activities.activities` left-joined 3x to `activities.vw_segment_leaderboard` (current, best all-time-rank=1, prior recency_rank+1).
+- **Derived logic:** `distance_mi = m2mi(distance_m)`; `activity_pace = pace_as_text(m2mi(distance_m), duration_elapsed_s)`; `best_delta_s = best - activity_time`; `prior_delta_s = prior - activity_time`; `segment_pace = pace_as_text(segment_distance_mi, activity_time_s)`.
+- **Dependencies:** `activities.activities`, `activities.vw_segment_leaderboard` (3x).
+- **Consumers:** activity summary UI.
+- **Rules:** read-only view; ordered by `is_course DESC, start_time_utc`.
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_start_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `distance_mi` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_pace` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `is_course` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_time_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `segment_distance_mi` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `all_time_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `best_time_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `prior_time_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `best_delta_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `prior_delta_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `segment_pace` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Activity id | id | `activities.activity_id` | schema_only.sql:11172 | confirmed |
+| `activity_start_utc` | timestamp with time zone | YES | Activity start | UTC timestamptz | `activities.start_time_utc` | schema_only.sql:11173 | confirmed |
+| `distance_mi` | numeric | YES | Distance | miles | `m2mi(distance_m)` | schema_only.sql:11174 | inferred |
+| `activity_pace` | text | YES | Activity pace | text | `pace_as_text(m2mi(distance_m), duration_elapsed_s)` | schema_only.sql:11175 | inferred |
+| `segment_name` | text | YES | Segment name | text | `vw_segment_leaderboard.segment_name` | schema_only.sql:11176 | confirmed |
+| `segment_id` | integer | YES | Segment id | id | `vw_segment_leaderboard.segment_id` | schema_only.sql:11177 | confirmed |
+| `is_course` | boolean | YES | Is course flag | boolean | `vw_segment_leaderboard.is_course` | schema_only.sql:11178 | confirmed |
+| `activity_time_s` | numeric | YES | Activity time | seconds | `vw_segment_leaderboard.elapsed_duration_s` | schema_only.sql:11179 | confirmed |
+| `segment_distance_mi` | numeric | YES | Segment distance | miles | `vw_segment_leaderboard.distance_mi` | schema_only.sql:11180 | confirmed |
+| `all_time_rank` | bigint | YES | All-time rank | ordinal | `vw_segment_leaderboard.all_time_rank` | schema_only.sql:11181 | confirmed |
+| `best_time_s` | numeric | YES | Best time | seconds | `vw_segment_leaderboard` (all_time_rank=1) | schema_only.sql:11182 | confirmed |
+| `prior_time_s` | numeric | YES | Prior time | seconds | `vw_segment_leaderboard` (recency_rank+1) | schema_only.sql:11183 | confirmed |
+| `best_delta_s` | numeric | YES | Best delta | seconds | `best - activity_time` | schema_only.sql:11184 | inferred |
+| `prior_delta_s` | numeric | YES | Prior delta | seconds | `prior - activity_time` | schema_only.sql:11185 | inferred |
+| `segment_pace` | text | YES | Segment pace | text | `pace_as_text(segment_distance_mi, activity_time_s)` | schema_only.sql:11186 | inferred |
 
 ### activities.segment_matches (table)
-- **Grain:** one row per segment matches (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.segment_matches`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** confirmed segment matches linking a segment to an activity with start/end points and the matched activity path.
+- **Grain:** one row per `(segment_id, activity_id)` match.
+- **Canonical source:** `activities.segment_matches`; write path not evidenced in application code searched (populated by the segment-matching pipeline).
+- **Consumers:** `activities.vw_segment_comps` (joins temp_activity_segment_metas to segments_details), segment leaderboard/effort views.
+- **Relationships:** `enforced` composite PK `(segment_id, activity_id)` (`segment_matches_pkey`); `enforced` FK `activity_id` -> `activities.activities.activity_id` (`segment_matches_activity_id_fkey`); `segment_id` references `activities.segments.segment_id` at application level.
+- **Rules:** `enforced` composite PK + unique index `uc_segment_match_act_seg_ids`; GIST index `idx_segment_activities_path_gist` on `activity_path`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | NO | Segment id | id | PK part; references `activities.segments.segment_id` | schema.generated.md:230-247 | confirmed |
+| `activity_id` | bigint | NO | Activity id | id | PK part; FK to `activities.activities.activity_id` | schema.generated.md:230-247 | confirmed |
+| `activity_start_point` | integer | YES | Activity start point | ordinal | segment-match result | schema.generated.md:233 | confirmed |
+| `activity_end_point` | integer | YES | Activity end point | ordinal | segment-match result | schema.generated.md:234 | confirmed |
+| `activity_path` | USER-DEFINED | YES | Matched activity path | geometry/geography | segment-match result | schema.generated.md:235 | confirmed |
+| `match_confirmed` | boolean | YES | Match confirmed flag | boolean | segment-match result | schema.generated.md:236 | confirmed |
+| `match_confidence` | numeric | YES | Match confidence | score | segment-match result | schema.generated.md:237 | confirmed |
+| `match_ts_utc` | timestamp with time zone | YES | Match timestamp | UTC timestamptz | segment-match result | schema.generated.md:238 | confirmed |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -332,9 +354,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `match_ts_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.steps_raw (table)
-- **Grain:** one row per steps raw (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.steps_raw`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** raw per-second step samples keyed by timestamp; used to derive step cadence and daily step totals.
+- **Grain:** one row per timestamp, keyed by `ts_utc`.
+- **Canonical source:** `activities.steps_raw`; write path not evidenced in application code searched (populated by activity import/ETL).
+- **Consumers:** step/cadence analytics views (not individually evidenced).
+- **Relationships:** `enforced` PK `ts_utc` (`steps_raw_pkey`).
+- **Rules:** `enforced` PK; `ts_utc` NOT NULL; `step_goal`/`total_steps`/`total_distance_m` nullable integers.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Sample timestamp | UTC timestamptz | PK | schema.generated.md:298-307 | confirmed |
+| `step_goal` | integer | YES | Daily step goal | steps | source | schema.generated.md:299 | confirmed |
+| `total_steps` | integer | YES | Total steps | steps | source | schema.generated.md:300 | confirmed |
+| `total_distance_m` | integer | YES | Total distance | metres | source | schema.generated.md:301 | confirmed |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -344,118 +376,126 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `total_distance_m` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.temp_activity_segment_metas (table)
-- **Grain:** one row per temp activity segment metas (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.temp_activity_segment_metas`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `activities.temp_*` tables); existence documented only.
+- **Purpose:** scratch per-activity segment metadata (`activity_id`, `start_point`, `end_point`) used by segment matching; working table rebuilt per run.
+- **Rules:** no declared PK; transient scratch table; columns marked unknown (not application data).
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `start_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `end_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Activity id | id | scratch | schema.generated.md:346-352 | unknown |
+| `start_point` | integer | YES | Segment start point | ordinal | scratch | schema.generated.md:347-352 | unknown |
+| `end_point` | integer | YES | Segment end point | ordinal | scratch | schema.generated.md:348-352 | unknown |
 
 ### activities.temp_segment_details (table)
-- **Grain:** one row per temp segment details (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.temp_segment_details`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `activities.temp_*` tables); existence documented only.
+- **Purpose:** scratch per-activity segment detail rows (`activity_id`, `activity_type_id`, `is_course`, `segment_name`, lat/lon/elevation/distance/deltas) used by segment matching; working table rebuilt per run.
+- **Rules:** no declared PK; transient scratch table; columns marked unknown (not application data).
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_type_id` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `is_course` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `row_asc` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `row_desc` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `elapsed_duration_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `latitude` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `longitude` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `elevation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `distance_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `elevation_delta` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Activity id | id | scratch | schema.generated.md | unknown |
+| `activity_type_id` | smallint | YES | Activity type id | id | scratch | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Is course flag | boolean | scratch | schema.generated.md | unknown |
+| `segment_name` | text | YES | Segment name | text | scratch | schema.generated.md | unknown |
+| `row_asc` | integer | YES | Ascending row index | ordinal | scratch | schema.generated.md | unknown |
+| `row_desc` | integer | YES | Descending row index | ordinal | scratch | schema.generated.md | unknown |
+| `elapsed_duration_s` | integer | YES | Elapsed duration | seconds | scratch | schema.generated.md | unknown |
+| `latitude` | numeric | YES | Latitude | degrees | scratch | schema.generated.md | unknown |
+| `longitude` | numeric | YES | Longitude | degrees | scratch | schema.generated.md | unknown |
+| `elevation_m` | numeric | YES | Elevation | metres | scratch | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Distance | metres | scratch | schema.generated.md | unknown |
+| `elevation_delta` | numeric | YES | Elevation delta | metres | scratch | schema.generated.md | unknown |
 
 ### activities.temp_segment_matches_downselect (table)
-- **Grain:** one row per temp segment matches downselect (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.temp_segment_matches_downselect`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `activities.temp_*` tables); existence documented only.
+- **Purpose:** scratch segment-match downselect candidates (`activity_id`, best start/end distances, `full_path`/`short_path` paths, `segment_id`, `confidence`, `ruggedness`, various deviation metrics) used by segment matching; working table rebuilt per run.
+- **Rules:** no declared PK; transient scratch table; columns marked unknown (not application data).
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `best_start_dist` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `best_end_dist` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `full_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `confidence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `ruggedness` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `utm_srid` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `short_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `dist_deviation` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `full_path_transformed` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `freschet_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `polygon_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `hausdorff_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `heading_deviation` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Activity id | id | scratch | schema.generated.md | unknown |
+| `best_start_dist` | integer | YES | Best start distance | distance | scratch | schema.generated.md | unknown |
+| `best_end_dist` | integer | YES | Best end distance | distance | scratch | schema.generated.md | unknown |
+| `full_path` | USER-DEFINED | YES | Full path geometry | USER-DEFINED | scratch | schema.generated.md | unknown |
+| `confidence` | numeric | YES | Match confidence | score | scratch | schema.generated.md | unknown |
+| `ruggedness` | numeric | YES | Path ruggedness | score | scratch | schema.generated.md | unknown |
+| `utm_srid` | integer | YES | UTM spatial reference id | id | scratch | schema.generated.md | unknown |
+| `short_path` | USER-DEFINED | YES | Short path geometry | USER-DEFINED | scratch | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment id | id | scratch | schema.generated.md | unknown |
+| `dist_deviation` | numeric | YES | Distance deviation | metres | scratch | schema.generated.md | unknown |
+| `full_path_transformed` | USER-DEFINED | YES | Transformed full path | USER-DEFINED | scratch | schema.generated.md | unknown |
+| `freschet_deviation_m` | numeric | YES | Fréchet deviation | metres | scratch | schema.generated.md | unknown |
+| `polygon_deviation_m` | numeric | YES | Polygon deviation | metres | scratch | schema.generated.md | unknown |
+| `hausdorff_deviation_m` | numeric | YES | Hausdorff deviation | metres | scratch | schema.generated.md | unknown |
+| `heading_deviation` | numeric | YES | Heading deviation | degrees | scratch | schema.generated.md | unknown |
 
 ### activities.temp_segment_matches_v1 (table)
-- **Grain:** one row per temp segment matches v1 (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.temp_segment_matches_v1`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `activities.temp_*` tables); existence documented only.
+- **Purpose:** scratch segment-match candidates v1 (`segment_id`, `activity_id`, start/end points, `activity_path`, `match_confirmed`/`match_confidence`, `match_ts_utc`) used by segment matching; working table rebuilt per run.
+- **Rules:** no declared PK; transient scratch table; columns marked unknown (not application data).
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_start_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_end_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `match_confirmed` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `match_confidence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `match_ts_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment id | id | scratch | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Activity id | id | scratch | schema.generated.md | unknown |
+| `activity_start_point` | integer | YES | Activity start point | ordinal | scratch | schema.generated.md | unknown |
+| `activity_end_point` | integer | YES | Activity end point | ordinal | scratch | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Activity path | USER-DEFINED | scratch | schema.generated.md | unknown |
+| `match_confirmed` | boolean | YES | Match confirmed flag | boolean | scratch | schema.generated.md | unknown |
+| `match_confidence` | numeric | YES | Match confidence | score | scratch | schema.generated.md | unknown |
+| `match_ts_utc` | timestamp with time zone | YES | Match timestamp | UTC timestamptz | scratch | schema.generated.md | unknown |
 
 ### activities.temp_segment_matching_activities (table)
-- **Grain:** one row per temp segment matching activities (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.temp_segment_matching_activities`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `activities.temp_*` tables); existence documented only.
+- **Purpose:** scratch list of activity ids pending segment matching; working table rebuilt per run.
+- **Rules:** `activity_id` NOT NULL; transient scratch table; column marked unknown (not application data).
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `activity_id` | bigint | NO | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | NO | Activity id | id | scratch | schema.generated.md | unknown |
 
 ### activities.temp_segment_matching_segments (table)
-- **Grain:** one row per temp segment matching segments (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.temp_segment_matching_segments`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `activities.temp_*` tables); existence documented only.
+- **Purpose:** scratch list of segment ids pending segment matching; working table rebuilt per run.
+- **Rules:** transient scratch table; column marked unknown (not application data).
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment id | id | scratch | schema.generated.md | unknown |
 
 ### activities.temp_segments_v1 (table)
-- **Grain:** one row per temp segments v1 (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.temp_segments_v1`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `activities.temp_*` tables); existence documented only.
+- **Purpose:** scratch segment candidate rows v1 (`segment_id`, `activity_reference_id`, start/end reference points, `is_course`, `segment_name`/`segment_path`, distance/elevation deltas, start/end points, `activity_type_id`) used by segment matching; working table rebuilt per run.
+- **Rules:** no declared PK; transient scratch table; columns marked unknown (not application data).
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_reference_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `reference_start_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `reference_end_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `is_course` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `segment_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `distance_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `elevation_gain` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `elevation_loss` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `start_point` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `end_point` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_type_id` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment id | id | scratch | schema.generated.md | unknown |
+| `activity_reference_id` | bigint | YES | Reference activity id | id | scratch | schema.generated.md | unknown |
+| `reference_start_point` | integer | YES | Reference start point | ordinal | scratch | schema.generated.md | unknown |
+| `reference_end_point` | integer | YES | Reference end point | ordinal | scratch | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Is course flag | boolean | scratch | schema.generated.md | unknown |
+| `segment_name` | text | YES | Segment name | text | scratch | schema.generated.md | unknown |
+| `segment_path` | USER-DEFINED | YES | Segment path | USER-DEFINED | scratch | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Distance | metres | scratch | schema.generated.md | unknown |
+| `elevation_gain` | numeric | YES | Elevation gain | metres | scratch | schema.generated.md | unknown |
+| `elevation_loss` | numeric | YES | Elevation loss | metres | scratch | schema.generated.md | unknown |
+| `start_point` | USER-DEFINED | YES | Start point | USER-DEFINED | scratch | schema.generated.md | unknown |
+| `end_point` | USER-DEFINED | YES | End point | USER-DEFINED | scratch | schema.generated.md | unknown |
+| `activity_type_id` | smallint | YES | Activity type id | id | scratch | schema.generated.md | unknown |
 
 ### activities.training_cycle_dates (table)
-- **Grain:** one row per training cycle dates (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.training_cycle_dates`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** training-cycle date windows (cycle start + name) used to segment activity history into cycles (e.g. current cycle vs last 365 days vs all time).
+- **Grain:** one row per training cycle, keyed by `cycle_start_utc`.
+- **Canonical source:** `activities.training_cycle_dates`; write path not evidenced in application code searched.
+- **Consumers:** `activities.vw_segments_details_ranked` (computes `cycle_name`), segment ranking views.
+- **Relationships:** `enforced` PK `cycle_start_utc` (`training_cycle_dates_pkey`).
+- **Rules:** `enforced` PK; `cycle_start_utc` NOT NULL; `cycle_name` free text.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `cycle_start_utc` | timestamp with time zone | NO | Cycle start timestamp | UTC timestamptz | PK | schema.generated.md:390-397 | confirmed |
+| `cycle_name` | text | YES | Cycle name | free text | source | schema.generated.md:393 | confirmed |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -463,9 +503,18 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `cycle_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_elevation_deltas (view)
-- **Grain:** one row per vw activity elevation deltas (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_activity_elevation_deltas`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-sample elevation deltas computed from smoothed elevation via a 3-point average minus the lagged value.
+- **Grain:** one row per `activities.activity_details` sample.
+- **Canonical source:** derived view over `activities.activity_details`.
+- **Derived logic:** `elevation_delta = round(((elevation_m_smooth + COALESCE(lag(elevation_m_smooth), elevation_m_smooth) + COALESCE(lead(elevation_m_smooth), elevation_m_smooth)) / 3 - COALESCE(lag(elevation_m_smooth), elevation_m_smooth)), 1)` partitioned by activity_id ordered by elapsed_duration_s.
+- **Consumers:** elevation-smoothing analysis.
+- **Rules:** read-only view.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Activity id | id | `activity_details.activity_id` | schema.generated.md:399-404 | confirmed |
+| `elapsed_duration_s` | integer | YES | Elapsed duration | seconds | `activity_details.elapsed_duration_s` | schema.generated.md:400 | confirmed |
+| `elevation_delta` | numeric | YES | Elevation delta | metres | 3-point smooth minus lag | schema_only.sql:9073 | inferred |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -474,9 +523,17 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `elevation_delta` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_ids_to_sync (view)
-- **Grain:** one row per vw activity ids to sync (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_activity_ids_to_sync`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** candidate activities needing GPX/path sync (not downloaded, not treadmill, distance > 1000 m), limited to 15, prioritizing running activities.
+- **Grain:** one row per candidate activity.
+- **Canonical source:** derived view over `activities.activities`.
+- **Derived logic:** `max_points = round(duration_elapsed_s, 0) * 2`; filter `NOT is_downloaded AND NOT treadmill AND distance_m > 1000`; ordered by running-first then start desc; LIMIT 15.
+- **Consumers:** activity sync worker (GPX download).
+- **Rules:** read-only view; `max_points` heuristic (2 points per elapsed second).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Activity id | id | `activities.activity_id` | schema.generated.md:9230-9236 | confirmed |
+| `max_points` | numeric | YES | Max path points | count (points) | `round(duration_elapsed_s, 0) * 2` | schema_only.sql:9232 | inferred |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -484,9 +541,17 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `max_points` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_path_updates (view)
-- **Grain:** one row per vw activity path updates (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_activity_path_updates`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** rebuilt GPX activity path (`activity_path` geography linestring) per activity from smoothed activity detail points.
+- **Grain:** one row per activity.
+- **Canonical source:** derived view joining `activities.activities` to `activities.activity_details`.
+- **Derived logic:** `activity_path = ST_SetSRID(ST_MakeLine(ST_MakePoint(longitude, latitude, elevation_m_smooth, elapsed_duration_s) ORDER BY elapsed_duration_s), 4326)` grouped by activity.
+- **Consumers:** `build_activity_path` sets `activities.activities.activity_path`/`is_downloaded`.
+- **Rules:** read-only view; `activity_path` is PostGIS geography SRID 4326 with M (elapsed duration) dimension.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Activity id | id | `activities.activity_id` | schema.generated.md:9257-9262 | confirmed |
+| `activity_path` | USER-DEFINED | YES | Activity path | geography SRID 4326 | `ST_MakeLine(...)` of smoothed points | schema_only.sql:9259 | inferred |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -494,9 +559,35 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `activity_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_segments_aggregated (view)
-- **Grain:** one row per vw activity segments aggregated (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_activity_segments_aggregated`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** downsampled per-segment telemetry arrays (path coords, timestamps, HR, cadence, elevation, etc.) for segment detail charts.
+- **Grain:** one row per `(id_val, meta_rank)` segment composite.
+- **Canonical source:** derived view over `activities.vw_segment_comps`; downsamples telemetry via `DISTINCT ON (meta_rank, id_val, elapsed_duration_s)` then aggregates into JSON/arrays ordered by elapsed duration.
+- **Dependencies:** `activities.vw_segment_comps`; uses `c2f()` for temperature.
+- **Consumers:** segment detail chart rendering.
+- **Rules:** read-only view; `elapsed_ms` converted to seconds (`/1000`); air temp converted Celsius→Fahrenheit via `c2f()`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `id_val` | text | YES | Segment composite id | text | `vw_segment_comps.id_val` | schema.generated.md:9554 | confirmed |
+| `meta_rank` | integer | YES | Meta rank | ordinal | `vw_segment_comps.meta_rank` | schema.generated.md:9555 | confirmed |
+| `path_coords` | json | YES | Path coordinates | json array | `json_agg([lon, lat])` ordered by elapsed | schema_only.sql:9556 | inferred |
+| `map_timestamps` | json | YES | Timestamps | json array | `json_agg(elapsed_duration_s)` | schema_only.sql:9557 | inferred |
+| `x_time` | json | YES | X time array | json array | `array_agg(elapsed_duration_s)` | schema_only.sql:9558 | inferred |
+| `x_distance` | json | YES | X distance array | json array | `array_agg(distance_m)` | schema_only.sql:9559 | inferred |
+| `y_time` | json | YES | Y time (s) array | json array | `round(elapsed_ms/1000.0, 2)` | schema_only.sql:9560 | inferred |
+| `y_time_delta` | json | YES | Y time-delta array | json array | `round(elapsed_ms_delta/1000.0, 2)` | schema_only.sql:9561 | inferred |
+| `y_hr` | json | YES | HR array | json array | `array_agg(heartrate_bpm)` | schema_only.sql:9562 | inferred |
+| `y_hr_delta` | json | YES | HR delta array | json array | `array_agg(heartrate_bpm_delta)` | schema_only.sql:9563 | inferred |
+| `y_elevation` | json | YES | Elevation array | json array | `array_agg(elevation_m_smooth)` | schema_only.sql:9564 | inferred |
+| `y_cadence` | json | YES | Cadence array | json array | `array_agg(cadence_spm)` | schema_only.sql:9565 | inferred |
+| `y_balance` | json | YES | GCT balance array | json array | `array_agg(ground_contact_balance_left)` | schema_only.sql:9566 | inferred |
+| `y_performance` | json | YES | Performance array | json array | `array_agg(performance_condition)` | schema_only.sql:9567 | inferred |
+| `y_vert_ratio` | json | YES | Vert ratio array | json array | `array_agg(vert_ratio)` | schema_only.sql:9568 | inferred |
+| `y_osc` | json | YES | Vert oscillation array | json array | `array_agg(vert_oscillation_cm)` | schema_only.sql:9569 | inferred |
+| `y_temp` | json | YES | Temp array (°F) | json array | `c2f(air_temp_c)` | schema_only.sql:9570 | inferred |
+| `y_stride` | json | YES | Stride array | json array | `array_agg(stride_length_cm)` | schema_only.sql:9571 | inferred |
+| `y_gct` | json | YES | GCT array | json array | `array_agg(ground_contact_time_ms)` | schema_only.sql:9572 | inferred |
+| `y_speed` | json | YES | Speed array | json array | `array_agg(speed_mmps)` | schema_only.sql:9573 | inferred |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -522,9 +613,21 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `y_speed` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_sleep (view)
-- **Grain:** one row per vw activity sleep (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_activity_sleep`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** sleep context for each activity (sleep score, hours slept, hours awake prior) using the most recent sleep ending on the activity date.
+- **Grain:** one row per activity.
+- **Canonical source:** derived view over `activities.activities` and `health.sleep_totals`.
+- **Derived logic:** `awake_hours_prior = floor(epoch(start_time_utc - sleep_end_utc)) / 3600.0`; `one_day_sleep_hours = round(sleep_duration_s/3600, 1)`; `avg_sleep_hours = round(avg over prior 3 days, 1)`.
+- **Dependencies:** `health.sleep_totals`.
+- **Consumers:** activity summary / fatigue context.
+- **Rules:** read-only view; `awake_hours_prior` relative to most recent sleep end.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Activity id | id | `activities.activity_id` | schema.generated.md:9850-9872 | confirmed |
+| `awake_hours_prior` | numeric | YES | Hours awake before activity | hours | `epoch(start - sleep_end)/3600` | schema_only.sql:9867 | inferred |
+| `sleep_score` | integer | YES | Sleep score | score points | `health.sleep_totals.sleep_score` | schema.generated.md:9868 | confirmed |
+| `avg_sleep_hours` | numeric | YES | Average sleep hours | hours | 3-day avg of sleep_duration_s/3600 | schema_only.sql:9861 | inferred |
+| `one_day_sleep_hours` | numeric | YES | One-day sleep hours | hours | `sleep_duration_s/3600` | schema_only.sql:9860 | inferred |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -552,9 +655,39 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `matched_segments` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_training_status (view)
-- **Grain:** one row per vw activity training status (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_activity_training_status`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-activity training status context: latest pre-activity VO2 max, acclimation, training load, resting HR, and sleep.
+- **Grain:** one row per activity.
+- **Canonical source:** derived view joining `activities.activities` to `health.vw_heart_rates`, `health.sleep_totals` (latest before activity), and `health.training_status_raw` (latest before activity).
+- **Derived logic:** `training_load_mid = (max+min)/2`; `training_readiness = round((min-acute)/min, 3)`; `training_load_pct = round(acute/max, 3)`; `awake_s_before_activity = epoch(start - sleep_end)`.
+- **Dependencies:** `health.vw_heart_rates`, `health.sleep_totals`, `health.training_status_raw`.
+- **Consumers:** training-readiness dashboards.
+- **Rules:** read-only view; uses `NOW()`-independent lateral latest-before lookups.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Activity id | id | `activities.activity_id` | schema.generated.md:10095-10118 | confirmed |
+| `vo2_max_value` | numeric | YES | VO2 max | score points | `training_status_raw.vo2_max_value` | schema.generated.md:10097 | confirmed |
+| `altitude_acclimation_m` | integer | YES | Altitude acclimation | metres | `training_status_raw.altitude_acclimation_m` | schema.generated.md:10098 | confirmed |
+| `heat_acclimation_pct` | numeric | YES | Heat acclimation pct | percent | `training_status_raw.heat_acclimation_pct` | schema.generated.md:10099 | confirmed |
+| `training_load_acute` | numeric | YES | Acute training load | score | `training_status_raw.training_load_acute` | schema.generated.md:10100 | confirmed |
+| `training_load_pct` | numeric | YES | Load pct of max | ratio (0-1) | `round(acute/max, 3)` | schema_only.sql:10147 | inferred |
+| `training_readiness` | numeric | YES | Readiness score | ratio (0-1) | `round((min-acute)/min, 3)` | schema_only.sql:10147 | inferred |
+| `training_load_mid` | numeric | YES | Mid training load | score | `(max+min)/2` | schema_only.sql:10146 | inferred |
+| `training_load_max` | numeric | YES | Max training load | score | `training_status_raw.training_load_max` | schema.generated.md:10104 | confirmed |
+| `training_load_min` | numeric | YES | Min training load | score | `training_status_raw.training_load_min` | schema.generated.md:10105 | confirmed |
+| `resting_hr_asleep` | integer | YES | Resting HR asleep | bpm | `health.vw_heart_rates.resting_hr_asleep` | schema.generated.md:10106 | confirmed |
+| `resting_hr_awake` | integer | YES | Resting HR awake | bpm | `health.vw_heart_rates.resting_hr_awake` | schema.generated.md:10107 | confirmed |
+| `sleep_duration_s` | integer | YES | Sleep duration | seconds | `health.sleep_totals.sleep_duration_s` | schema.generated.md:10108 | confirmed |
+| `sleep_score` | integer | YES | Sleep score | score points | `health.sleep_totals.sleep_score` | schema.generated.md:10109 | confirmed |
+| `light_sleep_s` | integer | YES | Light sleep | seconds | `health.sleep_totals.light_sleep_s` | schema.generated.md:10110 | confirmed |
+| `deep_sleep_s` | integer | YES | Deep sleep | seconds | `health.sleep_totals.deep_sleep_s` | schema.generated.md:10111 | confirmed |
+| `awake_sleep_s` | integer | YES | Awake sleep | seconds | `health.sleep_totals.awake_sleep_s` | schema.generated.md:10112 | confirmed |
+| `rem_sleep_s` | integer | YES | REM sleep | seconds | `health.sleep_totals.rem_sleep_s` | schema.generated.md:10113 | confirmed |
+| `awake_s_before_activity` | numeric | YES | Seconds awake before activity | seconds | `epoch(start - sleep_end)` | schema_only.sql:10114 | inferred |
+| `start_time_utc` | timestamp with time zone | YES | Activity start | UTC timestamptz | `activities.start_time_utc` | schema.generated.md:10115 | confirmed |
+| `sleep_end_utc` | timestamp with time zone | YES | Sleep end | UTC timestamptz | `health.sleep_totals.sleep_end_utc` | schema.generated.md:10116 | confirmed |
+| `sleep_end_date` | date | YES | Sleep end date | calendar date | `health.sleep_totals.sleep_end_date` | schema.generated.md:10117 | confirmed |
+| `activity_start_date` | date | YES | Activity start date | calendar date | `activities.start_time_utc::date` | schema_only.sql:10118 | inferred |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -583,9 +716,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `activity_start_date` | date | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_weights (view)
-- **Grain:** one row per vw activity weights (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_activity_weights`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-activity interpolated body weight/muscle/fat in lbs, bracketing the activity start with the nearest prior and next body-composition samples.
+- **Grain:** one row per activity with both prior and next composition samples.
+- **Canonical source:** derived view over `activities.activities` and `health.body_composition_raw` (two lateral latest-before/after lookups), interpolating weight/muscle/fat.
+- **Dependencies:** `health.body_composition_raw`.
+- **Consumers:** body-composition context for activities.
+- **Rules:** read-only view; `g2lb()` converts grams to pounds; interpolation is linear between bracketing samples.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Activity id | id | `activities.activity_id` | schema_only.sql (~10446) | confirmed |
+| `weight_lb` | numeric | YES | Interpolated weight | pounds | `g2lb(interpolated_weight_g)` | schema_only.sql:10439 | inferred |
+| `muscle_lb` | numeric | YES | Interpolated muscle | pounds | `g2lb(interpolated_muscle_g)` | schema_only.sql:10440 | inferred |
+| `fat_lb` | numeric | YES | Interpolated fat | pounds | `g2lb(weight_g * fat_pct)` | schema_only.sql:10441 | inferred |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -815,39 +958,43 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `activity_type_id` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_segment_leaderboard (view)
-- **Grain:** one row per vw segment leaderboard (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_segment_leaderboard`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-segment effort leaderboard with all-time/last-365/current-cycle ranks, weights, VO2, and training context for run activities.
+- **Grain:** one row per `(segment_id, activity_id)` effort.
+- **Canonical source:** complex derived view with CTEs over `activities.vw_segments_details_ranked`, `activities.activities`, `health.*` raw tables; filters `is_course` courses.
+- **Derived logic:** computes per-segment best/last-365/current-cycle effort weights, VO2, and acute training load via conditional `max()`; converts grams→lbs via `g2lb()`; `muscle_pct`/`fat_pct` from weight; `pace_str` from elapsed/distance.
+- **Dependencies:** `activities.vw_segments_details_ranked`, `activities.activities`, health raw tables.
+- **Consumers:** `vw_activity_summary`, `vw_report_segment_efforts`, segment leaderboard UI.
+- **Rules:** read-only view; `is_course` filter; aggregates keyed on rank=1 rows.
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `is_course` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `cycle_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_start_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `activity_end_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `distance_mi` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `start_time_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `all_time_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `last_365_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `current_cycle_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `recency_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `elapsed_duration_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `pace_str` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `weight_lb` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `muscle_pct` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `fat_pct` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `vo2_max_value` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `altitude_acclimation_m` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `heat_acclimation_pct` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `training_load_acute` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `training_load_pct` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `training_readiness` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `training_load_mid` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `training_load_max` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `training_load_min` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment id | id | leaderboard source | schema_only.sql:10839 | confirmed |
+| `is_course` | boolean | YES | Is course flag | boolean | leaderboard source | schema_only.sql:10846 | confirmed |
+| `segment_name` | text | YES | Segment name | text | leaderboard source | schema_only.sql:10853 | confirmed |
+| `cycle_name` | text | YES | Cycle label | text | leaderboard source | schema_only.sql:10860 | confirmed |
+| `activity_id` | bigint | YES | Activity id | id | leaderboard source | schema_only.sql:10867 | confirmed |
+| `activity_start_point` | integer | YES | Activity start point | ordinal | leaderboard source | schema_only.sql:10874 | confirmed |
+| `activity_end_point` | integer | YES | Activity end point | ordinal | leaderboard source | schema_only.sql:10881 | confirmed |
+| `distance_mi` | numeric | YES | Distance | miles | leaderboard source | schema_only.sql:10888 | confirmed |
+| `start_time_utc` | timestamp with time zone | YES | Start time | UTC timestamptz | leaderboard source | schema_only.sql:10895 | confirmed |
+| `all_time_rank` | bigint | YES | All-time rank | ordinal | leaderboard source | schema_only.sql (~10791) | confirmed |
+| `last_365_rank` | bigint | YES | Last-365 rank | ordinal | leaderboard source | schema_only.sql (~10792) | confirmed |
+| `current_cycle_rank` | bigint | YES | Current-cycle rank | ordinal | leaderboard source | schema_only.sql (~10793) | confirmed |
+| `recency_rank` | bigint | YES | Recency rank | ordinal | leaderboard source | schema_only.sql (~10794) | confirmed |
+| `elapsed_duration_s` | integer | YES | Elapsed duration | seconds | leaderboard source | schema_only.sql (~10795) | confirmed |
+| `pace_str` | text | YES | Pace string | text | derived pace | schema_only.sql:10796 | inferred |
+| `weight_lb` | numeric | YES | Weight | pounds | `g2lb(...)` | schema_only.sql:10797 | inferred |
+| `muscle_pct` | numeric | YES | Muscle pct | ratio | `muscle_lb/weight_lb` | schema_only.sql:10799 | inferred |
+| `fat_pct` | numeric | YES | Fat pct | ratio | `fat_lb/weight_lb` | schema_only.sql:10803 | inferred |
+| `vo2_max_value` | numeric | YES | VO2 max | score points | leaderboard source | schema_only.sql:10806 | confirmed |
+| `altitude_acclimation_m` | integer | YES | Altitude acclimation | metres | leaderboard source | schema_only.sql:10807 | confirmed |
+| `heat_acclimation_pct` | numeric | YES | Heat acclimation pct | percent | leaderboard source | schema_only.sql:10808 | confirmed |
+| `training_load_acute` | numeric | YES | Acute training load | score | leaderboard source | schema_only.sql:10809 | confirmed |
+| `training_load_pct` | numeric | YES | Load pct | ratio | leaderboard source | schema_only.sql:10810 | confirmed |
+| `training_readiness` | numeric | YES | Readiness score | ratio | leaderboard source | schema_only.sql:10811 | confirmed |
+| `training_load_mid` | numeric | YES | Mid training load | score | leaderboard source | schema_only.sql:10812 | confirmed |
+| `training_load_max` | numeric | YES | Max training load | score | leaderboard source | schema_only.sql:10813 | confirmed |
+| `training_load_min` | numeric | YES | Min training load | score | leaderboard source | schema_only.sql:10814 | confirmed |
 | `resting_hr_asleep` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 | `resting_hr_awake` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 | `sleep_duration_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
@@ -934,9 +1081,39 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 | `is_course` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_segments_details_ranked (view)
-- **Grain:** one row per vw segments details ranked (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_segments_details_ranked`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-segment-attempt details with cycle assignment (current cycle / last 365 / all time) and recency/all-time/current-cycle ranks.
+- **Grain:** one row per segment attempt (`activities.segments_details` row).
+- **Canonical source:** derived view over `activities.segments_details` and `activities.training_cycle_dates`.
+- **Derived logic:** `cycle_name` CASE on start_time vs most-recent cycle start / 365-day window; `recency_rank`/`all_time_rank`/`last_365_rank`/`current_cycle_rank` via `row_number()` per segment; `distance_mi = m2mi(distance_m)`.
+- **Dependencies:** `activities.segments_details`, `activities.training_cycle_dates`; uses `CURRENT_TIMESTAMP` for the 365-day window (query-time relative).
+- **Consumers:** `vw_segment_leaderboard`, `vw_activity_summary`.
+- **Rules:** read-only view; ranks reset per segment partition.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Segment id | id | `segments_details.segment_id` | schema.generated.md:10477-10514 | confirmed |
+| `activity_id` | bigint | YES | Activity id | id | `segments_details.activity_id` | schema.generated.md:10483 | confirmed |
+| `cycle_name` | text | YES | Cycle label | 'Current Cycle' | 'Last 365' | 'All Time' | CASE expression | schema_only.sql:10484-10488 | inferred |
+| `activity_start_point` | integer | YES | Activity start point | ordinal | `segments_details.activity_start_point` | schema.generated.md:10490 | confirmed |
+| `activity_end_point` | integer | YES | Activity end point | ordinal | `segments_details.activity_end_point` | schema.generated.md:10491 | confirmed |
+| `recency_rank` | bigint | YES | Recency rank | ordinal | `row_number()` per segment by start desc | schema.generated.md:10492 | confirmed |
+| `all_time_rank` | bigint | YES | All-time duration rank | ordinal | `row_number()` per segment by elapsed asc | schema.generated.md:10493 | confirmed |
+| `last_365_rank` | bigint | YES | Last-365-days rank | ordinal | `row_number()` with 365 filter | schema.generated.md:10494 | confirmed |
+| `current_cycle_rank` | bigint | YES | Current-cycle rank | ordinal | `row_number()` with cycle filter | schema.generated.md:10495 | confirmed |
+| `start_time_utc` | timestamp with time zone | YES | Attempt start | UTC timestamptz | `segments_details.start_time_utc` | schema.generated.md:10497 | confirmed |
+| `distance_mi` | numeric | YES | Segment distance | miles | `m2mi(distance_m)` | schema_only.sql:10498 | inferred |
+| `elapsed_duration_s` | integer | YES | Elapsed duration | seconds | `segments_details.elapsed_duration_s` | schema.generated.md:10499 | confirmed |
+| `max_hr` | integer | YES | Max HR | bpm | `segments_details.max_hr` | schema.generated.md:10500 | confirmed |
+| `avg_hr` | integer | YES | Avg HR | bpm | `segments_details.avg_hr` | schema.generated.md:10501 | confirmed |
+| `avg_cadence` | integer | YES | Avg cadence | steps/min | `segments_details.avg_cadence` | schema.generated.md:10502 | confirmed |
+| `avg_temp` | smallint | YES | Avg temp | °C | `segments_details.avg_temp` | schema.generated.md:10503 | confirmed |
+| `avg_vert_osc` | numeric | YES | Avg vertical oscillation | cm | `segments_details.avg_vert_osc` | schema.generated.md:10504 | confirmed |
+| `avg_vert_ratio` | numeric | YES | Avg vertical ratio | ratio | CASE nulls to NULL | schema_only.sql:10505-10508 | inferred |
+| `avg_gct` | integer | YES | Avg ground contact time | ms | `segments_details.avg_gct` | schema.generated.md:10509 | confirmed |
+| `avg_perf` | smallint | YES | Avg performance condition | score | `segments_details.avg_perf` | schema.generated.md:10510 | confirmed |
+| `avg_balance` | numeric | YES | Avg ground contact balance | ratio | `segments_details.avg_balance` | schema.generated.md:10511 | confirmed |
+| `avg_stride_length` | numeric | YES | Avg stride length | cm | `segments_details.avg_stride_length` | schema.generated.md:10512 | confirmed |
+| `segment_path` | USER-DEFINED | YES | Segment path | USER-DEFINED | `segments_details.segment_path` | schema.generated.md:10513 | confirmed |
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
@@ -1469,11 +1646,19 @@ API service registry and OAuth/credential store for third-party integrations (Sp
 | `fitness_age_potential` | numeric | YES | Potential fitness age | years | Garmin import | schema.generated.md | confirmed |
 
 ### health.heartrate_raw (table)
-- **Grain:** one row per heart-rate sample (ts_utc).
-- **Canonical source:** `health.heartrate_raw`; populated by `activity_smoothing.insert_heartrate_for_activity` from `activities.activity_details`.
-- **Rules:** `enforced` PK ts_utc; upsert on conflict.
+- **Purpose:** raw heart-rate samples from Garmin activity details, flattened into a per-timestamp series.
+- **Grain:** one row per heart-rate sample, keyed by `ts_utc`.
+- **Canonical source:** `health.heartrate_raw`; populated by `activity_smoothing.insert_heartrate_for_activity` (`backend/backend_functions/activity_smoothing.py:140`) from `activities.activity_details` rows where `heartrate_bpm IS NOT NULL`; `activity_label` and `hr_date` are backfilled by SQL in `docs/data/_evidence/database/definitions.sql` (activity-window overlap and sleep-window rules).
+- **Consumers:** `backend/pifitness/health/queries.py:150` (`SELECT ts_utc, heartrate_bpm, activity_label, hr_date`); `backend/pifitness/health/router.py`; `backend/pifitness/health/schemas.py` (`HeartRate` pydantic model).
+- **Relationships:** no declared FK; `ts_utc` aligns with `activities.activity_details.ts_utc`.
+- **Rules:** `enforced` PK on `ts_utc` (`heartrate_raw_pkey`); upsert — `ON CONFLICT(ts_utc) DO UPDATE SET heartrate_bpm = EXCLUDED.heartrate_bpm WHERE health.heartrate_raw.heartrate_bpm IS DISTINCT FROM EXCLUDED.heartrate_bpm`; `activity_label` backfilled to 'active' for non-run/non-walk activity windows and 'asleep' within `health.sleep_totals` windows (guard conditions also reference 'running'/'walking'); timestamps UTC.
 
-- **Rules:** `convention` raw sample.
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Sample timestamp | UTC timestamptz | `activities.activity_details.ts_utc`; PK; upsert on conflict | schema.generated.md:1248-1260; `activity_smoothing.py:141` | confirmed |
+| `heartrate_bpm` | smallint | YES | Heart rate | bpm | `activities.activity_details.heartrate_bpm`, filtered `IS NOT NULL`; updated only when value changed | schema.generated.md:1252; `activity_smoothing.py:141-145` | confirmed |
+| `activity_label` | text | YES | Activity context label | free text; evidenced closed set 'running' | 'walking' | 'active' | 'asleep' | backfilled per activity type: 'running' for run-type windows, 'walking' for walk-type windows, 'active' for other activity windows, 'asleep' within `health.sleep_totals` windows | schema.generated.md:1253; `definitions.sql:24693,24698,24703,26987` | confirmed |
+| `hr_date` | date | YES | Sample date | date | stored date column; populate path not evidenced in application code searched | schema.generated.md:1254; `health/queries.py:150` returns `hr_date` | unknown |
 
 ### health.hrv_raw (table)
 - **Grain:** one row per HRV sample.
@@ -1649,271 +1834,926 @@ API service registry and OAuth/credential store for third-party integrations (Sp
 ## logging
 
 ### logging.api_logins (table)
-- **Grain:** one row per API login event.
-- **Canonical source:** `logging.api_logins`.
-- **Rules:** `convention` audit log.
+- **Purpose:** audit log of API login/token events for each connected external service (e.g. Garmin, Spotify).
+- **Grain:** one row per API login event, keyed by `event_time_utc`.
+- **Canonical source:** `logging.api_logins`; written by `log_api_event` in `backend/backend_functions/logging_functions.py:48`.
+- **Consumers:** `backend/pifitness/auth/status.py:54,73,78` (last login and last error per service).
+- **Relationships:** `enforced` FK `api_service_name` -> `api_services.api_service_list.api_service_name` (`api_logins_api_service_name_fkey`).
+- **Rules:** `enforced` PK `event_time_utc` (`api_logins_pkey`); `event_time_utc` DEFAULT `now()` (insert path omits it). `token_age_s` in seconds.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `event_time_utc` | timestamp with time zone | NO | Event timestamp | UTC timestamptz, DEFAULT now() | `log_api_event` (omitted from insert → default) | `logging_functions.py:48-52`; schema_only.sql:16295 | confirmed |
+| `api_service_name` | text | YES | External service name | service identifier (e.g. 'Garmin', 'Spotify'); FK | `log_api_event` param `service` | `logging_functions.py:49` | confirmed |
+| `event_name` | text | YES | Event label | free text (e.g. 'New Token') | `log_api_event` param `event` | `logging_functions.py:49` | confirmed |
+| `token_age_s` | smallint | YES | Token age | seconds | `log_api_event` param `token_age` | `logging_functions.py:49` | confirmed |
+| `error_text` | text | YES | Error message | free text | `log_api_event` param `err` | `logging_functions.py:50` | confirmed |
 
 ### logging.application_events (table)
-- **Grain:** one row per application event.
-- **Canonical source:** `logging.application_events`.
-- **Rules:** `convention` event log.
+- **Purpose:** application event log capturing task executioner, DB maintenance, backup, and other operational events.
+- **Grain:** one row per logged application event, keyed by `event_time_utc`.
+- **Canonical source:** `logging.application_events`; written by `log_app_event` in `backend/backend_functions/logging_functions.py:6` (dynamic INSERT of whichever optional fields are supplied).
+- **Consumers:** `backend/pifitness/admin/queries.py:584` (task execution log records filtered by `event_category`); `tools/probe/probe4.py` round-trip test inserts a probe row and reads it back.
+- **Relationships:** none declared.
+- **Rules:** `enforced` PK `event_time_utc` (`application_events_pkey`); DEFAULT `now()`; no FKs. `execution_time_ms` is milliseconds per code (`int(exec_time)`).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `event_time_utc` | timestamp with time zone | NO | Event timestamp | UTC timestamptz, DEFAULT now() | `log_app_event` (omitted from insert → default) | `logging_functions.py:6-44`; schema_only.sql:16350 | confirmed |
+| `event_category` | text | YES | Event category | free text (e.g. 'Task Executioner', 'DB Maintenance', 'DB Backup') | `log_app_event` param `cat` | `logging_functions.py:13` | confirmed |
+| `event_description` | text | YES | Event description | free text | `log_app_event` param `desc` | `logging_functions.py:13` | confirmed |
+| `execution_time_ms` | integer | YES | Duration | milliseconds | `log_app_event` param `exec_time` cast to int | `logging_functions.py:26-28` | confirmed |
+| `error_text` | text | YES | Error message | free text | `log_app_event` param `err` | `logging_functions.py:18-23` | confirmed |
+| `task_id` | integer | YES | Related task id | id | `log_app_event` param `task_id` | `logging_functions.py:30-33` | confirmed |
+| `data_event` | text | YES | Event payload tag | free text ('probe' in tests) | `log_app_event` param `data_event` | `logging_functions.py:35-40` | confirmed |
 
 ### logging.db_size_log (table)
-- **Grain:** one row per DB size snapshot.
-- **Canonical source:** `logging.db_size_log`.
-- **Rules:** `convention` monitoring log.
+- **Purpose:** per-table database size snapshots recorded during nightly maintenance.
+- **Grain:** one row per table per snapshot; no declared PK (`event_time_utc` nullable).
+- **Canonical source:** `logging.db_size_log`; written by `backend/pifitness/worker/backend_tasks.py:96` — `INSERT INTO logging.db_size_log ... SELECT ... FROM logging.vw_db_size`.
+- **Consumers:** `logging.vw_db_biggest_table_chart`, `logging.vw_db_size`, `logging.vw_db_size_chart`.
+- **Relationships:** none declared.
+- **Rules:** `convention` monitoring snapshot; sizes stored in MB as `numeric(5,1)`; `event_time_utc` DEFAULT `now()`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `event_time_utc` | timestamp with time zone | YES | Snapshot timestamp | UTC timestamptz, DEFAULT now() | `backend_tasks.py:96` (omitted from insert → default) | `backend_tasks.py:96`; schema_only.sql:16421 | confirmed |
+| `table_name` | text | YES | Table name | text | `logging.vw_db_size` | schema_only.sql:16422 | confirmed |
+| `total_size_mb` | numeric(5,1) | YES | Total relation size | MB | `pg_total_relation_size / 1024 / 1024` via `vw_db_size` | schema_only.sql:16423; `schema_only.sql:17017` | confirmed |
+| `table_size_mb` | numeric(5,1) | YES | Table (main fork) size | MB | `pg_relation_size / 1024 / 1024` via `vw_db_size` | schema_only.sql:16424; `schema_only.sql:17018` | confirmed |
+| `index_size_mb` | numeric(5,1) | YES | Index size | MB | `pg_indexes_size / 1024 / 1024` via `vw_db_size` | schema_only.sql:16425; `schema_only.sql:17019` | confirmed |
 
 ### logging.db_stats (table)
-- **Grain:** one row per DB stats snapshot.
-- **Canonical source:** `logging.db_stats`.
-- **Rules:** `convention` monitoring log.
+- **Purpose:** nightly database maintenance statistics (migration `011__comment_backfill_logging.sql`: 'Various statistics recorded from database nightly maintenance.').
+- **Grain:** one row per maintenance run; no declared PK.
+- **Canonical source:** `logging.db_stats`; written by `backend/pifitness/worker/backend_tasks.py:109` — `INSERT into logging.db_stats (size_before_mb, size_after_mb, maintenance_time_ms, total_time_ms, maintenance_type)`.
+- **Relationships:** none declared.
+- **Rules:** `convention` maintenance log; sizes in MB; duration columns named `_ms` and passed as `int(...)` milliseconds in code, so treat as milliseconds (the migration comment 'Duration in seconds/milliseconds' is ambiguous and not authoritative for units). `event_time_utc` DEFAULT `now()`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `event_time_utc` | timestamp with time zone | YES | Run timestamp | UTC timestamptz, DEFAULT now() | `backend_tasks.py:109` (omitted from insert → default) | `backend_tasks.py:109`; schema_only.sql:16476 | confirmed |
+| `size_before_mb` | numeric(5,1) | YES | DB size before maintenance | MB | `backend_tasks.py:109` param | schema_only.sql:16477 | confirmed |
+| `size_after_mb` | numeric(5,1) | YES | DB size after maintenance | MB | `backend_tasks.py:109` param | schema_only.sql:16478 | confirmed |
+| `maintenance_time_ms` | integer | YES | Maintenance duration | milliseconds (column name + int cast) | `backend_tasks.py:109` param | schema_only.sql:16479 | confirmed |
+| `total_time_ms` | integer | YES | Total run duration | milliseconds (column name + int cast) | `backend_tasks.py:109` param | schema_only.sql:16480 | confirmed |
+| `maintenance_type` | text | YES | Maintenance type | free text | `backend_tasks.py:109` param | schema_only.sql:16481 | confirmed |
 
 ### logging.health_checks (table)
-- **Grain:** one row per health check result.
-- **Canonical source:** `logging.health_checks`.
-- **Rules:** `convention` monitoring log.
+- **Purpose:** results of database/backup/hardware health checks, one row per check per run.
+- **Grain:** one row per check result, keyed by `check_id`.
+- **Canonical source:** `logging.health_checks`; written by `run_health_checks` in `backend/pifitness/worker/backend_tasks.py:206` (insert at line 343); results are also written to `/home/god/Documents/PiFitness_Local/health_status.json` for the frontend.
+- **Relationships:** none declared.
+- **Rules:** `enforced` PK `check_id` (`health_checks_pkey`, sequence `logging.health_checks_check_id_seq`); `enforced` CHECK `status IN ('ok','warn','critical')` (`health_checks_status_check`); `check_name` and `status` NOT NULL; `check_time_utc` DEFAULT `now()` NOT NULL.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `check_id` | bigint | NO | Check row id | sequence-backed identity | `run_health_checks` insert omits it (sequence default) | `backend_tasks.py:343`; schema_only.sql:16538-16545 | confirmed |
+| `check_time_utc` | timestamp with time zone | NO | Check timestamp | UTC timestamptz, DEFAULT now() | `run_health_checks` insert omits it → default | schema_only.sql:16540 | confirmed |
+| `check_name` | text | NO | Check name | free text | `run_health_checks` param `c['name']` | `backend_tasks.py:344` | confirmed |
+| `status` | text | NO | Check status | 'ok' | 'warn' | 'critical' (CHECK constraint enforced) | `run_health_checks` param `c['status']` | confirmed |
+| `value` | numeric | YES | Check metric value | unit depends on the check | `run_health_checks` param `c['value']` | `backend_tasks.py:345` | confirmed |
+| `message` | text | YES | Check detail message | free text | `run_health_checks` param `c['message']` | `backend_tasks.py:345` | confirmed |
 
 ### logging.music_db_info (table)
-- **Grain:** one row per music DB info snapshot.
-- **Canonical source:** `logging.music_db_info`.
-- **Rules:** `convention` monitoring log.
+- **Purpose:** snapshot of music database cardinality (migration `011__comment_backfill_logging.sql`: 'Tracking the state of the musical tracks known by the application').
+- **Grain:** one row per snapshot, keyed by `ts_utc`.
+- **Canonical source:** `logging.music_db_info`; written by procedure `music.isrc_duplicate_finder()` (`docs/data/_evidence/database/schema_only.sql:2866-2879`), which aggregates `music.all_tracks` left-joined to `music.isrc_swaps` and stores the counts; `ts_utc` DEFAULT `CURRENT_TIMESTAMP` (the insert omits it, so the default applies).
+- **Relationships:** none declared.
+- **Rules:** `enforced` PK `ts_utc` (`music_db_info_pkey`). All count columns are plain counts with no declared allowed-value set (open set).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Snapshot timestamp | UTC timestamptz, DEFAULT CURRENT_TIMESTAMP | PK; `isrc_duplicate_finder()` insert omits it → default applies | schema_only.sql:16622,2866-2879 | confirmed |
+| `track_id_count` | integer | YES | Distinct track count | count | `COUNT(DISTINCT track_id)` FROM `music.all_tracks` | schema_only.sql:2873 | confirmed |
+| `isrc_id_count` | integer | YES | Distinct ISRC count | count | `COUNT(DISTINCT track_isrc)` | schema_only.sql:2874 | confirmed |
+| `mapped_isrc_id_count` | integer | YES | Distinct mapped/preferred ISRC count | count | `COUNT(DISTINCT COALESCE(mapped_isrc, track_isrc))` (aliased `preferred_isrc_count` in source) | schema_only.sql:2875 | confirmed |
+| `artist_id_count` | integer | YES | Distinct artist count | count | `COUNT(DISTINCT artist_id)` | schema_only.sql:2876 | confirmed |
+| `album_id_count` | integer | YES | Distinct album count | count | `COUNT(DISTINCT album_id)` | schema_only.sql:2877 | confirmed |
 
 ### logging.task_executions (table)
-- **Grain:** one row per task execution record.
-- **Canonical source:** `logging.task_executions`.
-- **Rules:** `convention` execution log.
+- **Purpose:** fine-grained per-phase task execution timing log (distinct from `tasks.task_executions`, which is a coarse execution log).
+- **Grain:** one row per task execution record, keyed by `record_id`.
+- **Canonical source:** `logging.task_executions`; written by `task_log` in `backend/pifitness/worker/task_execution.py:300`, which inserts `task_id, task_name, extract_time_ms, load_time_ms, transform_time_ms, failure_type, error_text` (other columns remain NULL).
+- **Consumers:** frontend `frontend/pifitness/src/app/admin/components/TaskLogView.tsx:20` (maps DB columns to display fields); `tasks.vw_task_execution` consumes aggregated data.
+- **Relationships:** none declared. Do not confuse with `tasks.task_executions` (different schema, coarse log; both happen to have an index named `task_executions_pkey`).
+- **Rules:** `enforced` PK `record_id` (`task_executions_pkey`, sequence-backed); `event_time_utc` DEFAULT `now()`; phase duration columns are milliseconds per their `_ms` names and the `task_log` parameter names.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `record_id` | bigint | NO | Log row id | sequence-backed identity | `task_log` insert omits it (sequence default) | `task_execution.py:300`; schema_only.sql:16684 | confirmed |
+| `event_time_utc` | timestamp with time zone | YES | Event timestamp | UTC timestamptz, DEFAULT now() | `task_log` insert omits it → default | schema_only.sql:16686 | confirmed |
+| `task_name` | text | YES | Task name | free text | `task_log` param `task_name` | `task_execution.py:301` | confirmed |
+| `extract_time_ms` | integer | YES | Extract phase duration | milliseconds | `task_log` param `e_time` | `task_execution.py:303` | confirmed |
+| `load_time_ms` | integer | YES | Load phase duration | milliseconds | `task_log` param `l_time` | `task_execution.py:304` | confirmed |
+| `transform_time_ms` | integer | YES | Transform phase duration | milliseconds | `task_log` param `t_time` | `task_execution.py:305` | confirmed |
+| `failure_type` | text | YES | Failure category | free text; non-NULL indicates a failed execution | `task_log` param `fail_type` | `task_execution.py:306` | confirmed |
+| `error_text` | text | YES | Error message | free text | `task_log` param `fail_text` | `task_execution.py:307` | confirmed |
+| `task_id` | integer | YES | Related task id | id | `task_log` param `task_id` | `task_execution.py:301` | confirmed |
+| `interpolation_time_ms` | integer | YES | Interpolation phase duration | milliseconds | not inserted by `task_log` (remains NULL) | schema_only.sql:16694 | inferred |
+| `forecast_time_ms` | integer | YES | Forecast phase duration | milliseconds | not inserted by `task_log` (remains NULL) | schema_only.sql:16695 | inferred |
 
 ### logging.vw_all_event_history (view)
-- **Grain:** one row per event across history.
-- **Canonical source:** derived view.
-- **Rules:** `convention` read-only view.
+- **Purpose:** unified event history backing the admin event-log viewer (searchable, filterable, errors-only toggle).
+- **Grain:** one row per event across `logging.api_logins`, `logging.application_events`, and `logging.task_executions`; no key (order by `event_time_utc DESC`).
+- **Canonical source:** derived view — `UNION ALL` of three typed streams.
+- **Dependencies:** `logging.api_logins` (filtered `event_name IS NOT NULL`, event_type 'Login'), `logging.application_events` (event_type 'App Event'), `logging.task_executions` (event_type 'Task Execution').
+- **Derived logic:** `description` is a composite (service + event name + token age, or category + description + execution seconds, or task name); task-event `error_text` combines `error_text || ' @ ' || failure_type`; `is_error = error_text IS NOT NULL`; `not_skip_row = description NOT ILIKE '%skipped%'`; ordered `event_time_utc DESC`.
+- **Consumers:** `backend/pifitness/admin/queries.py:641` (`SELECT * FROM logging.vw_all_event_history WHERE 1=1`); frontend `frontend/pifitness/src/app/admin/components/EventHistory.tsx`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `event_time_utc` | timestamp with time zone | YES | Event timestamp | UTC timestamptz | derived from source tables | schema.generated.md:1500 | confirmed |
+| `event_type` | text | YES | Event stream label | 'Login' | 'App Event' | 'Task Execution' | derived literal per CTE | schema_only.sql:16808,16817,16823 | confirmed |
+| `description` | text | YES | Human-readable description | composite text | derived COALESCE chain | schema_only.sql:16810,16817,16824 | confirmed |
+| `error_text` | text | YES | Error message | free text | derived; for task events `error_text || ' @ ' || failure_type` | schema_only.sql:16812,16819,16825 | confirmed |
+| `is_error` | boolean | YES | Error flag | boolean | `error_text IS NOT NULL` | schema_only.sql:16849 | confirmed |
+| `not_skip_row` | boolean | YES | Skip-row filter | boolean | `description NOT ILIKE '%skipped%'` | schema_only.sql:16857 | confirmed |
 
 ### logging.vw_db_biggest_table_chart (view)
-- **Grain:** one row per table size entry.
+- **Purpose:** chart of the largest tables by size over time (top tables).
+- **Grain:** one row per date per table, for the top tables.
 - **Canonical source:** derived view.
-- **Rules:** `convention` read-only view.
+- **Dependencies:** `logging.db_size_log`, `public.vw_date`; filters `date_utc > '2025-11-16'`; identifies top tables via `row_number() OVER (ORDER BY max(total_size_mb) DESC) < 4`, then joins back per date.
+- **Consumers:** none evidenced in application code (dashboard chart data).
+- **Rules:** read-only view; `total_size_mb` is the max per table on that date.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `date_utc` | date | YES | Chart date | date | `public.vw_date.date_utc` | schema.generated.md:1510; schema_only.sql:16979 | confirmed |
+| `db_table` | text | YES | Table name | text | `logging.db_size_log.table_name` | schema_only.sql:16980 | confirmed |
+| `total_size_mb` | numeric | YES | Total size | MB | `max(sl.total_size_mb)` per date/table | schema_only.sql:16981 | confirmed |
 
 ### logging.vw_db_size (view)
-- **Grain:** one row per DB size reading.
-- **Canonical source:** derived view.
-- **Rules:** `convention` read-only view.
+- **Purpose:** current per-table size snapshot from PostgreSQL statistics.
+- **Grain:** one row per user table with `total_size_mb > 0`.
+- **Canonical source:** derived view over `pg_stat_user_tables`.
+- **Dependencies:** `pg_stat_user_tables` (system view); sizes computed as bytes / 1024 / 1024 → MB (`numeric(10,1)`); `other_size_mb = total_size_mb - table_size_mb - index_size_mb` derived.
+- **Consumers:** `logging.db_size_log` is populated from this view (`backend_tasks.py:96`); `logging.vw_db_biggest_table_chart` and `logging.vw_db_size_chart` read `logging.db_size_log`, not this view directly.
+- **Rules:** read-only view; ordered `total_size_mb DESC`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `table_name` | text | YES | Table name | `schema.table` text | `schemaname || '.' || relname` from `pg_stat_user_tables` | schema.generated.md:1517; schema_only.sql:17016 | confirmed |
+| `total_size_mb` | numeric | YES | Total relation size | MB | `pg_total_relation_size(relid) / 1024 / 1024` | schema_only.sql:17017 | confirmed |
+| `table_size_mb` | numeric | YES | Table (main fork) size | MB | `pg_relation_size(relid) / 1024 / 1024` | schema_only.sql:17018 | confirmed |
+| `index_size_mb` | numeric | YES | Index size | MB | `pg_indexes_size(relid) / 1024 / 1024` | schema_only.sql:17019 | confirmed |
+| `other_size_mb` | numeric | YES | Other (toast, etc.) size | MB | derived `total - table - index` | schema_only.sql:17026 | inferred |
 
 ### logging.vw_db_size_chart (view)
-- **Grain:** one row per DB size chart point.
+- **Purpose:** daily aggregated database size chart across all tables.
+- **Grain:** one row per date; sums across tables.
 - **Canonical source:** derived view.
-- **Rules:** `convention` read-only view.
+- **Dependencies:** `logging.db_size_log`, `public.vw_date`; latest size record per table per date (`row_number() = 1` ordered by `event_time_utc DESC`); filters `date_utc > '2025-11-16'`; `other_size_mb = total_size_mb - table_size_mb - index_size_mb` per record.
+- **Consumers:** none evidenced in application code (dashboard chart data).
+- **Rules:** read-only view; sums `table_size_mb`, `index_size_mb`, `other_size_mb` grouped by `date_utc`; ordered by date.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `date_utc` | date | YES | Chart date | date | `public.vw_date.date_utc` | schema.generated.md:1526; schema_only.sql:17097 | confirmed |
+| `table_size_mb` | numeric | YES | Sum of table sizes | MB | `sum(table_size_mb)` per date | schema_only.sql:17098 | confirmed |
+| `index_size_mb` | numeric | YES | Sum of index sizes | MB | `sum(index_size_mb)` per date | schema_only.sql:17099 | confirmed |
+| `other_size_mb` | numeric | YES | Sum of other sizes | MB | `sum(total - table - index)` per date | schema_only.sql:17100 | confirmed |
 
 ### logging.vw_event_analysis (view)
-- **Grain:** one row per event analysis.
-- **Canonical source:** derived view.
-- **Rules:** `convention` read-only view.
+- **Purpose:** application-event analysis with human-readable age.
+- **Grain:** one row per `logging.application_events` row.
+- **Canonical source:** derived view over `logging.application_events`.
+- **Dependencies:** `logging.application_events`, `public.time_ago()`; `task_age = public.time_ago(event_time_utc)`; `is_error = error_text IS NOT NULL`; ordered `event_time_utc DESC`.
+- **Consumers:** none evidenced in application code.
+- **Rules:** read-only view; `time_ago` is `IMMUTABLE` and uses `NOW()` at call time, so `task_age` is relative to when the view is queried.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `task_age` | text | YES | Human-readable age | free text (e.g. '2 hours ago') | `public.time_ago(event_time_utc)` | schema.generated.md:1534; schema_only.sql:17139 | confirmed |
+| `event_category` | text | YES | Event category | free text | `logging.application_events.event_category` | schema_only.sql:17140 | confirmed |
+| `event_description` | text | YES | Event description | free text | `logging.application_events.event_description` | schema_only.sql:17141 | confirmed |
+| `error_text` | text | YES | Error message | free text | `logging.application_events.error_text` | schema_only.sql:17142 | confirmed |
+| `execution_time_ms` | integer | YES | Duration | milliseconds | `logging.application_events.execution_time_ms` | schema_only.sql:17143 | confirmed |
+| `event_time_utc` | timestamp with time zone | YES | Event timestamp | UTC timestamptz | `logging.application_events.event_time_utc` | schema_only.sql:17144 | confirmed |
+| `is_error` | boolean | YES | Error flag | boolean | `error_text IS NOT NULL` | schema_only.sql:17145 | confirmed |
 
 ### logging.vw_last_login (view)
-- **Grain:** one row per last login.
-- **Canonical source:** derived view.
-- **Rules:** `convention` read-only view.
+- **Purpose:** most recent login per API service with seconds since that login.
+- **Grain:** one row per `api_service_name`.
+- **Canonical source:** derived view over `logging.api_logins`.
+- **Dependencies:** `logging.api_logins` (filtered `event_name LIKE 'login%'`), `public.utc_now()`; `DISTINCT ON (api_service_name)` ordered by `event_time_utc DESC`; `seconds_since_last_event = round(extract(epoch from utc_now() - event_time_utc), 0)::integer` seconds.
+- **Consumers:** `backend/pifitness/auth/status.py` reads `logging.api_logins` directly for last login/error (this view not evidenced as consumed).
+- **Rules:** read-only view; `utc_now()` is `NOW() AT TIME ZONE 'UTC'` (STABLE), so seconds are relative to query time.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `api_service_name` | text | YES | External service name | text | `DISTINCT ON (api_service_name)` from `logging.api_logins` | schema.generated.md:1545; schema_only.sql:17204 | confirmed |
+| `seconds_since_last_event` | integer | YES | Seconds since last login | integer seconds | `round(extract(epoch from public.utc_now() - event_time_utc), 0)::integer` | schema_only.sql:17205 | confirmed |
 
 ### logging.vw_task_analysis (view)
-- **Grain:** one row per task analysis.
-- **Canonical source:** derived view.
-- **Rules:** `convention` read-only view.
+- **Purpose:** task-execution analysis with human-readable age and failure flag.
+- **Grain:** one row per `logging.task_executions` row.
+- **Canonical source:** derived view over `logging.task_executions`.
+- **Dependencies:** `logging.task_executions`, `public.time_ago()`; `task_age = public.time_ago(event_time_utc)`; `is_failure = failure_type IS NOT NULL`; ordered `event_time_utc DESC`.
+- **Consumers:** none evidenced in application code.
+- **Rules:** read-only view; `time_ago` uses `NOW()` at call time, so `task_age` is relative to when the view is queried.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `task_age` | text | YES | Human-readable age | free text (e.g. '2 hours ago') | `public.time_ago(event_time_utc)` | schema.generated.md:1551; schema_only.sql:17230 | confirmed |
+| `task_name` | text | YES | Task name | free text | `logging.task_executions.task_name` | schema_only.sql:17231 | confirmed |
+| `is_failure` | boolean | YES | Failure flag | boolean | `failure_type IS NOT NULL` | schema_only.sql:17232 | confirmed |
+| `error_text` | text | YES | Error message | free text | `logging.task_executions.error_text` | schema_only.sql:17233 | confirmed |
 
 ## music
 
 ### music.all_albums (table)
-- **Grain:** one row per all albums (table); see schema.generated.md for columns.
-- **Canonical source:** `music.all_albums`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** Spotify album master data (names + search vectors) used by track resolution and playlist features.
+- **Grain:** one row per album, keyed by `album_id`.
+- **Canonical source:** `music.all_albums`; populated by the Spotify JSON extraction worker (`backend/pifitness/worker/json_extractors.py`) and upserted by SQL in `deploy/migrations`/`schema_only.sql`.
+- **Consumers:** `music.all_tracks` (via `album_id` FK-like join), `music_functions.py:393` (best-track lookup joins `all_albums`).
+- **Relationships:** no declared FK; `album_id` is referenced by `music.all_tracks.album_id` at the application level.
+- **Rules:** `enforced` PK `album_id` (`all_albums_pkey`); trgm index `trgm_idx_album_name` on `album_name_search` for fuzzy search. `updated_at_utc` is refreshed on each sync/upsert.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `album_id` | text | NO | Album id | Spotify album id | PK; extraction/upsert | schema.generated.md:1561; json_extractors.py | confirmed |
+| `album_name` | text | YES | Album name | text | extraction | schema.generated.md:1562 | confirmed |
+| `album_name_clean` | text | YES | Cleaned album name | text | normalized from `album_name` | schema.generated.md:1563 | inferred |
+| `album_name_search` | text | YES | Search-optimized name | text | indexed with `gin_trgm_ops` | schema.generated.md:1564; index `trgm_idx_album_name` | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Last sync timestamp | UTC timestamptz | set on upsert | schema.generated.md:1565 | confirmed |
 
 ### music.all_artists (table)
-- **Grain:** one row per all artists (table); see schema.generated.md for columns.
-- **Canonical source:** `music.all_artists`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** Spotify artist master data (names + search vectors) used by track resolution and playlist features.
+- **Grain:** one row per artist, keyed by `artist_id`.
+- **Canonical source:** `music.all_artists`; populated by the Spotify JSON extraction worker (`backend/pifitness/worker/json_extractors.py`) and upserted alongside `all_albums` in SQL (`schema_only.sql`/`definitions.sql` upsert block).
+- **Consumers:** `music.all_tracks` (via `artist_id` join).
+- **Relationships:** no declared FK; `artist_id` referenced by `music.all_tracks.artist_id` at application level.
+- **Rules:** `enforced` PK `artist_id` (`all_artists_pkey`); trgm index `trgm_idx_artist_name` on `artist_name_search`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `artist_id` | text | NO | Artist id | Spotify artist id | PK; extraction/upsert | schema.generated.md:1574; json_extractors.py | confirmed |
+| `artist_name` | text | YES | Artist name | text | extraction | schema.generated.md:1575 | confirmed |
+| `artist_name_clean` | text | YES | Cleaned artist name | text | normalized from `artist_name` | schema.generated.md:1576 | inferred |
+| `artist_name_search` | text | YES | Search-optimized name | text | indexed with `gin_trgm_ops` | schema.generated.md:1577; index `trgm_idx_artist_name` | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Last sync timestamp | UTC timestamptz | set on upsert | schema.generated.md:1578 | confirmed |
 
 ### music.all_tracks (table)
-- **Grain:** one row per all tracks (table); see schema.generated.md for columns.
-- **Canonical source:** `music.all_tracks`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** Spotify track master data with core audio/metadata fields, the central track dimension for the music domain.
+- **Grain:** one row per track, keyed by `track_id`.
+- **Canonical source:** `music.all_tracks`; populated by `backend/pifitness/worker/json_extractors.py` (Spotify API extraction); upserted by SQL in `schema_only.sql` (`ON CONFLICT (track_id) DO UPDATE` when name/search/release/availability/markets/popularity/duration changed).
+- **Consumers:** `music.track_recommendations`, `music.vw_all_tracks`, `music.vw_best_track_id`, `music_functions.py`, `music_service.py` (`get_track_ids_by_isrc`).
+- **Relationships:** no declared FKs; `artist_id` -> `music.all_artists.artist_id` and `album_id` -> `music.all_albums.album_id` are application-level joins.
+- **Rules:** `enforced` PK `track_id` (`all_tracks_pkey`); trgm index `trgm_idx_track_name` on `track_name_search`. `duration_ms` is milliseconds (column-name convention). `track_isrc` is the ISRC identifier (open set, not a declared enum).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `track_id` | text | NO | Track id | Spotify track id | PK; extraction/upsert | schema.generated.md:1586 | confirmed |
+| `track_name` | text | YES | Track name | text | extraction | schema.generated.md:1587 | confirmed |
+| `track_name_clean` | text | YES | Cleaned track name | text | normalized from `track_name` | schema.generated.md:1588 | inferred |
+| `track_name_search` | text | YES | Search-optimized name | text | indexed with `gin_trgm_ops` | schema.generated.md:1589; index `trgm_idx_track_name` | confirmed |
+| `track_isrc` | text | YES | ISRC identifier | ISRC code (open set) | extraction | schema.generated.md:1590 | confirmed |
+| `duration_ms` | integer | YES | Track duration | milliseconds | extraction (column-name convention) | schema.generated.md:1591 | inferred |
+| `artist_id` | text | YES | Artist id | references `all_artists.artist_id` (app-level) | extraction | schema.generated.md:1592 | confirmed |
+| `artist_display_name` | text | YES | Artist display name | text | extraction | schema.generated.md:1593 | confirmed |
+| `album_id` | text | YES | Album id | references `all_albums.album_id` (app-level) | extraction | schema.generated.md:1594 | confirmed |
+| `release_date` | date | YES | Release date | calendar date | extraction | schema.generated.md:1595 | confirmed |
+| `available_in_us` | boolean | YES | Available in US flag | boolean | extraction | schema.generated.md:1596 | confirmed |
+| `total_markets` | integer | YES | Market count | count | extraction | schema.generated.md:1597 | confirmed |
+| `popularity` | integer | YES | Popularity score | 0-100 scale (Spotify convention, not DB-enforced) | extraction | schema.generated.md:1598 | inferred |
+| `updated_at_utc` | timestamp with time zone | YES | Last sync timestamp | UTC timestamptz | set on upsert | schema.generated.md:1599 | confirmed |
+| `id_synced_at_utc` | timestamp with time zone | YES | ID sync timestamp | UTC timestamptz | set on sync | schema.generated.md:1600 | confirmed |
 
 ### music.isrc_non_swaps (table)
-- **Grain:** one row per isrc non swaps (table); see schema.generated.md for columns.
-- **Canonical source:** `music.isrc_non_swaps`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** ISRC pairs explicitly rejected as mappings (low-confidence duplicates), i.e. "do not swap" decisions.
+- **Grain:** one row per `(original_isrc, mapped_isrc)` rejected pair.
+- **Canonical source:** `music.isrc_non_swaps`; written by procedure `music.isrc_duplicate_finder()` (`schema_only.sql:2847-2864`) for candidates where `duration_score < 0.99 AND artist_score < 0.25 AND album_score < 0.25`; `mapping_time_utc = CURRENT_TIMESTAMP`.
+- **Consumers:** none evidenced in application code (audit/review reference only).
+- **Relationships:** none declared.
+- **Rules:** `enforced` uniqueness via `uq_original_mapped_isrc` on `(original_isrc, mapped_isrc)`; no PK declared.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `original_isrc` | text | YES | Original ISRC | ISRC code | `isrc_duplicate_finder()` | schema.generated.md:1609; schema_only.sql:2847 | confirmed |
+| `mapped_isrc` | text | YES | Rejected mapped ISRC | ISRC code | `isrc_duplicate_finder()` | schema.generated.md:1610; schema_only.sql:2848 | confirmed |
+| `mapping_time_utc` | timestamp with time zone | YES | Mapping timestamp | UTC timestamptz, DEFAULT CURRENT_TIMESTAMP | `isrc_duplicate_finder()` | schema.generated.md:1611; schema_only.sql:2854 | confirmed |
 
 ### music.isrc_possible_dupes (table)
-- **Grain:** one row per isrc possible dupes (table); see schema.generated.md for columns.
-- **Canonical source:** `music.isrc_possible_dupes`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** candidate ISRC duplicate pairs scored by similarity, used for manual review before creating swaps/non-swaps.
+- **Grain:** one row per candidate pair `(isrc1, isrc2)`.
+- **Canonical source:** `music.isrc_possible_dupes`; populated by the duplicate-finder scoring logic (`music.isrc_duplicate_finder()` and related SQL in `schema_only.sql`); columns are similarity scores.
+- **Consumers:** duplicate-review workflow (no direct application consumer evidenced).
+- **Relationships:** none declared.
+- **Rules:** no PK/index declared. Score columns are numeric similarity values (0-1 range implied by SIMILARITY usage, not DB-enforced — treat as open set).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `isrc1` | text | YES | First ISRC of pair | ISRC code | duplicate-finder | schema.generated.md:1619 | confirmed |
+| `isrc2` | text | YES | Second ISRC of pair | ISRC code | duplicate-finder | schema.generated.md:1620 | confirmed |
+| `match_score` | numeric | YES | Overall match score | numeric similarity | duplicate-finder | schema.generated.md:1621 | confirmed |
+| `track_score` | numeric | YES | Track-name similarity score | numeric similarity | duplicate-finder | schema.generated.md:1622 | confirmed |
+| `artist_score` | numeric | YES | Artist-name similarity score | numeric similarity | duplicate-finder | schema.generated.md:1623 | confirmed |
+| `album_score` | numeric | YES | Album-name similarity score | numeric similarity | duplicate-finder | schema.generated.md:1624 | confirmed |
 
 ### music.isrc_swaps (table)
-- **Grain:** one row per isrc swaps (table); see schema.generated.md for columns.
-- **Canonical source:** `music.isrc_swaps`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** curated ISRC remappings (original -> preferred/mapped ISRC) used to normalize track identity across listening history.
+- **Grain:** one row per `original_isrc`, keyed by `original_isrc`.
+- **Canonical source:** `music.isrc_swaps`; written by procedure `music.isrc_duplicate_finder()` (`schema_only.sql:2842-2845`) with `mapping_time_utc = CURRENT_TIMESTAMP`.
+- **Consumers:** `music.missing_relationships` view (joins `isrc_swaps` on `valid_mapping`), `music.listening_history` reconciliation (coalesces `mapped_isrc`).
+- **Relationships:** none declared.
+- **Rules:** `enforced` PK `original_isrc` (`isrc_swaps_pkey`); `valid_mapping` boolean flags whether the swap is active; `mapping_time_utc` records when the swap was created/refreshed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `original_isrc` | text | NO | Original ISRC | ISRC code | PK; duplicate-finder | schema.generated.md:1629 | confirmed |
+| `mapped_isrc` | text | YES | Preferred/mapped ISRC | ISRC code | duplicate-finder | schema.generated.md:1630 | confirmed |
+| `mapping_time_utc` | timestamp with time zone | YES | Mapping timestamp | UTC timestamptz, DEFAULT CURRENT_TIMESTAMP | duplicate-finder | schema.generated.md:1631 | confirmed |
+| `valid_mapping` | boolean | YES | Swap active flag | boolean | duplicate-finder | schema.generated.md:1632 | confirmed |
 
 ### music.listening_history (table)
-- **Grain:** one row per listening history (table); see schema.generated.md for columns.
-- **Canonical source:** `music.listening_history`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** reconciled play history — which track (ISRC) was played in which playlist and when.
+- **Grain:** one row per play event, keyed by composite `(isrc, played_at_utc)`.
+- **Canonical source:** `music.listening_history`; written by `_insert_listening_history` in `backend/pifitness/activities/router.py:526` from `activities.vw_watch_music_heard` (`INSERT ... ON CONFLICT(played_at_utc, isrc) DO NOTHING`); `music.temp_listening_history` is truncated before each reload.
+- **Consumers:** `music.missing_relationships`, `music.vw_listening_history`, `music.vw_playlist_last_heard`, `music.vw_playlist_isrc_stats`, rating-eligibility views.
+- **Relationships:** no declared FKs; `isrc` relates to `music.all_tracks.track_isrc` / `music.isrc_swaps.original_isrc` at application level.
+- **Rules:** `enforced` composite PK `(isrc, played_at_utc)` (`listening_history_pk`); `played_at_utc` and `isrc` NOT NULL; duplicates are ignored on conflict. Timestamps UTC.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `played_at_utc` | timestamp with time zone | NO | Play timestamp | UTC timestamptz | PK part; `vw_watch_music_heard` | schema.generated.md:1640 | confirmed |
+| `isrc` | text | NO | Track ISRC | ISRC code | PK part; `vw_watch_music_heard` | schema.generated.md:1641 | confirmed |
+| `playlist_id` | text | YES | Playlist id | references `playlist_config.playlist_id` (app-level) | `vw_watch_music_heard` | schema.generated.md:1642 | confirmed |
 
 ### music.missing_relationships (view)
-- **Grain:** one row per missing relationships (view); see schema.generated.md for columns.
-- **Canonical source:** `music.missing_relationships`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** playlists that are configured for a shuffle/recommendation type but still lack a corresponding child-playlist relationship — drives relationship creation.
+- **Grain:** one row per playlist that needs at least one relationship (auto/manual/recommendation).
+- **Canonical source:** derived view over `music.playlist_config` left-joined to `music.playlist_relationships` by `child_playlist_type`.
+- **Dependencies:** `music.playlist_config`, `music.playlist_relationships` (joined 3x, once per type: 'manual', 'auto', 'recommendation').
+- **Derived logic:** `needs_auto = pc.auto_shuffle AND NOT EXISTS(auto child)`, `needs_manual = pc.manual_shuffle AND NOT EXISTS(manual child)`, `needs_recs = pc.make_recs AND NOT EXISTS(recommendation child)`; filtered to rows where any flag is true.
+- **Consumers:** `ensure_playlist_relationships` in `backend/backend_functions/music_functions.py:193` (selects `playlist_id, playlist_name, needs_auto, needs_manual, needs_recs`).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | from `playlist_config.playlist_id` | derived | schema.generated.md:1650 | confirmed |
+| `playlist_name` | text | YES | Playlist name | from `playlist_config.playlist_name` | derived | schema.generated.md:1651 | confirmed |
+| `needs_auto` | boolean | YES | Needs auto-shuffle child | boolean | `pc.auto_shuffle AND child_playlist_id IS NULL` (type 'auto') | schema_only.sql:17521 | confirmed |
+| `needs_manual` | boolean | YES | Needs manual-shuffle child | boolean | `pc.manual_shuffle AND child_playlist_id IS NULL` (type 'manual') | schema_only.sql:17522 | confirmed |
+| `needs_recs` | boolean | YES | Needs recommendations child | boolean | `pc.make_recs AND child_playlist_id IS NULL` (type 'recommendation') | schema_only.sql:17523 | confirmed |
 
 ### music.playlist_config (table)
-- **Grain:** one row per playlist config (table); see schema.generated.md for columns.
-- **Canonical source:** `music.playlist_config`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-playlist shuffle/recommendation configuration (weights, flags, sync timestamps).
+- **Grain:** one row per playlist, keyed by `playlist_id`.
+- **Canonical source:** `music.playlist_config`; upserted from `staging.api_imports` (`schema_only.sql:5600-5633`, `ON CONFLICT (playlist_id) DO UPDATE` when name/description/track_count changed or inactive); `update_playlist_config` in `backend/backend_functions/music_service.py:98` persists shuffle weights.
+- **Consumers:** `music_service.py:38` (`list_playlists` reads all rows), `music_functions.py`, `music.vw_playlist_config`, `missing_relationships`, rating/shuffle views.
+- **Relationships:** no declared FKs; `playlist_id` is referenced by `music.playlist_isrcs`, `music.ratings`, etc. at application level.
+- **Rules:** `enforced` PK `playlist_id` (`playlist_config_pkey`); weights are numeric (application convention, no range check); booleans `auto_shuffle`/`seeds_only`/`make_recs`/`is_active`/`manual_shuffle` control shuffle behavior; `last_verified_utc` marks last external verification.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | NO | Playlist id | Spotify playlist id | PK; upsert from staging | schema.generated.md:1659 | confirmed |
+| `playlist_name` | text | YES | Playlist name | text | upsert | schema.generated.md:1660 | confirmed |
+| `playlist_description` | text | YES | Playlist description | text | upsert | schema.generated.md:1661 | confirmed |
+| `track_count` | integer | YES | Track count | count | upsert | schema.generated.md:1662 | confirmed |
+| `auto_shuffle` | boolean | YES | Auto-shuffle enabled | boolean | config flag | schema.generated.md:1663 | confirmed |
+| `seeds_only` | boolean | YES | Seeds-only mode | boolean | config flag | schema.generated.md:1664 | confirmed |
+| `make_recs` | boolean | YES | Generate recommendations | boolean | config flag | schema.generated.md:1665 | confirmed |
+| `ratings_weight` | numeric | YES | Rating weight | weight (numeric) | `update_playlist_config` | schema.generated.md:1666 | confirmed |
+| `recency_weight` | numeric | YES | Recency weight | weight (numeric) | `update_playlist_config` | schema.generated.md:1667 | confirmed |
+| `randomness_weight` | numeric | YES | Randomness weight | weight (numeric) | `update_playlist_config` | schema.generated.md:1668 | confirmed |
+| `is_active` | boolean | YES | Playlist active flag | boolean | upsert; deactivated when absent from staging | schema.generated.md:1669 | confirmed |
+| `minutes_to_sync` | integer | YES | Sync interval | minutes | config value | schema.generated.md:1670 | confirmed |
+| `manual_shuffle` | boolean | YES | Manual shuffle enabled | boolean | config flag | schema.generated.md:1671 | confirmed |
+| `last_synced_utc` | timestamp with time zone | YES | Last sync timestamp | UTC timestamptz | `music_functions.py:133` sets `CURRENT_TIMESTAMP` | schema.generated.md:1672 | confirmed |
+| `last_auto_shuffled_utc` | timestamp with time zone | YES | Last auto-shuffle timestamp | UTC timestamptz | `update_playlist_config` / `music_functions.py:315` | schema.generated.md:1673 | confirmed |
+| `last_verified_utc` | timestamp with time zone | YES | Last verification timestamp | UTC timestamptz | upsert from staging | schema.generated.md:1674 | confirmed |
+| `prior_track_count` | integer | YES | Previous track count | count | snapshot before sync | schema.generated.md:1675 | confirmed |
 
 ### music.playlist_isrcs (table)
-- **Grain:** one row per playlist isrcs (table); see schema.generated.md for columns.
-- **Canonical source:** `music.playlist_isrcs`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** ordered track membership of playlists (ISRC sequence per playlist).
+- **Grain:** one row per `(playlist_id, isrc)` position, ordered by `track_order`.
+- **Canonical source:** `music.playlist_isrcs`; written by `backend/pifitness/music/queries.py` and `music_service.py` (DELETE then re-insert on playlist changes); loaded from `staging.stg_playlist_details` in SQL (`schema_only.sql:5541`).
+- **Consumers:** playlist track endpoints (`/api/music/playlists/{playlist_id}/tracks`), shuffle logic views.
+- **Relationships:** no declared FKs; relates to `playlist_config.playlist_id` and `all_tracks.track_isrc` at application level.
+- **Rules:** no PK/index declared in inventory; `track_order` defines play sequence; `updated_at_utc` marks last membership change.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | references `playlist_config.playlist_id` (app-level) | insert from staging/queries | schema.generated.md:1683 | confirmed |
+| `isrc` | text | YES | Track ISRC | ISRC code | insert from staging/queries | schema.generated.md:1684 | confirmed |
+| `track_order` | integer | YES | Position in playlist | ordinal | insert from staging/queries | schema.generated.md:1685 | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Last change timestamp | UTC timestamptz | set on insert | schema.generated.md:1686 | confirmed |
 
 ### music.playlist_recommendation_exclusions (table)
-- **Grain:** one row per playlist recommendation exclusions (table); see schema.generated.md for columns.
-- **Canonical source:** `music.playlist_recommendation_exclusions`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** ISRCs explicitly excluded from recommendations for a playlist ("remove recommendation" actions).
+- **Grain:** one row per `(playlist_id, isrc)` exclusion.
+- **Canonical source:** `music.playlist_recommendation_exclusions`; written by `remove_recommendation` in `backend/backend_functions/music_service.py:70` (`INSERT ... ON CONFLICT (playlist_id, isrc) DO NOTHING`).
+- **Consumers:** recommendation-generation logic (excludes these ISRCs).
+- **Relationships:** none declared.
+- **Rules:** no PK declared; composite uniqueness implied by application (`ON CONFLICT (playlist_id, isrc)`).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | references `playlist_config.playlist_id` (app-level) | `music_service.py:70` | schema.generated.md:1691 | confirmed |
+| `isrc` | text | YES | Excluded ISRC | ISRC code | `music_service.py:70` | schema.generated.md:1692 | confirmed |
+| `elo_track_predicted` | text | YES | Predicted Elo at exclusion | text (stores a score) | recorded at exclusion time | schema.generated.md:1693 | inferred |
+| `decision_timestamp` | timestamp with time zone | YES | Exclusion timestamp | UTC timestamptz | set at exclusion | schema.generated.md:1694 | confirmed |
 
 ### music.playlist_relationships (table)
-- **Grain:** one row per playlist relationships (table); see schema.generated.md for columns.
-- **Canonical source:** `music.playlist_relationships`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** parent->child playlist relationships: auto-shuffled copies, manual-shuffled copies, and recommendation playlists derived from a parent playlist.
+- **Grain:** one row per `(parent_playlist_id, child_playlist_id)` relationship.
+- **Canonical source:** `music.playlist_relationships`; written by `ensure_playlist_relationships` / playlist generation in `backend/backend_functions/music_functions.py:212-228` when `needs_auto`/`needs_manual`/`needs_recs` (from `missing_relationships`) are true.
+- **Consumers:** `missing_relationships` (joins by type), `vw_playlist_families`, `vw_playlist_shuffle_targets`.
+- **Relationships:** no declared FKs; both columns reference `playlist_config.playlist_id` at application level.
+- **Rules:** `enforced` composite PK `(parent_playlist_id, child_playlist_id)` (`pk_parent_child_playlist`); `child_playlist_type` is 'auto' | 'manual' | 'recommendation' (application convention, not a DB enum).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `parent_playlist_id` | text | NO | Parent playlist id | references `playlist_config.playlist_id` (app-level) | PK part; `music_functions.py:212` | schema.generated.md:1699 | confirmed |
+| `child_playlist_id` | text | NO | Child playlist id | references `playlist_config.playlist_id` (app-level) | PK part; newly generated playlist | schema.generated.md:1700 | confirmed |
+| `child_playlist_type` | text | YES | Relationship type | 'auto' | 'manual' | 'recommendation' | `music_functions.py:210-226` | schema.generated.md:1701 | confirmed |
 
 ### music.ratings (table)
-- **Grain:** one row per ratings (table); see schema.generated.md for columns.
-- **Canonical source:** `music.ratings`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-playlist-per-ISRC Elo rating state (wins/losses/count) for the music matchup/rating feature.
+- **Grain:** one row per `(playlist_id, isrc)` rated pair, keyed by composite PK.
+- **Canonical source:** `music.ratings`; upserted from `music.vw_ratings_update` by `backend/backend_functions/music_functions.py:746` (`ON CONFLICT (playlist_id, isrc) DO UPDATE` when `last_rated_utc` changed); also written by `backend/pifitness/music/queries.py:443,530`.
+- **Consumers:** rating endpoints (`GET/POST /api/music/ratings`), `vw_ratings`, `vw_rating_update`, matchup logic.
+- **Relationships:** no declared FKs; references `playlist_config.playlist_id` and `all_tracks.track_isrc` at application level.
+- **Rules:** `enforced` composite PK `(playlist_id, isrc)` (`isrc_ratings`); `elo_rating` is an application-managed Elo score (no DB range check); `rating_wins` + `rating_losses` <= `rating_count` is an application invariant, not DB-enforced.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | NO | Playlist id | references `playlist_config.playlist_id` (app-level) | PK part | schema.generated.md:1709 | confirmed |
+| `isrc` | text | NO | Track ISRC | ISRC code | PK part | schema.generated.md:1710 | confirmed |
+| `elo_rating` | integer | YES | Elo rating | score points | upsert from `vw_ratings_update` | schema.generated.md:1711 | confirmed |
+| `rating_count` | integer | YES | Total ratings | count | upsert | schema.generated.md:1712 | confirmed |
+| `rating_wins` | integer | YES | Wins | count | upsert | schema.generated.md:1713 | confirmed |
+| `rating_losses` | integer | YES | Losses | count | upsert | schema.generated.md:1714 | confirmed |
+| `last_rated_utc` | timestamp with time zone | YES | Last rating timestamp | UTC timestamptz | upsert conflict condition | schema.generated.md:1715 | confirmed |
 
 ### music.ratings_history (table)
-- **Grain:** one row per ratings history (table); see schema.generated.md for columns.
-- **Canonical source:** `music.ratings_history`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** append-only snapshot history of rating events (Elo before/after and result) for audit and the ratings-history view.
+- **Grain:** one row per rating event, keyed by composite `(rating_time_utc, playlist_id, isrc)`.
+- **Canonical source:** `music.ratings_history`; written by the rating write path (`music_functions.py`/`music/queries.py`) alongside `music.ratings` updates.
+- **Consumers:** `music.vw_ratings_history` (adds `row_num` ranking).
+- **Relationships:** no declared FKs.
+- **Rules:** `enforced` composite PK `(rating_time_utc, playlist_id, isrc)` (`pk_rating_history`); `rating_result` smallint (outcome code, application convention); append-only (no update path evidenced).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `rating_time_utc` | timestamp with time zone | NO | Rating timestamp | UTC timestamptz | PK part | schema.generated.md:1723 | confirmed |
+| `playlist_id` | text | NO | Playlist id | references `playlist_config.playlist_id` (app-level) | PK part | schema.generated.md:1724 | confirmed |
+| `isrc` | text | NO | Track ISRC | ISRC code | PK part | schema.generated.md:1725 | confirmed |
+| `isrc_vs` | text | YES | Opponent ISRC | ISRC code | the matched opponent | schema.generated.md:1726 | confirmed |
+| `elo_old` | integer | YES | Elo before event | score points | rating write path | schema.generated.md:1727 | confirmed |
+| `elo_new` | integer | YES | Elo after event | score points | rating write path | schema.generated.md:1728 | confirmed |
+| `rating_result` | smallint | YES | Rating outcome | result code (app convention) | rating write path | schema.generated.md:1729 | confirmed |
 
 ### music.temp_listening_history (table)
-- **Grain:** one row per temp listening history (table); see schema.generated.md for columns.
-- **Canonical source:** `music.temp_listening_history`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** scratch/staging table for listening-history reconciliation; truncated and reloaded before each `_insert_listening_history` run.
+- **Grain:** one row per `(played_at_utc, isrc, playlist_id)` staging row; no PK declared (temp working table).
+- **Canonical source:** `music.temp_listening_history`; truncated then populated from `activities.vw_watch_music_heard` by `_insert_listening_history` (`backend/pifitness/activities/router.py:526` docstring), then reconciled into `music.listening_history`.
+- **Consumers:** `_insert_listening_history` only (application-level staging).
+- **Relationships:** none declared.
+- **Rules:** `convention` temp table — scratch working table; document existence but not full lifecycle beyond the reconcile job (per worklog classification of `temp_*` tables). Columns mirror `listening_history`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `played_at_utc` | timestamp with time zone | YES | Play timestamp | UTC timestamptz | staging | schema.generated.md:1737 | confirmed |
+| `isrc` | text | YES | Track ISRC | ISRC code | staging | schema.generated.md:1738 | confirmed |
+| `playlist_id` | text | YES | Playlist id | references `playlist_config.playlist_id` (app-level) | staging | schema.generated.md:1739 | confirmed |
 
 ### music.track_recommendation_decisions (table)
-- **Grain:** one row per track recommendation decisions (table); see schema.generated.md for columns.
-- **Canonical source:** `music.track_recommendation_decisions`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-playlist-per-ISRC recommendation model decision snapshots — multiple Elo model predictions plus artist/genre/popularity snapshots at decision time.
+- **Grain:** one row per `(playlist_id, isrc)` decision.
+- **Canonical source:** `music.track_recommendation_decisions`; written by the recommendation generation path (`backend/pifitness/music/queries.py`, `backend/backend_functions/music_functions.py`).
+- **Consumers:** `track_recommendations`, recommendation/playlist endpoints.
+- **Relationships:** no declared FKs; references `playlist_config.playlist_id` and `all_tracks.track_isrc` at application level.
+- **Rules:** no PK declared in inventory. All `elo_*` / `popularity_snap` are numeric model outputs (open set, not DB-enforced); `was_promoted` boolean flags whether the track was promoted; `decision_time_utc` is the decision timestamp (UTC); `model_version`/`notes` are free text.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | references `playlist_config.playlist_id` (app-level) | recommendation path | schema.generated.md:1744 | confirmed |
+| `isrc` | text | YES | Track ISRC | ISRC code | recommendation path | schema.generated.md:1745 | confirmed |
+| `elo_track_linear` | numeric | YES | Linear-model track Elo | score points | model output | schema.generated.md:1746 | confirmed |
+| `elo_track_rf` | numeric | YES | Random-forest track Elo | score points | model output | schema.generated.md:1747 | confirmed |
+| `elo_track_neural_net` | numeric | YES | Neural-net track Elo | score points | model output | schema.generated.md:1748 | confirmed |
+| `elo_track_pairwise` | numeric | YES | Pairwise track Elo | score points | model output | schema.generated.md:1749 | confirmed |
+| `elo_track_predicted` | numeric | YES | Predicted track Elo | score points | model output | schema.generated.md:1750 | confirmed |
+| `elo_artist_snap` | numeric | YES | Artist Elo snapshot | score points | model output | schema.generated.md:1751 | confirmed |
+| `elo_genre_snap` | numeric | YES | Genre Elo snapshot | score points | model output | schema.generated.md:1752 | confirmed |
+| `popularity_snap` | numeric | YES | Popularity snapshot | score points | model output | schema.generated.md:1753 | confirmed |
+| `was_promoted` | boolean | YES | Promotion flag | boolean | model output | schema.generated.md:1754 | confirmed |
+| `decision_time_utc` | timestamp with time zone | YES | Decision timestamp | UTC timestamptz | set at decision | schema.generated.md:1755 | confirmed |
+| `model_version` | text | YES | Model version | text | recommendation path | schema.generated.md:1756 | confirmed |
+| `notes` | text | YES | Decision notes | free text | recommendation path | schema.generated.md:1757 | confirmed |
 
 ### music.track_recommendations (table)
-- **Grain:** one row per track recommendations (table); see schema.generated.md for columns.
-- **Canonical source:** `music.track_recommendations`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-playlist track recommendation candidates with audio features, Elo norms, and genre ranks used to build shuffle/recommendation playlists.
+- **Grain:** one row per `(playlist_id, isrc)` recommendation candidate.
+- **Canonical source:** `music.track_recommendations`; populated by the recommendation path (`backend/pifitness/music/queries.py`, `backend/backend_functions/music_functions.py`) joining `all_tracks` + `track_recommendation_decisions` + audio features.
+- **Consumers:** recommendation endpoints, `vw_rating_eligible`, shuffle-target views.
+- **Relationships:** no declared FKs; references `playlist_config.playlist_id` and `all_tracks.track_isrc` at application level.
+- **Rules:** no PK declared in inventory. `m_*` columns are Spotify audio-feature values (0-1 scale convention, not DB-enforced); `is_best_genre` boolean flags the best-genre pick; `playlist_genre_rank` ordinal within genre.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | references `playlist_config.playlist_id` (app-level) | recommendation path | schema.generated.md:1762 | confirmed |
+| `isrc` | text | YES | Track ISRC | ISRC code | recommendation path | schema.generated.md:1763 | confirmed |
+| `artist_id` | text | YES | Artist id | references `all_artists.artist_id` (app-level) | recommendation path | schema.generated.md:1764 | confirmed |
+| `genre` | text | YES | Track genre | text | recommendation path | schema.generated.md:1765 | confirmed |
+| `possible_genres` | text | YES | Candidate genres | text | recommendation path | schema.generated.md:1766 | confirmed |
+| `artist_elo` | numeric | YES | Artist Elo | score points | recommendation path | schema.generated.md:1767 | confirmed |
+| `genre_elo` | numeric | YES | Genre Elo | score points | recommendation path | schema.generated.md:1768 | confirmed |
+| `playlist_genre_rank` | integer | YES | Genre rank in playlist | ordinal | recommendation path | schema.generated.md:1769 | confirmed |
+| `is_best_genre` | boolean | YES | Best-genre flag | boolean | recommendation path | schema.generated.md:1770 | confirmed |
+| `track_name_clean` | text | YES | Cleaned track name | text | recommendation path | schema.generated.md:1771 | confirmed |
+| `popularity` | integer | YES | Popularity | score points | recommendation path | schema.generated.md:1772 | confirmed |
+| `m_acousticness` | numeric | YES | Acousticness feature | 0-1 (Spotify convention) | audio features | schema.generated.md:1773 | inferred |
+| `m_energy` | numeric | YES | Energy feature | 0-1 (Spotify convention) | audio features | schema.generated.md:1774 | inferred |
+| `m_instrumentalness` | numeric | YES | Instrumentalness feature | 0-1 (Spotify convention) | audio features | schema.generated.md:1775 | inferred |
+| `m_key` | numeric | YES | Key feature | pitch class | audio features | schema.generated.md:1776 | inferred |
+| `m_liveness` | numeric | YES | Liveness feature | 0-1 (Spotify convention) | audio features | schema.generated.md:1777 | inferred |
+| `m_mode` | numeric | YES | Mode feature | major/minor | audio features | schema.generated.md:1778 | inferred |
+| `m_speechiness` | numeric | YES | Speechiness feature | 0-1 (Spotify convention) | audio features | schema.generated.md:1779 | inferred |
+| `m_tempo` | numeric | YES | Tempo feature | BPM | audio features | schema.generated.md:1780 | inferred |
+| `m_valence` | numeric | YES | Valence feature | 0-1 (Spotify convention) | audio features | schema.generated.md:1781 | inferred |
+| `m_danceability` | numeric | YES | Danceability feature | 0-1 (Spotify convention) | audio features | schema.generated.md:1782 | inferred |
+| `elo_artist_norm` | numeric | YES | Normalized artist Elo | score points | model output | schema.generated.md:1783 | confirmed |
+| `elo_genre_norm` | numeric | YES | Normalized genre Elo | score points | model output | schema.generated.md:1784 | confirmed |
+| `elo_track_linear` | numeric | YES | Linear-model track Elo | score points | model output | schema.generated.md:1785 | confirmed |
+| `elo_track_random_forest` | numeric | YES | RF track Elo | score points | model output | schema.generated.md:1786 | confirmed |
+| `elo_track_neural_net` | numeric | YES | NN track Elo | score points | model output | schema.generated.md:1787 | confirmed |
+| `elo_track_pairwise` | numeric | YES | Pairwise track Elo | score points | model output | schema.generated.md:1788 | confirmed |
+| `elo_track_predicted` | numeric | YES | Predicted track Elo | score points | model output | schema.generated.md:1789 | confirmed |
 
 ### music.vw_all_tracks (view)
-- **Grain:** one row per vw all tracks (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_all_tracks`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** enriched track dimension: every track with its album name, best-track flag, and ISRC-normalized best ISRC.
+- **Grain:** one row per track (from `music.all_tracks`).
+- **Canonical source:** derived view over `music.all_tracks`, `music.all_albums`, `music.isrc_swaps`, `music.vw_best_track_id`.
+- **Dependencies:** `music.all_tracks` (JOIN `all_albums` on album_id), `music.isrc_swaps` (valid_mapping on track_isrc), `music.vw_best_track_id` (on coalesced isrc).
+- **Derived logic:** `album_name = all_albums.album_name_clean`; `best_track_id` from `vw_best_track_id`; `is_best_track_id = track_id = best_track_id`; `best_isrc = COALESCE(mapped_isrc, track_isrc)`; `is_best_isrc = best_isrc = track_isrc`.
+- **Consumers:** track detail/search features, `vw_isrc_dupe_review`, `vw_recent_plays`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `track_id` | text | YES | Track id | Spotify track id | `all_tracks.track_id` | schema.generated.md:1794 | confirmed |
+| `track_name` | text | YES | Track name | text | `all_tracks.track_name` | schema.generated.md:1795 | confirmed |
+| `track_name_clean` | text | YES | Cleaned track name | text | `all_tracks.track_name_clean` | schema.generated.md:1796 | confirmed |
+| `track_name_search` | text | YES | Search-optimized name | text | `all_tracks.track_name_search` | schema.generated.md:1797 | confirmed |
+| `track_isrc` | text | YES | Track ISRC | ISRC code | `all_tracks.track_isrc` | schema.generated.md:1798 | confirmed |
+| `duration_ms` | integer | YES | Track duration | milliseconds | `all_tracks.duration_ms` | schema.generated.md:1799 | confirmed |
+| `artist_id` | text | YES | Artist id | Spotify artist id | `all_tracks.artist_id` | schema.generated.md:1800 | confirmed |
+| `artist_display_name` | text | YES | Artist display name | text | `all_tracks.artist_display_name` | schema.generated.md:1801 | confirmed |
+| `album_id` | text | YES | Album id | Spotify album id | `all_tracks.album_id` | schema.generated.md:1802 | confirmed |
+| `release_date` | date | YES | Release date | calendar date | `all_tracks.release_date` | schema.generated.md:1803 | confirmed |
+| `available_in_us` | boolean | YES | Available in US flag | boolean | `all_tracks.available_in_us` | schema.generated.md:1804 | confirmed |
+| `total_markets` | integer | YES | Market count | count | `all_tracks.total_markets` | schema.generated.md:1805 | confirmed |
+| `popularity` | integer | YES | Popularity score | score points | `all_tracks.popularity` | schema.generated.md:1806 | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Last sync timestamp | UTC timestamptz | `all_tracks.updated_at_utc` | schema.generated.md:1807 | confirmed |
+| `album_name` | text | YES | Album name | text | `all_albums.album_name_clean` (JOIN) | schema_only.sql:18179 | confirmed |
+| `best_track_id` | text | YES | Best track id for isrc | Spotify track id | `vw_best_track_id.best_track_id` | schema_only.sql:18180 | confirmed |
+| `is_best_track_id` | boolean | YES | Is this the best track | boolean | `track_id = best_track_id` | schema_only.sql:18181 | confirmed |
+| `best_isrc` | text | YES | Best ISRC | ISRC code | `COALESCE(mapped_isrc, track_isrc)` | schema_only.sql:18182 | confirmed |
+| `is_best_isrc` | boolean | YES | Is this the best ISRC | boolean | `best_isrc = track_isrc` | schema_only.sql:18183 | confirmed |
 
 ### music.vw_best_track_id (view)
-- **Grain:** one row per vw best track id (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_best_track_id`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** picks the canonical ("best") track per ISRC for dedup across swap variants.
+- **Grain:** one row per coalesced ISRC (`isrc`).
+- **Canonical source:** derived view over `music.all_tracks` left-joined to `music.isrc_swaps` (valid mapping).
+- **Derived logic:** `isrc = COALESCE(mapped_isrc, track_isrc)`; `isrc_preference = row_number() OVER (PARTITION BY isrc ORDER BY available_in_us DESC, release_date, total_markets DESC, popularity DESC)`; keeps `isrc_preference = 1` (best = available in US, earliest release, most markets, highest popularity).
+- **Consumers:** `vw_all_tracks`, `vw_isrc_dupe_review`, `vw_recent_plays`, `music_functions.py:392,532,862`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `isrc` | text | YES | Coalesced ISRC | ISRC code | `COALESCE(mapped_isrc, track_isrc)` | schema.generated.md:1817 | confirmed |
+| `best_track_id` | text | YES | Best track id | Spotify track id | `all_tracks.track_id` of preferred row | schema.generated.md:1818 | confirmed |
+| `isrc_preference` | bigint | YES | Preference rank | ordinal (1 = best) | `row_number()` per isrc | schema.generated.md:1819 | confirmed |
 
 ### music.vw_isrc_dupe_review (view)
-- **Grain:** one row per vw isrc dupe review (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_isrc_dupe_review`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** scored candidate ISRC duplicate pairs for manual review, with a preferred-ISRC recommendation and rationale.
+- **Grain:** one row per candidate pair `(isrc1, isrc2)` from `music.isrc_possible_dupes`.
+- **Canonical source:** derived view over `music.isrc_possible_dupes`, `music.vw_best_track_id`, `music.all_tracks`, `music.all_albums`.
+- **Derived logic:** `duration_score = least/greatest(duration_ms)` ratio rounded; `preferred_isrc` chosen by CASE (available_in_us, then release_date, then total_markets, then popularity, then duration_ms); `preferred_logic` text code ('avail'|'release'|'markets'|'popularity'|'duration'|'No Preference'); ordered by match/track/album/artist score DESC.
+- **Consumers:** duplicate-review workflow; `isrc_duplicate_finder` consumes review outcomes.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `isrc1` | text | YES | First ISRC | ISRC code | `isrc_possible_dupes.isrc1` | schema.generated.md:1824 | confirmed |
+| `pref1` | bigint | YES | First track preference rank | ordinal | `vw_best_track_id.isrc_preference` | schema.generated.md:1825 | confirmed |
+| `track_name1` | text | YES | First track name | text | `all_tracks.track_name` | schema.generated.md:1826 | confirmed |
+| `artist_name1` | text | YES | First artist name | text | `all_tracks.artist_display_name` | schema.generated.md:1827 | confirmed |
+| `album_name1` | text | YES | First album name | text | `all_albums.album_name` | schema.generated.md:1828 | confirmed |
+| `duration_1` | integer | YES | First track duration | minutes | `round(duration_ms/60)` | schema.generated.md:1829 | confirmed |
+| `isrc2` | text | YES | Second ISRC | ISRC code | `isrc_possible_dupes.isrc2` | schema.generated.md:1830 | confirmed |
+| `pref2` | bigint | YES | Second track preference rank | ordinal | `vw_best_track_id.isrc_preference` | schema.generated.md:1831 | confirmed |
+| `track_name2` | text | YES | Second track name | text | `all_tracks.track_name` | schema.generated.md:1832 | confirmed |
+| `artist_name2` | text | YES | Second artist name | text | `all_tracks.artist_display_name` | schema.generated.md:1833 | confirmed |
+| `album_name2` | text | YES | Second album name | text | `all_albums.album_name` | schema.generated.md:1834 | confirmed |
+| `duration_2` | integer | YES | Second track duration | minutes | `round(duration_ms/60)` | schema.generated.md:1835 | confirmed |
+| `match_score` | numeric | YES | Overall match score | similarity score | `isrc_possible_dupes.match_score` | schema.generated.md:1836 | confirmed |
+| `track_score` | numeric | YES | Track-name similarity | similarity score | `isrc_possible_dupes.track_score` | schema.generated.md:1837 | confirmed |
+| `artist_score` | numeric | YES | Artist similarity | similarity score | `isrc_possible_dupes.artist_score` | schema.generated.md:1838 | confirmed |
+| `album_score` | numeric | YES | Album similarity | similarity score | `isrc_possible_dupes.album_score` | schema.generated.md:1839 | confirmed |
+| `duration_score` | numeric | YES | Duration similarity | ratio (0-1) | `least/greatest(duration_ms)` | schema_only.sql:18344 | confirmed |
+| `preferred_isrc` | text | YES | Recommended ISRC | ISRC code | CASE priority: avail > release > markets > popularity > duration | schema_only.sql:18345-18357 | confirmed |
+| `preferred_logic` | text | YES | Preference rationale | 'avail'|'release'|'markets'|'popularity'|'duration'|'No Preference' | CASE expression | schema_only.sql:18358-18365 | confirmed |
 
 ### music.vw_listening_history (view)
-- **Grain:** one row per vw listening history (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_listening_history`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** ISRC-normalized, parent-playlist-mapped listening history.
+- **Grain:** one row per play event from `music.listening_history`.
+- **Canonical source:** derived view over `music.listening_history`.
+- **Dependencies:** `music.listening_history`, `music.isrc_swaps` (valid_mapping), `music.playlist_relationships` (parent map).
+- **Derived logic:** `isrc = COALESCE(mapped_isrc, lh.isrc)`; `playlist_id = COALESCE(parent_playlist_id, lh.playlist_id)`.
+- **Consumers:** `vw_playlist_last_heard`, `vw_playlist_isrc_stats`, `vw_rating_eligible`, `vw_recent_plays`, `vw_playlist_shuffle_eligibility`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `played_at_utc` | timestamp with time zone | YES | Play timestamp | UTC timestamptz | `listening_history.played_at_utc` | schema.generated.md:1847 | confirmed |
+| `isrc` | text | YES | Normalized ISRC | ISRC code | `COALESCE(mapped_isrc, lh.isrc)` | schema_only.sql:18515 | confirmed |
+| `playlist_id` | text | YES | Parent playlist id | references `playlist_config.playlist_id` (app-level) | `COALESCE(pr.parent_playlist_id, lh.playlist_id)` | schema_only.sql:18516 | confirmed |
 
 ### music.vw_playlist_config (view)
-- **Grain:** one row per vw playlist config (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_playlist_config`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** playlist listing with derived playlist type and last-played timestamp, excluding playlists that are themselves children of another playlist.
+- **Grain:** one row per non-child playlist (where no `playlist_relationships` row has it as `child_playlist_id`).
+- **Canonical source:** derived view over `music.playlist_config`, `music.playlist_relationships`, `music.vw_playlist_last_heard`.
+- **Derived logic:** `playlist_type = 'Parents' if has parent else 'Seeds' if seeds_only else 'Other'`; `last_played_utc` from `vw_playlist_last_heard`; ordered by last played, active, seeds, auto, recs, track count.
+- **Consumers:** playlist listing UI, `vw_playlist_detail_sync_logic`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | text | `playlist_config.playlist_id` | schema.generated.md:1854 | confirmed |
+| `playlist_name` | text | YES | Playlist name | text | `playlist_config.playlist_name` | schema.generated.md:1855 | confirmed |
+| `playlist_description` | text | YES | Playlist description | text | `playlist_config.playlist_description` | schema.generated.md:1856 | confirmed |
+| `track_count` | integer | YES | Track count | count | `playlist_config.track_count` | schema.generated.md:1857 | confirmed |
+| `auto_shuffle` | boolean | YES | Auto-shuffle enabled | boolean | `playlist_config.auto_shuffle` | schema.generated.md:1858 | confirmed |
+| `manual_shuffle` | boolean | YES | Manual shuffle enabled | boolean | `playlist_config.manual_shuffle` | schema.generated.md:1859 | confirmed |
+| `seeds_only` | boolean | YES | Seeds-only mode | boolean | `playlist_config.seeds_only` | schema.generated.md:1860 | confirmed |
+| `make_recs` | boolean | YES | Generate recommendations | boolean | `playlist_config.make_recs` | schema.generated.md:1861 | confirmed |
+| `ratings_weight` | numeric | YES | Rating weight | weight | `playlist_config.ratings_weight` | schema.generated.md:1862 | confirmed |
+| `recency_weight` | numeric | YES | Recency weight | weight | `playlist_config.recency_weight` | schema.generated.md:1863 | confirmed |
+| `randomness_weight` | numeric | YES | Randomness weight | weight | `playlist_config.randomness_weight` | schema.generated.md:1864 | confirmed |
+| `minutes_to_sync` | integer | YES | Sync interval | minutes | `playlist_config.minutes_to_sync` | schema.generated.md:1865 | confirmed |
+| `playlist_type` | text | YES | Derived type | 'Parents' | 'Seeds' | 'Other' | CASE expression | schema_only.sql:18587-18591 | confirmed |
+| `last_played_utc` | timestamp with time zone | YES | Last played timestamp | UTC timestamptz | `vw_playlist_last_heard.last_played_utc` | schema_only.sql:18592 | confirmed |
 
 ### music.vw_playlist_detail_sync_logic (view)
-- **Grain:** one row per vw playlist detail sync logic (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_playlist_detail_sync_logic`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** sync-priority ranking of playlists that need attention (manual/shuffle/seed/master types), capped at top 5 (`rval` 1-5).
+- **Grain:** one row per candidate playlist with a computed `next_valid_sync` and rank.
+- **Canonical source:** derived view over `music.playlist_relationships`, `music.playlist_config`, `music.vw_playlist_last_heard`, `music.vw_playlist_with_mismatched_isrc`.
+- **Derived logic:** classifies `list_type` ('manual' for manual-type children; 'updated'|'seeds'|'rare seeds'|'masters'|'No Type' for active parents); `next_valid_sync` = mismatch? now-1d : 'updated'? now : 'masters'? last_synced+3d : 'seeds'? +7d : 'rare seeds'? +30d : NULL; `rval = row_number()` ordered by next_valid_sync and last_played; filter `0 < rval < 6`.
+- **Consumers:** sync/scheduler logic deciding which playlists to sync next.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | text | derived from relationships/config | schema.generated.md:1872 | confirmed |
+| `playlist_name` | text | YES | Playlist name | text | `playlist_config.playlist_name` | schema.generated.md:1873 | confirmed |
+| `next_valid_sync` | timestamp with time zone | YES | Next valid sync time | UTC timestamptz | type-based offset from `last_synced`/`now()` | schema_only.sql:18767-18773 | confirmed |
+| `last_played_utc` | timestamp with time zone | YES | Last played timestamp | UTC timestamptz | `vw_playlist_last_heard` | schema_only.sql:18782 | confirmed |
+| `rval` | bigint | YES | Sync rank | ordinal (1-5) | `row_number()` ordered by next_valid_sync, last_played | schema_only.sql:18785 | confirmed |
 
 ### music.vw_playlist_families (view)
-- **Grain:** one row per vw playlist families (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_playlist_families`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** playlist family graph: self, parent, and sibling relationships derived from `music.playlist_relationships`.
+- **Grain:** one row per (playlist, related-playlist) pair with a `playlist_type` role.
+- **Canonical source:** derived view: `UNION` of self-rows from `music.playlist_config` and parent/sibling rows from self-joining `music.playlist_relationships` on `parent_playlist_id`.
+- **Derived logic:** `playlist_type` = 'self' for own row; 'parent' when the joined relationship shares the same child; 'sibling' otherwise.
+- **Consumers:** family/playlist navigation features.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | text | `playlist_config.playlist_id` or relationship child | schema.generated.md:1881 | confirmed |
+| `child_playlist_id` | text | YES | Related playlist id | text | self or sibling/parent child id | schema.generated.md:1882 | confirmed |
+| `playlist_type` | text | YES | Relationship role | 'self' | 'parent' | 'sibling' | CASE expression | schema_only.sql:18841-18852 | confirmed |
 
 ### music.vw_playlist_isrc_stats (view)
-- **Grain:** one row per vw playlist isrc stats (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_playlist_isrc_stats`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-playlist-per-ISRC shuffle recommendation scores (recency, ratings, randomness pressures and total weight) used to order tracks in shuffle/recommendation playlists.
+- **Grain:** one row per `(parent_playlist_id, target_playlist_id, isrc)` catalog row.
+- **Canonical source:** complex derived view with CTEs (`catalog`, `isrc_last_played_anywhere`, `isrc_last_played_on_playlist`, `playlist_last_played_any_track`, `elo`, `config`, `recency_inputs`, `pressures`) over shuffle targets, listening history, ratings, and playlist config.
+- **Dependencies:** `music.vw_playlist_shuffle_targets`, `music.vw_playlist_isrcs`, `music.vw_listening_history`, `music.vw_ratings`, `music.playlist_config`.
+- **Derived logic:** `recency_pct`/`ratings_pct`/`random_pct` = `percent_rank()` per parent playlist; default Elo 1500 when missing; `days_since_played_*` squared (CURRENT_DATE anchor, 730-day fallback); `total_weight` combines the three weights; `default_new_order` and `cumulative_playlist_minutes` for ordering. Uses `CURRENT_TIMESTAMP`/`CURRENT_DATE` (query-time relative).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Parent playlist id | text | shuffle target parent | schema.generated.md:1888 | confirmed |
+| `target_playlist_id` | text | YES | Target playlist id | text | shuffle target | schema.generated.md:1889 | confirmed |
+| `isrc` | text | YES | Track ISRC | ISRC code | `vw_playlist_isrcs.isrc` | schema.generated.md:1890 | confirmed |
+| `track_id` | text | YES | Track id | Spotify track id | via best-track mapping | schema.generated.md:1891 | confirmed |
+| `track_artist` | text | YES | Track artist | text | derived | schema.generated.md:1892 | confirmed |
+| `album_name` | text | YES | Album name | text | derived | schema.generated.md:1893 | confirmed |
+| `duration_s` | integer | YES | Duration | seconds | derived | schema.generated.md:1894 | confirmed |
+| `recency_pct` | double precision | YES | Recency percentile | 0-1 | `percent_rank()` per playlist | schema_only.sql:19079 | confirmed |
+| `ratings_pct` | double precision | YES | Ratings percentile | 0-1 | `percent_rank()` on Elo | schema_only.sql:19080 | confirmed |
+| `random_pct` | double precision | YES | Random percentile | 0-1 | `percent_rank()` on `random()` | schema_only.sql:19081 | confirmed |
+| `recency_weight` | numeric | YES | Recency weight | weight | `playlist_config.recency_weight` (default 1) | schema_only.sql:19057 | confirmed |
+| `ratings_weight` | numeric | YES | Ratings weight | weight | `playlist_config.ratings_weight` (default 1) | schema_only.sql:19058 | confirmed |
+| `randomness_weight` | numeric | YES | Randomness weight | weight | `playlist_config.randomness_weight` (default 1) | schema_only.sql:19059 | confirmed |
+| `elo_rating` | integer | YES | Elo rating | score points | `vw_ratings.elo_rating`, default 1500 | schema_only.sql:19078 | confirmed |
+| `play_count_on_playlist` | bigint | YES | Play count on playlist | count | per-parent-playlist play count | schema_only.sql:19067 | confirmed |
+| `recency_pressure` | double precision | YES | Recency pressure | derived score | pressure computation | schema_only.sql:19082+ | inferred |
+| `ratings_pressure` | double precision | YES | Ratings pressure | derived score | pressure computation | schema_only.sql:19082+ | inferred |
+| `randomness_pressure` | double precision | YES | Randomness pressure | derived score | pressure computation | schema_only.sql:19082+ | inferred |
+| `total_weight` | double precision | YES | Combined weight | derived score | weighted combination | schema_only.sql:19082+ | inferred |
+| `minutes_to_sync` | integer | YES | Sync interval | minutes | `playlist_config.minutes_to_sync` (default 9999) | schema_only.sql:19060 | confirmed |
+| `default_new_order` | bigint | YES | Default new order | ordinal | derived ordering | schema_only.sql:19082+ | inferred |
+| `cumulative_playlist_minutes` | numeric | YES | Cumulative minutes | minutes | cumulative duration | schema_only.sql:19082+ | inferred |
 
 ### music.vw_playlist_isrcs (view)
-- **Grain:** one row per vw playlist isrcs (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_playlist_isrcs`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** ISRC-normalized ordered track membership of playlists.
+- **Grain:** one row per `(playlist_id, isrc)` position from `music.playlist_isrcs`.
+- **Canonical source:** derived view over `music.playlist_isrcs` left-joined to `music.isrc_swaps`.
+- **Derived logic:** `isrc = COALESCE(mapped_isrc, pi.isrc)` (applies swaps even when `valid_mapping` is not constrained).
+- **Consumers:** `vw_playlist_isrc_stats`, playlist track endpoints.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | text | `playlist_isrcs.playlist_id` | schema.generated.md:1914 | confirmed |
+| `isrc` | text | YES | Normalized ISRC | ISRC code | `COALESCE(s.mapped_isrc, pi.isrc)` | schema_only.sql:18884 | confirmed |
+| `track_order` | integer | YES | Position in playlist | ordinal | `playlist_isrcs.track_order` | schema.generated.md:1916 | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Last change timestamp | UTC timestamptz | `playlist_isrcs.updated_at_utc` | schema.generated.md:1917 | confirmed |
 
 ### music.vw_playlist_last_heard (view)
-- **Grain:** one row per vw playlist last heard (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_playlist_last_heard`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** most recent play timestamp per parent playlist.
+- **Grain:** one row per parent playlist (where mapped playlist_id IS NOT NULL).
+- **Canonical source:** derived view: `max(listening_history.played_at_utc)` grouped by COALESCE(parent_playlist_id, playlist_id), over `music.listening_history` left-joined to `music.playlist_relationships`.
+- **Consumers:** `vw_playlist_config`, `vw_playlist_detail_sync_logic`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `last_played_utc` | timestamp with time zone | YES | Last played timestamp | UTC timestamptz | `max(lh.played_at_utc)` per playlist | schema.generated.md:1922 | confirmed |
+| `playlist_id` | text | YES | Parent playlist id | text | `COALESCE(pr.parent_playlist_id, lh.playlist_id)` | schema.generated.md:1923 | confirmed |
 
 ### music.vw_playlist_shuffle_eligibility (view)
-- **Grain:** one row per vw playlist shuffle eligibility (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_playlist_shuffle_eligibility`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** active playlists eligible for auto-shuffle (played since last shuffle, or have mismatched ISRCs).
+- **Grain:** one row per eligible playlist.
+- **Canonical source:** derived view over `music.playlist_config`, `music.vw_playlist_with_mismatched_isrc`, `music.listening_history`, `music.playlist_relationships`.
+- **Derived logic:** filter `is_active AND (auto_shuffle OR mismatched)`; `last_played_utc = max(lh.played_at_utc)` per parent playlist; keep only where `last_played_utc > last_auto_shuffled_utc` (default anchor '2025-12-01').
+- **Consumers:** shuffle scheduler deciding which playlists to reshuffle.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | text | `playlist_config.playlist_id` | schema.generated.md:1928 | confirmed |
+| `playlist_name` | text | YES | Playlist name | text | `playlist_config.playlist_name` | schema.generated.md:1929 | confirmed |
+| `last_played_utc` | timestamp with time zone | YES | Last played timestamp | UTC timestamptz | `max(lh.played_at_utc)` per playlist | schema.generated.md:1930 | confirmed |
+| `last_auto_shuffled_utc` | timestamp with time zone | YES | Last auto-shuffle timestamp | UTC timestamptz | `playlist_config.last_auto_shuffled_utc` (default '2025-12-01') | schema_only.sql:19295 | confirmed |
 
 ### music.vw_playlist_shuffle_targets (view)
-- **Grain:** one row per vw playlist shuffle targets (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_playlist_shuffle_targets`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** shuffle-eligible parent->child relationships (auto or manual type) used as shuffle targets.
+- **Grain:** one row per relationship of type 'auto' or 'manual'.
+- **Canonical source:** derived view over `music.playlist_relationships` filtered `child_playlist_type IN ('auto','manual')`.
+- **Consumers:** `vw_playlist_isrc_stats`, `vw_playlist_shuffle_eligibility`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `parent_playlist_id` | text | YES | Parent playlist id | text | `playlist_relationships.parent_playlist_id` | schema.generated.md:1936 | confirmed |
+| `target_playlist_id` | text | YES | Target (child) playlist id | text | `playlist_relationships.child_playlist_id` | schema.generated.md:1937 | confirmed |
+| `target_playlist_type` | text | YES | Target relationship type | 'auto' | 'manual' | `playlist_relationships.child_playlist_type` | schema.generated.md:1938 | confirmed |
 
 ### music.vw_playlist_with_mismatched_isrc (view)
-- **Grain:** one row per vw playlist with mismatched isrc (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_playlist_with_mismatched_isrc`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** playlists containing at least one ISRC that differs from its mapped (preferred) ISRC — flags playlists needing re-normalization.
+- **Grain:** one distinct `playlist_id` per mismatched membership.
+- **Canonical source:** derived view over `music.playlist_isrcs` left-joined to `music.isrc_swaps` (valid_mapping).
+- **Derived logic:** `WHERE pd.isrc <> COALESCE(s.mapped_isrc, pd.isrc)`.
+- **Consumers:** `vw_playlist_shuffle_eligibility`, `vw_playlist_detail_sync_logic`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id with mismatch | text | `playlist_isrcs.playlist_id` | schema.generated.md:1943 | confirmed |
 
 ### music.vw_rating_eligible (view)
-- **Grain:** one row per vw rating eligible (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_rating_eligible`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** tracks due for a user rating (played but not yet rated, or never rated), per playlist.
+- **Grain:** one row per `(isrc, playlist_id)` candidate.
+- **Canonical source:** derived view over `music.listening_history`, `music.isrc_swaps`, `music.playlist_relationships`, `music.vw_playlist_isrcs`, `music.playlist_config`, `music.vw_ratings`.
+- **Derived logic:** `needs_rating = COALESCE(last_rated_utc, '1980-07-18') < last_played_utc` (sentinel '1980-07-18' = never rated); `played_in_last_24 = last_played_utc > now() - 24h`; `never_rated = last_rated_utc IS NULL`; filter `needs_rating AND (played_in_last_24 OR rating_count = 0)`. Uses `CURRENT_TIMESTAMP` (query-time relative).
+- **Consumers:** `vw_rating_eligible_playlists`, rating-matchup UI.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `isrc` | text | YES | Track ISRC | ISRC code | normalized via `isrc_swaps` | schema.generated.md:1948 | confirmed |
+| `playlist_id` | text | YES | Playlist id | text | parent-mapped playlist | schema.generated.md:1949 | confirmed |
+| `playlist_name` | text | YES | Playlist name | text | `playlist_config.playlist_name` | schema.generated.md:1950 | confirmed |
+| `last_played_utc` | timestamp with time zone | YES | Last played timestamp | UTC timestamptz | `max(lh.played_at_utc)` per (isrc, playlist) | schema.generated.md:1951 | confirmed |
+| `last_rated_utc` | timestamp with time zone | YES | Last rated timestamp | UTC timestamptz | `vw_ratings.last_rated_utc` | schema.generated.md:1952 | confirmed |
+| `needs_rating` | boolean | YES | Rating due flag | boolean | `COALESCE(last_rated_utc,'1980-07-18') < last_played_utc` | schema_only.sql:19366 | confirmed |
+| `played_in_last_24` | boolean | YES | Played in last 24h | boolean | `last_played_utc > CURRENT_TIMESTAMP - interval '24:00:00'` | schema_only.sql:19367 | confirmed |
+| `never_rated` | boolean | YES | Never rated flag | boolean | `last_rated_utc IS NULL` | schema_only.sql:19368 | confirmed |
 
 ### music.vw_rating_eligible_playlists (view)
-- **Grain:** one row per vw rating eligible playlists (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_rating_eligible_playlists`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** playlists that have at least one track due for rating, with a count-appended display name.
+- **Grain:** one row per eligible playlist.
+- **Canonical source:** derived view: `GROUP BY playlist_id, playlist_name` over `music.vw_rating_eligible`.
+- **Derived logic:** `playlist_name = name || ' (' || count(DISTINCT isrc) || ')'`.
+- **Consumers:** `GET /api/music/ratings` (`list_rating_eligible_playlists`).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | text | `vw_rating_eligible.playlist_id` | schema.generated.md:1960 | confirmed |
+| `playlist_name` | text | YES | Display name with count | text | `name || ' (' || count || ')'` | schema_only.sql:19438 | confirmed |
 
 ### music.vw_rating_update (view)
-- **Grain:** one row per vw rating update (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_rating_update`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** latest rating state per `(playlist_id, isrc)` computed from rating history — the upsert source for `music.ratings`.
+- **Grain:** one row per `(playlist_id, isrc)` (latest event only, `row_num = 1`).
+- **Canonical source:** derived view over `music.vw_ratings_history`.
+- **Derived logic:** `elo_rating = elo_new` of latest event; `rating_count = count(*)` over partition; `rating_wins = count(rating_result > 0)`; `rating_losses = count(rating_result < 0)`; `last_rated_utc = latest rating_time_utc`; `rating_result > 0` = win, `< 0` = loss (application convention).
+- **Consumers:** `music_functions.py:746` upserts into `music.ratings`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | text | `ratings_history.playlist_id` | schema.generated.md:1966 | confirmed |
+| `isrc` | text | YES | Track ISRC | ISRC code | `ratings_history.isrc` | schema.generated.md:1967 | confirmed |
+| `elo_rating` | integer | YES | Latest Elo | score points | `elo_new` of latest event | schema_only.sql:19554 | confirmed |
+| `rating_count` | bigint | YES | Total ratings | count | `count(*)` per partition | schema_only.sql:19555 | confirmed |
+| `rating_wins` | bigint | YES | Wins | count | `count(rating_result > 0)` | schema_only.sql:19556-19560 | confirmed |
+| `rating_losses` | bigint | YES | Losses | count | `count(rating_result < 0)` | schema_only.sql:19561-19565 | confirmed |
+| `last_rated_utc` | timestamp with time zone | YES | Last rating timestamp | UTC timestamptz | latest `rating_time_utc` | schema_only.sql:19566 | confirmed |
 
 ### music.vw_ratings (view)
-- **Grain:** one row per vw ratings (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_ratings`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-(playlist, normalized-ISRC) aggregated rating state (max Elo, wins, losses, last rated).
+- **Grain:** one row per `(playlist_id, isrc)` after ISRC normalization.
+- **Canonical source:** derived view over `music.ratings` left-joined to `music.isrc_swaps` (valid_mapping), grouping by `playlist_id, COALESCE(mapped_isrc, isrc)`.
+- **Derived logic:** `isrc` normalized via swaps; aggregates `max(elo_rating)`, `max(rating_count)`, `max(rating_wins)`, `max(rating_losses)`, `max(last_rated_utc)`.
+- **Consumers:** `vw_rating_eligible`, `vw_recent_plays`, rating UI.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | text | `ratings.playlist_id` | schema.generated.md:1977 | confirmed |
+| `isrc` | text | YES | Normalized ISRC | ISRC code | `COALESCE(mapped_isrc, r.isrc)` | schema_only.sql:18958 | confirmed |
+| `elo_rating` | integer | YES | Max Elo | score points | `max(r.elo_rating)` | schema.generated.md:1978 | confirmed |
+| `rating_count` | integer | YES | Max rating count | count | `max(r.rating_count)` | schema.generated.md:1979 | confirmed |
+| `rating_wins` | integer | YES | Max wins | count | `max(r.rating_wins)` | schema.generated.md:1980 | confirmed |
+| `rating_losses` | integer | YES | Max losses | count | `max(r.rating_losses)` | schema.generated.md:1981 | confirmed |
+| `last_rated_utc` | timestamp with time zone | YES | Max last-rated timestamp | UTC timestamptz | `max(r.last_rated_utc)` | schema.generated.md:1982 | confirmed |
 
 ### music.vw_ratings_history (view)
-- **Grain:** one row per vw ratings history (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_ratings_history`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** latest rating event per `(playlist_id, isrc, isrc_vs)` after ISRC normalization, with a recency rank.
+- **Grain:** one row per normalized triple (`row_num = 1`, latest by `rating_time_utc`).
+- **Canonical source:** derived view over `music.ratings_history` left-joined twice to `music.isrc_swaps` (for `isrc` and `isrc_vs`).
+- **Derived logic:** `isrc`/`isrc_vs` normalized via `isrc_swaps` (valid_mapping); `row_number() OVER (PARTITION BY playlist_id, normalized isrc, normalized isrc_vs ORDER BY rating_time_utc DESC)`; filter `row_num = 1`.
+- **Consumers:** `vw_rating_update`, `vw_ratings_update`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `rating_time_utc` | timestamp with time zone | YES | Rating timestamp | UTC timestamptz | `ratings_history.rating_time_utc` | schema.generated.md:1988 | confirmed |
+| `playlist_id` | text | YES | Playlist id | text | `ratings_history.playlist_id` | schema.generated.md:1989 | confirmed |
+| `isrc` | text | YES | Normalized ISRC | ISRC code | `COALESCE(s1.mapped_isrc, h.isrc)` | schema_only.sql:19472 | confirmed |
+| `isrc_vs` | text | YES | Normalized opponent ISRC | ISRC code | `COALESCE(s2.mapped_isrc, h.isrc_vs)` | schema_only.sql:19473 | confirmed |
+| `elo_old` | integer | YES | Elo before | score points | `ratings_history.elo_old` | schema.generated.md:1991 | confirmed |
+| `elo_new` | integer | YES | Elo after | score points | `ratings_history.elo_new` | schema.generated.md:1992 | confirmed |
+| `rating_result` | smallint | YES | Rating outcome | result code (>0 win, <0 loss) | `ratings_history.rating_result` | schema.generated.md:1993 | confirmed |
+| `row_num` | bigint | YES | Recency rank | ordinal (1 = latest) | `row_number()` per partition | schema.generated.md:1994 | confirmed |
 
 ### music.vw_ratings_update (view)
-- **Grain:** one row per vw ratings update (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_ratings_update`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** aggregate rating summary per `(playlist_id, isrc)`: current Elo at last rating, distinct win/loss counts, and last-rated timestamp.
+- **Grain:** one row per `(playlist_id, isrc)`.
+- **Canonical source:** derived view over `music.vw_ratings_history` with a `lr` CTE (max `rating_time_utc` per pair).
+- **Derived logic:** `elo_current = elo_new` at the last-rated time; `rating_count = count(DISTINCT rating_time_utc)`; `wins = count(DISTINCT rating_result > 0)`; `losses = count(DISTINCT rating_result < 0)`; `last_rated_utc = max(rating_time_utc)`. Default Elo 1500 applied downstream in `vw_recent_plays`.
+- **Consumers:** not directly consumed by application code evidenced (sister view `vw_rating_update` feeds `music.ratings`).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | text | `vw_ratings_history.playlist_id` | schema.generated.md:1998 | confirmed |
+| `isrc` | text | YES | Track ISRC | ISRC code | `vw_ratings_history.isrc` | schema.generated.md:1999 | confirmed |
+| `elo_current` | integer | YES | Elo at last rating | score points | `elo_new` at `last_rated` | schema.generated.md:2002 | confirmed |
+| `rating_count` | bigint | YES | Distinct rating times | count | `count(DISTINCT rating_time_utc)` | schema.generated.md:2003 | confirmed |
+| `wins` | bigint | YES | Distinct wins | count | `count(rating_result > 0)` | schema.generated.md:2004 | confirmed |
+| `losses` | bigint | YES | Distinct losses | count | `count(rating_result < 0)` | schema.generated.md:2005 | confirmed |
+| `last_rated_utc` | timestamp with time zone | YES | Last rated timestamp | UTC timestamptz | `max(rating_time_utc)` | schema.generated.md:2006 | confirmed |
 
 ### music.vw_recent_plays (view)
-- **Grain:** one row per vw recent plays (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_recent_plays`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** recent-play summary per ISRC: last played, 30-day/total play counts, track artist line, and current Elo with global max/min context.
+- **Grain:** one row per ISRC with at least one play.
+- **Canonical source:** derived view: `play_stats` CTE over `music.vw_listening_history` joined to `vw_best_track_id`, `all_tracks`, `playlist_relationships`, `vw_ratings`, `playlist_config`.
+- **Derived logic:** `playcount_last_30 = count(played_at_utc > now() - 30 days)`; `playcount_total = count(*)`; `track_artist = 'name by artist [ from playlist]'`, default Elo 1500 when unrated; window `max`/`min` over playcounts and Elo for global context. Uses `CURRENT_TIMESTAMP` (query-time relative).
+- **Consumers:** `GET /api/music/recent-plays` (`list_recent_plays`).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `last_played_at_utc` | timestamp with time zone | YES | Last played timestamp | UTC timestamptz | `max(played_at_utc)` per isrc | schema.generated.md:2011 | confirmed |
+| `playcount_last_30` | bigint | YES | Plays in last 30 days | count | `count(now()-30d filter)` | schema.generated.md:2012 | confirmed |
+| `playcount_total` | bigint | YES | Total plays | count | `count(*)` per isrc | schema.generated.md:2013 | confirmed |
+| `track_artist` | text | YES | Display label | text | `'name by artist [ from playlist]'` | schema_only.sql:19726 | confirmed |
+| `rating` | integer | YES | Current Elo | score points | `COALESCE(vw_ratings.elo_rating, 1500)` | schema_only.sql:19727 | confirmed |
+| `max_playcount_last_30` | bigint | YES | Global max 30d count | count | `max() OVER ()` | schema_only.sql:19728 | confirmed |
+| `max_playcount_total` | bigint | YES | Global max total count | count | `max() OVER ()` | schema_only.sql:19729 | confirmed |
+| `max_elo` | integer | YES | Global max Elo | score points | `max(COALESCE(elo,1500)) OVER ()` | schema_only.sql:19730 | confirmed |
+| `min_elo` | integer | YES | Global min Elo | score points | `min(COALESCE(elo,1500)) OVER ()` | schema_only.sql:19731 | confirmed |
 
 ### music.vw_track_id_finder (view)
-- **Grain:** one row per vw track id finder (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_track_id_finder`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** distinct track ISRCs ordered by most recently synced (lookup helper).
+- **Grain:** one row per distinct `track_isrc` in `music.all_tracks`.
+- **Canonical source:** derived view: `SELECT DISTINCT track_isrc, id_synced_at_utc FROM music.all_tracks ORDER BY id_synced_at_utc` (only `track_isrc` projected).
+- **Consumers:** track-id lookup flows.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `track_isrc` | text | YES | Track ISRC | ISRC code | `all_tracks.track_isrc` distinct | schema.generated.md:2024 | confirmed |
 
 ### music.vw_track_id_to_isrc (view)
-- **Grain:** one row per vw track id to isrc (view); see schema.generated.md for columns.
-- **Canonical source:** `music.vw_track_id_to_isrc`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** track id -> normalized ISRC mapping helper.
+- **Grain:** one row per track in `music.all_tracks`.
+- **Canonical source:** derived view over `music.all_tracks` left-joined to `music.isrc_swaps`.
+- **Derived logic:** `isrc = COALESCE(mapped_isrc, track_isrc)` (applies swaps without requiring `valid_mapping`).
+- **Consumers:** ISRC resolution flows.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `track_id` | text | YES | Track id | Spotify track id | `all_tracks.track_id` | schema.generated.md:2029 | confirmed |
+| `isrc` | text | YES | Normalized ISRC | ISRC code | `COALESCE(s.mapped_isrc, t.track_isrc)` | schema_only.sql:19830 | confirmed |
 
 ## public
 
@@ -2147,239 +2987,747 @@ The following objects appear in the generated inventory under schema `public` bu
 ## staging
 
 ### staging.activity_metric_descriptors (table)
-- **Grain:** one row per activity metric descriptors (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.activity_metric_descriptors`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-activity metric descriptor definitions (name + unit) extracted from activity detail JSON during flatten.
+- **Grain:** one row per `(activity_id, metric_idx)` metric descriptor.
+- **Canonical source:** `staging.activity_metric_descriptors`; populated from `staging.activity_payload.payload` JSON (`metricDescriptors` array) by the flatten procedure (`schema_only.sql:4442-4446`).
+- **Consumers:** `activity_metrics_flat` / `activity_metrics_matched` reference metric names/units.
+- **Relationships:** `enforced` composite PK `(activity_id, metric_idx)` (`activity_metric_descriptors_pkey`).
+- **Rules:** `enforced` composite PK; derived working table (rebuilt per activity flatten run).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | NO | Activity id | id | PK part | schema.generated.md:2301-2304 | confirmed |
+| `metric_idx` | smallint | NO | Metric index within activity | ordinal | PK part | schema.generated.md:2305 | confirmed |
+| `metric_name` | text | YES | Metric name | text | `payload->'metricDescriptors'` name | schema.generated.md:2306 | confirmed |
+| `metric_unit` | text | YES | Metric unit | text | `payload->'metricDescriptors'->'unit'->'key'` | schema.generated.md:2307 | confirmed |
+| `activity_type_id` | smallint | YES | Activity type id | id | source | schema.generated.md:2308 | confirmed |
 
 ### staging.activity_metrics_flat (table)
-- **Grain:** one row per activity metrics flat (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.activity_metrics_flat`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** flattened per-activity-detail metric values (one value per activity/detail/metric index) extracted from activity detail JSON.
+- **Grain:** one row per `(activity_id, activity_detail_index, metric_index)` metric sample.
+- **Canonical source:** `staging.activity_metrics_flat`; populated from `staging.activity_payload.payload` JSON (`activityDetailMetrics` array) by the flatten procedure (`schema_only.sql:4457-4461`).
+- **Relationships:** `enforced` composite PK `(activity_id, activity_detail_index, metric_index)` (`activity_metrics_flat_pkey`); index `idx_activity_metrics_activity` on `activity_id`.
+- **Rules:** `enforced` composite PK; derived working table (rebuilt per activity flatten run); `metric_value` stored as text (raw, not typed).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | NO | Activity id | id | PK part | schema.generated.md:2313-2316 | confirmed |
+| `activity_detail_index` | integer | NO | Activity detail sample index | ordinal | PK part | schema.generated.md:2317 | confirmed |
+| `metric_index` | integer | NO | Metric index | ordinal | PK part | schema.generated.md:2318 | confirmed |
+| `metric_value` | text | YES | Metric raw value | text (raw) | `payload->'activityDetailMetrics'` value | schema.generated.md:2319 | confirmed |
 
 ### staging.activity_metrics_matched (table)
-- **Grain:** one row per activity metrics matched (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.activity_metrics_matched`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** matched metric samples keyed to known metric descriptors (name/unit) per activity detail sample, produced by matching `activity_metrics_flat` to `activity_metric_descriptors`.
+- **Grain:** one row per `(activity_id, activity_detail_index)` matched metric sample.
+- **Canonical source:** `staging.activity_metrics_matched`; derived from `activity_payload`/`activity_metrics_flat` during flatten; `activity_id` references `activity_payload.activity_id` ON DELETE CASCADE.
+- **Relationships:** `enforced` FK `activity_id` -> `staging.activity_payload.activity_id` ON DELETE CASCADE (`activity_metrics_matched_activity_id_fkey`).
+- **Rules:** no PK declared; working table rebuilt per activity flatten run; `metric_value` stored as text.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Activity id | id | FK to `activity_payload.activity_id` ON DELETE CASCADE | schema.generated.md:2325-2327 | confirmed |
+| `activity_detail_index` | integer | YES | Activity detail sample index | ordinal | derived | schema.generated.md:2328 | confirmed |
+| `metric_name` | text | YES | Matched metric name | text | derived from descriptors | schema.generated.md:2329 | confirmed |
+| `metric_value` | text | YES | Matched metric value | text (raw) | derived | schema.generated.md:2330 | confirmed |
+| `activity_type_id` | smallint | YES | Activity type id | id | derived | schema.generated.md:2331 | confirmed |
 
 ### staging.activity_payload (table)
-- **Grain:** one row per activity payload (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.activity_payload`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** raw Garmin activity detail JSON payloads held during the flatten/extract stage before they are written to `activities.activity_details`.
+- **Grain:** one row per activity, keyed by `activity_id`.
+- **Canonical source:** `staging.activity_payload` (UNLOGGED table); `TRUNCATE ... CASCADE` then `INSERT (activity_id, payload)` by `flatten_activity_details` (`schema_only.sql:4415-4419`); referenced by `staging.activity_metrics_matched` via `ON DELETE CASCADE` FK.
+- **Consumers:** `flatten_activity_details` writes `activities.activity_details` from it; `activity_metric_descriptors` / `activity_metrics_flat` / `activity_metrics_matched` are derived from its `payload` JSON.
+- **Relationships:** `enforced` PK `activity_id`; `activity_metrics_matched.activity_id` -> `activity_payload.activity_id` ON DELETE CASCADE.
+- **Rules:** `enforced` PK; `payload` jsonb nullable; no application write path evidenced (SQL procedure only).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | NO | Activity id | id | PK; source row key | schema.generated.md:2338-2341 | confirmed |
+| `payload` | jsonb | YES | Raw activity detail JSON | JSON document | source JSON from Garmin sync | schema.generated.md:2341 | confirmed |
 
 ### staging.api_imports (table)
-- **Grain:** one row per api imports (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.api_imports`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** staging landing table for raw Spotify/Garmin API JSON responses fetched by task jobs, keyed by `load_id`; consumed by upsert procedures that populate `music.playlist_config`, `music.playlist_isrcs`, `health.*` raw tables, etc., then deleted after processing.
+- **Grain:** one row per API import job payload, keyed by `load_id`.
+- **Canonical source:** `staging.api_imports`; written by `backend/pifitness/worker/task_execution.py:434` (`INSERT (api_function_name, payload)`) and `backend/pifitness/worker/ultimate_task_executioner_v2.py:738` (`INSERT (task_id, payload)`); read by `docs/data/_evidence/database/definitions.sql` upsert procedures (`playlist_config` at :5631, `playlist_isrcs` at :5541, health raw tables at :25752/:25802, `json_examples` at :25840); deleted via `DELETE FROM staging.api_imports WHERE task_id = ...` after processing.
+- **Consumers:** `music.playlist_config`, `music.playlist_isrcs`, `health.*` raw tables, `staging.json_examples`.
+- **Relationships:** `enforced` PK `load_id` (`api_imports_pkey`).
+- **Rules:** `enforced` PK; `payload` jsonb NOT NULL; `task_id` nullable FK-like link to tasks. Staging/working table — rows are transient (inserted then deleted per job).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `load_id` | bigint | NO | Import load id | id | PK; insert path | schema.generated.md:2347-2350 | confirmed |
+| `event_time_utc` | timestamp with time zone | YES | Event timestamp | UTC timestamptz | insert/default | schema.generated.md:2350 | confirmed |
+| `api_function_name` | text | YES | API function name | text | `task_execution.py` param | schema.generated.md:2351 | confirmed |
+| `payload` | jsonb | NO | Raw API response JSON | JSON document | NOT NULL; insert path | schema.generated.md:2352 | confirmed |
+| `task_id` | integer | YES | Related task id | id | `ultimate_task_executioner_v2.py` param | schema.generated.md:2353 | confirmed |
 
 ### staging.bounds (table)
-- **Grain:** one row per bounds (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.bounds`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** singleton time-bounds row holding `min_ts`/`max_ts` for the activity time range (acts as a flag row via `id` boolean).
+- **Grain:** exactly one row (`id` defaults to `true` and is NOT NULL — singleton pattern).
+- **Canonical source:** `staging.bounds`; write path not evidenced in application code searched (schema/DDL only).
+- **Relationships:** `enforced` PK `id` (`bounds_pkey`).
+- **Rules:** `enforced` PK; `id` boolean DEFAULT true NOT NULL (enforces singleton via application convention); `min_ts`/`max_ts` nullable timestamptz.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `id` | boolean | NO | Singleton flag (always true) | boolean | DEFAULT true; PK | schema.generated.md:2358-2360; schema_only.sql:20246-20248 | confirmed |
+| `min_ts` | timestamp with time zone | YES | Range start timestamp | UTC timestamptz | write path not evidenced | schema.generated.md:2361 | confirmed |
+| `max_ts` | timestamp with time zone | YES | Range end timestamp | UTC timestamptz | write path not evidenced | schema.generated.md:2362 | confirmed |
 
 ### staging.interpolation_anchors (table)
-- **Grain:** one row per interpolation anchors (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.interpolation_anchors`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-timestamp interpolation anchor points (previous/next known values) produced by `build_anchors()` from `staging.interpolation_load_values`, used to fill gaps in time series.
+- **Grain:** one row per timestamp, keyed by `ts_utc`.
+- **Canonical source:** `staging.interpolation_anchors`; `TRUNCATE` + rebuild by procedure `staging.build_anchors()` (`schema_only.sql:4065-4084` / `definitions.sql:24839-24858`).
+- **Dependencies:** `staging.interpolation_load_values` (source); forward/backward window functions locate `prev_ts`/`next_ts`.
+- **Relationships:** `enforced` PK `ts_utc` (`interpolation_anchors_pkey`).
+- **Rules:** `enforced` PK; working table rebuilt per run (truncate + insert).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Anchor timestamp | UTC timestamptz | PK; from load_values | schema.generated.md:2368-2370 | confirmed |
+| `load_value` | numeric | YES | Value at this timestamp | numeric | `interpolation_load_values.load_value` | schema.generated.md:2371 | confirmed |
+| `prev_value` | numeric | YES | Previous known value | numeric | forward_pass value at prev_ts | schema.generated.md:2372 | confirmed |
+| `prev_ts` | timestamp with time zone | YES | Previous known timestamp | UTC timestamptz | forward_pass window | schema.generated.md:2373 | confirmed |
+| `next_value` | numeric | YES | Next known value | numeric | backward_pass value at next_ts | schema.generated.md:2374 | confirmed |
+| `next_ts` | timestamp with time zone | YES | Next known timestamp | UTC timestamptz | backward_pass window | schema.generated.md:2375 | confirmed |
 
 ### staging.interpolation_load_values (table)
-- **Grain:** one row per interpolation load values (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.interpolation_load_values`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** raw per-timestamp load values fed to `build_anchors()` to compute interpolation anchors (`prev`/`next` known values).
+- **Grain:** one row per timestamp, keyed by `ts_utc`.
+- **Canonical source:** `staging.interpolation_load_values`; write path not evidenced in application code searched (populated by import/ETL outside searched code).
+- **Relationships:** `enforced` PK `ts_utc` (`interpolation_load_values_pkey`); consumed by `staging.build_anchors()`.
+- **Rules:** `enforced` PK; `load_value` nullable numeric.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Sample timestamp | UTC timestamptz | PK | schema.generated.md:2381-2383 | confirmed |
+| `load_value` | numeric | YES | Raw load value | numeric | source measurement | schema.generated.md:2384 | confirmed |
 
 ### staging.isrc_dupe_pairs (table)
-- **Grain:** one row per isrc dupe pairs (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.isrc_dupe_pairs`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** candidate ISRC duplicate pairs (two ISRCs referring to possibly the same track) produced by `isrc_duplicate_finder()` from `staging.isrc_dupe_seeds`, with trgm indexes on track names for fuzzy matching.
+- **Grain:** one row per candidate pair `(isrc1, isrc2)`; no PK declared.
+- **Canonical source:** `staging.isrc_dupe_pairs`; `TRUNCATE` + `INSERT ... SELECT` by `music.isrc_duplicate_finder()` (`schema_only.sql`/catalog JSON procedure def) joining two seeds on similarity/duration/artist/album thresholds.
+- **Consumers:** duplicate-review workflow feeding `music.isrc_swaps` / `music.isrc_non_swaps`.
+- **Relationships:** none declared; trgm indexes `trgm_idx_pair_track1`/`trgm_idx_pair_track2` support fuzzy search.
+- **Rules:** no PK/index uniqueness declared; working table rebuilt per duplicate-finder run.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `isrc1` | text | YES | First ISRC | ISRC code | `isrc_duplicate_finder()` | schema.generated.md:2391 | confirmed |
+| `isrc2` | text | YES | Second ISRC | ISRC code | `isrc_duplicate_finder()` | schema.generated.md:2392 | confirmed |
+| `track1` | text | YES | First track name | text | seed track_name_search | schema.generated.md:2393 | confirmed |
+| `track2` | text | YES | Second track name | text | seed track_name_search | schema.generated.md:2394 | confirmed |
+| `artist1` | text | YES | First artist name | text | seed artist_name_search | schema.generated.md:2395 | confirmed |
+| `artist2` | text | YES | Second artist name | text | seed artist_name_search | schema.generated.md:2396 | confirmed |
+| `artist_id1` | text | YES | First artist id | text | seed artist_id | schema.generated.md:2397 | confirmed |
+| `artist_id2` | text | YES | Second artist id | text | seed artist_id | schema.generated.md:2398 | confirmed |
+| `album1` | text | YES | First album name | text | seed album_name_search | schema.generated.md:2399 | confirmed |
+| `album2` | text | YES | Second album name | text | seed album_name_search | schema.generated.md:2400 | confirmed |
+| `album_id1` | text | YES | First album id | text | seed album_id | schema.generated.md:2401 | confirmed |
+| `album_id2` | text | YES | Second album id | text | seed album_id | schema.generated.md:2402 | confirmed |
+| `duration1` | integer | YES | First track duration | milliseconds | seed duration_ms | schema.generated.md:2403 | confirmed |
+| `duration2` | integer | YES | Second track duration | milliseconds | seed duration_ms | schema.generated.md:2404 | confirmed |
 
 ### staging.isrc_dupe_seeds (table)
-- **Grain:** one row per isrc dupe seeds (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.isrc_dupe_seeds`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** seed rows (one per track) used by `isrc_duplicate_finder()` to build candidate ISRC duplicate pairs; populated from `music.all_tracks` joined to artists/albums/best-track.
+- **Grain:** one row per track ISRC, keyed by `isrc`.
+- **Canonical source:** `staging.isrc_dupe_seeds`; `TRUNCATE` + insert by `music.isrc_duplicate_finder()` (`schema_only.sql`/catalog JSON procedure def); clustered on `duration_ms` via `idx_isrc_seeds_duration_gist`.
+- **Consumers:** `isrc_duplicate_finder()` builds `isrc_dupe_pairs` from it.
+- **Relationships:** `enforced` PK `isrc` (`isrc_dupe_seeds_pkey`); trgm index `trgm_idx_track_seeds` on `track_name_search`.
+- **Rules:** `enforced` PK; working table rebuilt per run (truncate + insert + ANALYZE + CLUSTER).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `isrc` | text | NO | Track ISRC | ISRC code | PK; `all_tracks.track_isrc` | schema.generated.md:2412-2414 | confirmed |
+| `track_name_search` | text | YES | Search-optimized track name | text | `all_tracks.track_name_search` | schema.generated.md:2415 | confirmed |
+| `artist_name_search` | text | YES | Search-optimized artist name | text | `all_artists.artist_name_search` | schema.generated.md:2416 | confirmed |
+| `album_name_search` | text | YES | Search-optimized album name | text | `all_albums.album_name_search` | schema.generated.md:2417 | confirmed |
+| `artist_id` | text | YES | Artist id | text | `all_tracks.artist_id` | schema.generated.md:2418 | confirmed |
+| `album_id` | text | YES | Album id | text | `all_tracks.album_id` | schema.generated.md:2419 | confirmed |
+| `duration_ms` | integer | YES | Track duration | milliseconds | `all_tracks.duration_ms`; used for clustering | schema.generated.md:2420 | confirmed |
+| `prior_comparison` | text | YES | Prior comparison tag | text | free text | schema.generated.md:2421 | confirmed |
 
 ### staging.json_examples (table)
-- **Grain:** one row per json examples (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.json_examples`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** curated JSON sample documents keyed by raw table name, used as reference fixtures for API payload shapes.
+- **Grain:** one row per raw table name, keyed by `raw_table_name`.
+- **Canonical source:** `staging.json_examples`; written by `definitions.sql:25838-25842` from `staging.api_imports` (`SELECT payload, CURRENT_TIMESTAMP ... ORDER BY event_time_utc DESC LIMIT 1 WHERE task_id = v_task_id`).
+- **Consumers:** API payload reference/diagnostics (no direct application consumer evidenced).
+- **Relationships:** `enforced` PK `raw_table_name` (`json_examples_pkey`).
+- **Rules:** `enforced` PK; `json_sample` jsonb nullable; `updated_at_utc` DEFAULT CURRENT_TIMESTAMP.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `raw_table_name` | text | NO | Raw table identifier | text | PK | schema.generated.md:2430-2433 | confirmed |
+| `json_sample` | jsonb | YES | Sample JSON document | JSON document | `api_imports.payload` | schema.generated.md:2433 | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Last refresh timestamp | UTC timestamptz | CURRENT_TIMESTAMP | schema.generated.md:2434 | confirmed |
 
 ### staging.stg_listen_history (table)
-- **Grain:** one row per stg listen history (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.stg_listen_history`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** raw Spotify listening-history staging rows (track + album + artist + play context + played_at) loaded from API imports before insertion into `music.listening_history`.
+- **Grain:** one row per `(track_id, played_at_utc)` listen event.
+- **Canonical source:** `staging.stg_listen_history`; TRUNCATED then repopulated by `definitions.sql` import procedures (`:26075` `TRUNCATE staging.stg_listen_history`).
+- **Consumers:** `music.listening_history` insert path; `vw_album_inserts`/`vw_artist_inserts` reference it for dedup; `vw_listening_history_inserts`, `vw_track_inserts_from_listen_history` derive from it.
+- **Relationships:** `enforced` composite PK `(track_id, played_at_utc)` (`stg_listen_history_pkey`); relates to `music.all_tracks.track_id` / `all_albums.album_id` / `all_artists.artist_id` at application level.
+- **Rules:** `enforced` composite PK; `played_at_utc` NOT NULL; `incoming_isrc` holds the raw ISRC that may later be normalized via `isrc_swaps`; `context_type`/`context_uri` describe the playback context.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `track_id` | text | NO | Track id | Spotify track id | PK part | schema.generated.md:2440-2443 | confirmed |
+| `track_name` | text | YES | Track name | text | source | schema.generated.md:2444 | confirmed |
+| `album_id` | text | YES | Album id | Spotify album id | source | schema.generated.md:2445 | confirmed |
+| `album_name` | text | YES | Album name | text | source | schema.generated.md:2446 | confirmed |
+| `artist_id` | text | YES | Artist id | Spotify artist id | source | schema.generated.md:2447 | confirmed |
+| `artist_name` | text | YES | Artist name | text | source | schema.generated.md:2448 | confirmed |
+| `popularity` | integer | YES | Popularity score | score points | source | schema.generated.md:2449 | confirmed |
+| `duration_ms` | integer | YES | Track duration | milliseconds | source | schema.generated.md:2450 | confirmed |
+| `incoming_isrc` | text | YES | Raw ISRC from API | ISRC code | source | schema.generated.md:2451 | confirmed |
+| `available_market_count` | integer | YES | Market count | count | source | schema.generated.md:2452 | confirmed |
+| `available_in_usa` | boolean | YES | Available in US flag | boolean | source | schema.generated.md:2453 | confirmed |
+| `context_type` | text | YES | Playback context type | text | source | schema.generated.md:2454 | confirmed |
+| `context_uri` | text | YES | Playback context URI | text | source | schema.generated.md:2455 | confirmed |
+| `played_at_utc` | timestamp with time zone | NO | Play timestamp | UTC timestamptz | PK part | schema.generated.md:2456 | confirmed |
+| `track_release` | text | YES | Release date | calendar date text | source | schema.generated.md:2457 | confirmed |
+| `track_release_precision` | text | YES | Release precision | text | source | schema.generated.md:2458 | confirmed |
 
 ### staging.stg_now_playing (table)
-- **Grain:** one row per stg now playing (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.stg_now_playing`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** raw Spotify "now playing"/recent-play staging rows with track, album, artist, market, context, and release fields.
+- **Grain:** one row per `(track_id, played_at_utc)` play event.
+- **Canonical source:** `staging.stg_now_playing`; write path via API import staging (not individually evidenced in application code searched).
+- **Relationships:** `enforced` composite PK `(track_id, played_at_utc)` (`stg_now_playing_pk`).
+- **Rules:** `enforced` composite PK; `played_at_utc` NOT NULL; `available_in_usa` boolean flag; `incoming_isrc` holds the raw ISRC from the API response.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `track_id` | text | NO | Track id | Spotify track id | PK part | schema.generated.md:2463-2465 | confirmed |
+| `track_name` | text | YES | Track name | text | source | schema.generated.md:2466 | confirmed |
+| `album_id` | text | YES | Album id | Spotify album id | source | schema.generated.md:2467 | confirmed |
+| `album_name` | text | YES | Album name | text | source | schema.generated.md:2468 | confirmed |
+| `artist_id` | text | YES | Artist id | Spotify artist id | source | schema.generated.md:2469 | confirmed |
+| `artist_name` | text | YES | Artist name | text | source | schema.generated.md:2470 | confirmed |
+| `popularity` | integer | YES | Popularity score | score points | source | schema.generated.md:2471 | confirmed |
+| `duration_ms` | integer | YES | Track duration | milliseconds | source | schema.generated.md:2472 | confirmed |
+| `incoming_isrc` | text | YES | Raw ISRC from API | ISRC code | source | schema.generated.md:2473 | confirmed |
+| `available_market_count` | integer | YES | Market count | count | source | schema.generated.md:2474 | confirmed |
+| `available_in_usa` | boolean | YES | Available in US flag | boolean | source | schema.generated.md:2475 | confirmed |
+| `context_type` | text | YES | Playback context type | text | source | schema.generated.md:2476 | confirmed |
+| `context_uri` | text | YES | Playback context URI | text | source | schema.generated.md:2477 | confirmed |
+| `played_at_utc` | timestamp with time zone | NO | Play timestamp | UTC timestamptz | PK part | schema.generated.md:2478 | confirmed |
+| `track_release` | text | YES | Release date | calendar date text | source | schema.generated.md:2479 | confirmed |
+| `track_release_precision` | text | YES | Release precision | text | source | schema.generated.md:2480 | confirmed |
 
 ### staging.stg_playlist_details (table)
-- **Grain:** one row per stg playlist details (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.stg_playlist_details`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** raw Spotify playlist-track details staging rows (playlist, track, order, album, artist, release, markets) loaded from `api_imports` before insertion into `music.playlist_isrcs`.
+- **Grain:** one row per `(playlist_id, track_id, track_order)` membership row.
+- **Canonical source:** `staging.stg_playlist_details`; populated by `definitions.sql` playlist import procedure (`:5598-5633` `INSERT INTO music.playlist_config ... FROM staging.api_imports src` then `stg_playlist_details` loaded at `:5541`); `DELETE FROM staging.stg_playlist_details` after processing (`:5593`).
+- **Consumers:** `music.playlist_isrcs` insert path; `vw_album_inserts`/`vw_artist_inserts` dedup reference it.
+- **Relationships:** no declared FKs; relates to `playlist_config.playlist_id` / `all_tracks.track_id` at application level.
+- **Rules:** staging/working table; `fetched_at_utc` marks when the page was fetched; `incoming_isrc` is the raw ISRC that may later be normalized via `isrc_swaps`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | Spotify playlist id | source | schema.generated.md:2487 | confirmed |
+| `track_id` | text | YES | Track id | Spotify track id | source | schema.generated.md:2489 | confirmed |
+| `track_name` | text | YES | Track name | text | source | schema.generated.md:2490 | confirmed |
+| `track_order` | integer | YES | Position in playlist | ordinal | source | schema.generated.md:2491 | confirmed |
+| `album_id` | text | YES | Album id | Spotify album id | source | schema.generated.md:2492 | confirmed |
+| `album_name` | text | YES | Album name | text | source | schema.generated.md:2493 | confirmed |
+| `artist_id` | text | YES | Artist id | Spotify artist id | source | schema.generated.md:2494 | confirmed |
+| `artist_name` | text | YES | Artist name | text | source | schema.generated.md:2495 | confirmed |
+| `track_release` | text | YES | Release date | calendar date text | source | schema.generated.md:2496 | confirmed |
+| `track_release_precision` | text | YES | Release precision | text | source | schema.generated.md:2497 | confirmed |
+| `track_markets` | text | YES | Markets list | text | source | schema.generated.md:2498 | confirmed |
+| `popularity` | integer | YES | Popularity score | score points | source | schema.generated.md:2499 | confirmed |
+| `incoming_isrc` | text | YES | Raw ISRC from API | ISRC code | source | schema.generated.md:2500 | confirmed |
+| `duration_ms` | integer | YES | Track duration | milliseconds | source | schema.generated.md:2501 | confirmed |
+| `fetched_at_utc` | timestamp with time zone | YES | Fetch timestamp | UTC timestamptz | source | schema.generated.md:2502 | confirmed |
 
 ### staging.temp_activity_locations (table)
-- **Grain:** one row per temp activity locations (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_activity_locations`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only, no full column semantics.
+- **Purpose:** scratch location points used by the elevation-smoothing/segment-matching pipeline; columns include `latitude`, `longitude`, `loc_point`, `elevation_m_smooth`, and `grid_5m_*` USER-DEFINED grid cells (see `schema.generated.md`).
+- **Rules:** no declared PK; transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `latitude` | numeric | YES | Latitude | degrees | scratch | schema.generated.md:2505-2507 | unknown |
+| `longitude` | numeric | YES | Longitude | degrees | scratch | schema.generated.md:2506 | unknown |
+| `loc_point` | USER-DEFINED | YES | Location point | geometry/geography | scratch | schema.generated.md:2507 | unknown |
+| `elevation_m_smooth` | numeric | YES | Smoothed elevation | metres | scratch | schema.generated.md:2508 | unknown |
+| `grid_5m_00` | USER-DEFINED | YES | Grid cell | USER-DEFINED | scratch | schema.generated.md:2509 | unknown |
+| `grid_5m_25_00` | USER-DEFINED | YES | Grid cell | USER-DEFINED | scratch | schema.generated.md:2510 | unknown |
+| `grid_5m_00_25` | USER-DEFINED | YES | Grid cell | USER-DEFINED | scratch | schema.generated.md:2511 | unknown |
+| `grid_5m_25_25` | USER-DEFINED | YES | Grid cell | USER-DEFINED | scratch | schema.generated.md:2512 | unknown |
 
 ### staging.temp_activity_matched_locations (table)
-- **Grain:** one row per temp activity matched locations (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_activity_matched_locations`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch matched location pairs used by elevation-smoothing/segment matching; columns `latitude`, `longitude`, `loc_point`, `loc_point_matched`, `elevation_m_smooth` (see `schema.generated.md`).
+- **Rules:** no declared PK; btree indexes on `(latitude, longitude)` and `(loc_point, loc_point_matched)`; transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `latitude` | numeric | YES | Latitude | degrees | scratch | schema.generated.md:2517-2519 | unknown |
+| `longitude` | numeric | YES | Longitude | degrees | scratch | schema.generated.md:2518 | unknown |
+| `loc_point` | USER-DEFINED | YES | Location point | geometry/geography | scratch | schema.generated.md:2519 | unknown |
+| `loc_point_matched` | USER-DEFINED | YES | Matched location point | geometry/geography | scratch | schema.generated.md:2520 | unknown |
+| `elevation_m_smooth` | numeric | YES | Smoothed elevation | metres | scratch | schema.generated.md:2521 | unknown |
 
 ### staging.temp_activity_metas (table)
-- **Grain:** one row per temp activity metas (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_activity_metas`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch per-activity metadata used by the activity-smoothing pipeline (`activity_id`, `activity_type_id`, `activity_path`).
+- **Rules:** `enforced` PK `activity_id` (`temp_activity_metas_pkey`); transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | NO | Activity id | id | PK | schema.generated.md:2530-2533 | unknown |
+| `activity_type_id` | smallint | YES | Activity type id | id | scratch | schema.generated.md:2534 | unknown |
+| `activity_path` | USER-DEFINED | YES | Activity path | geometry/geography | scratch | schema.generated.md:2535 | unknown |
 
 ### staging.temp_activity_trackpoints (table)
-- **Grain:** one row per temp activity trackpoints (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_activity_trackpoints`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch per-activity track points (longitude/latitude/elevation) used by elevation smoothing; columns `activity_id`, `track_point`, `longitude`, `latitude`, `elevation_m`, `activity_type_id`.
+- **Rules:** no declared PK; transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Activity id | id | scratch | schema.generated.md:2540-2543 | unknown |
+| `track_point` | integer | YES | Track point index | ordinal | scratch | schema.generated.md:2544 | unknown |
+| `longitude` | numeric | YES | Longitude | degrees | scratch | schema.generated.md:2545 | unknown |
+| `latitude` | numeric | YES | Latitude | degrees | scratch | schema.generated.md:2546 | unknown |
+| `elevation_m` | numeric | YES | Elevation | metres | scratch | schema.generated.md:2547 | unknown |
+| `activity_type_id` | smallint | YES | Activity type id | id | scratch | schema.generated.md:2548 | unknown |
 
 ### staging.temp_bc_import (table)
-- **Grain:** one row per temp bc import (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_bc_import`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables / public scratch `temp_bc_import` pattern); existence documented only.
+- **Purpose:** scratch body-composition import staging (columns `Weight`, `BMI`, `Body Fat`, `Skeletal Muscle Mass`, `Bone Mass`, `Body Water` plus `ROW_ID`, `ts_utc`) referenced in the excluded-objects register; no persistent application write path evidenced in searched code.
+- **Rules:** no declared PK; transient scratch table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ROW_ID` | bigint | YES | Row id | id | scratch | schema.generated.md:2550-2553 | unknown |
+| `ts_utc` | text | YES | Timestamp (text) | text | scratch | schema.generated.md:2554 | unknown |
+| `Weight` | double precision | YES | Body weight | unknown units | scratch | schema.generated.md:2555 | unknown |
+| `BMI` | double precision | YES | BMI | unknown units | scratch | schema.generated.md:2556 | unknown |
+| `Body Fat` | double precision | YES | Body fat | unknown units | scratch | schema.generated.md:2557 | unknown |
+| `Skeletal Muscle Mass` | double precision | YES | Skeletal muscle mass | unknown units | scratch | schema.generated.md:2558 | unknown |
+| `Bone Mass` | double precision | YES | Bone mass | unknown units | scratch | schema.generated.md:2559 | unknown |
+| `Body Water` | double precision | YES | Body water | unknown units | scratch | schema.generated.md:2560 | unknown |
 
 ### staging.temp_csv_import (table)
-- **Grain:** one row per temp csv import (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_csv_import`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch CSV health-import staging with text columns for sleep score, resting HR, body battery, pulse ox, respiration, HRV status, quality, duration, bedtime, wake time (see `schema.generated.md`).
+- **Rules:** no declared PK; transient scratch table; column names are raw CSV headers (units not established).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `Sleep Score 4 Weeks` | text | YES | Sleep score | text | scratch CSV header | schema.generated.md:2562 | unknown |
+| `Score` | text | YES | Score | text | scratch CSV header | schema.generated.md:2563 | unknown |
+| `Resting Heart Rate` | text | YES | Resting HR | text | scratch CSV header | schema.generated.md:2564 | unknown |
+| `Body Battery` | text | YES | Body battery | text | scratch CSV header | schema.generated.md:2565 | unknown |
+| `Pulse Ox` | text | YES | Pulse ox | text | scratch CSV header | schema.generated.md:2566 | unknown |
+| `Respiration` | text | YES | Respiration | text | scratch CSV header | schema.generated.md:2567 | unknown |
+| `HRV Status` | text | YES | HRV status | text | scratch CSV header | schema.generated.md:2568 | unknown |
+| `Quality` | text | YES | Quality | text | scratch CSV header | schema.generated.md:2569 | unknown |
+| `Duration` | text | YES | Duration | text | scratch CSV header | schema.generated.md:2570 | unknown |
+| `Bedtime` | text | YES | Bedtime | text | scratch CSV header | schema.generated.md:2571 | unknown |
+| `Wake Time` | text | YES | Wake time | text | scratch CSV header | schema.generated.md:2572 | unknown |
 
 ### staging.temp_elevation_deltas (table)
-- **Grain:** one row per temp elevation deltas (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_elevation_deltas`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch per-activity elevation ascent/descent deltas used by elevation smoothing.
+- **Rules:** `enforced` PK `activity_id` (`temp_elevation_deltas_pkey`); transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | NO | Activity id | id | PK | schema.generated.md:2577-2580 | unknown |
+| `ascent_m` | numeric | YES | Ascent | metres | scratch | schema.generated.md:2581 | unknown |
+| `descent_m` | numeric | YES | Descent | metres | scratch | schema.generated.md:2582 | unknown |
 
 ### staging.temp_elevation_medians (table)
-- **Grain:** one row per temp elevation medians (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_elevation_medians`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch per-location median elevation used by elevation smoothing (`loc_point` PK, `median_elev`).
+- **Rules:** `enforced` PK `loc_point` (`temp_elevation_medians_pkey`); transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `loc_point` | USER-DEFINED | NO | Location point | geometry/geography | PK | schema.generated.md:2587-2589 | unknown |
+| `median_elev` | numeric | YES | Median elevation | metres | scratch | schema.generated.md:2590 | unknown |
 
 ### staging.temp_elevation_smoothed (table)
-- **Grain:** one row per temp elevation smoothed (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_elevation_smoothed`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch smoothed per-activity track-point elevations (`activity_id`, `track_point`, `elevation_m`).
+- **Rules:** no declared PK; transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Activity id | id | scratch | schema.generated.md:2597-2599 | unknown |
+| `track_point` | integer | YES | Track point index | ordinal | scratch | schema.generated.md:2600 | unknown |
+| `elevation_m` | numeric | YES | Smoothed elevation | metres | scratch | schema.generated.md:2601 | unknown |
 
 ### staging.temp_elevation_smoothing (table)
-- **Grain:** one row per temp elevation smoothing (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_elevation_smoothing`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch elevation-smoothing state keyed by `elapsed_duration_s` (`elapsed_duration_s`, `elevation_m_raw`, `distance_m`).
+- **Rules:** `enforced` PK `elapsed_duration_s` (`temp_elevation_smoothing_pkey`); transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `elapsed_duration_s` | numeric | NO | Elapsed duration | seconds | PK | schema.generated.md:2604-2606 | unknown |
+| `elevation_m_raw` | numeric | YES | Raw elevation | metres | scratch | schema.generated.md:2607 | unknown |
+| `distance_m` | numeric | YES | Distance | metres | scratch | schema.generated.md:2608 | unknown |
 
 ### staging.temp_elevation_smoothing_m (table)
-- **Grain:** one row per temp elevation smoothing m (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_elevation_smoothing_m`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch per-meter elevation smoothing state (`meter`, `elapsed_duration_s`, `elevation_m_raw`, `elevation_m_smooth`).
+- **Rules:** `enforced` PK `meter` (`temp_elevation_smoothing_m_pkey`); transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | NO | Meter position | ordinal | PK | schema.generated.md:2614-2616 | unknown |
+| `elapsed_duration_s` | numeric | YES | Elapsed duration | seconds | scratch | schema.generated.md:2617 | unknown |
+| `elevation_m_raw` | numeric | YES | Raw elevation | metres | scratch | schema.generated.md:2618 | unknown |
+| `elevation_m_smooth` | numeric | YES | Smoothed elevation | metres | scratch | schema.generated.md:2619 | unknown |
 
 ### staging.temp_isrc_swaps (table)
-- **Grain:** one row per temp isrc swaps (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_isrc_swaps`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch ISRC swap candidates (`original_isrc`, `mapped_isrc`, `mapping_time_utc`, `valid_mapping`) used by the duplicate-finder pipeline.
+- **Rules:** no declared PK; transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `original_isrc` | text | YES | Original ISRC | ISRC code | scratch | schema.generated.md:2625-2628 | unknown |
+| `mapped_isrc` | text | YES | Mapped ISRC | ISRC code | scratch | schema.generated.md:2629 | unknown |
+| `mapping_time_utc` | timestamp with time zone | YES | Mapping timestamp | UTC timestamptz | scratch | schema.generated.md:2630 | unknown |
+| `valid_mapping` | boolean | YES | Valid mapping flag | boolean | scratch | schema.generated.md:2631 | unknown |
 
 ### staging.temp_performance_profiling (table)
-- **Grain:** one row per temp performance profiling (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_performance_profiling`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch performance-profiling rows (`ts`, `segment`, `code`, `time_ms`) used to time pipeline steps.
+- **Rules:** no declared PK; transient scratch table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts` | timestamp with time zone | YES | Sample timestamp | UTC timestamptz | scratch | schema.generated.md:2633-2635 | unknown |
+| `segment` | text | YES | Pipeline segment name | text | scratch | schema.generated.md:2636 | unknown |
+| `code` | text | YES | Code/step identifier | text | scratch | schema.generated.md:2637 | unknown |
+| `time_ms` | integer | YES | Elapsed time | milliseconds | scratch | schema.generated.md:2638 | unknown |
 
 ### staging.temp_segment_matches (table)
-- **Grain:** one row per temp segment matches (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_segment_matches`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch segment-match candidates (`segment_id`, `activity_id`, start/end points, `activity_path`, `match_confirmed`, `match_confidence`, `match_ts_utc`) used by segment matching.
+- **Rules:** no declared PK; transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Segment id | id | scratch | schema.generated.md:2641-2644 | unknown |
+| `activity_id` | bigint | YES | Activity id | id | scratch | schema.generated.md:2645 | unknown |
+| `activity_start_point` | integer | YES | Activity start point | ordinal | scratch | schema.generated.md:2646 | unknown |
+| `activity_end_point` | integer | YES | Activity end point | ordinal | scratch | schema.generated.md:2647 | unknown |
+| `activity_path` | USER-DEFINED | YES | Activity path | geometry/geography | scratch | schema.generated.md:2648 | unknown |
+| `match_confirmed` | boolean | YES | Match confirmed flag | boolean | scratch | schema.generated.md:2649 | unknown |
+| `match_confidence` | numeric | YES | Match confidence | score | scratch | schema.generated.md:2650 | unknown |
+| `match_ts_utc` | timestamp with time zone | YES | Match timestamp | UTC timestamptz | scratch | schema.generated.md:2651 | unknown |
 
 ### staging.temp_training_status_raw (table)
-- **Grain:** one row per temp training status raw (table); see schema.generated.md for columns.
-- **Canonical source:** `staging.temp_training_status_raw`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Status:** `excluded` — temporary working/scratch table (per worklog classification of `staging.temp_*` tables); existence documented only.
+- **Purpose:** scratch raw training-status samples (`ts_utc`, vo2 max, altitude/acclimation, heat acclimation, training load acute/min/max) used by health-training-status processing.
+- **Rules:** no declared PK; transient working table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | YES | Sample timestamp | UTC timestamptz | scratch | schema.generated.md:2653-2656 | unknown |
+| `vo2_max_value` | numeric | YES | VO2 max | score points | scratch | schema.generated.md:2657 | unknown |
+| `altitude_current_m` | integer | YES | Current altitude | metres | scratch | schema.generated.md:2658 | unknown |
+| `altitude_acclimation_m` | integer | YES | Altitude acclimation | metres | scratch | schema.generated.md:2659 | unknown |
+| `altitude_acclimation_pct` | numeric | YES | Altitude acclimation pct | percent | scratch | schema.generated.md:2660 | unknown |
+| `heat_acclimation_pct` | numeric | YES | Heat acclimation pct | percent | scratch | schema.generated.md:2661 | unknown |
+| `training_load_acute` | numeric | YES | Acute training load | score | scratch | schema.generated.md:2662 | unknown |
+| `training_load_min` | numeric | YES | Min training load | score | scratch | schema.generated.md:2663 | unknown |
+| `training_load_max` | numeric | YES | Max training load | score | scratch | schema.generated.md:2664 | unknown |
 
 ### staging.vw_activity_by_distance (view)
-- **Grain:** one row per vw activity by distance (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_activity_by_distance`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-meter interpolated activity elevation/duration series used by the elevation-smoothing pipeline.
+- **Grain:** one row per integer meter position (0..ceil(max distance_m)).
+- **Canonical source:** derived view over `staging.temp_elevation_smoothing`; uses window `lag()` to get prev_t/prev_elev_raw/prev_d, then `generate_series` over meters and linear interpolation (`elapsed_duration_s`, `elevation_raw`) between bounds, averaged per meter.
+- **Dependencies:** `staging.temp_elevation_smoothing`.
+- **Consumers:** elevation smoothing pipeline.
+- **Rules:** read-only view; `meter`/`elapsed_duration_s`/`elev_raw` derived (interpolated, not raw).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | YES | Meter position | ordinal | `generate_series` over distance | schema.generated.md:2666-2670 | confirmed |
+| `elapsed_duration_s` | numeric | YES | Interpolated elapsed duration | seconds | linear interpolation per meter | schema.generated.md:2667 | confirmed |
+| `elev_raw` | numeric | YES | Interpolated raw elevation | metres | linear interpolation per meter | schema.generated.md:2668 | confirmed |
 
 ### staging.vw_activity_flatten (view)
-- **Grain:** one row per vw activity flatten (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_activity_flatten`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** flattened per-activity-detail sample series (the canonical flattened activity view) with computed location point and smoothed elevation.
+- **Grain:** one row per `(activity_id, activity_detail_index)` sample.
+- **Canonical source:** derived view over `staging.activity_metrics_matched`; pivots metric_name/metric_value rows into columns via conditional aggregation on `directTimestamp`/`distance`/`heartrate` etc., and computes `loc_point = ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography`, `elevation_smooth_m = elevation_m`.
+- **Dependencies:** `staging.activity_metrics_matched` (source), `public.st_setsrid`/`st_makepoint` (PostGIS).
+- **Consumers:** `activities.activity_details` insert path (`flatten_activity_details`); downstream activity analytics.
+- **Rules:** read-only view; `distance_mm`/`speed_mmps` are millimetre/millimetre-per-second raw metric values (text-derived, cast); `loc_point` is PostGIS geography SRID 4326.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Activity id | id | `activity_metrics_matched.activity_id` | schema.generated.md:2671 | confirmed |
+| `activity_type_id` | smallint | YES | Activity type id | id | `activity_metrics_matched.activity_type_id` | schema.generated.md:2672 | confirmed |
+| `activity_detail_index` | integer | YES | Detail sample index | ordinal | `activity_metrics_matched.activity_detail_index` | schema.generated.md:2673 | confirmed |
+| `ts_utc` | timestamp with time zone | YES | Sample timestamp | UTC timestamptz | pivoted `directTimestamp` metric | schema.generated.md:2674 | confirmed |
+| `moving_duration_s` | integer | YES | Moving duration | seconds | pivoted metric | schema.generated.md:2675 | confirmed |
+| `elapsed_duration_s` | integer | YES | Elapsed duration | seconds | pivoted metric | schema.generated.md:2676 | confirmed |
+| `duration_s` | integer | YES | Duration | seconds | pivoted metric | schema.generated.md:2677 | confirmed |
+| `distance_mm` | bigint | YES | Distance | millimetres | pivoted metric | schema.generated.md:2678 | confirmed |
+| `latitude` | numeric | YES | Latitude | degrees | pivoted metric | schema.generated.md:2679 | confirmed |
+| `longitude` | numeric | YES | Longitude | degrees | pivoted metric | schema.generated.md:2680 | confirmed |
+| `heartrate_bpm` | integer | YES | Heart rate | bpm | pivoted metric | schema.generated.md:2681 | confirmed |
+| `cadence_spm` | smallint | YES | Cadence | steps/min | pivoted metric | schema.generated.md:2682 | confirmed |
+| `air_temp_c` | smallint | YES | Air temperature | °C | pivoted metric | schema.generated.md:2683 | confirmed |
+| `elevation_m` | numeric | YES | Elevation | metres | pivoted metric | schema.generated.md:2684 | confirmed |
+| `speed_mmps` | bigint | YES | Speed | mm/s | pivoted metric | schema.generated.md:2685 | confirmed |
+| `vertical_speed_mps` | numeric | YES | Vertical speed | m/s | pivoted metric | schema.generated.md:2686 | confirmed |
+| `vert_oscillation_cm` | numeric | YES | Vertical oscillation | cm | pivoted metric | schema.generated.md:2687 | confirmed |
+| `stride_length_cm` | numeric | YES | Stride length | cm | pivoted metric | schema.generated.md:2688 | confirmed |
+| `vert_ratio` | numeric | YES | Vertical ratio | ratio | pivoted metric | schema.generated.md:2689 | confirmed |
+| `ground_contact_time_ms` | smallint | YES | Ground contact time | ms | pivoted metric | schema.generated.md:2690 | confirmed |
+| `ground_contact_balance_left` | numeric | YES | Ground contact balance left | ratio | pivoted metric | schema.generated.md:2691 | confirmed |
+| `performance_condition` | smallint | YES | Performance condition | score | pivoted metric | schema.generated.md:2692 | confirmed |
+| `loc_point` | USER-DEFINED | YES | Location point | geography SRID 4326 | `ST_SetSRID(ST_MakePoint(lon,lat),4326)::geography` | schema_only.sql:21992 | confirmed |
+| `elevation_smooth_m` | numeric | YES | Smoothed elevation | metres | `elevation_m` passthrough | schema_only.sql:21993 | confirmed |
 
 ### staging.vw_album_inserts (view)
-- **Grain:** one row per vw album inserts (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_album_inserts`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** deduplicated album insert candidates (latest fetched_at_utc per album) with cleaned/search names, feeding `music.all_albums`.
+- **Grain:** one row per `album_id` (latest record only, `duplicate_finder = 1`).
+- **Canonical source:** derived view over `staging.stg_playlist_details` UNION ALL `staging.stg_listen_history`; `row_number()` dedup by `album_id` ordered by `fetched_at_utc DESC`; `album_name_search` via `public.clean_album_match()`.
+- **Dependencies:** `staging.stg_playlist_details`, `staging.stg_listen_history`, `public.clean_album_match`.
+- **Consumers:** `music.all_albums` upsert path.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `album_id` | text | YES | Album id | Spotify album id | source | schema.generated.md:2700 | confirmed |
+| `album_name` | text | YES | Album name | text | source | schema.generated.md:2701 | confirmed |
+| `album_name_clean` | text | YES | Cleaned album name | text | `public.clean_track_display(album_name)` | schema.generated.md:2702 | confirmed |
+| `album_name_search` | text | YES | Search-optimized album name | text | `public.clean_album_match(album_name_clean)` | schema.generated.md:2703 | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Refresh timestamp | UTC timestamptz | `fetched_at_utc` (latest) | schema.generated.md:2704 | confirmed |
 
 ### staging.vw_artist_inserts (view)
-- **Grain:** one row per vw artist inserts (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_artist_inserts`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** deduplicated artist insert candidates (latest fetched_at_utc per artist) with cleaned/search name, feeding `music.all_artists`.
+- **Grain:** one row per `artist_id` (latest record only, `duplicate_finder = 1`).
+- **Canonical source:** derived view over `staging.stg_playlist_details` UNION ALL `staging.stg_listen_history`; `row_number()` dedup by `artist_id` ordered by `fetched_at_utc DESC`; `artist_name_search` via `public.clean_artist_match()`.
+- **Dependencies:** `staging.stg_playlist_details`, `staging.stg_listen_history`, `public.clean_artist_match`.
+- **Consumers:** `music.all_artists` upsert path.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `artist_id` | text | YES | Artist id | Spotify artist id | source | schema.generated.md:2709 | confirmed |
+| `artist_name` | text | YES | Artist name | text | source | schema.generated.md:2710 | confirmed |
+| `artist_name_search` | text | YES | Search-optimized artist name | text | `public.clean_artist_match(artist_name)` | schema.generated.md:2711 | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Refresh timestamp | UTC timestamptz | `fetched_at_utc` (latest) | schema.generated.md:2712 | confirmed |
 
 ### staging.vw_elevation_backward (view)
-- **Grain:** one row per vw elevation backward (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_elevation_backward`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** backward-pass elevation smoothing: adjusts invalid points by comparing to `next_elev` (±2 m), part of the multi-pass elevation-smoothing pipeline.
+- **Grain:** one row per invalid point (`valid_point = false`) from `vw_elevation_neighbors`.
+- **Canonical source:** derived view over `staging.vw_elevation_neighbors`; `new_elev = next_elev - 2` if `next_elev > curr_elev` else `next_elev + 2`.
+- **Dependencies:** `staging.vw_elevation_neighbors`.
+- **Consumers:** elevation smoothing pipeline.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | YES | Meter position | ordinal | `vw_elevation_neighbors.meter` | schema.generated.md:2717 | confirmed |
+| `curr_elev` | numeric | YES | Current elevation | metres | `vw_elevation_neighbors.curr_elev` | schema.generated.md:2718 | confirmed |
+| `new_elev` | numeric | YES | Smoothed elevation | metres | `next_elev ± 2` case expression | schema_only.sql:22506-22509 | inferred |
 
 ### staging.vw_elevation_bumps (view)
-- **Grain:** one row per vw elevation bumps (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_elevation_bumps`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** identifies elevation "bumps" (extreme points) and replaces them with the average elevation of valid neighbors within 500 m.
+- **Grain:** one row per extreme point (`extreme_point = true`) from `vw_elevation_neighbors`.
+- **Canonical source:** derived view joining `vw_elevation_neighbors` to itself on valid points within 500 m; `new_elev = avg(neighbor curr_elev)`.
+- **Dependencies:** `staging.vw_elevation_neighbors`.
+- **Consumers:** elevation smoothing pipeline.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | YES | Meter position | ordinal | `vw_elevation_neighbors.meter` | schema.generated.md:2725 | confirmed |
+| `curr_elev` | numeric | YES | Current elevation | metres | `vw_elevation_neighbors.curr_elev` | schema.generated.md:2726 | confirmed |
+| `new_elev` | numeric | YES | Smoothed elevation | metres | `avg()` of valid neighbors within 500 m | schema_only.sql:22542 | inferred |
 
 ### staging.vw_elevation_forward (view)
-- **Grain:** one row per vw elevation forward (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_elevation_forward`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** forward-pass elevation smoothing: adjusts invalid points by comparing to `prior_elev`/`next_elev` (±0.35 m), part of the multi-pass elevation-smoothing pipeline.
+- **Grain:** one row per invalid point (`valid_point = false`) from `vw_elevation_neighbors`.
+- **Canonical source:** derived view over `staging.vw_elevation_neighbors`; `new_elev = prior_elev - 0.35` if `prior_elev > curr_elev` else `next_elev + 0.35`.
+- **Dependencies:** `staging.vw_elevation_neighbors`.
+- **Consumers:** elevation smoothing pipeline.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | YES | Meter position | ordinal | `vw_elevation_neighbors.meter` | schema.generated.md:2733 | confirmed |
+| `curr_elev` | numeric | YES | Current elevation | metres | `vw_elevation_neighbors.curr_elev` | schema.generated.md:2734 | confirmed |
+| `new_elev` | numeric | YES | Smoothed elevation | metres | `prior_elev/next_elev ± 0.35` case expression | schema_only.sql:22577-22580 | inferred |
 
 ### staging.vw_elevation_median (view)
-- **Grain:** one row per vw elevation median (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_elevation_median`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** median-based elevation smoothing: replaces invalid points with the median elevation of valid neighbors within 45 m (`percentile_disc(0.5)`).
+- **Grain:** one row per invalid point (`valid_point = false`) from `vw_elevation_neighbors`.
+- **Canonical source:** derived view joining `vw_elevation_neighbors` to itself on valid points within 45 m; `new_elev = percentile_disc(0.5)` of neighbor `curr_elev`.
+- **Dependencies:** `staging.vw_elevation_neighbors`.
+- **Consumers:** elevation smoothing pipeline.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | YES | Meter position | ordinal | `vw_elevation_neighbors.meter` | schema.generated.md:2739 | confirmed |
+| `curr_elev` | numeric | YES | Current elevation | metres | `vw_elevation_neighbors.curr_elev` | schema.generated.md:2740 | confirmed |
+| `new_elev` | numeric | YES | Smoothed elevation | metres | `percentile_disc(0.5)` of neighbors within 45 m | schema_only.sql:22613 | inferred |
 
 ### staging.vw_elevation_medians (view)
-- **Grain:** one row per vw elevation medians (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_elevation_medians`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** weighted-average elevation smoothing over `temp_elevation_smoothing_m`: flags valid points (neighbor deltas < 2 m), computes distance-weighted elevation within 150 m, then a second validity pass falling back to median.
+- **Grain:** one row per meter position.
+- **Canonical source:** complex derived view (CTEs `neighbors`, `altered`, `wa`, `wa_neighbor`, `valid_pass_2`) over `staging.temp_elevation_smoothing_m`; `curr_elev` = weighted average or median fallback.
+- **Dependencies:** `staging.temp_elevation_smoothing_m`.
+- **Consumers:** elevation smoothing pipeline.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | YES | Meter position | ordinal | `temp_elevation_smoothing_m.meter` | schema.generated.md:2746 | confirmed |
+| `curr_elev` | numeric | YES | Smoothed elevation | metres | weighted average / median fallback | schema_only.sql:22689-22693 | inferred |
 
 ### staging.vw_elevation_neighbors (view)
-- **Grain:** one row per vw elevation neighbors (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_elevation_neighbors`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-meter elevation neighbor context (prior/next valid elevations and deltas) plus validity/extreme-point flags used by the elevation-smoothing pass views.
+- **Grain:** one row per meter position.
+- **Canonical source:** derived view over the elevation-smoothing base (temp smoothed points); computes `prior_elev`/`next_elev` via window `lag`/`lead`, `inc_delta`/`out_delta`, and `valid_point`/`extreme_point` flags.
+- **Dependencies:** `staging.temp_elevation_smoothing_m` (via upstream CTEs).
+- **Consumers:** `vw_elevation_backward`, `vw_elevation_bumps`, `vw_elevation_forward`, `vw_elevation_median`, `vw_small_pull`.
+- **Rules:** read-only view; `inc_delta`/`out_delta` are elevation deltas in metres; `valid_point`/`extreme_point` are boolean flags.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | YES | Meter position | ordinal | elevation base | schema.generated.md:2752 | confirmed |
+| `curr_elev` | numeric | YES | Current elevation | metres | elevation base | schema.generated.md:2753 | confirmed |
+| `prior_elev` | numeric | YES | Prior valid elevation | metres | window `lag` | schema.generated.md:2754 | confirmed |
+| `next_elev` | numeric | YES | Next valid elevation | metres | window `lead` | schema.generated.md:2755 | confirmed |
+| `inc_delta` | numeric | YES | Incoming elevation delta | metres | derived difference | schema.generated.md:2756 | confirmed |
+| `out_delta` | numeric | YES | Outgoing elevation delta | metres | derived difference | schema.generated.md:2757 | confirmed |
+| `valid_point` | boolean | YES | Valid point flag | boolean | window-based validity (neighbor deltas < 2 m) | schema_only.sql (elevation base) | inferred |
+| `extreme_point` | boolean | YES | Extreme point (bump) flag | boolean | flag used by `vw_elevation_bumps` | schema_only.sql (elevation base) | inferred |
 
 ### staging.vw_elevation_weighted_avg (view)
-- **Grain:** one row per vw elevation weighted avg (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_elevation_weighted_avg`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** weighted-average elevation smoothing pass producing `new_elev` per meter from raw/current elevation (part of the multi-pass elevation-smoothing pipeline).
+- **Grain:** one row per meter position.
+- **Canonical source:** derived view over elevation neighbor data; `new_elev` is a weighted average of neighboring elevations.
+- **Dependencies:** `staging.vw_elevation_neighbors` (upstream elevation data).
+- **Consumers:** elevation smoothing pipeline.
+- **Rules:** read-only view; elevation values in metres (inferred from column names and pipeline context, not DB-enforced).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | YES | Meter position | ordinal | elevation base | schema.generated.md:2747 | confirmed |
+| `curr_elev` | numeric | YES | Current elevation | metres | elevation base | schema.generated.md:2748 | confirmed |
+| `new_elev` | numeric | YES | Smoothed elevation | metres | weighted average | schema.generated.md:2749 | inferred |
 
 ### staging.vw_large_pull (view)
-- **Grain:** one row per vw large pull (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_large_pull`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** elevation-smoothing pass producing `new_elev` per meter (part of the multi-pass elevation-smoothing pipeline); name suggests a large-batch pull of points for smoothing.
+- **Grain:** one row per meter position.
+- **Canonical source:** derived view over elevation data; exact upstream relation not individually evidenced in searched code beyond the view definition.
+- **Dependencies:** elevation smoothing base tables/views (not individually evidenced).
+- **Consumers:** elevation smoothing pipeline.
+- **Rules:** read-only view; elevation values in metres (inferred, not DB-enforced).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | YES | Meter position | ordinal | elevation base | schema.generated.md:2758 | confirmed |
+| `curr_elev` | numeric | YES | Current elevation | metres | elevation base | schema.generated.md:2759 | confirmed |
+| `new_elev` | numeric | YES | Smoothed elevation | metres | derived | schema.generated.md:2760 | inferred |
 
 ### staging.vw_listening_history_inserts (view)
-- **Grain:** one row per vw listening history inserts (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_listening_history_inserts`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** deduplicated listening-history insert candidates (one row per played_at_utc, ordered) with ISRC and playlist_id extracted from context URI, feeding `music.listening_history`.
+- **Grain:** one row per `played_at_utc` play event.
+- **Canonical source:** derived view over `staging.stg_listen_history`; `playlist_id = split_part(context_uri, 'spotify:playlist:', 2)` when `context_type = 'playlist'`, else NULL; ordered by `played_at_utc`.
+- **Dependencies:** `staging.stg_listen_history`.
+- **Consumers:** `music.listening_history` insert path.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `played_at_utc` | timestamp with time zone | YES | Play timestamp | UTC timestamptz | `stg_listen_history.played_at_utc` | schema.generated.md:2764 | confirmed |
+| `isrc` | text | YES | Track ISRC | ISRC code | `stg_listen_history.incoming_isrc` | schema_only.sql:22798 | confirmed |
+| `playlist_id` | text | YES | Playlist id | Spotify playlist id | `split_part(context_uri,...)` if playlist | schema_only.sql:22799-22802 | confirmed |
 
 ### staging.vw_now_playing_inserts (view)
-- **Grain:** one row per vw now playing inserts (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_now_playing_inserts`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** distinct now-playing insert candidates (played_at_utc, ISRC, playlist_id) from `staging.stg_now_playing`, feeding `music.listening_history`.
+- **Grain:** one row per `(played_at_utc, isrc)` play event.
+- **Canonical source:** derived view over `staging.stg_now_playing`; `isrc = incoming_isrc`; `playlist_id = split_part(context_uri, 'spotify:playlist:', 2)` when `context_type = 'playlist'`, else NULL; `DISTINCT`, ordered by `played_at_utc`.
+- **Dependencies:** `staging.stg_now_playing`.
+- **Consumers:** `music.listening_history` insert path.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `played_at_utc` | timestamp with time zone | YES | Play timestamp | UTC timestamptz | `stg_now_playing.played_at_utc` | schema.generated.md:2769 | confirmed |
+| `isrc` | text | YES | Track ISRC | ISRC code | `stg_now_playing.incoming_isrc` | schema_only.sql:22834 | confirmed |
+| `playlist_id` | text | YES | Playlist id | Spotify playlist id | `split_part(context_uri,...)` if playlist | schema_only.sql:22835-22838 | confirmed |
 
 ### staging.vw_playlist_inserts (view)
-- **Grain:** one row per vw playlist inserts (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_playlist_inserts`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** deduplicated playlist-track insert candidates with ISRC normalized via `music.isrc_swaps`, feeding `music.playlist_isrcs`.
+- **Grain:** one row per `(playlist_id, isrc)` (first occurrence per playlist+isrc, renumbered `track_order`).
+- **Canonical source:** derived view over `staging.stg_playlist_details` left-joined to `music.isrc_swaps`; `isrc = COALESCE(mapped_isrc, incoming_isrc)`; dedup `row_number() = 1` per playlist+isrc; `track_order` renumbered per playlist.
+- **Dependencies:** `staging.stg_playlist_details`, `music.isrc_swaps`.
+- **Consumers:** `music.playlist_isrcs` insert path.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Playlist id | Spotify playlist id | `stg_playlist_details.playlist_id` | schema.generated.md:2774 | confirmed |
+| `isrc` | text | YES | Normalized track ISRC | ISRC code | `COALESCE(mapped_isrc, incoming_isrc)` | schema_only.sql:22871 | confirmed |
+| `track_order` | integer | YES | Position in playlist | ordinal | renumbered `row_number()` per playlist | schema_only.sql:22879 | confirmed |
 
 ### staging.vw_small_pull (view)
-- **Grain:** one row per vw small pull (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_small_pull`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** small-batch elevation-smoothing pass: for invalid points, replaces elevation with the average of `(prior_elev + next_elev + curr_elev) / 3` from neighbors 1-10 m away.
+- **Grain:** one row per bad point from `vw_elevation_neighbors`.
+- **Canonical source:** derived view joining `vw_elevation_neighbors` to bad points within 1-10 m; `new_elev = avg((prior_elev + next_elev + curr_elev) / 3)`.
+- **Dependencies:** `staging.vw_elevation_neighbors`.
+- **Consumers:** elevation smoothing pipeline.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `meter` | integer | YES | Meter position | ordinal | bad point meter | schema.generated.md:2779 | confirmed |
+| `curr_elev` | numeric | YES | Current elevation | metres | `vw_elevation_neighbors.curr_elev` | schema.generated.md:2780 | confirmed |
+| `new_elev` | numeric | YES | Smoothed elevation | metres | `avg((prior+next+curr)/3)` of neighbors 1-10 m | schema_only.sql:22918 | inferred |
 
 ### staging.vw_track_inserts (view)
-- **Grain:** one row per vw track inserts (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_track_inserts`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** deduplicated track insert candidates (latest fetched_at_utc per track) with cleaned names, parsed release date, US availability, market count, feeding `music.all_tracks`.
+- **Grain:** one row per `track_id` (latest record only, `duplicate_finder = 1`).
+- **Canonical source:** derived view over `staging.stg_playlist_details`; `row_number()` dedup by `track_id` ordered by `fetched_at_utc DESC`; `track_name_clean` via `clean_track_display()`, `artist_display_name` via `clean_artist_display()`, `release_date` parsed from `track_release`/`track_release_precision`, `available_in_us = track_markets ILIKE '%US%'`, `total_markets = cardinality(track_markets[])`.
+- **Dependencies:** `staging.stg_playlist_details`, `public.clean_track_display`, `public.clean_artist_display`.
+- **Consumers:** `music.all_tracks` upsert path.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `track_id` | text | YES | Track id | Spotify track id | source | schema.generated.md:2785 | confirmed |
+| `track_name` | text | YES | Track name | text | source | schema.generated.md:2786 | confirmed |
+| `track_name_clean` | text | YES | Cleaned track name | text | `public.clean_track_display(track_name)` | schema.generated.md:2787 | confirmed |
+| `track_name_search` | text | YES | Search-optimized track name | text | derived | schema.generated.md:2788 | confirmed |
+| `track_isrc` | text | YES | Track ISRC | ISRC code | `stg_playlist_details.incoming_isrc` | schema.generated.md:2789 | confirmed |
+| `artist_id` | text | YES | Artist id | Spotify artist id | source | schema.generated.md:2790 | confirmed |
+| `artist_display_name` | text | YES | Artist display name | text | `public.clean_artist_display(track_name, artist_name)` | schema.generated.md:2791 | confirmed |
+| `album_id` | text | YES | Album id | Spotify album id | source | schema.generated.md:2792 | confirmed |
+| `release_date` | date | YES | Release date | calendar date | parsed from `track_release`/`precision` | schema.generated.md:2793 | confirmed |
+| `available_in_us` | boolean | YES | Available in US flag | boolean | `track_markets ILIKE '%US%'` | schema.generated.md:2794 | confirmed |
+| `total_markets` | integer | YES | Market count | count | `cardinality(track_markets[])` | schema.generated.md:2795 | confirmed |
+| `popularity` | integer | YES | Popularity score | score points | source | schema.generated.md:2796 | confirmed |
+| `duration_ms` | integer | YES | Track duration | milliseconds | source | schema.generated.md:2797 | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Refresh timestamp | UTC timestamptz | `fetched_at_utc` (latest) | schema.generated.md:2798 | confirmed |
 
 ### staging.vw_track_inserts_from_listen_history (view)
-- **Grain:** one row per vw track inserts from listen history (view); see schema.generated.md for columns.
-- **Canonical source:** `staging.vw_track_inserts_from_listen_history`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** deduplicated track insert candidates derived from `staging.stg_listen_history` (latest played_at_utc per track), feeding `music.all_tracks` from listen history.
+- **Grain:** one row per `track_id` (latest record only).
+- **Canonical source:** derived view over `staging.stg_listen_history`; same cleaning/parsing logic as `vw_track_inserts` (`track_name_clean`, `artist_display_name`, `release_date`, `available_in_us`, `total_markets`) but `total_markets` from `available_market_count` and `available_in_us` from `available_in_usa`.
+- **Dependencies:** `staging.stg_listen_history`, `public.clean_track_display`, `public.clean_artist_display`.
+- **Consumers:** `music.all_tracks` upsert path.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `track_id` | text | YES | Track id | Spotify track id | source | schema.generated.md:2803 | confirmed |
+| `track_name` | text | YES | Track name | text | source | schema.generated.md:2804 | confirmed |
+| `track_name_clean` | text | YES | Cleaned track name | text | `public.clean_track_display(track_name)` | schema.generated.md:2805 | confirmed |
+| `track_name_search` | text | YES | Search-optimized track name | text | derived | schema.generated.md:2806 | confirmed |
+| `track_isrc` | text | YES | Track ISRC | ISRC code | `stg_listen_history.incoming_isrc` | schema.generated.md:2807 | confirmed |
+| `artist_id` | text | YES | Artist id | Spotify artist id | source | schema.generated.md:2808 | confirmed |
+| `artist_display_name` | text | YES | Artist display name | text | `public.clean_artist_display(track_name, artist_name)` | schema.generated.md:2809 | confirmed |
+| `album_id` | text | YES | Album id | Spotify album id | source | schema.generated.md:2810 | confirmed |
+| `release_date` | date | YES | Release date | calendar date | parsed from `track_release`/`precision` | schema.generated.md:2811 | confirmed |
+| `available_in_us` | boolean | YES | Available in US flag | boolean | `stg_listen_history.available_in_usa` | schema.generated.md:2812 | confirmed |
+| `total_markets` | integer | YES | Market count | count | `stg_listen_history.available_market_count` | schema.generated.md:2813 | confirmed |
+| `popularity` | integer | YES | Popularity score | score points | source | schema.generated.md:2814 | confirmed |
+| `duration_ms` | integer | YES | Track duration | milliseconds | source | schema.generated.md:2815 | confirmed |
+| `updated_at_utc` | timestamp with time zone | YES | Refresh timestamp | UTC timestamptz | `played_at_utc` as `fetched_at_utc` | schema.generated.md:2816 | confirmed |
 
 ## tasks
 
