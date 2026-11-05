@@ -1,5 +1,5 @@
 {
-  "source_file": "docs/data/schema.generated.md",
+  "source_file": "docs\\data\\schema.generated.md",
   "object_count": 222,
   "unique_object_count": 222,
   "column_count": 1817,

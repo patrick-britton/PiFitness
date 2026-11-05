@@ -2,8 +2,8 @@
 
 ## Status / timestamp
 - Status: IN_PROGRESS (Phase 0 complete; Phase 1 baseline established; Phase 3 batch authoring begun)
-- Last updated: 2026-11-04
-- Cline session: first session of this evergreen task
+- Last updated: 2026-11-05
+- Cline session: resumed evergreen task; public schema batch completed
 
 ## Inventory source / version
 - Generated schema: `docs/data/schema.generated.md` (generator: `python tools/db/schema_map.py`; do not edit by hand)
@@ -69,6 +69,12 @@
 - Continue activities domain: activity_details, activity_details_distance, courses, segments, segments_details, distinct_segments, metric_list, training_cycle_dates, and the vw_* views. Then temp tables (excluded-with-reason).
 - Continue schema-by-schema. Suggested: food (11 objects, self-contained, has food_normalize.py/food_search.py in backend_functions) or activities (largest, 56 objects, already has partial draft content to preserve/improve). Reserve public PostGIS/system objects and staging.temp_* scratch tables as excluded-with-reason.
 
+## Batch (health weight_target) - 2026-11-04
+- Added column table for health.weight_target (ts_utc, weight_total_g). Health domain now fully column-documented.
+- Audit: documented_column_count 834/1817; objects_with_missing_columns 129. Next: next domain with missing columns.
+## Batch (health remaining tables+views) - 2026-11-04
+- Added column tables for health.body_composition_raw, photo_metadata, sleep_movement_raw, sleep_totals, spo2_raw, stress_raw, training_status_raw, vw_activity_weights, vw_body_comp_interpolation_precalc, vw_heart_rates.
+- Audit: documented_column_count 832/1817; objects_with_missing_columns 130. weight_target still missing. Next: health.weight_target + other domains.
 ## Batch (health raw tables columns) - 2026-11-04
 - Added column tables for health.body_battery_raw, body_dimensions, fitness_age_raw, hrv_raw, respiration_raw (headings restored after edit mistake).
 - Audit: documented_column_count 768/1817; objects_with_missing_columns 140. Next: photo_metadata, sleep_movement_raw, spo2_raw, stress_raw, body_composition_raw, sleep_totals, training_status_raw, and health views.
@@ -82,3 +88,13 @@
 - docs/data/_evidence/schema_inventory.json, dictionary_audit.json, repo_references.json, data_profiles.json
 - deploy/migrations/013__comment_backfill_staging.sql (generic boilerplate COMMENTs only — treat as hints, not definitions)
 - backend/ layout: pifitness/{activities,admin,auth,config,core,exercises,food,health,integrations,music,segments,tri_tip,volleyball,worker}, backend_functions/{queries,schemas,activity_smoothing,backend_tasks,credential_management,database_functions,db_schema,domain_exceptions,file_handlers,food_normalize,food_search,helper_functions,logging_functions,music_functions,music_service,segments_service,tri_tip_prediction}
+
+## Batch (public schema objects) - 2026-11-05
+- Inventory regenerated: `python tools/data_dictionary/schema_inventory.py inventory` (exit 0) — 222 objects, 1817 columns, 11 schemas; git `04cf6cf7fe797245f1da4c6433678172e32d6a8b`, branch `agent/phase-3`.
+- Inserted `## public` section into `docs/data/dictionary.md` covering all 18 `public.*` objects (object coverage now 222/222 headings, `schema_only: []`, no duplicates):
+  - In-scope, fully documented (purpose/grain/keys/consumers/rules + full column tables): `public.dim_date` (11 cols), `public.dim_hour` (4 cols incl. naive `ts_utc` without time zone), `public.schema_migrations` (2 cols; write path = `tools/db/migrate.py`), `public.vw_date` (19 cols), `public.vw_date_all` (14 cols), `public.vw_hour` (15 cols). Evidence: `schema.generated.md`, `docs/data/_evidence/database/{definitions.sql,catalog.json}`, `repo_references.json` (0 code references for dims/migrations/views), `tools/db/migrate.py`.
+  - Excluded with reason (heading present, column tables intentionally omitted — not application data): `public.geography_columns`, `public.geometry_columns`, `public.raster_columns`, `public.raster_overviews`, `public.spatial_ref_sys` (PostGIS system catalogs); `public.pg_stat_statements`, `public.pg_stat_statements_info` (PostgreSQL statistics views); `public.staging.temp_bc_import`, `public.v_end_elev`, `public.v_is_loop`, `public.v_start_elev`, `public.v_total_distance` (scratch/work tables; elevation-smoothing procedure uses same-named local variables, no persistent-table write path evidenced in captured DDL).
+- Cleanup: replaced 672 U+FFFD replacement characters with em dash in `dictionary.md` (`replacement_character_count` 672 -> 0). Deleted temp helper `docs/data/_evidence/tmp_list_headers.py`.
+- Audit result (`audit.py --sql-file deploy/migrations/013__comment_backfill_staging.sql`, exit 1 expected): headings 222/222 unique; `schema_only` []; duplicates {}; `placeholder_count` 669; replacement chars 0; documented columns 899/1817; `objects_with_missing_columns` 123 (12 excluded public objects among them — intentional); `ready_for_completion` false (expected; placeholders + missing columns remain).
+- Tooling: 9/9 tests pass with venv interpreter.
+- Next batch: continue column documentation domain-by-domain (suggested: `tasks` — clear `backend_tasks` write paths — then `health`/`logging`/`music`); chip away at the 669 'Unknown — investigation incomplete' placeholders (activities temp tables first).

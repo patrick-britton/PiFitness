@@ -2,132 +2,25 @@
   "coverage": {
     "schema_object_count": 222,
     "schema_column_count": 1817,
-    "dictionary_heading_count": 204,
-    "dictionary_unique_heading_count": 204,
-    "schema_only": [
-      "public.dim_date",
-      "public.dim_hour",
-      "public.geography_columns",
-      "public.geometry_columns",
-      "public.pg_stat_statements",
-      "public.pg_stat_statements_info",
-      "public.raster_columns",
-      "public.raster_overviews",
-      "public.schema_migrations",
-      "public.spatial_ref_sys",
-      "public.staging.temp_bc_import",
-      "public.v_end_elev",
-      "public.v_is_loop",
-      "public.v_start_elev",
-      "public.v_total_distance",
-      "public.vw_date",
-      "public.vw_date_all",
-      "public.vw_hour"
-    ],
+    "dictionary_heading_count": 222,
+    "dictionary_unique_heading_count": 222,
+    "schema_only": [],
     "dictionary_only": [],
     "duplicate_dictionary_headings": {},
     "placeholder_count": 669,
-    "replacement_character_count": 672,
+    "replacement_character_count": 0,
     "schema_duplicates": []
   },
   "column_coverage": {
-    "documented_column_count": 768,
+    "documented_column_count": 899,
     "expected_column_count": 1817,
-    "objects_with_missing_columns": 140,
+    "objects_with_missing_columns": 123,
     "missing_columns": {
-      "health.body_composition_raw": [
-        "body_mass_index",
-        "fat_pct",
-        "ts_utc",
-        "water_pct",
-        "weight_bone_g",
-        "weight_muscle_g",
-        "weight_total_g"
-      ],
       "health.heartrate_raw": [
         "activity_label",
         "heartrate_bpm",
         "hr_date",
         "ts_utc"
-      ],
-      "health.photo_metadata": [
-        "captured_at_utc",
-        "file_name",
-        "photo_type"
-      ],
-      "health.sleep_movement_raw": [
-        "sleep_movement",
-        "ts_utc"
-      ],
-      "health.sleep_totals": [
-        "awake_sleep_s",
-        "breaths_per_min",
-        "deep_sleep_s",
-        "heartrate_bpm",
-        "hrv_value",
-        "light_sleep_s",
-        "rem_sleep_s",
-        "score_label",
-        "sleep_duration_s",
-        "sleep_end_date",
-        "sleep_end_utc",
-        "sleep_score",
-        "sleep_start_utc",
-        "spo2"
-      ],
-      "health.spo2_raw": [
-        "spo2_confidence",
-        "spo2_reading",
-        "ts_utc"
-      ],
-      "health.stress_raw": [
-        "stress_value",
-        "ts_utc"
-      ],
-      "health.training_status_raw": [
-        "altitude_acclimation_m",
-        "altitude_acclimation_pct",
-        "altitude_current_m",
-        "heat_acclimation_pct",
-        "training_load_acute",
-        "training_load_max",
-        "training_load_min",
-        "ts_utc",
-        "vo2_max_value"
-      ],
-      "health.vw_activity_weights": [
-        "activity_id",
-        "fat_pct",
-        "water_pct",
-        "weight_bone_g",
-        "weight_fat_g",
-        "weight_muscle_g",
-        "weight_total_g"
-      ],
-      "health.vw_body_comp_interpolation_precalc": [
-        "bone_delta_per_s",
-        "delta_s",
-        "fat_delta_per_s",
-        "fat_pct",
-        "muscle_delta_per_s",
-        "next_ts_utc",
-        "ts_utc",
-        "water_delta_per_s",
-        "water_pct",
-        "weight_bone_g",
-        "weight_delta_per_s",
-        "weight_muscle_g",
-        "weight_total_g"
-      ],
-      "health.vw_heart_rates": [
-        "hr_date",
-        "max_hr",
-        "resting_hr_asleep",
-        "resting_hr_awake"
-      ],
-      "health.weight_target": [
-        "ts_utc",
-        "weight_total_g"
       ],
       "logging.api_logins": [
         "api_service_name",
@@ -597,25 +490,6 @@
         "isrc",
         "track_id"
       ],
-      "public.dim_date": [
-        "date_key",
-        "date_utc",
-        "day_name",
-        "day_of_month",
-        "day_of_week",
-        "day_of_year",
-        "month",
-        "month_name",
-        "quarter",
-        "week_of_year",
-        "year"
-      ],
-      "public.dim_hour": [
-        "date_key",
-        "hour",
-        "hour_key",
-        "ts_utc"
-      ],
       "public.geography_columns": [
         "coord_dimension",
         "f_geography_column",
@@ -722,10 +596,6 @@
         "r_table_name",
         "r_table_schema"
       ],
-      "public.schema_migrations": [
-        "applied_at",
-        "version"
-      ],
       "public.spatial_ref_sys": [
         "auth_name",
         "auth_srid",
@@ -754,60 +624,6 @@
       ],
       "public.v_total_distance": [
         "max"
-      ],
-      "public.vw_date": [
-        "date_key",
-        "date_utc",
-        "day_name",
-        "day_of_month",
-        "day_of_week",
-        "day_of_year",
-        "dm30",
-        "dm90",
-        "month",
-        "month_name",
-        "quarter",
-        "relative_30",
-        "relative_90",
-        "relative_day",
-        "relative_month",
-        "relative_week",
-        "relative_year",
-        "week_of_year",
-        "year"
-      ],
-      "public.vw_date_all": [
-        "date_key",
-        "date_utc",
-        "day_name",
-        "day_of_month",
-        "day_of_week",
-        "month",
-        "month_name",
-        "quarter",
-        "relative_day",
-        "relative_month",
-        "relative_week",
-        "relative_year",
-        "week_of_year",
-        "year"
-      ],
-      "public.vw_hour": [
-        "date_hour_utc",
-        "date_key",
-        "date_utc",
-        "day_name",
-        "day_of_month",
-        "day_of_week",
-        "month",
-        "month_name",
-        "quarter",
-        "relative_day",
-        "relative_month",
-        "relative_week",
-        "relative_year",
-        "week_of_year",
-        "year"
       ],
       "staging.activity_metric_descriptors": [
         "activity_id",
@@ -1367,15 +1183,1607 @@
     }
   },
   "sql_comments": {
-    "table_comments": [],
-    "column_comments": [],
-    "table_comment_statement_count": 0,
-    "table_comment_null_count": 0,
-    "column_comment_statement_count": 0,
+    "table_comments": [
+      {
+        "object": "staging.\"activity_metric_descriptors\"",
+        "comment": "Staging table.",
+        "line": 2
+      },
+      {
+        "object": "staging.\"activity_metrics_flat\"",
+        "comment": "Staging table.",
+        "line": 8
+      },
+      {
+        "object": "staging.\"activity_metrics_matched\"",
+        "comment": "Staging table.",
+        "line": 13
+      },
+      {
+        "object": "staging.\"activity_payload\"",
+        "comment": "Staging table.",
+        "line": 19
+      },
+      {
+        "object": "staging.\"api_imports\"",
+        "comment": "Staging table.",
+        "line": 22
+      },
+      {
+        "object": "staging.\"bounds\"",
+        "comment": "Staging table.",
+        "line": 28
+      },
+      {
+        "object": "staging.\"interpolation_anchors\"",
+        "comment": "Staging table.",
+        "line": 32
+      },
+      {
+        "object": "staging.\"interpolation_load_values\"",
+        "comment": "Staging table.",
+        "line": 39
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\"",
+        "comment": "Staging table.",
+        "line": 42
+      },
+      {
+        "object": "staging.\"isrc_dupe_seeds\"",
+        "comment": "Staging table.",
+        "line": 57
+      },
+      {
+        "object": "staging.\"json_examples\"",
+        "comment": "Staging table.",
+        "line": 66
+      },
+      {
+        "object": "staging.\"stg_listen_history\"",
+        "comment": "Staging table.",
+        "line": 70
+      },
+      {
+        "object": "staging.\"stg_now_playing\"",
+        "comment": "Staging table.",
+        "line": 87
+      },
+      {
+        "object": "staging.\"stg_playlist_details\"",
+        "comment": "Staging table.",
+        "line": 104
+      },
+      {
+        "object": "staging.\"temp_activity_locations\"",
+        "comment": "Staging table.",
+        "line": 120
+      },
+      {
+        "object": "staging.\"temp_activity_matched_locations\"",
+        "comment": "Staging table.",
+        "line": 129
+      },
+      {
+        "object": "staging.\"temp_activity_metas\"",
+        "comment": "Staging table.",
+        "line": 135
+      },
+      {
+        "object": "staging.\"temp_activity_trackpoints\"",
+        "comment": "Staging table.",
+        "line": 139
+      },
+      {
+        "object": "staging.\"temp_bc_import\"",
+        "comment": "Staging table.",
+        "line": 146
+      },
+      {
+        "object": "staging.\"temp_csv_import\"",
+        "comment": "Staging table.",
+        "line": 155
+      },
+      {
+        "object": "staging.\"temp_elevation_deltas\"",
+        "comment": "Staging table.",
+        "line": 167
+      },
+      {
+        "object": "staging.\"temp_elevation_medians\"",
+        "comment": "Staging table.",
+        "line": 171
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothed\"",
+        "comment": "Staging table.",
+        "line": 174
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothing\"",
+        "comment": "Staging table.",
+        "line": 178
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothing_m\"",
+        "comment": "Staging table.",
+        "line": 182
+      },
+      {
+        "object": "staging.\"temp_isrc_swaps\"",
+        "comment": "Staging table.",
+        "line": 187
+      },
+      {
+        "object": "staging.\"temp_performance_profiling\"",
+        "comment": "Staging table.",
+        "line": 192
+      },
+      {
+        "object": "staging.\"temp_segment_matches\"",
+        "comment": "Staging table.",
+        "line": 197
+      },
+      {
+        "object": "staging.\"temp_training_status_raw\"",
+        "comment": "Staging table.",
+        "line": 206
+      }
+    ],
+    "column_comments": [
+      {
+        "object": "staging.\"activity_metric_descriptors\".\"activity_id\"",
+        "comment": "Identifier.",
+        "line": 3
+      },
+      {
+        "object": "staging.\"activity_metric_descriptors\".\"metric_idx\"",
+        "comment": "Metric idx value.",
+        "line": 4
+      },
+      {
+        "object": "staging.\"activity_metric_descriptors\".\"metric_name\"",
+        "comment": "Metric name value.",
+        "line": 5
+      },
+      {
+        "object": "staging.\"activity_metric_descriptors\".\"metric_unit\"",
+        "comment": "Metric unit value.",
+        "line": 6
+      },
+      {
+        "object": "staging.\"activity_metric_descriptors\".\"activity_type_id\"",
+        "comment": "Identifier.",
+        "line": 7
+      },
+      {
+        "object": "staging.\"activity_metrics_flat\".\"activity_id\"",
+        "comment": "Identifier.",
+        "line": 9
+      },
+      {
+        "object": "staging.\"activity_metrics_flat\".\"activity_detail_index\"",
+        "comment": "Activity detail index value.",
+        "line": 10
+      },
+      {
+        "object": "staging.\"activity_metrics_flat\".\"metric_index\"",
+        "comment": "Metric index value.",
+        "line": 11
+      },
+      {
+        "object": "staging.\"activity_metrics_flat\".\"metric_value\"",
+        "comment": "Metric value value.",
+        "line": 12
+      },
+      {
+        "object": "staging.\"activity_metrics_matched\".\"activity_id\"",
+        "comment": "Identifier.",
+        "line": 14
+      },
+      {
+        "object": "staging.\"activity_metrics_matched\".\"activity_detail_index\"",
+        "comment": "Activity detail index value.",
+        "line": 15
+      },
+      {
+        "object": "staging.\"activity_metrics_matched\".\"metric_name\"",
+        "comment": "Metric name value.",
+        "line": 16
+      },
+      {
+        "object": "staging.\"activity_metrics_matched\".\"metric_value\"",
+        "comment": "Metric value value.",
+        "line": 17
+      },
+      {
+        "object": "staging.\"activity_metrics_matched\".\"activity_type_id\"",
+        "comment": "Identifier.",
+        "line": 18
+      },
+      {
+        "object": "staging.\"activity_payload\".\"activity_id\"",
+        "comment": "Identifier.",
+        "line": 20
+      },
+      {
+        "object": "staging.\"activity_payload\".\"payload\"",
+        "comment": "Payload value.",
+        "line": 21
+      },
+      {
+        "object": "staging.\"api_imports\".\"load_id\"",
+        "comment": "Identifier.",
+        "line": 23
+      },
+      {
+        "object": "staging.\"api_imports\".\"event_time_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 24
+      },
+      {
+        "object": "staging.\"api_imports\".\"api_function_name\"",
+        "comment": "Api function name value.",
+        "line": 25
+      },
+      {
+        "object": "staging.\"api_imports\".\"payload\"",
+        "comment": "Payload value.",
+        "line": 26
+      },
+      {
+        "object": "staging.\"api_imports\".\"task_id\"",
+        "comment": "Identifier.",
+        "line": 27
+      },
+      {
+        "object": "staging.\"bounds\".\"id\"",
+        "comment": "Id value.",
+        "line": 29
+      },
+      {
+        "object": "staging.\"bounds\".\"min_ts\"",
+        "comment": "Min ts value.",
+        "line": 30
+      },
+      {
+        "object": "staging.\"bounds\".\"max_ts\"",
+        "comment": "Max ts value.",
+        "line": 31
+      },
+      {
+        "object": "staging.\"interpolation_anchors\".\"ts_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 33
+      },
+      {
+        "object": "staging.\"interpolation_anchors\".\"load_value\"",
+        "comment": "Load value value.",
+        "line": 34
+      },
+      {
+        "object": "staging.\"interpolation_anchors\".\"prev_value\"",
+        "comment": "Prev value value.",
+        "line": 35
+      },
+      {
+        "object": "staging.\"interpolation_anchors\".\"prev_ts\"",
+        "comment": "Prev ts value.",
+        "line": 36
+      },
+      {
+        "object": "staging.\"interpolation_anchors\".\"next_value\"",
+        "comment": "Next value value.",
+        "line": 37
+      },
+      {
+        "object": "staging.\"interpolation_anchors\".\"next_ts\"",
+        "comment": "Next ts value.",
+        "line": 38
+      },
+      {
+        "object": "staging.\"interpolation_load_values\".\"ts_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 40
+      },
+      {
+        "object": "staging.\"interpolation_load_values\".\"load_value\"",
+        "comment": "Load value value.",
+        "line": 41
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"isrc1\"",
+        "comment": "Isrc1 value.",
+        "line": 43
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"isrc2\"",
+        "comment": "Isrc2 value.",
+        "line": 44
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"track1\"",
+        "comment": "Track1 value.",
+        "line": 45
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"track2\"",
+        "comment": "Track2 value.",
+        "line": 46
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"artist1\"",
+        "comment": "Artist1 value.",
+        "line": 47
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"artist2\"",
+        "comment": "Artist2 value.",
+        "line": 48
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"artist_id1\"",
+        "comment": "Artist id1 value.",
+        "line": 49
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"artist_id2\"",
+        "comment": "Artist id2 value.",
+        "line": 50
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"album1\"",
+        "comment": "Album1 value.",
+        "line": 51
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"album2\"",
+        "comment": "Album2 value.",
+        "line": 52
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"album_id1\"",
+        "comment": "Album id1 value.",
+        "line": 53
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"album_id2\"",
+        "comment": "Album id2 value.",
+        "line": 54
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"duration1\"",
+        "comment": "Duration1 value.",
+        "line": 55
+      },
+      {
+        "object": "staging.\"isrc_dupe_pairs\".\"duration2\"",
+        "comment": "Duration2 value.",
+        "line": 56
+      },
+      {
+        "object": "staging.\"isrc_dupe_seeds\".\"isrc\"",
+        "comment": "Isrc value.",
+        "line": 58
+      },
+      {
+        "object": "staging.\"isrc_dupe_seeds\".\"track_name_search\"",
+        "comment": "Track name search value.",
+        "line": 59
+      },
+      {
+        "object": "staging.\"isrc_dupe_seeds\".\"artist_name_search\"",
+        "comment": "Artist name search value.",
+        "line": 60
+      },
+      {
+        "object": "staging.\"isrc_dupe_seeds\".\"album_name_search\"",
+        "comment": "Album name search value.",
+        "line": 61
+      },
+      {
+        "object": "staging.\"isrc_dupe_seeds\".\"artist_id\"",
+        "comment": "Identifier.",
+        "line": 62
+      },
+      {
+        "object": "staging.\"isrc_dupe_seeds\".\"album_id\"",
+        "comment": "Identifier.",
+        "line": 63
+      },
+      {
+        "object": "staging.\"isrc_dupe_seeds\".\"duration_ms\"",
+        "comment": "Duration in milliseconds.",
+        "line": 64
+      },
+      {
+        "object": "staging.\"isrc_dupe_seeds\".\"prior_comparison\"",
+        "comment": "Prior comparison value.",
+        "line": 65
+      },
+      {
+        "object": "staging.\"json_examples\".\"raw_table_name\"",
+        "comment": "Raw table name value.",
+        "line": 67
+      },
+      {
+        "object": "staging.\"json_examples\".\"json_sample\"",
+        "comment": "Json sample value.",
+        "line": 68
+      },
+      {
+        "object": "staging.\"json_examples\".\"updated_at_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 69
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"track_id\"",
+        "comment": "Identifier.",
+        "line": 71
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"track_name\"",
+        "comment": "Track name value.",
+        "line": 72
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"album_id\"",
+        "comment": "Identifier.",
+        "line": 73
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"album_name\"",
+        "comment": "Album name value.",
+        "line": 74
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"artist_id\"",
+        "comment": "Identifier.",
+        "line": 75
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"artist_name\"",
+        "comment": "Artist name value.",
+        "line": 76
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"popularity\"",
+        "comment": "Popularity value.",
+        "line": 77
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"duration_ms\"",
+        "comment": "Duration in milliseconds.",
+        "line": 78
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"incoming_isrc\"",
+        "comment": "Incoming isrc value.",
+        "line": 79
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"available_market_count\"",
+        "comment": "Count.",
+        "line": 80
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"available_in_usa\"",
+        "comment": "Available in usa value.",
+        "line": 81
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"context_type\"",
+        "comment": "Context type value.",
+        "line": 82
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"context_uri\"",
+        "comment": "Context uri value.",
+        "line": 83
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"played_at_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 84
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"track_release\"",
+        "comment": "Track release value.",
+        "line": 85
+      },
+      {
+        "object": "staging.\"stg_listen_history\".\"track_release_precision\"",
+        "comment": "Track release precision value.",
+        "line": 86
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"track_id\"",
+        "comment": "Identifier.",
+        "line": 88
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"track_name\"",
+        "comment": "Track name value.",
+        "line": 89
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"album_id\"",
+        "comment": "Identifier.",
+        "line": 90
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"album_name\"",
+        "comment": "Album name value.",
+        "line": 91
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"artist_id\"",
+        "comment": "Identifier.",
+        "line": 92
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"artist_name\"",
+        "comment": "Artist name value.",
+        "line": 93
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"popularity\"",
+        "comment": "Popularity value.",
+        "line": 94
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"duration_ms\"",
+        "comment": "Duration in milliseconds.",
+        "line": 95
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"incoming_isrc\"",
+        "comment": "Incoming isrc value.",
+        "line": 96
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"available_market_count\"",
+        "comment": "Count.",
+        "line": 97
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"available_in_usa\"",
+        "comment": "Available in usa value.",
+        "line": 98
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"context_type\"",
+        "comment": "Context type value.",
+        "line": 99
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"context_uri\"",
+        "comment": "Context uri value.",
+        "line": 100
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"played_at_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 101
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"track_release\"",
+        "comment": "Track release value.",
+        "line": 102
+      },
+      {
+        "object": "staging.\"stg_now_playing\".\"track_release_precision\"",
+        "comment": "Track release precision value.",
+        "line": 103
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"playlist_id\"",
+        "comment": "Identifier.",
+        "line": 105
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"track_id\"",
+        "comment": "Identifier.",
+        "line": 106
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"track_name\"",
+        "comment": "Track name value.",
+        "line": 107
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"track_order\"",
+        "comment": "Track order value.",
+        "line": 108
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"album_id\"",
+        "comment": "Identifier.",
+        "line": 109
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"album_name\"",
+        "comment": "Album name value.",
+        "line": 110
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"artist_id\"",
+        "comment": "Identifier.",
+        "line": 111
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"artist_name\"",
+        "comment": "Artist name value.",
+        "line": 112
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"track_release\"",
+        "comment": "Track release value.",
+        "line": 113
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"track_release_precision\"",
+        "comment": "Track release precision value.",
+        "line": 114
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"track_markets\"",
+        "comment": "Track markets value.",
+        "line": 115
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"popularity\"",
+        "comment": "Popularity value.",
+        "line": 116
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"incoming_isrc\"",
+        "comment": "Incoming isrc value.",
+        "line": 117
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"duration_ms\"",
+        "comment": "Duration in milliseconds.",
+        "line": 118
+      },
+      {
+        "object": "staging.\"stg_playlist_details\".\"fetched_at_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 119
+      },
+      {
+        "object": "staging.\"temp_activity_locations\".\"latitude\"",
+        "comment": "Latitude value.",
+        "line": 121
+      },
+      {
+        "object": "staging.\"temp_activity_locations\".\"longitude\"",
+        "comment": "Longitude value.",
+        "line": 122
+      },
+      {
+        "object": "staging.\"temp_activity_locations\".\"loc_point\"",
+        "comment": "Loc point value.",
+        "line": 123
+      },
+      {
+        "object": "staging.\"temp_activity_locations\".\"elevation_m_smooth\"",
+        "comment": "Elevation m smooth value.",
+        "line": 124
+      },
+      {
+        "object": "staging.\"temp_activity_locations\".\"grid_5m_00\"",
+        "comment": "Grid 5m 00 value.",
+        "line": 125
+      },
+      {
+        "object": "staging.\"temp_activity_locations\".\"grid_5m_25_00\"",
+        "comment": "Grid 5m 25 00 value.",
+        "line": 126
+      },
+      {
+        "object": "staging.\"temp_activity_locations\".\"grid_5m_00_25\"",
+        "comment": "Grid 5m 00 25 value.",
+        "line": 127
+      },
+      {
+        "object": "staging.\"temp_activity_locations\".\"grid_5m_25_25\"",
+        "comment": "Grid 5m 25 25 value.",
+        "line": 128
+      },
+      {
+        "object": "staging.\"temp_activity_matched_locations\".\"latitude\"",
+        "comment": "Latitude value.",
+        "line": 130
+      },
+      {
+        "object": "staging.\"temp_activity_matched_locations\".\"longitude\"",
+        "comment": "Longitude value.",
+        "line": 131
+      },
+      {
+        "object": "staging.\"temp_activity_matched_locations\".\"loc_point\"",
+        "comment": "Loc point value.",
+        "line": 132
+      },
+      {
+        "object": "staging.\"temp_activity_matched_locations\".\"loc_point_matched\"",
+        "comment": "Loc point matched value.",
+        "line": 133
+      },
+      {
+        "object": "staging.\"temp_activity_matched_locations\".\"elevation_m_smooth\"",
+        "comment": "Elevation m smooth value.",
+        "line": 134
+      },
+      {
+        "object": "staging.\"temp_activity_metas\".\"activity_id\"",
+        "comment": "Identifier.",
+        "line": 136
+      },
+      {
+        "object": "staging.\"temp_activity_metas\".\"activity_type_id\"",
+        "comment": "Identifier.",
+        "line": 137
+      },
+      {
+        "object": "staging.\"temp_activity_metas\".\"activity_path\"",
+        "comment": "Activity path value.",
+        "line": 138
+      },
+      {
+        "object": "staging.\"temp_activity_trackpoints\".\"activity_id\"",
+        "comment": "Identifier.",
+        "line": 140
+      },
+      {
+        "object": "staging.\"temp_activity_trackpoints\".\"track_point\"",
+        "comment": "Track point value.",
+        "line": 141
+      },
+      {
+        "object": "staging.\"temp_activity_trackpoints\".\"longitude\"",
+        "comment": "Longitude value.",
+        "line": 142
+      },
+      {
+        "object": "staging.\"temp_activity_trackpoints\".\"latitude\"",
+        "comment": "Latitude value.",
+        "line": 143
+      },
+      {
+        "object": "staging.\"temp_activity_trackpoints\".\"elevation_m\"",
+        "comment": "Length in meters.",
+        "line": 144
+      },
+      {
+        "object": "staging.\"temp_activity_trackpoints\".\"activity_type_id\"",
+        "comment": "Identifier.",
+        "line": 145
+      },
+      {
+        "object": "staging.\"temp_bc_import\".\"ROW_ID\"",
+        "comment": "Identifier.",
+        "line": 147
+      },
+      {
+        "object": "staging.\"temp_bc_import\".\"ts_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 148
+      },
+      {
+        "object": "staging.\"temp_bc_import\".\"Weight\"",
+        "comment": "Weight value.",
+        "line": 149
+      },
+      {
+        "object": "staging.\"temp_bc_import\".\"BMI\"",
+        "comment": "Bmi value.",
+        "line": 150
+      },
+      {
+        "object": "staging.\"temp_bc_import\".\"Body Fat\"",
+        "comment": "Body fat value.",
+        "line": 151
+      },
+      {
+        "object": "staging.\"temp_bc_import\".\"Skeletal Muscle Mass\"",
+        "comment": "Skeletal muscle mass value.",
+        "line": 152
+      },
+      {
+        "object": "staging.\"temp_bc_import\".\"Bone Mass\"",
+        "comment": "Bone mass value.",
+        "line": 153
+      },
+      {
+        "object": "staging.\"temp_bc_import\".\"Body Water\"",
+        "comment": "Body water value.",
+        "line": 154
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"Sleep Score 4 Weeks\"",
+        "comment": "Sleep score 4 weeks value.",
+        "line": 156
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"Score\"",
+        "comment": "Score value.",
+        "line": 157
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"Resting Heart Rate\"",
+        "comment": "Resting heart rate value.",
+        "line": 158
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"Body Battery\"",
+        "comment": "Body battery value.",
+        "line": 159
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"Pulse Ox\"",
+        "comment": "Pulse ox value.",
+        "line": 160
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"Respiration\"",
+        "comment": "Respiration value.",
+        "line": 161
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"HRV Status\"",
+        "comment": "Hrv status value.",
+        "line": 162
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"Quality\"",
+        "comment": "Quality value.",
+        "line": 163
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"Duration\"",
+        "comment": "Duration value.",
+        "line": 164
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"Bedtime\"",
+        "comment": "Bedtime value.",
+        "line": 165
+      },
+      {
+        "object": "staging.\"temp_csv_import\".\"Wake Time\"",
+        "comment": "Wake time value.",
+        "line": 166
+      },
+      {
+        "object": "staging.\"temp_elevation_deltas\".\"activity_id\"",
+        "comment": "Identifier.",
+        "line": 168
+      },
+      {
+        "object": "staging.\"temp_elevation_deltas\".\"ascent_m\"",
+        "comment": "Length in meters.",
+        "line": 169
+      },
+      {
+        "object": "staging.\"temp_elevation_deltas\".\"descent_m\"",
+        "comment": "Length in meters.",
+        "line": 170
+      },
+      {
+        "object": "staging.\"temp_elevation_medians\".\"loc_point\"",
+        "comment": "Loc point value.",
+        "line": 172
+      },
+      {
+        "object": "staging.\"temp_elevation_medians\".\"median_elev\"",
+        "comment": "Median elev value.",
+        "line": 173
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothed\".\"activity_id\"",
+        "comment": "Identifier.",
+        "line": 175
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothed\".\"track_point\"",
+        "comment": "Track point value.",
+        "line": 176
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothed\".\"elevation_m\"",
+        "comment": "Length in meters.",
+        "line": 177
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothing\".\"elapsed_duration_s\"",
+        "comment": "Duration in seconds.",
+        "line": 179
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothing\".\"elevation_m_raw\"",
+        "comment": "Elevation m raw value.",
+        "line": 180
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothing\".\"distance_m\"",
+        "comment": "Length in meters.",
+        "line": 181
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothing_m\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 183
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothing_m\".\"elapsed_duration_s\"",
+        "comment": "Duration in seconds.",
+        "line": 184
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothing_m\".\"elevation_m_raw\"",
+        "comment": "Elevation m raw value.",
+        "line": 185
+      },
+      {
+        "object": "staging.\"temp_elevation_smoothing_m\".\"elevation_m_smooth\"",
+        "comment": "Elevation m smooth value.",
+        "line": 186
+      },
+      {
+        "object": "staging.\"temp_isrc_swaps\".\"original_isrc\"",
+        "comment": "Original isrc value.",
+        "line": 188
+      },
+      {
+        "object": "staging.\"temp_isrc_swaps\".\"mapped_isrc\"",
+        "comment": "Mapped isrc value.",
+        "line": 189
+      },
+      {
+        "object": "staging.\"temp_isrc_swaps\".\"mapping_time_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 190
+      },
+      {
+        "object": "staging.\"temp_isrc_swaps\".\"valid_mapping\"",
+        "comment": "Valid mapping value.",
+        "line": 191
+      },
+      {
+        "object": "staging.\"temp_performance_profiling\".\"ts\"",
+        "comment": "Ts value.",
+        "line": 193
+      },
+      {
+        "object": "staging.\"temp_performance_profiling\".\"segment\"",
+        "comment": "Segment value.",
+        "line": 194
+      },
+      {
+        "object": "staging.\"temp_performance_profiling\".\"code\"",
+        "comment": "Code value.",
+        "line": 195
+      },
+      {
+        "object": "staging.\"temp_performance_profiling\".\"time_ms\"",
+        "comment": "Duration in milliseconds.",
+        "line": 196
+      },
+      {
+        "object": "staging.\"temp_segment_matches\".\"segment_id\"",
+        "comment": "Identifier.",
+        "line": 198
+      },
+      {
+        "object": "staging.\"temp_segment_matches\".\"activity_id\"",
+        "comment": "Identifier.",
+        "line": 199
+      },
+      {
+        "object": "staging.\"temp_segment_matches\".\"activity_start_point\"",
+        "comment": "Activity start point value.",
+        "line": 200
+      },
+      {
+        "object": "staging.\"temp_segment_matches\".\"activity_end_point\"",
+        "comment": "Activity end point value.",
+        "line": 201
+      },
+      {
+        "object": "staging.\"temp_segment_matches\".\"activity_path\"",
+        "comment": "Activity path value.",
+        "line": 202
+      },
+      {
+        "object": "staging.\"temp_segment_matches\".\"match_confirmed\"",
+        "comment": "Match confirmed value.",
+        "line": 203
+      },
+      {
+        "object": "staging.\"temp_segment_matches\".\"match_confidence\"",
+        "comment": "Match confidence value.",
+        "line": 204
+      },
+      {
+        "object": "staging.\"temp_segment_matches\".\"match_ts_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 205
+      },
+      {
+        "object": "staging.\"temp_training_status_raw\".\"ts_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 207
+      },
+      {
+        "object": "staging.\"temp_training_status_raw\".\"vo2_max_value\"",
+        "comment": "Vo2 max value value.",
+        "line": 208
+      },
+      {
+        "object": "staging.\"temp_training_status_raw\".\"altitude_current_m\"",
+        "comment": "Length in meters.",
+        "line": 209
+      },
+      {
+        "object": "staging.\"temp_training_status_raw\".\"altitude_acclimation_m\"",
+        "comment": "Length in meters.",
+        "line": 210
+      },
+      {
+        "object": "staging.\"temp_training_status_raw\".\"altitude_acclimation_pct\"",
+        "comment": "Percentage value.",
+        "line": 211
+      },
+      {
+        "object": "staging.\"temp_training_status_raw\".\"heat_acclimation_pct\"",
+        "comment": "Percentage value.",
+        "line": 212
+      },
+      {
+        "object": "staging.\"temp_training_status_raw\".\"training_load_acute\"",
+        "comment": "Training load acute value.",
+        "line": 213
+      },
+      {
+        "object": "staging.\"temp_training_status_raw\".\"training_load_min\"",
+        "comment": "Training load min value.",
+        "line": 214
+      },
+      {
+        "object": "staging.\"temp_training_status_raw\".\"training_load_max\"",
+        "comment": "Training load max value.",
+        "line": 215
+      },
+      {
+        "object": "staging.\"vw_activity_by_distance\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 216
+      },
+      {
+        "object": "staging.\"vw_activity_by_distance\".\"elapsed_duration_s\"",
+        "comment": "Duration in seconds.",
+        "line": 217
+      },
+      {
+        "object": "staging.\"vw_activity_by_distance\".\"elev_raw\"",
+        "comment": "Elev raw value.",
+        "line": 218
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"activity_id\"",
+        "comment": "Identifier.",
+        "line": 219
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"activity_type_id\"",
+        "comment": "Identifier.",
+        "line": 220
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"activity_detail_index\"",
+        "comment": "Activity detail index value.",
+        "line": 221
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"ts_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 222
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"moving_duration_s\"",
+        "comment": "Duration in seconds.",
+        "line": 223
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"elapsed_duration_s\"",
+        "comment": "Duration in seconds.",
+        "line": 224
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"duration_s\"",
+        "comment": "Duration in seconds.",
+        "line": 225
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"distance_mm\"",
+        "comment": "Distance mm value.",
+        "line": 226
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"latitude\"",
+        "comment": "Latitude value.",
+        "line": 227
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"longitude\"",
+        "comment": "Longitude value.",
+        "line": 228
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"heartrate_bpm\"",
+        "comment": "Heartrate bpm value.",
+        "line": 229
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"cadence_spm\"",
+        "comment": "Cadence spm value.",
+        "line": 230
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"air_temp_c\"",
+        "comment": "Air temp c value.",
+        "line": 231
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"elevation_m\"",
+        "comment": "Length in meters.",
+        "line": 232
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"speed_mmps\"",
+        "comment": "Speed mmps value.",
+        "line": 233
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"vertical_speed_mps\"",
+        "comment": "Vertical speed mps value.",
+        "line": 234
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"vert_oscillation_cm\"",
+        "comment": "Length in centimeters.",
+        "line": 235
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"stride_length_cm\"",
+        "comment": "Length in centimeters.",
+        "line": 236
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"vert_ratio\"",
+        "comment": "Vert ratio value.",
+        "line": 237
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"ground_contact_time_ms\"",
+        "comment": "Duration in milliseconds.",
+        "line": 238
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"ground_contact_balance_left\"",
+        "comment": "Ground contact balance left value.",
+        "line": 239
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"performance_condition\"",
+        "comment": "Performance condition value.",
+        "line": 240
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"loc_point\"",
+        "comment": "Loc point value.",
+        "line": 241
+      },
+      {
+        "object": "staging.\"vw_activity_flatten\".\"elevation_smooth_m\"",
+        "comment": "Length in meters.",
+        "line": 242
+      },
+      {
+        "object": "staging.\"vw_album_inserts\".\"album_id\"",
+        "comment": "Identifier.",
+        "line": 243
+      },
+      {
+        "object": "staging.\"vw_album_inserts\".\"album_name\"",
+        "comment": "Album name value.",
+        "line": 244
+      },
+      {
+        "object": "staging.\"vw_album_inserts\".\"album_name_clean\"",
+        "comment": "Album name clean value.",
+        "line": 245
+      },
+      {
+        "object": "staging.\"vw_album_inserts\".\"album_name_search\"",
+        "comment": "Album name search value.",
+        "line": 246
+      },
+      {
+        "object": "staging.\"vw_album_inserts\".\"updated_at_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 247
+      },
+      {
+        "object": "staging.\"vw_artist_inserts\".\"artist_id\"",
+        "comment": "Identifier.",
+        "line": 248
+      },
+      {
+        "object": "staging.\"vw_artist_inserts\".\"artist_name\"",
+        "comment": "Artist name value.",
+        "line": 249
+      },
+      {
+        "object": "staging.\"vw_artist_inserts\".\"artist_name_search\"",
+        "comment": "Artist name search value.",
+        "line": 250
+      },
+      {
+        "object": "staging.\"vw_artist_inserts\".\"updated_at_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 251
+      },
+      {
+        "object": "staging.\"vw_elevation_backward\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 252
+      },
+      {
+        "object": "staging.\"vw_elevation_backward\".\"curr_elev\"",
+        "comment": "Curr elev value.",
+        "line": 253
+      },
+      {
+        "object": "staging.\"vw_elevation_backward\".\"new_elev\"",
+        "comment": "New elev value.",
+        "line": 254
+      },
+      {
+        "object": "staging.\"vw_elevation_bumps\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 255
+      },
+      {
+        "object": "staging.\"vw_elevation_bumps\".\"curr_elev\"",
+        "comment": "Curr elev value.",
+        "line": 256
+      },
+      {
+        "object": "staging.\"vw_elevation_bumps\".\"new_elev\"",
+        "comment": "New elev value.",
+        "line": 257
+      },
+      {
+        "object": "staging.\"vw_elevation_forward\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 258
+      },
+      {
+        "object": "staging.\"vw_elevation_forward\".\"curr_elev\"",
+        "comment": "Curr elev value.",
+        "line": 259
+      },
+      {
+        "object": "staging.\"vw_elevation_forward\".\"new_elev\"",
+        "comment": "New elev value.",
+        "line": 260
+      },
+      {
+        "object": "staging.\"vw_elevation_median\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 261
+      },
+      {
+        "object": "staging.\"vw_elevation_median\".\"curr_elev\"",
+        "comment": "Curr elev value.",
+        "line": 262
+      },
+      {
+        "object": "staging.\"vw_elevation_median\".\"new_elev\"",
+        "comment": "New elev value.",
+        "line": 263
+      },
+      {
+        "object": "staging.\"vw_elevation_medians\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 264
+      },
+      {
+        "object": "staging.\"vw_elevation_medians\".\"curr_elev\"",
+        "comment": "Curr elev value.",
+        "line": 265
+      },
+      {
+        "object": "staging.\"vw_elevation_neighbors\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 266
+      },
+      {
+        "object": "staging.\"vw_elevation_neighbors\".\"curr_elev\"",
+        "comment": "Curr elev value.",
+        "line": 267
+      },
+      {
+        "object": "staging.\"vw_elevation_neighbors\".\"prior_elev\"",
+        "comment": "Prior elev value.",
+        "line": 268
+      },
+      {
+        "object": "staging.\"vw_elevation_neighbors\".\"next_elev\"",
+        "comment": "Next elev value.",
+        "line": 269
+      },
+      {
+        "object": "staging.\"vw_elevation_neighbors\".\"inc_delta\"",
+        "comment": "Inc delta value.",
+        "line": 270
+      },
+      {
+        "object": "staging.\"vw_elevation_neighbors\".\"out_delta\"",
+        "comment": "Out delta value.",
+        "line": 271
+      },
+      {
+        "object": "staging.\"vw_elevation_neighbors\".\"valid_point\"",
+        "comment": "Valid point value.",
+        "line": 272
+      },
+      {
+        "object": "staging.\"vw_elevation_neighbors\".\"extreme_point\"",
+        "comment": "Extreme point value.",
+        "line": 273
+      },
+      {
+        "object": "staging.\"vw_elevation_weighted_avg\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 274
+      },
+      {
+        "object": "staging.\"vw_elevation_weighted_avg\".\"curr_elev\"",
+        "comment": "Curr elev value.",
+        "line": 275
+      },
+      {
+        "object": "staging.\"vw_elevation_weighted_avg\".\"new_elev\"",
+        "comment": "New elev value.",
+        "line": 276
+      },
+      {
+        "object": "staging.\"vw_large_pull\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 277
+      },
+      {
+        "object": "staging.\"vw_large_pull\".\"curr_elev\"",
+        "comment": "Curr elev value.",
+        "line": 278
+      },
+      {
+        "object": "staging.\"vw_large_pull\".\"new_elev\"",
+        "comment": "New elev value.",
+        "line": 279
+      },
+      {
+        "object": "staging.\"vw_listening_history_inserts\".\"played_at_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 280
+      },
+      {
+        "object": "staging.\"vw_listening_history_inserts\".\"isrc\"",
+        "comment": "Isrc value.",
+        "line": 281
+      },
+      {
+        "object": "staging.\"vw_listening_history_inserts\".\"playlist_id\"",
+        "comment": "Identifier.",
+        "line": 282
+      },
+      {
+        "object": "staging.\"vw_now_playing_inserts\".\"played_at_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 283
+      },
+      {
+        "object": "staging.\"vw_now_playing_inserts\".\"isrc\"",
+        "comment": "Isrc value.",
+        "line": 284
+      },
+      {
+        "object": "staging.\"vw_now_playing_inserts\".\"playlist_id\"",
+        "comment": "Identifier.",
+        "line": 285
+      },
+      {
+        "object": "staging.\"vw_playlist_inserts\".\"playlist_id\"",
+        "comment": "Identifier.",
+        "line": 286
+      },
+      {
+        "object": "staging.\"vw_playlist_inserts\".\"isrc\"",
+        "comment": "Isrc value.",
+        "line": 287
+      },
+      {
+        "object": "staging.\"vw_playlist_inserts\".\"track_order\"",
+        "comment": "Track order value.",
+        "line": 288
+      },
+      {
+        "object": "staging.\"vw_small_pull\".\"meter\"",
+        "comment": "Meter value.",
+        "line": 289
+      },
+      {
+        "object": "staging.\"vw_small_pull\".\"curr_elev\"",
+        "comment": "Curr elev value.",
+        "line": 290
+      },
+      {
+        "object": "staging.\"vw_small_pull\".\"new_elev\"",
+        "comment": "New elev value.",
+        "line": 291
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"track_id\"",
+        "comment": "Identifier.",
+        "line": 292
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"track_name\"",
+        "comment": "Track name value.",
+        "line": 293
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"track_name_clean\"",
+        "comment": "Track name clean value.",
+        "line": 294
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"track_name_search\"",
+        "comment": "Track name search value.",
+        "line": 295
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"track_isrc\"",
+        "comment": "Track isrc value.",
+        "line": 296
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"artist_id\"",
+        "comment": "Identifier.",
+        "line": 297
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"artist_display_name\"",
+        "comment": "Artist display name value.",
+        "line": 298
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"album_id\"",
+        "comment": "Identifier.",
+        "line": 299
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"release_date\"",
+        "comment": "Release date value.",
+        "line": 300
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"available_in_us\"",
+        "comment": "Available in us value.",
+        "line": 301
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"total_markets\"",
+        "comment": "Total markets value.",
+        "line": 302
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"popularity\"",
+        "comment": "Popularity value.",
+        "line": 303
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"duration_ms\"",
+        "comment": "Duration in milliseconds.",
+        "line": 304
+      },
+      {
+        "object": "staging.\"vw_track_inserts\".\"updated_at_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 305
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"track_id\"",
+        "comment": "Identifier.",
+        "line": 306
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"track_name\"",
+        "comment": "Track name value.",
+        "line": 307
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"track_name_clean\"",
+        "comment": "Track name clean value.",
+        "line": 308
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"track_name_search\"",
+        "comment": "Track name search value.",
+        "line": 309
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"track_isrc\"",
+        "comment": "Track isrc value.",
+        "line": 310
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"artist_id\"",
+        "comment": "Identifier.",
+        "line": 311
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"artist_display_name\"",
+        "comment": "Artist display name value.",
+        "line": 312
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"album_id\"",
+        "comment": "Identifier.",
+        "line": 313
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"release_date\"",
+        "comment": "Release date value.",
+        "line": 314
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"available_in_us\"",
+        "comment": "Available in us value.",
+        "line": 315
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"total_markets\"",
+        "comment": "Total markets value.",
+        "line": 316
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"popularity\"",
+        "comment": "Popularity value.",
+        "line": 317
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"duration_ms\"",
+        "comment": "Duration in milliseconds.",
+        "line": 318
+      },
+      {
+        "object": "staging.\"vw_track_inserts_from_listen_history\".\"updated_at_utc\"",
+        "comment": "Timestamp (UTC).",
+        "line": 319
+      }
+    ],
+    "table_comment_statement_count": 58,
+    "table_comment_null_count": 29,
+    "column_comment_statement_count": 289,
     "column_comment_null_count": 0,
-    "generic_count": 0,
-    "line_count": 0
+    "generic_count": 316,
+    "line_count": 350
   },
-  "dictionary_line_count": 2159,
+  "dictionary_line_count": 2498,
   "ready_for_completion": false
 }
