@@ -2384,54 +2384,286 @@ The following objects appear in the generated inventory under schema `public` bu
 ## tasks
 
 ### tasks.acceptable_failures (table)
-- **Grain:** one row per acceptable failures (table); see schema.generated.md for columns.
-- **Canonical source:** `tasks.acceptable_failures`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** single-value configuration table storing the maximum tolerated consecutive failures before the scheduler treats a task as failed.
+- **Grain:** exactly one row holding one integer threshold. No primary key or unique constraint is declared, so single-row cardinality is convention only.
+- **Canonical source:** `tasks.acceptable_failures`; no application INSERT/UPDATE/DELETE path evidenced in repository code (maintained out-of-band).
+- **Consumers:** `tasks.vw_task_info` — scalar subquery `(SELECT acceptable_failures FROM tasks.acceptable_failures)` caps `consecutive_failures` in `should_execute`.
+- **Relationships:** no foreign keys; not referenced by any foreign key.
+- **Rules:** `convention` — `should_execute` requires `consecutive_failures < (SELECT acceptable_failures FROM tasks.acceptable_failures)`; value compared as a count. Migration `deploy/migrations/014__comment_backfill_tasks.sql` carries only generic boilerplate ('Tasks table.', 'Acceptable failures value.').
+- **Write path:** none evidenced in application code.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `acceptable_failures` | smallint | YES | Maximum consecutive failures tolerated before a task is skipped | count | schema.generated.md; scalar subquery in `tasks.vw_task_info` definition | schema.generated.md, docs/data/_evidence/database/schema_only.sql | inferred |
 
 ### tasks.fact_configuration (table)
-- **Grain:** one row per fact configuration (table); see schema.generated.md for columns.
+- **Purpose:** ETL fact registry: each row declares one derived fact/metric computed by a task, including the extraction SQL and whether values are inferred, forecasted, interpolated, or unique.
+- **Grain:** one row per fact, keyed by `fact_id`; each fact belongs to one task (`task_id`) and one staging job (`staging_id`).
+- **Primary key:** `fact_id` (enforced; unique index `fact_configuration_pkey`, default from sequence `tasks.fact_configuration_fact_id_seq`).
+- **Foreign keys (enforced):** `task_id` -> `tasks.task_configuration.task_id` (`fk_fact_to_task`); `staging_id` -> `tasks.staging_configuration.staging_id` (`fk_fact_to_staging`).
 - **Canonical source:** `tasks.fact_configuration`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Consumers:** admin API `POST /api/admin/tasks/facts` (`upsert_fact_configuration_endpoint`) and `DELETE /api/admin/tasks/facts/{fact_id}` (`delete_fact_configuration_endpoint`) via `backend/pifitness/admin/queries.py` (`upsert_fact_configuration`, `delete_fact_configuration`).
+- **Relationships:** child of `tasks.task_configuration` and `tasks.staging_configuration`; no downstream consumers evidenced.
+- **Rules:** `enforced` PK + 2 FKs; upsert (INSERT or UPDATE by `fact_id`) is application logic, not DB-enforced. Migration `deploy/migrations/014__comment_backfill_tasks.sql` carries only generic boilerplate ('Tasks table.', per-column '... value.').
+- **Write path:** `backend/pifitness/admin/queries.py:336` `upsert_fact_configuration`; `:288` `delete_fact_configuration`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `fact_id` | integer | NO | Surrogate fact id | count | sequence default `tasks.fact_configuration_fact_id_seq` | schema.generated.md, docs/data/_evidence/database/catalog.json | confirmed |
+| `staging_id` | integer | YES | Owning staging job | id | FK `fk_fact_to_staging` | schema.generated.md, catalog.json | confirmed |
+| `task_id` | integer | YES | Owning task | id | FK `fk_fact_to_task` | schema.generated.md, catalog.json | confirmed |
+| `fact_name` | text | YES | Fact/metric name | text | upsert fields | backend/pifitness/admin/queries.py:336 | inferred |
+| `data_type` | text | YES | Declared data type of the fact | text | upsert fields | backend/pifitness/admin/queries.py:336 | inferred |
+| `extraction_sql` | text | YES | SQL used to extract/compute the fact | SQL text | upsert fields | backend/pifitness/admin/queries.py:336 | inferred |
+| `infer_values` | boolean | YES | Whether missing values are inferred | yes/no; default false | upsert fields; column default false | catalog.json + queries.py:336 | inferred |
+| `forecast_values` | boolean | YES | Whether future values are forecast | yes/no; default false | upsert fields; column default false | catalog.json + queries.py:336 | inferred |
+| `is_unique_constraint` | boolean | YES | Whether fact values are expected unique | yes/no; default false | upsert fields; column default false | catalog.json + queries.py:336 | inferred |
+| `interpolation_ts` | boolean | YES | Whether interpolation is timestamp-based | yes/no; default false | upsert fields; column default false | catalog.json + queries.py:336 | inferred |
+| `interpolation_destination_table` | text | YES | Target table for interpolated values | table name | upsert fields | backend/pifitness/admin/queries.py:336 | inferred |
+| `interpolate_values` | boolean | YES | Whether values are interpolated | yes/no; default false | upsert fields; column default false | catalog.json + queries.py:336 | inferred |
+| `value_recency` | timestamp with time zone | YES | Timestamp of last known-good value | UTC timestamptz | upsert fields | backend/pifitness/admin/queries.py:336 | inferred |
 
 ### tasks.staging_configuration (table)
-- **Grain:** one row per staging configuration (table); see schema.generated.md for columns.
-- **Canonical source:** `tasks.staging_configuration`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** staging-job registry: each row declares one extract/load staging job (source table, destination table, optional filter/cross-join conditions) for a task.
+- **Grain:** one row per staging job, keyed by `staging_id`; belongs to one task (`task_id`).
+- **Primary key:** `staging_id` (enforced; sequence `tasks.staging_configuration_staging_id_seq`).
+- **Foreign keys (enforced):** `task_id` -> `tasks.task_configuration.task_id` (`fk_staging_to_task`).
+- **Canonical source:** `tasks.staging_configuration`; no application read/write path evidenced in repository code (referenced only by FKs and migration comments).
+- **Consumers:** none evidenced.
+- **Relationships:** child of `tasks.task_configuration`.
+- **Rules:** `enforced` PK + FK; `source_table` defaults to `staging.api_imports` (live catalog default). Migration comments are generic boilerplate only.
+- **Write path:** none evidenced in application code.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `staging_id` | integer | NO | Surrogate staging-job id | count | sequence default `tasks.staging_configuration_staging_id_seq` | schema.generated.md, docs/data/_evidence/database/catalog.json | confirmed |
+| `task_id` | integer | YES | Owning task | id | FK `fk_staging_to_task` | schema.generated.md, catalog.json | confirmed |
+| `staging_name` | text | YES | Staging job name | text | no write path evidenced | schema.generated.md | inferred |
+| `staging_description` | text | YES | Staging job description | text | no write path evidenced | schema.generated.md | inferred |
+| `destination_table` | text | YES | Target table for staged data | table name | no write path evidenced | schema.generated.md | inferred |
+| `cross_join_condition` | text | YES | Optional cross-join condition for the staging query | SQL fragment | no write path evidenced | schema.generated.md | inferred |
+| `filter_condition` | text | YES | Optional filter condition for the staging query | SQL fragment | no write path evidenced | schema.generated.md | inferred |
+| `source_table` | text | YES | Source table for the staging job | table name | default `'staging.api_imports'::text` | catalog.json | confirmed |
 
 ### tasks.task_config (table)
-- **Grain:** one row per task config (table); see schema.generated.md for columns.
+- **Purpose:** legacy static task schedule configuration, keyed by task name; used by the legacy task executioner (`worker/task_execution.py`) and refreshed by `reset_and_reload`/`update_task_through_date`. Runs in parallel with the newer `tasks.task_configuration` (name-keyed legacy vs id-keyed current runtime state).
+- **Grain:** one row per task, keyed by `task_name`.
+- **Primary key:** `task_name` (enforced; `task_config_pkey`).
+- **Foreign keys (enforced):** `api_service_name` -> `api_services.api_service_list.api_service_name` (`task_config_api_service_name_fkey`).
 - **Canonical source:** `tasks.task_config`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Consumers:** `backend/pifitness/worker/task_execution.py` (`task_executioner` resolves `task_name` -> `task_id` against this table); `reset_and_reload` and `update_task_through_date` write `updated_through_date`.
+- **Relationships:** references `api_services.api_service_list`; overlaps conceptually with `tasks.task_configuration`.
+- **Rules:** `enforced` PK + FK; live-catalog defaults: `task_priority` 999, `task_frequency` 'daily', `task_interval` 23 (`numeric(3,1)`). `task_interval` unit is not evidenced (hours assumed by scheduling helpers; unverified).
+- **Write path:** no INSERT path evidenced; `UPDATE tasks.task_config SET updated_through_date` in `backend/pifitness/worker/task_execution.py` (`reset_and_reload` sets '2020-01-01'; `update_task_through_date` sets today's date).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `task_name` | text | NO | Task name (natural key) | text | key assignment | schema.generated.md, catalog.json | confirmed |
+| `task_description` | text | YES | Task description | text | no write path evidenced | schema.generated.md | inferred |
+| `task_priority` | integer | YES | Scheduling priority (lower = higher priority assumed, not evidenced) | count | default 999 | catalog.json | inferred |
+| `task_frequency` | text | YES | Schedule frequency (e.g. 'daily') | text | default 'daily' | catalog.json | inferred |
+| `task_interval` | numeric | YES | Interval for recurrence | unit unknown (hours assumed) | default 23 | catalog.json | inferred |
+| `api_function` | text | YES | API function name | text | no write path evidenced | schema.generated.md | inferred |
+| `api_service_name` | text | YES | API service | id | FK `task_config_api_service_name_fkey` | schema.generated.md, catalog.json | confirmed |
+| `api_loop_type` | text | YES | API pagination/loop strategy | text | no write path evidenced | schema.generated.md | inferred |
+| `api_post_processing` | text | YES | Post-processing step name | text | no write path evidenced | schema.generated.md | inferred |
+| `python_function` | text | YES | Python entry point to run | function name | no write path evidenced | schema.generated.md | inferred |
+| `last_calendar_field` | text | YES | Calendar field used for date boundaries | text | no write path evidenced | schema.generated.md | inferred |
+| `updated_through_date` | date | YES | Data watermark (date only, no time zone) | calendar date | `reset_and_reload` ('2020-01-01'), `update_task_through_date` (today) | backend/pifitness/worker/task_execution.py:458-496 | confirmed |
+| `api_parameters` | text | YES | API call parameters | text | no write path evidenced | schema.generated.md | inferred |
 
 ### tasks.task_configuration (table)
-- **Grain:** one row per task configuration (table); see schema.generated.md for columns.
+- **Purpose:** current task schedule plus runtime state: last run timestamps, failure message, and next planned execution. Source of truth for the v2 execution engine (`worker/ultimate_task_executioner_v2.py`).
+- **Grain:** one row per task, keyed by `task_id`.
+- **Primary key:** `task_id` (enforced; sequence `tasks.task_configuration_task_id_seq`).
 - **Canonical source:** `tasks.task_configuration`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Consumers:** admin API (`GET /api/admin/tasks`, `/api/admin/tasks/{task_id}/config`, `/api/admin/tasks/schedule`, `/api/admin/tasks/names`, `PUT /api/admin/tasks/{task_id}`, `DELETE /api/admin/tasks/schedule/{task_id}`); `worker/ultimate_task_executioner_v2.py` (`ultimate_task_executioner` reads via `tasks.vw_task_info`; `reconcile_task_dates` writes state); `tasks.vw_task_info` and `tasks.vw_task_summary_chart` derive from it.
+- **Relationships:** parent of `tasks.task_executions` (`task_executions_task_id_fkey`), `tasks.fact_configuration` (`fk_fact_to_task`), `tasks.staging_configuration` (`fk_staging_to_task`).
+- **Rules:** `enforced` PK; new rows default `task_frequency` = 'Inactive'. Write semantics (from `reconcile_task_dates`, `worker/ultimate_task_executioner_v2.py:483`): on success sets `last_executed_utc = last_succeeded_utc = CURRENT_TIMESTAMP`, `consecutive_failures = 0`, and computes `next_planned_execution_utc` by frequency (Hourly: +`task_interval` hours; Daily/Weekly/Monthly: at America/Los_Angeles midnight + interval hours; otherwise +24 hours; +2 hours when the service value is not current); on failure increments `consecutive_failures`, sets `last_failed_utc` and `last_failure_message`, and backfills `next_planned_execution_utc` by `consecutive_failures * 60 minutes` (exponential backoff in minutes). Sentinel default '1980-07-18 07:00:00+00' on the `last_*`/`next_planned` timestamps means 'never run'. All timestamps are `CURRENT_TIMESTAMP` (database server time; time zone not confirmed as UTC).
+- **Write path:** `backend/pifitness/admin/queries.py` (`insert_task_configuration`, `update_task_configuration`, `insert_placeholder_task`) + `worker/ultimate_task_executioner_v2.py:483` `reconcile_task_dates`.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `task_id` | integer | NO | Surrogate task id | count | sequence default `tasks.task_configuration_task_id_seq` | schema.generated.md, catalog.json | confirmed |
+| `task_name` | text | YES | Task name | text | default 'placeholder' | catalog.json | confirmed |
+| `last_executed_utc` | timestamp with time zone | YES | Last run start time | UTC timestamptz; sentinel '1980-07-18' = never run | `reconcile_task_dates` | catalog.json | confirmed |
+| `last_succeeded_utc` | timestamp with time zone | YES | Last successful run | UTC timestamptz; sentinel '1980-07-18' = never run | `reconcile_task_dates` | catalog.json | confirmed |
+| `last_failed_utc` | timestamp with time zone | YES | Last failed run | UTC timestamptz | `reconcile_task_dates` | catalog.json | confirmed |
+| `next_planned_execution_utc` | timestamp with time zone | YES | Next scheduled run | UTC timestamptz; sentinel '1980-07-18' = due immediately | `reconcile_task_dates` by frequency | catalog.json + worker/ultimate_task_executioner_v2.py:483 | confirmed |
+| `last_failure_message` | text | YES | Last error message | text | `reconcile_task_dates` | catalog.json | confirmed |
+| `display_icon` | text | YES | UI icon name | text | default 'task' | catalog.json | confirmed |
+| `task_description` | text | YES | Task description | text | no write path evidenced | schema.generated.md | inferred |
+| `task_priority` | integer | YES | Priority | count | default 999 | catalog.json | inferred |
+| `task_frequency` | text | YES | Schedule frequency ('Hourly'|'Daily'|'Weekly'|'Monthly'|'Inactive'|other) | text | default 'Inactive' | catalog.json | inferred |
+| `task_start_hour` | integer | YES | Start of hourly execution window (hour of day) | hour 0-23 | default 6 | catalog.json | inferred |
+| `task_stop_hour` | integer | YES | End of hourly execution window (hour of day) | hour 0-23 | default 22 | catalog.json | inferred |
+| `task_interval` | integer | YES | Recurrence interval | hours (per `reconcile_task_dates`) | default 8 | catalog.json | inferred |
+| `api_service_name` | text | YES | API service | id | default 'N/A' | catalog.json | confirmed |
+| `api_function_name` | text | YES | API/function name | text | default 'N/A' | catalog.json | confirmed |
+| `python_execution_function` | text | YES | Python entry point to run | function name | no write path evidenced | schema.generated.md | inferred |
+| `consecutive_failures` | smallint | YES | Current consecutive failure count | count | default 0; incremented on failure, zeroed on success | catalog.json + worker/ultimate_task_executioner_v2.py:483 | confirmed |
 
 ### tasks.task_executions (table)
-- **Grain:** one row per task executions (table); see schema.generated.md for columns.
+- **Purpose:** coarse-grained log of task runs: one row per execution with status, start/complete timestamps, JSON result, and error message.
+- **Grain:** one row per execution, keyed by `execution_id` (identity sequence `tasks.task_executions_execution_id_seq`).
+- **Primary key:** `execution_id` (enforced; `task_executions_pkey`).
+- **Foreign keys (enforced):** `task_id` -> `tasks.task_configuration.task_id` (`task_executions_task_id_fkey`).
 - **Canonical source:** `tasks.task_executions`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Consumers:** admin API (`GET /api/admin/tasks/executions/{execution_id}`, recent-executions list) via `backend/pifitness/admin/queries.py` (`get_task_execution`, `get_recent_task_executions`).
+- **Relationships:** child of `tasks.task_configuration`. Do not confuse with `logging.task_executions` (fine-grained phase-timing log consumed by `tasks.vw_task_execution`); both tables share index name `task_executions_pkey` in different schemas.
+- **Rules:** `enforced` PK + FK; `status` defaults to 'running', `started_at` defaults to CURRENT_TIMESTAMP but the column is `timestamp without time zone` (naive — server local time, not confirmed as UTC). `task_id`/`task_name` are NOT NULL. Completion update sets `completed_at = CURRENT_TIMESTAMP`, `result` (jsonb), `error_message`.
+- **Write path:** `backend/pifitness/admin/router.py:223` (`execute_task_v2_async` inserts 'running'); `backend/pifitness/admin/queries.py:449` (`insert_task_execution`) and `:474` (`update_task_execution`).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `execution_id` | integer | NO | Surrogate execution id | count | sequence default `tasks.task_executions_execution_id_seq` | schema.generated.md, catalog.json | confirmed |
+| `task_id` | integer | NO | Owning task | id | FK `task_executions_task_id_fkey` | schema.generated.md, catalog.json | confirmed |
+| `task_name` | character varying | NO | Task name at execution time | text (255 per catalog) | insert path | schema.generated.md, catalog.json | confirmed |
+| `status` | character varying | YES | Execution status ('running'|'success'|'failed') | text | default 'running' | catalog.json | confirmed |
+| `started_at` | timestamp without time zone | YES | Start time (naive) | server local time; default CURRENT_TIMESTAMP | insert path; zone not confirmed as UTC | catalog.json | confirmed |
+| `completed_at` | timestamp without time zone | YES | Completion time (naive) | server local time | `update_task_execution` | schema.generated.md | inferred |
+| `result` | jsonb | YES | Execution result payload | JSON | `update_task_execution` | schema.generated.md | confirmed |
+| `error_message` | text | YES | Error text | text | `update_task_execution` | schema.generated.md | confirmed |
 
 ### tasks.vw_task_execution (view)
-- **Grain:** one row per vw task execution (view); see schema.generated.md for columns.
-- **Canonical source:** `tasks.vw_task_execution`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-task dashboard/execution view: merges static config (`tasks.task_config`) with aggregated execution history (`logging.task_executions`) to drive skip/recency logic for the admin UI and the legacy executioner.
+- **Grain:** one row per `task_name` in `tasks.task_config`; tasks with no executions still appear with zeroed stats (left-joined aggregates).
+- **Output dependencies:** `tasks.task_config`, `logging.task_executions`, `api_services.api_service_list`, SQL functions `public.utc_now()`, `public.requires_catchup()`, `public.calculate_next_execution_utc()`.
+- **Derived logic:** `total_attempts`/`consecutive_successes`/`consecutive_failures` are streak aggregates over `logging.task_executions` (partitioned by task_name, latest row first); `updated_through_utc` is `updated_through_date` cast at UTC (or `utc_now()` when `api_function` IS NULL); `data_requires_catchup = public.requires_catchup(...)`; `next_execution_utc = public.calculate_next_execution_utc(...)`; `do_execute` is true unless the task is retired and either catchup is due or the next execution is past; `execution_logic` = 'recency' if the last run was under 1 minute ago, 'failures' if `consecutive_failures > 5`, else 'timing'. NOTE: this view's `consecutive_failures` comes from `logging.task_executions`, not `tasks.task_configuration.consecutive_failures` — two different failure counts.
+- **Consumers:** `backend/pifitness/worker/task_execution.py:16` (`task_executioner`); `backend/pifitness/admin/queries.py:368` (`get_distinct_task_names`) and `:377` (`get_task_execution_view`) for the admin UI.
+- **Rules:** read-only view; ORDER BY favors due/needed tasks (`next_execution_utc`, `data_requires_catchup DESC`, `do_execute DESC`, ...). Built over `logging.task_executions` — distinct from `tasks.task_executions`.
+- **Write path:** none (view).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `task_name` | text | YES | Task name | text | from `task_config` | schema.generated.md | confirmed |
+| `task_description` | text | YES | Task description | text | from `task_config` | schema.generated.md | inferred |
+| `task_frequency` | text | YES | Schedule frequency | text | from `task_config` | schema.generated.md | inferred |
+| `task_interval` | numeric | YES | Interval for recurrence | unit unknown | from `task_config` | schema.generated.md | inferred |
+| `task_priority` | integer | YES | Priority | count | from `task_config` | schema.generated.md | inferred |
+| `api_function` | text | YES | API function name | text | from `task_config` | schema.generated.md | inferred |
+| `api_service_name` | text | YES | API service | id | from `task_config` | schema.generated.md | inferred |
+| `api_loop_type` | text | YES | API loop strategy | text | from `task_config` | schema.generated.md | inferred |
+| `api_post_processing` | text | YES | Post-processing step | text | from `task_config` | schema.generated.md | inferred |
+| `api_parameters` | text | YES | API call parameters | text | from `task_config` | schema.generated.md | inferred |
+| `api_service_function` | text | YES | Resolved service function | function name | join to `api_service_list` | schema.generated.md | inferred |
+| `python_function` | text | YES | Python entry point | function name | from `task_config` | schema.generated.md | inferred |
+| `last_calendar_field` | text | YES | Calendar boundary field | text | from `task_config` | schema.generated.md | inferred |
+| `total_attempts` | bigint | YES | Total execution attempts | count | COUNT over `logging.task_executions` | view definition | derived |
+| `consecutive_successes` | bigint | YES | Current success streak | count | window aggregate over `logging.task_executions` | view definition | derived |
+| `consecutive_failures` | bigint | YES | Current failure streak | count | window aggregate over `logging.task_executions` | view definition | derived |
+| `last_execution_utc` | timestamp with time zone | YES | Most recent execution time | UTC timestamptz | MAX(event_time_utc) | view definition | derived |
+| `last_success_utc` | timestamp with time zone | YES | Most recent success | UTC timestamptz | conditional MAX | view definition | derived |
+| `updated_through_utc` | timestamp with time zone | YES | Data watermark as UTC | timestamptz | CASE: `updated_through_date` at UTC or `utc_now()` | view definition | derived |
+| `data_requires_catchup` | boolean | YES | Whether data is behind schedule | yes/no | `public.requires_catchup()` | view definition | derived |
+| `next_execution_utc` | timestamp with time zone | YES | Computed next run | UTC timestamptz | `public.calculate_next_execution_utc()` | view definition | derived |
+| `do_execute` | boolean | YES | Whether the task is due to run | yes/no | CASE expression | view definition | derived |
+| `execution_logic` | text | YES | Skip-reason category | 'recency'|'failures'|'timing' | CASE expression | view definition | derived |
 
 ### tasks.vw_task_info (view)
-- **Grain:** one row per vw task info (view); see schema.generated.md for columns.
-- **Canonical source:** `tasks.vw_task_info`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** execution-ready task list for the v2 engine: task runtime state enriched with service/rate-limit state and boolean action flags (`run_extract`, `run_python`).
+- **Grain:** one row per `tasks.task_configuration` row.
+- **Output dependencies:** `tasks.task_configuration`, `tasks.acceptable_failures` (scalar threshold subquery), `api_services.function_library`, `api_services.api_service_list`.
+- **Derived logic:** `should_execute` = (frequency = 'Hourly' within `task_start_hour`..`task_stop_hour`, or frequency not in ('Inactive','Hourly')) AND `next_planned_execution_utc` < now AND `consecutive_failures` < the `tasks.acceptable_failures` threshold; `next_planned_execution_utc` defaults to sentinel 1980-07-18 when NULL; `run_extract`/`run_python` = configured function not in ('None','N/A',''); `flatten_sproc` = computed call string `flatten_sproc(task_id, 'friendly_name')`; `api_under_rate_limits` = `rate_limit_cleared_utc` > now; internal `catchup_required` flags staleness vs yesterday.
+- **Consumers:** `backend/pifitness/worker/ultimate_task_executioner_v2.py:33` (`ultimate_task_executioner` filters `WHERE should_execute`).
+- **Rules:** read-only, non-updatable view — migrations `002`/`003`/`004` document that updates flow through base tables only and no UPDATE against the view is required/supported; `acceptable_failures` is assumed single-row. All view timestamps default-ish to sentinel 1980-07-18 / 2025-07-18 via COALESCE when base values are NULL.
+- **Write path:** none (view).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `task_id` | integer | YES | Task id | count | from `task_configuration` | schema.generated.md | confirmed |
+| `task_name` | text | YES | Task name | text | from `task_configuration` | schema.generated.md | inferred |
+| `task_frequency` | text | YES | Schedule frequency | text | from `task_configuration` | schema.generated.md | inferred |
+| `task_interval` | integer | YES | Recurrence interval | hours assumed | from `task_configuration` | schema.generated.md | inferred |
+| `task_start_hour` | integer | YES | Start of hourly window (hour of day) | hour 0-23 | from `task_configuration` | schema.generated.md | inferred |
+| `task_stop_hour` | integer | YES | End of hourly window (hour of day) | hour 0-23 | from `task_configuration` | schema.generated.md | inferred |
+| `next_planned_execution_utc` | timestamp with time zone | YES | Next scheduled run | UTC timestamptz; coalesce sentinel 1980-07-18 | COALESCE from base table | view definition | derived |
+| `should_execute` | boolean | YES | Execution gate | yes/no | compound expression incl. `acceptable_failures` subquery | view definition | derived |
+| `consecutive_failures` | integer | YES | Current consecutive failure count | count | cast of base-table column | view definition | derived |
+| `api_service_name` | text | YES | API service | id | join `function_library`/`api_service_list` | view definition | inferred |
+| `api_function_name` | text | YES | API/function name | text | join `function_library`/`api_service_list` | view definition | inferred |
+| `loop_strategy` | text | YES | API loop strategy | text | from `function_library` | view definition | inferred |
+| `iter_path_keys` | text | YES | Iteration path keys | text | from `function_library` | view definition | inferred |
+| `iter_query_keys` | text | YES | Iteration query keys | text | from `function_library` | view definition | inferred |
+| `static_path_params` | text | YES | Static path parameters | text | from `function_library` | view definition | inferred |
+| `static_query_params` | text | YES | Static query parameters | text | from `function_library` | view definition | inferred |
+| `friendly_name` | text | YES | Service friendly name | text | from `api_service_list` | view definition | inferred |
+| `run_extract` | boolean | YES | Whether extract step is configured | yes/no | `api_service_name` not in ('None','N/A','') | view definition | derived |
+| `python_login_function` | text | YES | Login function | function name | `api_service_list.api_service_function` | view definition | derived |
+| `python_extraction_function` | text | YES | Extraction function | function name | from `function_library` | view definition | inferred |
+| `flatten_sproc` | text | YES | Computed flatten stored-proc call | text | string concat `flatten_sproc(task_id, 'friendly_name')` | view definition | derived |
+| `value_recency` | timestamp with time zone | YES | Last known-good value timestamp | UTC timestamptz; coalesce default 2025-07-18 | from `function_library` | view definition | derived |
+| `python_execution_function` | text | YES | Python entry point | function name | from `task_configuration` | view definition | inferred |
+| `run_python` | boolean | YES | Whether Python step is configured | yes/no | `python_execution_function` not in ('None','N/A','') | view definition | derived |
+| `api_under_rate_limits` | boolean | YES | Whether service is rate limited | yes/no | `rate_limit_cleared_utc` > now | view definition | derived |
 
 ### tasks.vw_task_performance (view)
-- **Grain:** one row per vw task performance (view); see schema.generated.md for columns.
-- **Canonical source:** `tasks.vw_task_performance`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** per-task, per-day rollup of phase-level execution timings from application event logs.
+- **Grain:** one row per `task_id` + `event_date`; only events of the last 28 days with `task_id IS NOT NULL`.
+- **Output dependencies:** `logging.application_events`.
+- **Derived logic:** each event's `execution_time_ms` is bucketed by `data_event` ('Login'|'Extract'|'Load'|'Flatten'|'Parsing'|'Interpolation'|'Forecasting'|'Python'); all other events count as `admin_ms`; `total_ms` is the time at 'Complete' events; `is_failure` is true when any event in the day has `error_text`. Outputs are daily averages in milliseconds.
+- **Consumers:** none evidenced in repository code (likely admin dashboards; unverified).
+- **Rules:** read-only view; units milliseconds; 28-day sliding window is a hard filter in the view definition.
+- **Write path:** none (view).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `task_id` | integer | YES | Task id | count | from `application_events` | schema.generated.md | confirmed |
+| `event_date` | date | YES | Event date | calendar date | cast of `event_time_utc` | schema.generated.md | confirmed |
+| `login_ms` | numeric | YES | Login phase duration | ms (avg per day) | CASE bucket of execution_time_ms | view definition | derived |
+| `extract_ms` | numeric | YES | Extract phase duration | ms (avg per day) | CASE bucket | view definition | derived |
+| `load_ms` | numeric | YES | Load phase duration | ms (avg per day) | CASE bucket | view definition | derived |
+| `flatten_ms` | numeric | YES | Flatten phase duration | ms (avg per day) | CASE bucket | view definition | derived |
+| `parse_ms` | numeric | YES | Parsing phase duration | ms (avg per day) | CASE bucket | view definition | derived |
+| `interpolation_ms` | numeric | YES | Interpolation phase duration | ms (avg per day) | CASE bucket | view definition | derived |
+| `forecasting_ms` | numeric | YES | Forecasting phase duration | ms (avg per day) | CASE bucket | view definition | derived |
+| `python_ms` | numeric | YES | Python phase duration | ms (avg per day) | CASE bucket | view definition | derived |
+| `admin_ms` | numeric | YES | All other phases | ms (avg per day) | CASE bucket (non-standard events) | view definition | derived |
+| `total_ms` | numeric | YES | Total run duration | ms (avg per day) | 'Complete' events only | view definition | derived |
+| `is_failure` | boolean | YES | Whether any event failed that day | yes/no | `error_text IS NOT NULL` | view definition | derived |
 
 ### tasks.vw_task_summary_chart (view)
-- **Grain:** one row per vw task summary chart (view); see schema.generated.md for columns.
-- **Canonical source:** `tasks.vw_task_summary_chart`.
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Purpose:** admin dashboard chart data: per-task recency, execution counts, success rate, average phase timings, and an `increasing_steps` string flagging phases whose latest 7-day average exceeds the 14-day average by more than one standard deviation.
+- **Grain:** one row per task.
+- **Output dependencies:** `tasks.task_configuration`, `api_services.function_library`, `logging.application_events`, SQL functions `public.time_ago()`, `public.requires_catchup()`, `public.calculate_next_execution_utc()`.
+- **Derived logic:** CTE `te` joins task config with `function_library` (`value_recency`, active-failure flag `last_failed_utc = last_executed_utc`); execution aggregates are split into 7-day (el7), 14-day (el14) and stddev (sd) windows over `logging.application_events`; outputs include `time_ago_*` (text via `public.time_ago`), `*_minutes_ago` (epoch math), `success_percentage`, `max_executions` (window max across tasks), and `increasing_steps` (concatenated phase names whose el7 mean > el14 mean + 1 stddev). `last_failure_message` is truncated to 30 chars.
+- **Consumers:** `backend/pifitness/admin/queries.py:569` (`get_task_summary_chart`) for the admin API.
+- **Code discrepancy:** `backend/pifitness/worker/task_execution.py:286` issues `REFRESH MATERIALIZED VIEW tasks.vw_task_summary_chart_materialized`; no such relation exists in `schema.generated.md` or the live dev DB (relations are table/view only) — stale or forward-looking code, harmlessly swallowed by try/except. The relation that exists is the regular view `tasks.vw_task_summary_chart`.
+- **Rules:** read-only view; timings in milliseconds.
+- **Write path:** none (view).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `task_id` | integer | YES | Task id | count | from `task_configuration` | schema.generated.md | confirmed |
+| `task_name` | text | YES | Task name | text | from `task_configuration` | schema.generated.md | inferred |
+| `task_frequency` | text | YES | Schedule frequency | text | from `task_configuration` | schema.generated.md | inferred |
+| `consecutive_failures` | smallint | YES | Current consecutive failure count | count | from `task_configuration` | schema.generated.md | confirmed |
+| `time_ago_execution` | text | YES | Human-readable time since last execution | text | `public.time_ago(last_executed_utc)` | view definition | derived |
+| `time_ago_next` | text | YES | Human-readable time to next execution | text | `public.time_ago(next_planned_execution_utc)` | view definition | derived |
+| `time_ago_value` | text | YES | Human-readable time since value refreshed | text | `public.time_ago(value_recency)` | view definition | derived |
+| `execution_minutes_ago` | numeric | YES | Minutes since last execution | minutes | epoch math rounded to 1 decimal | view definition | derived |
+| `value_recency_minutes_ago` | numeric | YES | Minutes since value refreshed | minutes | epoch math rounded to 1 decimal | view definition | derived |
+| `next_planned_execution_minutes` | numeric | YES | Minutes to next execution | minutes | epoch math rounded to 1 decimal | view definition | derived |
+| `value_recency` | timestamp with time zone | YES | Last known-good value timestamp | UTC timestamptz | from `function_library` via `te` | view definition | derived |
+| `last_executed_utc` | timestamp with time zone | YES | Last run time | UTC timestamptz | from `task_configuration` | view definition | derived |
+| `last_failed_utc` | timestamp with time zone | YES | Last failed run | UTC timestamptz | from `task_configuration` | view definition | derived |
+| `next_planned_execution_utc` | timestamp with time zone | YES | Next scheduled run | UTC timestamptz | from `task_configuration` | view definition | derived |
+| `last_failure_message` | text | YES | Last failure message | text (first 30 chars) | `left(last_failure_message, 30)` | view definition | derived |
+| `is_active_failure` | boolean | YES | Whether the last run was a failure | yes/no | `last_failed_utc = last_executed_utc` | view definition | derived |
+| `execution_count` | bigint | YES | Execution count in window | count | 7-day aggregation | view definition | derived |
+| `success_count` | bigint | YES | Success count in window | count | 7-day aggregation | view definition | derived |
+| `success_percentage` | numeric | YES | Success rate | percent (0-100) | success_count / NULLIF(execution_count,0) * 100 | view definition | derived |
+| `max_executions` | bigint | YES | Max execution count across all tasks | count | window MAX | view definition | derived |
+| `login_ms` | numeric | YES | Login phase duration | ms (avg) | 7-day aggregation | view definition | derived |
+| `extract_ms` | numeric | YES | Extract phase duration | ms (avg) | 7-day aggregation | view definition | derived |
+| `flatten_ms` | numeric | YES | Flatten phase duration | ms (avg) | 7-day aggregation | view definition | derived |
+| `parse_ms` | numeric | YES | Parsing phase duration | ms (avg) | 7-day aggregation | view definition | derived |
+| `interpolation_ms` | numeric | YES | Interpolation phase duration | ms (avg) | 7-day aggregation | view definition | derived |
+| `forecasting_ms` | numeric | YES | Forecasting phase duration | ms (avg) | 7-day aggregation | view definition | derived |
+| `python_ms` | numeric | YES | Python phase duration | ms (avg) | 7-day aggregation | view definition | derived |
+| `admin_ms` | numeric | YES | All other phases | ms (avg) | 7-day aggregation | view definition | derived |
+| `total_ms` | numeric | YES | Total run duration | ms (avg) | 7-day aggregation | view definition | derived |
+| `increasing_steps` | text | YES | Phases trending worse | text | concatenated phase names | view definition | derived |
 
 ## volleyball
 

@@ -1,9 +1,9 @@
 # Data Dictionary Worklog (durable resume point)
 
 ## Status / timestamp
-- Status: IN_PROGRESS (Phase 0 complete; Phase 1 baseline established; Phase 3 batch authoring begun)
+- Status: IN_PROGRESS (Phase 0 complete; Phase 1 baseline established; Phase 3 batch authoring underway)
 - Last updated: 2026-11-05
-- Cline session: resumed evergreen task; public schema batch completed
+- Cline session: resumed evergreen task; tasks domain completed
 
 ## Inventory source / version
 - Generated schema: `docs/data/schema.generated.md` (generator: `python tools/db/schema_map.py`; do not edit by hand)
@@ -97,4 +97,10 @@
 - Cleanup: replaced 672 U+FFFD replacement characters with em dash in `dictionary.md` (`replacement_character_count` 672 -> 0). Deleted temp helper `docs/data/_evidence/tmp_list_headers.py`.
 - Audit result (`audit.py --sql-file deploy/migrations/013__comment_backfill_staging.sql`, exit 1 expected): headings 222/222 unique; `schema_only` []; duplicates {}; `placeholder_count` 669; replacement chars 0; documented columns 899/1817; `objects_with_missing_columns` 123 (12 excluded public objects among them — intentional); `ready_for_completion` false (expected; placeholders + missing columns remain).
 - Tooling: 9/9 tests pass with venv interpreter.
-- Next batch: continue column documentation domain-by-domain (suggested: `tasks` — clear `backend_tasks` write paths — then `health`/`logging`/`music`); chip away at the 669 'Unknown — investigation incomplete' placeholders (activities temp tables first).
+## Batch (tasks domain) - 2026-11-05
+- Replaced all 10 stub headings in `## tasks` with full entries (purpose/grain/keys/rules + complete column tables): `tasks.acceptable_failures` (1 col), `tasks.fact_configuration` (14 cols), `tasks.staging_configuration` (8 cols), `tasks.task_config` (14 cols), `tasks.task_configuration` (19 cols), `tasks.task_executions` (9 cols), `tasks.vw_task_execution` (21 cols), `tasks.vw_task_info` (26 cols), `tasks.vw_task_performance` (13 cols), `tasks.vw_task_summary_chart` (41 cols) — 166 columns newly documented.
+- Key evidence: `docs/data/schema.generated.md` (lines 2842-3063); `docs/data/_evidence/database/{catalog.json,schema_only.sql,definitions.sql}`; `backend/pifitness/admin/queries.py` (task config CRUD, fact upsert/delete, task_executions insert/update); `backend/pifitness/admin/router.py` (endpoints incl. `execute_task_v2_async`); `backend/pifitness/worker/ultimate_task_executioner_v2.py` (`reconcile_task_dates` write semantics incl. 1980-07-18 sentinel defaults, America/Los_Angeles daily scheduling, failure backoff `consecutive_failures * 60 minutes`); `backend/pifitness/worker/task_execution.py` (`task_log` writes `logging.task_executions`; stale `REFRESH MATERIALIZED VIEW tasks.vw_task_summary_chart_materialized` — object absent from DB and inventory).
+- Distinctions documented: `tasks.task_executions` (coarse log, naive `timestamp without time zone` started_at/completed_at) vs `logging.task_executions` (fine-grained phase-timing log consumed by `tasks.vw_task_execution`); `tasks.task_config` (legacy name-keyed) vs `tasks.task_configuration` (current id-keyed runtime state).
+- Audit result (`audit.py`, exit 1 expected): headings 222/222 unique; `schema_only` []; duplicates {}; `placeholder_count` 669 -> 659; replacement chars 0; documented columns 899 -> 1051/1817; `objects_with_missing_columns` 123 -> 113; `ready_for_completion` false (expected).
+- Tooling: 9/9 tests pass with venv interpreter.
+- Next batch: continue domain-by-domain (suggested: `health` then `logging`/`music`); chip away at remaining 659 placeholders (activities temp tables and Unknown columns first).
