@@ -929,7 +929,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id` | integer | NO | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | NO | Distinct-segment surrogate id | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -1067,25 +1067,25 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id_a` | integer | NO | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id_a` | integer | NO | First segment id in the queued overlap pair | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_id_b` | integer | NO | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id_b` | integer | NO | Second segment id in the queued overlap pair | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `match_confidence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_confidence` | numeric | YES | Match confidence score for the segment pair | 0..1 | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `created_at` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `created_at` | timestamp with time zone | YES | Queue entry creation time | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -1139,7 +1139,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | NO | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | NO | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -1337,43 +1337,43 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `grid_5m_00_id` | USER-DEFINED | NO | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `grid_5m_00_id` | USER-DEFINED | NO | 5m grid cell id | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_elevation` | double precision | NO | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_elevation` | double precision | NO | Average elevation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `obs_count` | integer | NO | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `obs_count` | integer | NO | Observation count | count | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `last_updated` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_updated` | timestamp with time zone | YES | Last updated | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elev_stddev` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elev_stddev` | numeric | YES | Elevation standard deviation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elevation_hammered` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_hammered` | numeric | YES | Hammered elevation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elevation_sanded` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_sanded` | numeric | YES | Sanded elevation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -1427,37 +1427,37 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `distance_m` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | integer | YES | Distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `latitude` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `latitude` | double precision | YES | Latitude | decimal degrees | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `longitude` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `longitude` | double precision | YES | Longitude | decimal degrees | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elevation_m` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m` | double precision | YES | Elevation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elapsed_duration_s` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | double precision | YES | Elapsed duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -2715,13 +2715,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `cycle_start_utc` | timestamp with time zone | NO | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `cycle_start_utc` | timestamp with time zone | NO | Cycle start time | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `cycle_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `cycle_name` | text | YES | Training cycle name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -2829,19 +2829,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elapsed_duration_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | integer | YES | Elapsed duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elevation_delta` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_delta` | numeric | YES | Elevation delta | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -2943,13 +2943,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `max_points` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `max_points` | numeric | YES | Max points | count | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -3051,13 +3051,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Activity geometry/path | geometry | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -3267,55 +3267,55 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `id_val` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `id_val` | text | YES | Identifier value | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `meta_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `meta_rank` | bigint | YES | Metadata rank | rank | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `path_coords` | json | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `path_coords` | json | YES | Path coordinates | geometry | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `map_timestamps` | json | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `map_timestamps` | json | YES | Mapped timestamps | timestamp | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `x_time` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `x_time` | ARRAY | YES | X time | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `x_distance` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `x_distance` | ARRAY | YES | X distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_time` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_time` | ARRAY | YES | Y time | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_time_delta` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_time_delta` | ARRAY | YES | Y time delta | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_hr` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_hr` | ARRAY | YES | Y heart rate | bpm | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -3327,61 +3327,61 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `y_elevation` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_elevation` | ARRAY | YES | Y elevation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_cadence` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_cadence` | ARRAY | YES | Y cadence | spm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_balance` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_balance` | ARRAY | YES | Y balance | percent | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_performance` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_performance` | ARRAY | YES | Y performance | score | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_vert_ratio` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_vert_ratio` | ARRAY | YES | Y vertical ratio | percent | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_osc` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_osc` | ARRAY | YES | Y oscillation | cm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_temp` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_temp` | ARRAY | YES | Y temperature | celsius | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_stride` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_stride` | ARRAY | YES | Y stride length | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_gct` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_gct` | ARRAY | YES | Y ground contact time | ms | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `y_speed` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_speed` | ARRAY | YES | Y speed | m/s | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -3507,7 +3507,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -3519,7 +3519,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `sleep_score` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_score` | integer | YES | Sleep score | score | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -3585,31 +3585,31 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_type_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_name` | text | YES | Activity type name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `start_time_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Activity start time | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `distance_mi` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Distance | miles | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `distance_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -3867,7 +3867,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -3927,49 +3927,49 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `resting_hr_asleep` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `resting_hr_asleep` | double precision | YES | Resting heart rate while asleep | bpm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `resting_hr_awake` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `resting_hr_awake` | double precision | YES | Resting heart rate while awake | bpm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `sleep_duration_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_duration_s` | integer | YES | Sleep duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `sleep_score` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_score` | integer | YES | Sleep score | score | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `light_sleep_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `light_sleep_s` | integer | YES | Light sleep duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `deep_sleep_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `deep_sleep_s` | integer | YES | Deep sleep duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `awake_sleep_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `awake_sleep_s` | integer | YES | Awake time during sleep window | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `rem_sleep_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `rem_sleep_s` | integer | YES | REM sleep duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -3981,7 +3981,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `start_time_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Activity start time | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4113,7 +4113,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4185,73 +4185,73 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Segment display name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_reference_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_reference_id` | bigint | YES | Reference activity id | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `reference_start_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_start_point` | integer | YES | Reference segment start point index | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `reference_end_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_end_point` | integer | YES | Reference segment end point index | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `effort_label` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `effort_label` | text | YES | Effort label | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_type_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_name` | text | YES | Activity type name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Activity geometry/path | geometry | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `distance_mi` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Distance | miles | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elevation_gain` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_gain` | numeric | YES | Elevation gain | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elevation_loss` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_loss` | numeric | YES | Elevation loss | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `matched_activities` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `matched_activities` | bigint | YES | Count of matched activities | count | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4329,19 +4329,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `latitude` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `latitude` | numeric | YES | Latitude | decimal degrees | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `longitude` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `longitude` | numeric | YES | Longitude | decimal degrees | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4425,7 +4425,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4485,19 +4485,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Activity geometry/path | geometry | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4551,43 +4551,43 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `match_rank` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_rank` | integer | YES | Match rank | rank | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `match_confidence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_confidence` | numeric | YES | Match confidence score | 0..1 | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Segment display name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `effort_label` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `effort_label` | text | YES | Effort label | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Activity geometry/path | geometry | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `matched_activities` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `matched_activities` | ARRAY | YES | Count of matched activities | count | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4641,19 +4641,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Segment display name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4665,7 +4665,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `match_confidence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_confidence` | numeric | YES | Match confidence score | 0..1 | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4677,19 +4677,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `is_course` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Whether activity is a course | boolean | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Activity geometry/path | geometry | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `effort_label` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `effort_label` | text | YES | Effort label | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4743,13 +4743,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Segment display name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4767,7 +4767,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `total_attempts` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `total_attempts` | bigint | YES | Total attempts | count | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -4869,73 +4869,73 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Segment display name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `is_course` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Whether activity is a course | boolean | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `start_time_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Activity start time | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elapsed_duration_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | numeric | YES | Elapsed duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_cadence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_cadence` | numeric | YES | Average cadence | spm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_stride_length` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_stride_length` | numeric | YES | Average stride length | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_gct` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_gct` | numeric | YES | Average ground contact time | ms | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_vert_ratio` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_ratio` | numeric | YES | Average vertical ratio | percent | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `all_time_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `all_time_rank` | bigint | YES | All-time rank | rank | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `total_attempts` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `total_attempts` | bigint | YES | Total attempts | count | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5037,7 +5037,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5049,7 +5049,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `music_start` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `music_start` | timestamp with time zone | YES | Music start time | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5115,13 +5115,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `id_val` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `id_val` | text | YES | Identifier value | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `meta_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `meta_rank` | bigint | YES | Metadata rank | rank | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5133,7 +5133,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `distance_m` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | integer | YES | Distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5151,13 +5151,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `longitude` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `longitude` | numeric | YES | Longitude | decimal degrees | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `latitude` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `latitude` | numeric | YES | Latitude | decimal degrees | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5277,55 +5277,55 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `best_start_dist` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_start_dist` | integer | YES | Best-match start distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `best_end_dist` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_end_dist` | integer | YES | Best-match end distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `dist_deviation` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `dist_deviation` | numeric | YES | Distance deviation between matched segments | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `polygon_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `polygon_deviation_m` | numeric | YES | Polygon deviation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `hausdorff_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `hausdorff_deviation_m` | numeric | YES | Hausdorff deviation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `freschet_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `freschet_deviation_m` | numeric | YES | Frechet deviation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `confidence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `confidence` | numeric | YES | Match confidence | 0..1 | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5385,73 +5385,73 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_reference_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_reference_id` | bigint | YES | Reference activity id | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `reference_start_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_start_point` | integer | YES | Reference segment start point index | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `reference_end_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_end_point` | integer | YES | Reference segment end point index | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `is_course` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Whether activity is a course | boolean | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Segment display name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_path` | USER-DEFINED | YES | Segment geometry path | geometry | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `distance_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elevation_gain` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_gain` | numeric | YES | Elevation gain | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elevation_loss` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_loss` | numeric | YES | Elevation loss | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `start_point` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_point` | USER-DEFINED | YES | Segment start point index | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `end_point` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `end_point` | USER-DEFINED | YES | Segment end point index | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_type_id` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_id` | smallint | YES | Activity type id | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5691,19 +5691,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `resting_hr_asleep` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `resting_hr_asleep` | double precision | YES | Resting heart rate while asleep | bpm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `resting_hr_awake` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `resting_hr_awake` | double precision | YES | Resting heart rate while awake | bpm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `sleep_duration_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_duration_s` | integer | YES | Sleep duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5715,31 +5715,31 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `sleep_score` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_score` | integer | YES | Sleep score | score | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `light_sleep_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `light_sleep_s` | integer | YES | Light sleep duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `deep_sleep_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `deep_sleep_s` | integer | YES | Deep sleep duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `awake_sleep_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `awake_sleep_s` | integer | YES | Awake time during sleep window | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `rem_sleep_s` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `rem_sleep_s` | integer | YES | REM sleep duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5751,61 +5751,61 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `max_hr` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `max_hr` | numeric | YES | Maximum heart rate | bpm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_hr` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_hr` | numeric | YES | Average heart rate | bpm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_cadence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_cadence` | numeric | YES | Average cadence | spm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_temp` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_temp` | numeric | YES | Average temperature | celsius | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_vert_osc` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_osc` | numeric | YES | Average vertical oscillation | cm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_vert_ratio` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_ratio` | numeric | YES | Average vertical ratio | percent | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_gct` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_gct` | numeric | YES | Average ground contact time | ms | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_perf` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_perf` | numeric | YES | Average performance condition | score | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_balance` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_balance` | numeric | YES | Average left/right balance | percent | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_stride_length` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_stride_length` | numeric | YES | Average stride length | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5865,43 +5865,43 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `best_start_dist` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_start_dist` | integer | YES | Best-match start distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `best_end_dist` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_end_dist` | integer | YES | Best-match end distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `dist_deviation` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `dist_deviation` | numeric | YES | Distance deviation between matched segments | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `polygon_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `polygon_deviation_m` | numeric | YES | Polygon deviation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `freschet_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `freschet_deviation_m` | numeric | YES | Frechet deviation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `hausdorff_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `hausdorff_deviation_m` | numeric | YES | Hausdorff deviation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -5961,31 +5961,31 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `best_start_dist` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_start_dist` | integer | YES | Best-match start distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `best_end_dist` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_end_dist` | integer | YES | Best-match end distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `dist_deviation` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `dist_deviation` | numeric | YES | Distance deviation between matched segments | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `ruggedness` | double precision | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ruggedness` | double precision | YES | Terrain ruggedness | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6039,43 +6039,43 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_reference_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_reference_id` | bigint | YES | Reference activity id | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_type_id` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_id` | smallint | YES | Activity type id | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `reference_start_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_start_point` | integer | YES | Reference segment start point index | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `reference_end_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_end_point` | integer | YES | Reference segment end point index | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_path` | USER-DEFINED | YES | Segment geometry path | geometry | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `distance_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6093,13 +6093,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `start_point` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_point` | USER-DEFINED | YES | Segment start point index | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `end_point` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `end_point` | USER-DEFINED | YES | Segment end point index | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6153,19 +6153,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Segment display name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `distance_mi` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Distance | miles | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6177,19 +6177,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `last_effort` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_effort` | timestamp with time zone | YES | Last effort time | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `is_course` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Whether activity is a course | boolean | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6423,19 +6423,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `cycle_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `cycle_name` | text | YES | Training cycle name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6459,7 +6459,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `all_time_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `all_time_rank` | bigint | YES | All-time rank | rank | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6477,85 +6477,85 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `start_time_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Activity start time | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `distance_mi` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Distance | miles | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elapsed_duration_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | numeric | YES | Elapsed duration | seconds | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `max_hr` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `max_hr` | numeric | YES | Maximum heart rate | bpm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_hr` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_hr` | numeric | YES | Average heart rate | bpm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_cadence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_cadence` | numeric | YES | Average cadence | spm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_temp` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_temp` | numeric | YES | Average temperature | celsius | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_vert_osc` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_osc` | numeric | YES | Average vertical oscillation | cm | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_vert_ratio` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_ratio` | numeric | YES | Average vertical ratio | percent | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_gct` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_gct` | numeric | YES | Average ground contact time | ms | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_perf` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_perf` | numeric | YES | Average performance condition | score | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_balance` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_balance` | numeric | YES | Average left/right balance | percent | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `avg_stride_length` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_stride_length` | numeric | YES | Average stride length | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_path` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_path` | USER-DEFINED | YES | Segment geometry path | geometry | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6609,43 +6609,43 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Segment display name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `is_course` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Whether activity is a course | boolean | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `activity_type_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_name` | text | YES | Activity type name | text | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `distance_mi` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Distance | miles | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `elevation_gain` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_gain` | numeric | YES | Elevation gain | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `last_effort` | date | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_effort` | date | YES | Last effort time | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6705,13 +6705,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `segment_id` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Segment identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6723,49 +6723,49 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `best_start_dist` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_start_dist` | integer | YES | Best-match start distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `best_end_dist` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_end_dist` | integer | YES | Best-match end distance | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `ruggedness` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ruggedness` | numeric | YES | Terrain ruggedness | index | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `dist_deviation` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `dist_deviation` | numeric | YES | Distance deviation between matched segments | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `polygon_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `polygon_deviation_m` | numeric | YES | Polygon deviation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `hausdorff_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `hausdorff_deviation_m` | numeric | YES | Hausdorff deviation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `freschet_deviation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `freschet_deviation_m` | numeric | YES | Frechet deviation | metres | schema.generated.md | schema.generated.md | inferred |
 
 
 
 
 
-| `confidence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `confidence` | numeric | YES | Match confidence | 0..1 | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6819,7 +6819,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_id` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Related activity identifier | id | schema.generated.md | schema.generated.md | inferred |
 
 
 
@@ -6921,7 +6921,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `music_start` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `music_start` | timestamp with time zone | YES | Music start time | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
 
 
 
