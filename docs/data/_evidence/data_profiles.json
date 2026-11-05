@@ -1,0 +1,642 @@
+{
+  "read_only": true,
+  "mode": "aggregate-only TABLESAMPLE; no raw rows",
+  "sample_percent": 0.5,
+  "relations": [
+    {
+      "schema": "activities",
+      "table": "activities",
+      "estimated_rows": 2565,
+      "category_columns": [
+        {
+          "column": "activity_type_id",
+          "data_type": "smallint",
+          "observed_categories": [
+            {
+              "value": "6",
+              "sampled_count": 17
+            },
+            {
+              "value": "1",
+              "sampled_count": 5
+            },
+            {
+              "value": "9",
+              "sampled_count": 2
+            },
+            {
+              "value": "13",
+              "sampled_count": 2
+            },
+            {
+              "value": "172",
+              "sampled_count": 1
+            }
+          ]
+        },
+        {
+          "column": "is_downloaded",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 24
+            },
+            {
+              "value": "false",
+              "sampled_count": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "activities",
+      "table": "activity_details",
+      "estimated_rows": 6221818,
+      "category_columns": [
+        {
+          "column": "activity_type_id",
+          "data_type": "smallint",
+          "observed_categories": [
+            {
+              "value": "9",
+              "sampled_count": 17731
+            },
+            {
+              "value": "6",
+              "sampled_count": 4570
+            },
+            {
+              "value": "3",
+              "sampled_count": 3600
+            },
+            {
+              "value": "1",
+              "sampled_count": 3209
+            },
+            {
+              "value": "5",
+              "sampled_count": 842
+            },
+            {
+              "value": "251",
+              "sampled_count": 493
+            },
+            {
+              "value": "172",
+              "sampled_count": 481
+            },
+            {
+              "value": "2",
+              "sampled_count": 262
+            },
+            {
+              "value": "229",
+              "sampled_count": 93
+            },
+            {
+              "value": "44",
+              "sampled_count": 76
+            },
+            {
+              "value": "176",
+              "sampled_count": 38
+            },
+            {
+              "value": "227",
+              "sampled_count": 31
+            },
+            {
+              "value": "231",
+              "sampled_count": 17
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "activities",
+      "table": "activity_details_distance",
+      "estimated_rows": 11933835,
+      "category_columns": [
+        {
+          "column": "activity_type_id",
+          "data_type": "smallint",
+          "observed_categories": [
+            {
+              "value": "9",
+              "sampled_count": 26217
+            },
+            {
+              "value": "6",
+              "sampled_count": 13936
+            },
+            {
+              "value": "1",
+              "sampled_count": 9718
+            },
+            {
+              "value": "3",
+              "sampled_count": 4608
+            },
+            {
+              "value": "5",
+              "sampled_count": 1931
+            },
+            {
+              "value": "172",
+              "sampled_count": 1787
+            },
+            {
+              "value": "2",
+              "sampled_count": 1279
+            },
+            {
+              "value": "251",
+              "sampled_count": 1079
+            },
+            {
+              "value": "229",
+              "sampled_count": 743
+            },
+            {
+              "value": "176",
+              "sampled_count": 146
+            },
+            {
+              "value": "10",
+              "sampled_count": 82
+            },
+            {
+              "value": "231",
+              "sampled_count": 41
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "activities",
+      "table": "segment_matches",
+      "estimated_rows": 2232,
+      "category_columns": [
+        {
+          "column": "match_confirmed",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 53
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "activities",
+      "table": "segments",
+      "estimated_rows": 70,
+      "category_columns": [
+        {
+          "column": "is_course",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "false",
+              "sampled_count": 19
+            },
+            {
+              "value": "true",
+              "sampled_count": 3
+            }
+          ]
+        },
+        {
+          "column": "activity_type_id",
+          "data_type": "smallint",
+          "observed_categories": [
+            {
+              "value": "6",
+              "sampled_count": 17
+            },
+            {
+              "value": "1",
+              "sampled_count": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "activities",
+      "table": "temp_segment_matches_v1",
+      "estimated_rows": 919,
+      "category_columns": [
+        {
+          "column": "match_confirmed",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 93
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "activities",
+      "table": "temp_segments_v1",
+      "estimated_rows": 278,
+      "category_columns": [
+        {
+          "column": "is_course",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 40
+            }
+          ]
+        },
+        {
+          "column": "activity_type_id",
+          "data_type": "smallint",
+          "observed_categories": [
+            {
+              "value": "6",
+              "sampled_count": 18
+            },
+            {
+              "value": "9",
+              "sampled_count": 9
+            },
+            {
+              "value": "1",
+              "sampled_count": 7
+            },
+            {
+              "value": "3",
+              "sampled_count": 3
+            },
+            {
+              "value": "251",
+              "sampled_count": 2
+            },
+            {
+              "value": "5",
+              "sampled_count": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "api_services",
+      "table": "api_tokens",
+      "estimated_rows": -1,
+      "category_columns": [
+        {
+          "column": "is_active",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "false",
+              "sampled_count": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "food",
+      "table": "diary_entries",
+      "estimated_rows": 107,
+      "category_columns": [
+        {
+          "column": "is_partial",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 48
+            },
+            {
+              "value": "false",
+              "sampled_count": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "food",
+      "table": "foods",
+      "estimated_rows": 77,
+      "category_columns": [
+        {
+          "column": "serving_unit",
+          "data_type": "text",
+          "observed_categories": [
+            {
+              "value": "g",
+              "sampled_count": 6
+            },
+            {
+              "value": "ml",
+              "sampled_count": 1
+            },
+            {
+              "value": "pancakes",
+              "sampled_count": 1
+            }
+          ]
+        },
+        {
+          "column": "needs_review",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "false",
+              "sampled_count": 9
+            },
+            {
+              "value": "true",
+              "sampled_count": 1
+            }
+          ]
+        },
+        {
+          "column": "is_deleted",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "false",
+              "sampled_count": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "logging",
+      "table": "db_stats",
+      "estimated_rows": 205,
+      "category_columns": [
+        {
+          "column": "maintenance_type",
+          "data_type": "text",
+          "observed_categories": [
+            {
+              "value": "daily",
+              "sampled_count": 74
+            },
+            {
+              "value": "weekly",
+              "sampled_count": 9
+            },
+            {
+              "value": "monthly",
+              "sampled_count": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "logging",
+      "table": "task_executions",
+      "estimated_rows": 5390,
+      "category_columns": [
+        {
+          "column": "failure_type",
+          "data_type": "text",
+          "observed_categories": [
+            {
+              "value": "extract",
+              "sampled_count": 6
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "music",
+      "table": "all_tracks",
+      "estimated_rows": 41517,
+      "category_columns": [
+        {
+          "column": "available_in_us",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 281
+            },
+            {
+              "value": "false",
+              "sampled_count": 11
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "music",
+      "table": "isrc_swaps",
+      "estimated_rows": 425,
+      "category_columns": [
+        {
+          "column": "valid_mapping",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 107
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "music",
+      "table": "playlist_config",
+      "estimated_rows": 54,
+      "category_columns": [
+        {
+          "column": "auto_shuffle",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "false",
+              "sampled_count": 15
+            }
+          ]
+        },
+        {
+          "column": "seeds_only",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "false",
+              "sampled_count": 10
+            },
+            {
+              "value": "true",
+              "sampled_count": 5
+            }
+          ]
+        },
+        {
+          "column": "make_recs",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "false",
+              "sampled_count": 15
+            }
+          ]
+        },
+        {
+          "column": "is_active",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 15
+            }
+          ]
+        },
+        {
+          "column": "manual_shuffle",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "false",
+              "sampled_count": 15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "music",
+      "table": "track_recommendation_decisions",
+      "estimated_rows": 121,
+      "category_columns": [
+        {
+          "column": "was_promoted",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 27
+            },
+            {
+              "value": "false",
+              "sampled_count": 25
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "music",
+      "table": "track_recommendations",
+      "estimated_rows": 2297,
+      "category_columns": [
+        {
+          "column": "is_best_genre",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 29
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "staging",
+      "table": "activity_metrics_matched",
+      "estimated_rows": 26024,
+      "category_columns": [
+        {
+          "column": "activity_type_id",
+          "data_type": "smallint",
+          "observed_categories": [
+            {
+              "value": "3",
+              "sampled_count": 223
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "staging",
+      "table": "temp_activity_trackpoints",
+      "estimated_rows": 2412,
+      "category_columns": [
+        {
+          "column": "activity_type_id",
+          "data_type": "smallint",
+          "observed_categories": [
+            {
+              "value": "9",
+              "sampled_count": 120
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "staging",
+      "table": "temp_isrc_swaps",
+      "estimated_rows": 447,
+      "category_columns": [
+        {
+          "column": "valid_mapping",
+          "data_type": "boolean",
+          "observed_categories": [
+            {
+              "value": "true",
+              "sampled_count": 64
+            },
+            {
+              "value": "false",
+              "sampled_count": 43
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "volleyball",
+      "table": "points",
+      "estimated_rows": 777,
+      "category_columns": [
+        {
+          "column": "event_type",
+          "data_type": "text",
+          "observed_categories": [
+            {
+              "value": "Dive",
+              "sampled_count": 5
+            },
+            {
+              "value": "Spike",
+              "sampled_count": 5
+            },
+            {
+              "value": "Ace",
+              "sampled_count": 3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
