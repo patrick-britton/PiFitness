@@ -26,29 +26,15 @@
     ],
     "dictionary_only": [],
     "duplicate_dictionary_headings": {},
-    "placeholder_count": 674,
-    "replacement_character_count": 677,
+    "placeholder_count": 669,
+    "replacement_character_count": 672,
     "schema_duplicates": []
   },
   "column_coverage": {
-    "documented_column_count": 744,
+    "documented_column_count": 768,
     "expected_column_count": 1817,
-    "objects_with_missing_columns": 146,
+    "objects_with_missing_columns": 140,
     "missing_columns": {
-      "food.diary_entries": [
-        "caffeine_mg",
-        "carbs_g",
-        "fat_g",
-        "fiber_g",
-        "kcal_per_100g",
-        "protein_g",
-        "sodium_mg",
-        "sugars_g"
-      ],
-      "health.body_battery_raw": [
-        "body_battery_value",
-        "ts_utc"
-      ],
       "health.body_composition_raw": [
         "body_mass_index",
         "fat_pct",
@@ -58,38 +44,16 @@
         "weight_muscle_g",
         "weight_total_g"
       ],
-      "health.body_dimensions": [
-        "butt_cm",
-        "captured_at_utc",
-        "chest_cm",
-        "neck_cm",
-        "stomach_cm",
-        "waist_cm"
-      ],
-      "health.fitness_age_raw": [
-        "fitness_age_measured",
-        "fitness_age_potential",
-        "human_age",
-        "ts_utc"
-      ],
       "health.heartrate_raw": [
         "activity_label",
         "heartrate_bpm",
         "hr_date",
         "ts_utc"
       ],
-      "health.hrv_raw": [
-        "hrv_value",
-        "ts_utc"
-      ],
       "health.photo_metadata": [
         "captured_at_utc",
         "file_name",
         "photo_type"
-      ],
-      "health.respiration_raw": [
-        "breaths_per_minute",
-        "ts_utc"
       ],
       "health.sleep_movement_raw": [
         "sleep_movement",
@@ -1412,6 +1376,6 @@
     "generic_count": 0,
     "line_count": 0
   },
-  "dictionary_line_count": 2117,
+  "dictionary_line_count": 2159,
   "ready_for_completion": false
 }

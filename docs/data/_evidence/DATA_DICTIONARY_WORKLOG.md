@@ -65,10 +65,16 @@
 ## Batch (activities semantics - this session)
 - Removed duplicate stub headings for segments, segments_details, vw_activity_header_stats, vw_activity_summary.
 - Upgraded all 49 columns of activities.activities with meanings (inferred where from name suffix; confirmed for units already in draft).
-## Next concrete batch
+- Batch (activities semantics - this session): upgraded 5 columns of activities.activity_details (activity_id, ts_utc, moving_duration_s, elapsed_duration_s, duration_s) from Unknown placeholders to inferred meanings. Audit documented_column_count 744/1817, objects_with_missing_columns 146. Next: continue activities domain columns.
 - Continue activities domain: activity_details, activity_details_distance, courses, segments, segments_details, distinct_segments, metric_list, training_cycle_dates, and the vw_* views. Then temp tables (excluded-with-reason).
 - Continue schema-by-schema. Suggested: food (11 objects, self-contained, has food_normalize.py/food_search.py in backend_functions) or activities (largest, 56 objects, already has partial draft content to preserve/improve). Reserve public PostGIS/system objects and staging.temp_* scratch tables as excluded-with-reason.
 
+## Batch (health raw tables columns) - 2026-11-04
+- Added column tables for health.body_battery_raw, body_dimensions, fitness_age_raw, hrv_raw, respiration_raw (headings restored after edit mistake).
+- Audit: documented_column_count 768/1817; objects_with_missing_columns 140. Next: photo_metadata, sleep_movement_raw, spo2_raw, stress_raw, body_composition_raw, sleep_totals, training_status_raw, and health views.
+## Batch (food.diary_entries columns) - 2026-11-04
+- Expanded collapsed nutrient row into 8 individual columns (kcal_per_100g, protein_g, fat_g, carbs_g, fiber_g, sugars_g, sodium_mg, caffeine_mg).
+- Audit: documented_column_count 752/1817; objects_with_missing_columns 145; placeholder_count 669. Next: continue health domain (15 objects with missing columns).
 ## Evidence inspected so far
 - .clinerules/00-operating-model.md, 10-data-dictionary.md, 20-database-readonly.md, 30-execution-and-checkpoints.md, 40-git-and-change-control.md
 - tools/data_dictionary/README.md

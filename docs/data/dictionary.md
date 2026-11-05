@@ -59,11 +59,11 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 | Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
 |---|---|---|---|---|---|---|---|
-| `activity_id` | bigint | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `ts_utc` | timestamp with time zone | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `moving_duration_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `elapsed_duration_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
-| `duration_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | NO | Activity id (FK to activities.activities) | id | schema.generated.md | schema.generated.md | inferred |
+| `ts_utc` | timestamptz | NO | Sample timestamp (UTC) | UTC timestamptz | schema.generated.md | schema.generated.md | inferred |
+| `moving_duration_s` | integer | YES | Moving duration up to sample | seconds | name suffix | schema.generated.md | inferred |
+| `elapsed_duration_s` | integer | YES | Elapsed duration up to sample | seconds | name suffix | schema.generated.md | inferred |
+| `duration_s` | integer | YES | Sample duration delta | seconds | name suffix | schema.generated.md | inferred |
 | `distance_mm` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 | `latitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 | `longitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
@@ -1191,7 +1191,14 @@ API service registry and OAuth/credential store for third-party integrations (Sp
 | `entry_id` | integer | NO | Surrogate id | Identifier | insert | diary_entries_pkey | confirmed |
 | `food_id` | integer | YES | Food consumed | FK -> food.foods.food_id | request | diary_entries_food_id_fkey | confirmed |
 | `name_snapshot` | text | NO | Name at log time | free text | food name at insert | queries.py | confirmed |
-| `kcal_per_100g`..`caffeine_mg` | double precision | YES | Nutrient densities per 100g snapshot | g/mg per 100g | snapshotted | _NUTRIENT_KEYS | confirmed |
+| `kcal_per_100g` | double precision | YES | Energy density snapshot | kcal/100g | snapshotted | _NUTRIENT_KEYS | confirmed |
+| `protein_g` | double precision | YES | Protein density snapshot | g/100g | snapshotted | _NUTRIENT_KEYS | confirmed |
+| `fat_g` | double precision | YES | Fat density snapshot | g/100g | snapshotted | _NUTRIENT_KEYS | confirmed |
+| `carbs_g` | double precision | YES | Carbohydrate density snapshot | g/100g | snapshotted | _NUTRIENT_KEYS | confirmed |
+| `fiber_g` | double precision | YES | Fiber density snapshot | g/100g | snapshotted | _NUTRIENT_KEYS | confirmed |
+| `sugars_g` | double precision | YES | Sugar density snapshot | g/100g | snapshotted | _NUTRIENT_KEYS | confirmed |
+| `sodium_mg` | double precision | YES | Sodium density snapshot | mg/100g | snapshotted | _NUTRIENT_KEYS | confirmed |
+| `caffeine_mg` | double precision | YES | Caffeine density snapshot | mg/100g | snapshotted | _NUTRIENT_KEYS | confirmed |
 | `is_partial` | boolean | NO | Nutrients unknown at log time | boolean | insert-assigned | queries.py | confirmed |
 | `qty` | double precision | NO | Quantity | number | request | queries.py | confirmed |
 | `unit` | text | NO | Unit | text | request, normalized | _norm_unit | confirmed |
@@ -1414,6 +1421,11 @@ API service registry and OAuth/credential store for third-party integrations (Sp
 - **Canonical source:** `health.body_battery_raw` (Garmin import).
 - **Rules:** `convention` raw time-series; PK app-level.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Sample timestamp | UTC timestamptz | Garmin import | schema.generated.md | confirmed |
+| `body_battery_value` | integer | YES | Body battery level | index 0-100 | Garmin import | schema.generated.md | confirmed |
+
 ### health.body_composition_raw (table)
 - **Grain:** one row per body-composition measurement.
 - **Canonical source:** `health.body_composition_raw` (Garmin import).
@@ -1424,30 +1436,60 @@ API service registry and OAuth/credential store for third-party integrations (Sp
 - **Canonical source:** `health.body_dimensions`.
 - **Rules:** `convention` dimension data.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `captured_at_utc` | timestamp with time zone | NO | Measurement timestamp | UTC timestamptz | manual entry | schema.generated.md | confirmed |
+| `butt_cm` | numeric | YES | Buttocks circumference | cm | manual entry | schema.generated.md | confirmed |
+| `waist_cm` | numeric | YES | Waist circumference | cm | manual entry | schema.generated.md | confirmed |
+| `stomach_cm` | numeric | YES | Stomach circumference | cm | manual entry | schema.generated.md | confirmed |
+| `chest_cm` | numeric | YES | Chest circumference | cm | manual entry | schema.generated.md | confirmed |
+| `neck_cm` | numeric | YES | Neck circumference | cm | manual entry | schema.generated.md | confirmed |
+
 ### health.fitness_age_raw (table)
 - **Grain:** one row per fitness-age sample.
 - **Canonical source:** `health.fitness_age_raw` (Garmin import).
 - **Rules:** `convention` raw sample.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Sample timestamp | UTC timestamptz | Garmin import | schema.generated.md | confirmed |
+| `human_age` | numeric | YES | Chronological age | years | Garmin import | schema.generated.md | confirmed |
+| `fitness_age_measured` | numeric | YES | Measured fitness age | years | Garmin import | schema.generated.md | confirmed |
+| `fitness_age_potential` | numeric | YES | Potential fitness age | years | Garmin import | schema.generated.md | confirmed |
 
 ### health.heartrate_raw (table)
 - **Grain:** one row per heart-rate sample (ts_utc).
 - **Canonical source:** `health.heartrate_raw`; populated by `activity_smoothing.insert_heartrate_for_activity` from `activities.activity_details`.
 - **Rules:** `enforced` PK ts_utc; upsert on conflict.
 
+- **Rules:** `convention` raw sample.
+
 ### health.hrv_raw (table)
 - **Grain:** one row per HRV sample.
 - **Canonical source:** `health.hrv_raw` (Garmin import).
 - **Rules:** `convention` raw sample.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Sample timestamp | UTC timestamptz | Garmin import | schema.generated.md | confirmed |
+| `hrv_value` | smallint | YES | HRV (ms) | ms | Garmin import | schema.generated.md | confirmed |
 
 ### health.photo_metadata (table)
 - **Grain:** one row per photo metadata.
 - **Canonical source:** `health.photo_metadata`.
 - **Rules:** `convention` metadata.
 
+- **Rules:** `convention` raw sample.
+
 ### health.respiration_raw (table)
 - **Grain:** one row per respiration sample.
 - **Canonical source:** `health.respiration_raw` (Garmin import).
 - **Rules:** `convention` raw sample.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Sample timestamp | UTC timestamptz | Garmin import | schema.generated.md | confirmed |
+| `breaths_per_minute` | smallint | YES | Respiration rate | breaths/min | Garmin import | schema.generated.md | confirmed |
 
 ### health.sleep_movement_raw (table)
 - **Grain:** one row per sleep movement sample.
