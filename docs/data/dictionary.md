@@ -452,9 +452,26 @@ API service registry and OAuth/credential store for third-party integrations (Sp
 ## food
 
 ### food.diary_entries (table)
-- **Grain:** one row per food diary entry (meal log), keyed by entry id.
-- **Canonical source:** `food.diary_entries`.
-- **Rules:** `enforced` PK; `convention` links to foods/recipes; timestamps UTC.
+- **Purpose:** one row per meal/snack log entry with nutrient snapshot.
+- **Grain:** one row per diary entry, keyed by `entry_id`.
+- **Primary/candidate key:** `diary_entries_pkey` on `entry_id`. FK `diary_entries_food_id_fkey` (nullable).
+- **Canonical source and lifecycle:** written by insert/update_diary_entry; hard-deleted by delete_diary_entry; nutrients snapshotted at log time; kcal derived via _kcal_for.
+- **Consumers:** GET /api/food/diary, /api/food/usual.
+- **Rules:** enforced PK; convention logged_at UTC; name_snapshot captures name at log time.
+- **Evidence/confidence:** backend/pifitness/food/queries.py (ENTRY_COLS, _kcal_for); schema.generated.md 989-1017. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `entry_id` | integer | NO | Surrogate id | Identifier | insert | diary_entries_pkey | confirmed |
+| `food_id` | integer | YES | Food consumed | FK -> food.foods.food_id | request | diary_entries_food_id_fkey | confirmed |
+| `name_snapshot` | text | NO | Name at log time | free text | food name at insert | queries.py | confirmed |
+| `kcal_per_100g`..`caffeine_mg` | double precision | YES | Nutrient densities per 100g snapshot | g/mg per 100g | snapshotted | _NUTRIENT_KEYS | confirmed |
+| `is_partial` | boolean | NO | Nutrients unknown at log time | boolean | insert-assigned | queries.py | confirmed |
+| `qty` | double precision | NO | Quantity | number | request | queries.py | confirmed |
+| `unit` | text | NO | Unit | text | request, normalized | _norm_unit | confirmed |
+| `kcal` | double precision | YES | Computed energy | kcal | _kcal_for | queries.py | confirmed |
+| `logged_at` | timestamp with time zone | NO | Consumption time | UTC timestamptz | request | ix_diary_day | confirmed |
+| `created_at` | timestamp with time zone | NO | Row creation | UTC timestamptz | insert | schema.generated.md | confirmed |
 
 ### food.foods (table)
 - **Grain:** one row per food item (canonical food catalog).
