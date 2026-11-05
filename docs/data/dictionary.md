@@ -9,300 +9,1026 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 - **Canonical source:** `activities.activities`; populated by the activity sync/import worker from Garmin data (staging.api_imports flow); `activity_path`/`is_downloaded` set later by `backend/backend_functions/activity_smoothing.build_activity_path` from `activities.activity_details_distance`.
 - **Rules:** `enforced` PK on `activity_id`; `convention` one row per activity; `activity_path` nullable until GPX downloaded; timestamps UTC.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | NO | Surrogate activity id | count | schema.generated.md | schema.generated.md | confirmed |
+| `activity_name` | text | YES | Garmin activity name/title | text | backend/pifitness/activities/queries.py | schema.generated.md | inferred |
+| `activity_type_id` | smallint | YES | Garmin activity type id | id | schema.generated.md | schema.generated.md | inferred |
+| `activity_type_name` | text | YES | Garmin activity type name (e.g. running, walking) | text | backend/backend_functions/activity_smoothing.py (filters walks/hikes) | schema.generated.md | inferred |
+| `distance_m` | numeric | YES | Activity distance | metres | schema.generated.md | schema.generated.md | confirmed |
+| `duration_s` | numeric | YES | Activity duration | seconds | schema.generated.md | schema.generated.md | confirmed |
+| `duration_elapsed_s` | numeric | YES | Elapsed duration including pauses | seconds | schema.generated.md | schema.generated.md | confirmed |
+| `duration_moving_s` | integer | YES | Moving duration excluding pauses | seconds | schema.generated.md | schema.generated.md | confirmed |
+| `calories` | integer | YES | Calories burned | kcal | schema.generated.md | schema.generated.md | confirmed |
+| `calories_bmr` | integer | YES | BMR calories | kcal | schema.generated.md | schema.generated.md | confirmed |
+| `steps` | integer | YES | Step count | count | schema.generated.md | schema.generated.md | confirmed |
+| `stride_length_cm_avg` | integer | YES | Average stride length | cm | name suffix | schema.generated.md | inferred |
+| `cadence_double_spm_max` | integer | YES | Max double (left+right) cadence | steps/min | name suffix | schema.generated.md | inferred |
+| `cadence_running_spm_max` | integer | YES | Max running cadence | steps/min | name suffix | schema.generated.md | inferred |
+| `cadence_running_spm_avg` | numeric | YES | Average running cadence | steps/min | name suffix | schema.generated.md | inferred |
+| `speed_mps_max` | numeric | YES | Max speed | m/s | name suffix | schema.generated.md | inferred |
+| `speed_mps_avg` | numeric | YES | Average speed | m/s | name suffix | schema.generated.md | inferred |
+| `heartrate_max` | integer | YES | Max heart rate | bpm | name suffix | schema.generated.md | inferred |
+| `heartrate_avg` | integer | YES | Average heart rate | bpm | name suffix | schema.generated.md | inferred |
+| `start_timestamp_utc` | bigint | YES | Start epoch | ms since epoch | schema.generated.md | schema.generated.md | confirmed |
+| `start_time_utc` | timestamptz | YES | Activity start time | UTC timestamptz | schema.generated.md | schema.generated.md | confirmed |
+| `end_time_utc` | timestamptz | YES | Activity end time | UTC timestamptz | schema.generated.md | schema.generated.md | confirmed |
+| `latitude_start` | numeric | YES | Start latitude | degrees | name suffix | schema.generated.md | inferred |
+| `latitude_end` | numeric | YES | End latitude | degrees | name suffix | schema.generated.md | inferred |
+| `longitude_start` | numeric | YES | Start longitude | degrees | name suffix | schema.generated.md | inferred |
+| `longitude_end` | numeric | YES | End longitude | degrees | name suffix | schema.generated.md | inferred |
+| `elevation_m_min` | numeric | YES | Min elevation | m | name suffix | schema.generated.md | inferred |
+| `elevation_m_max` | numeric | YES | Max elevation | m | name suffix | schema.generated.md | inferred |
+| `elevation_m_gain` | numeric | YES | Elevation gain | m | name suffix | schema.generated.md | inferred |
+| `elevation_m_loss` | numeric | YES | Elevation loss | m | name suffix | schema.generated.md | inferred |
+| `temperature_c_min` | smallint | YES | Min temperature | deg C | name suffix | schema.generated.md | inferred |
+| `temperature_c_max` | smallint | YES | Max temperature | deg C | name suffix | schema.generated.md | inferred |
+| `water_ml_estimated` | integer | YES | Estimated water loss | ml | name suffix | schema.generated.md | inferred |
+| `training_load` | numeric | YES | Training load | load | schema.generated.md | schema.generated.md | inferred |
+| `training_effect_aerobic` | numeric | YES | Aerobic training effect | 0-5 scale | name suffix | schema.generated.md | inferred |
+| `training_effect_anerobic` | numeric | YES | Anaerobic training effect | 0-5 scale | name suffix | schema.generated.md | inferred |
+| `intensity_minutes_moderate` | integer | YES | Moderate intensity minutes | min | name suffix | schema.generated.md | inferred |
+| `intensity_minutes_vigorous` | integer | YES | Vigorous intensity minutes | min | name suffix | schema.generated.md | inferred |
+| `is_downloaded` | boolean | YES | GPX/path downloaded flag | boolean | backend/backend_functions/activity_smoothing.py | schema.generated.md | confirmed |
+| `activity_path` | USER-DEFINED | YES | Stored activity geometry path | geometry | backend/backend_functions/activity_smoothing.build_activity_path | schema.generated.md | confirmed |
+
 ### activities.activity_details (table)
 - **Grain:** one row per timestamp sample within an activity (`activity_id`, `ts_utc`).
 - **Canonical source:** `activities.activity_details`.
 - **Rules:** `enforced` PK (`activity_id`, `ts_utc`); `convention` samples ordered by ts_utc; FK to activities.activities (app-level).
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ts_utc` | timestamp with time zone | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `moving_duration_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `duration_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mm` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `latitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `longitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `heartrate_bpm` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `cadence_spm` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `air_temp_c` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `speed_mmps` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vertical_speed_mps` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vert_oscillation_cm` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `stride_length_cm` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vert_ratio` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ground_contact_time_ms` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ground_contact_balance_left` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `performance_condition` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_id` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m_smooth` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_reference` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `loc_point` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `grid_5m_00_id` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.activity_details_distance (table)
 - **Grain:** one row per distance-binned sample; derived for path building.
 - **Canonical source:** `activities.activity_details_distance`.
 - **Rules:** `convention` derived table; PK not defined; FK app-level.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_type_id` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_ms` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `latitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `longitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `heartrate_bpm` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `cadence_spm` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `air_temp_c` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `speed_mmps` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vertical_speed_mps` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vert_oscillation_cm` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `stride_length_cm` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vert_ratio` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ground_contact_time_ms` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ground_contact_balance_left` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `performance_condition` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m_smooth` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_reference` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `loc_point` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `grid_5m_00_id` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.courses (table)
 - **Grain:** one row per named course/route.
 - **Canonical source:** `activities.courses`.
 - **Rules:** `convention` course metadata; referenced by segments.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `course_id` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `course_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `created_at` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `course_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `course_distance_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `course_elevation_gain_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.segments (table)
 - **Grain:** one row per defined segment.
 - **Canonical source:** `activities.segments`.
 - **Rules:** `enforced` PK `segment_id`; `convention` segment geometry in activities schema.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_reference_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_start_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_end_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_gain` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_loss` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_point` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `end_point` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_id` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `utm_srid` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_path_transformed` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.segments_details (table)
 - **Grain:** one row per segment match occurrence.
 - **Canonical source:** `activities.segments_details`.
 - **Rules:** `convention` match results; FKs app-level.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_start_point` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_end_point` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `max_hr` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_hr` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_cadence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_temp` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_osc` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_ratio` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_gct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_perf` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_balance` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_stride_length` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.distinct_segments (table)
 - **Grain:** one row per distinct segment geometry.
 - **Canonical source:** `activities.distinct_segments`.
 - **Rules:** `convention` dedup layer.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_seg_id` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.metric_list (table)
 - **Grain:** one row per activity metric descriptor.
 - **Canonical source:** `activities.metric_list`.
 - **Rules:** `convention` lookup table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_type_id` | smallint | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `metric_name` | text | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `metric_unit` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_seen_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.overlap_queue (table)
 - **Grain:** one row per queued overlap-processing job.
 - **Canonical source:** `activities.overlap_queue`.
 - **Rules:** `convention` queue table.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `queue_id` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id_a` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id_b` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_confidence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `created_at` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.activity_processing_queue (table)
 - **Grain:** one row per queued activity-processing job.
 - **Canonical source:** `activities.activity_processing_queue`.
 - **Rules:** `convention` queue table.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `created_at_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.race_predictions_raw (table)
 - **Grain:** one row per race prediction snapshot.
 - **Canonical source:** `activities.race_predictions_raw`.
 - **Rules:** `convention` raw predictions.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prediction_5k_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prediction_10k_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prediction_half_marathon_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prediction_marathon_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.segment_match_exclusions (table)
 - **Grain:** one row per excluded segment match.
 - **Canonical source:** `activities.segment_match_exclusions`.
 - **Rules:** `enforced` FKs to activities and segments.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.elevation_reference (table)
 - **Grain:** one row per elevation reference point.
 - **Canonical source:** `activities.elevation_reference`.
 - **Rules:** `convention` reference data.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `grid_5m_00_id` | USER-DEFINED | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_elevation` | double precision | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `obs_count` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_updated` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elev_stddev` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_hammered` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_sanded` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.activity_resampled_1m (table)
 - **Grain:** one row per minute-bucketed activity metrics.
 - **Canonical source:** `activities.activity_resampled_1m`.
 - **Rules:** `convention` derived aggregate.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `latitude` | double precision | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `longitude` | double precision | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m` | double precision | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | double precision | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_header_stats (view)
 - **Grain:** one row per activity with formatted header stats.
 - **Canonical source:** derived from `activities.activities`.
 - **Rules:** `convention` read-only view.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_basic` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `duration_display` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `pace_display` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `hr_median` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `hr_maximum` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_activity_summary (view)
 - **Grain:** one row per activity summary.
 - **Canonical source:** derived from `activities.activities`.
 - **Rules:** `convention` read-only view.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_start_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_pace` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_time_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_distance_mi` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `all_time_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_time_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior_time_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_delta_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior_delta_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_pace` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.segment_matches (table)
 - **Grain:** one row per segment matches (table); see schema.generated.md for columns.
 - **Canonical source:** `activities.segment_matches`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
-### activities.segments (table)
-- **Grain:** one row per segments (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.segments`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
-
-### activities.segments_details (table)
-- **Grain:** one row per segments details (table); see schema.generated.md for columns.
-- **Canonical source:** `activities.segments_details`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_start_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_end_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_confirmed` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_confidence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_ts_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.steps_raw (table)
 - **Grain:** one row per steps raw (table); see schema.generated.md for columns.
 - **Canonical source:** `activities.steps_raw`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `ts_utc` | timestamp with time zone | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `step_goal` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `total_steps` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `total_distance_m` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.temp_activity_segment_metas (table)
 - **Grain:** one row per temp activity segment metas (table); see schema.generated.md for columns.
 - **Canonical source:** `activities.temp_activity_segment_metas`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `end_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.temp_segment_details (table)
 - **Grain:** one row per temp segment details (table); see schema.generated.md for columns.
 - **Canonical source:** `activities.temp_segment_details`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_id` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `row_asc` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `row_desc` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `latitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `longitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_delta` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.temp_segment_matches_downselect (table)
 - **Grain:** one row per temp segment matches downselect (table); see schema.generated.md for columns.
 - **Canonical source:** `activities.temp_segment_matches_downselect`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_start_dist` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_end_dist` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `full_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `confidence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ruggedness` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `utm_srid` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `short_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `dist_deviation` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `full_path_transformed` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `freschet_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `polygon_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `hausdorff_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `heading_deviation` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.temp_segment_matches_v1 (table)
 - **Grain:** one row per temp segment matches v1 (table); see schema.generated.md for columns.
 - **Canonical source:** `activities.temp_segment_matches_v1`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_start_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_end_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_confirmed` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_confidence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_ts_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.temp_segment_matching_activities (table)
 - **Grain:** one row per temp segment matching activities (table); see schema.generated.md for columns.
 - **Canonical source:** `activities.temp_segment_matching_activities`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.temp_segment_matching_segments (table)
 - **Grain:** one row per temp segment matching segments (table); see schema.generated.md for columns.
 - **Canonical source:** `activities.temp_segment_matching_segments`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.temp_segments_v1 (table)
 - **Grain:** one row per temp segments v1 (table); see schema.generated.md for columns.
 - **Canonical source:** `activities.temp_segments_v1`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_reference_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_start_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_end_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_gain` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_loss` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_point` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `end_point` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_id` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.training_cycle_dates (table)
 - **Grain:** one row per training cycle dates (table); see schema.generated.md for columns.
 - **Canonical source:** `activities.training_cycle_dates`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `cycle_start_utc` | timestamp with time zone | NO | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `cycle_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_activity_elevation_deltas (view)
 - **Grain:** one row per vw activity elevation deltas (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_activity_elevation_deltas`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
-### activities.vw_activity_header_stats (view)
-- **Grain:** one row per vw activity header stats (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_activity_header_stats`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_delta` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_ids_to_sync (view)
 - **Grain:** one row per vw activity ids to sync (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_activity_ids_to_sync`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `max_points` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_activity_path_updates (view)
 - **Grain:** one row per vw activity path updates (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_activity_path_updates`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_segments_aggregated (view)
 - **Grain:** one row per vw activity segments aggregated (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_activity_segments_aggregated`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `id_val` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `meta_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `path_coords` | json | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `map_timestamps` | json | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `x_time` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `x_distance` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_time` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_time_delta` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_hr` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_hr_delta` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_elevation` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_cadence` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_balance` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_performance` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_vert_ratio` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_osc` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_temp` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_stride` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_gct` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_speed` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_activity_sleep (view)
 - **Grain:** one row per vw activity sleep (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_activity_sleep`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
-### activities.vw_activity_summary (view)
-- **Grain:** one row per vw activity summary (view); see schema.generated.md for columns.
-- **Canonical source:** `activities.vw_activity_summary`.
-- **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `awake_hours_prior` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_score` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_sleep_hours` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `one_day_sleep_hours` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_summary_segment_creation (view)
 - **Grain:** one row per vw activity summary segment creation (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_activity_summary_segment_creation`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `child_courses` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `child_segments` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `matched_courses` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `matched_segments` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_activity_training_status (view)
 - **Grain:** one row per vw activity training status (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_activity_training_status`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vo2_max_value` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `altitude_acclimation_m` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `heat_acclimation_pct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_acute` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_pct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_readiness` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_mid` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_max` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_min` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `resting_hr_asleep` | double precision | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `resting_hr_awake` | double precision | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_duration_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_score` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `light_sleep_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `deep_sleep_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `awake_sleep_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `rem_sleep_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `awake_s_before_activity` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_end_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_end_date` | date | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_start_date` | date | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_activity_weights (view)
 - **Grain:** one row per vw activity weights (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_activity_weights`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `weight_lb` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `muscle_lb` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `fat_lb` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_course_review (view)
 - **Grain:** one row per vw course review (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_course_review`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_reference_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_start_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_end_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `effort_label` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_gain` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_loss` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `matched_activities` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_event_utc` | date | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `course_idx` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `max_course_idx` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `new_count` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_elevation_smooth (view)
 - **Grain:** one row per vw elevation smooth (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_elevation_smooth`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `latitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `longitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `lat5` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `long5` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_raw` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `geog` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_last_activity_id_by_type (view)
 - **Grain:** one row per vw last activity id by type (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_last_activity_id_by_type`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_matched_segment_path_updates (view)
 - **Grain:** one row per vw matched segment path updates (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_matched_segment_path_updates`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_overlapped_segments (view)
 - **Grain:** one row per vw overlapped segments (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_overlapped_segments`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `match_rank` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_confidence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `effort_label` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `matched_activities` | ARRAY | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_possible_segment_matches (view)
 - **Grain:** one row per vw possible segment matches (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_possible_segment_matches`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_date` | date | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_confidence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `effort_label` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_pr_hunter (view)
 - **Grain:** one row per vw pr hunter (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_pr_hunter`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vs_date` | date | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `attempt_label` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `total_attempts` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `predicted_time_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vs_pace` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `estimated_pace` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prestige_score` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `weight_delta` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vo2_delta` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `acute_load_delta` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `load_max_delta` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_report_segment_efforts (view)
 - **Grain:** one row per vw report segment efforts (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_report_segment_efforts`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_cadence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_stride_length` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_gct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_ratio` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `all_time_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `total_attempts` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior_time_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_time_excl_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior_delta_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_delta_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior10_avg_cadence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior10_avg_stride_length` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior10_avg_gct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior10_avg_vert_ratio` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_run_timing (view)
 - **Grain:** one row per vw run timing (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_run_timing`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `run_age` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `music_start` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `music_end` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `music_duration_ms` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_segment_comps (view)
 - **Grain:** one row per vw segment comps (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_segment_comps`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `id_val` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `meta_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m_smooth` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_ms` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_ms_delta` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `longitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `latitude` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `heartrate_bpm` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `heartrate_bpm_delta` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `cadence_spm` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ground_contact_balance_left` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `performance_condition` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vert_ratio` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vert_oscillation_cm` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `air_temp_c` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `stride_length_cm` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ground_contact_time_ms` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `speed_mmps` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_segment_create_auto_approve (view)
 - **Grain:** one row per vw segment create auto approve (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_segment_create_auto_approve`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_start_dist` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_end_dist` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `dist_deviation` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `polygon_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `hausdorff_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `freschet_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `confidence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `approval_phase` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_segment_create_from_details (view)
 - **Grain:** one row per vw segment create from details (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_segment_create_from_details`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_reference_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_start_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_end_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_gain` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_loss` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_point` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `end_point` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_id` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_segment_leaderboard (view)
 - **Grain:** one row per vw segment leaderboard (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_segment_leaderboard`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `cycle_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_start_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_end_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `all_time_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_365_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `current_cycle_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `recency_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `pace_str` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `weight_lb` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `muscle_pct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `fat_pct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vo2_max_value` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `altitude_acclimation_m` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `heat_acclimation_pct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_acute` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_pct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_readiness` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_mid` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_max` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_min` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `resting_hr_asleep` | double precision | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `resting_hr_awake` | double precision | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_duration_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_hours` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_score` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `light_sleep_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `deep_sleep_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `awake_sleep_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `rem_sleep_s` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `awake_hours` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `max_hr` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_hr` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_cadence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_temp` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_osc` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_ratio` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_gct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_perf` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_balance` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_stride_length` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_segment_matching_downselect_confidence (view)
 - **Grain:** one row per vw segment matching downselect confidence (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_segment_matching_downselect_confidence`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `confirmed` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_start_dist` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_end_dist` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `dist_deviation` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `polygon_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `freschet_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `hausdorff_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `confidence_score` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_segment_matching_downselect_scores (view)
 - **Grain:** one row per vw segment matching downselect scores (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_segment_matching_downselect_scores`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_start_dist` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_end_dist` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `dist_deviation` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ruggedness` | double precision | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_segment_path_updates (view)
 - **Grain:** one row per vw segment path updates (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_segment_path_updates`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_reference_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_id` | smallint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_start_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `reference_end_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ascent_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `descent_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_point` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `end_point` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_segment_racing (view)
 - **Grain:** one row per vw segment racing (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_segment_racing`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `effort_count` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_effort` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_segments_details_ranked (view)
 - **Grain:** one row per vw segments details ranked (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_segments_details_ranked`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `cycle_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_start_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_end_point` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `recency_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `all_time_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_365_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `current_cycle_rank` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_time_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_duration_s` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `max_hr` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_hr` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_cadence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_temp` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_osc` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_vert_ratio` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_gct` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_perf` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_balance` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_stride_length` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_path` | USER-DEFINED | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_segments_effort_stats (view)
 - **Grain:** one row per vw segments effort stats (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_segments_effort_stats`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `is_course` | boolean | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `distance_mi` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_gain` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_effort` | date | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `matched_activity_count` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ### activities.vw_temp_segment_matches_downselect (view)
 - **Grain:** one row per vw temp segment matches downselect (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_temp_segment_matches_downselect`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `segment_id` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `effort_date` | date | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_start_dist` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_end_dist` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ruggedness` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `dist_deviation` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `polygon_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `hausdorff_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `freschet_deviation_m` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `confidence` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_unmatched_activitites (view)
 - **Grain:** one row per vw unmatched activitites (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_unmatched_activitites`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
 
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `activity_id` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+
 ### activities.vw_watch_music_heard (view)
 - **Grain:** one row per vw watch music heard (view); see schema.generated.md for columns.
 - **Canonical source:** `activities.vw_watch_music_heard`.
 - **Rules:** `convention` � not yet individually catalogued; DB constraints per schema.generated.md.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `playlist_id` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `playlist_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `track_id` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `isrc` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `track_order` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `track_name_clean` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `artist_display_name` | text | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `duration_ms` | integer | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `music_start` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_cumulative_ms` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `end_cumulative_ms` | bigint | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `pct_listened` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `total_listen_ms` | numeric | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `played_at_utc` | timestamp with time zone | YES | Unknown � investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
 
 ## api_services
 
@@ -474,54 +1200,212 @@ API service registry and OAuth/credential store for third-party integrations (Sp
 | `created_at` | timestamp with time zone | NO | Row creation | UTC timestamptz | insert | schema.generated.md | confirmed |
 
 ### food.foods (table)
-- **Grain:** one row per food item (canonical food catalog).
-- **Canonical source:** `food.foods`.
-- **Rules:** `enforced` PK `food_id`; `convention` is_deleted/deleted_at soft-delete; source tracking.
+- **Purpose:** canonical food catalog (manual + USDA + barcode + recipe-derived).
+- **Grain:** one row per food item.
+- **Primary/candidate key:** `foods_pkey` on `food_id`.
+- **Canonical source and lifecycle:** written by food search/import and recipe save (source='recipe' food row); soft-deleted via is_deleted/deleted_at.
+- **Consumers:** food.vw_food_search, food.vw_usual_foods, diary_entries.
+- **Rules:** enforced PK; convention soft-delete; needs_review flags uncertain imports; quality_score numeric.
+- **Evidence/confidence:** backend/pifitness/food/queries.py (FOOD_COLS); schema.generated.md 1018-1052. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `food_id` | integer | NO | Surrogate id | identifier | insert | foods_pkey | confirmed |
+| `name` | text | NO | Food name | free text | request/import | ix_foods_name_trgm | confirmed |
+| `source` | text | NO | Provenance | text (manual/usda/barcode/recipe) | insert | ix_foods_source_alive | confirmed |
+| `fdc_id` | integer | YES | USDA FDC id | identifier | import | queries.py | confirmed |
+| `barcode` | text | YES | Barcode | text | import | ix_foods_barcode | confirmed |
+| `kcal_per_100g` | double precision | YES | Energy density | kcal/100g | import/snapshot | _NUTRIENT_KEYS | confirmed |
+| `protein_g` | double precision | YES | Protein density | g/100g | import/snapshot | _NUTRIENT_KEYS | confirmed |
+| `fat_g` | double precision | YES | Fat density | g/100g | import/snapshot | _NUTRIENT_KEYS | confirmed |
+| `carbs_g` | double precision | YES | Carbs density | g/100g | import/snapshot | _NUTRIENT_KEYS | confirmed |
+| `fiber_g` | double precision | YES | Fiber density | g/100g | import/snapshot | _NUTRIENT_KEYS | confirmed |
+| `sugars_g` | double precision | YES | Sugars density | g/100g | import/snapshot | _NUTRIENT_KEYS | confirmed |
+| `sodium_mg` | double precision | YES | Sodium density | mg/100g | import/snapshot | _NUTRIENT_KEYS | confirmed |
+| `caffeine_mg` | double precision | YES | Caffeine density | mg/100g | import/snapshot | _NUTRIENT_KEYS | confirmed |
+| `serving_size` | double precision | YES | Grams per serving_unit | g | import/recipe | _kcal_for | confirmed |
+| `serving_unit` | text | YES | Serving unit label | text | import/recipe | _kcal_for | confirmed |
+| `serving_text` | text | YES | Human serving description | free text | import | schema.generated.md | confirmed |
+| `nutrients_raw` | jsonb | YES | Raw nutrient payload | json | import | schema.generated.md | confirmed |
+| `normalized_from` | text | YES | Normalization source | text | food_normalize | schema.generated.md | confirmed |
+| `needs_review` | boolean | NO | Needs manual review | boolean | import | ix_foods_needs_review | confirmed |
+| `review_reason` | text | YES | Review reason | free text | import | schema.generated.md | confirmed |
+| `quality_score` | double precision | NO | Quality score | number | import | schema.generated.md | confirmed |
+| `is_deleted` | boolean | NO | Soft-delete flag | boolean | delete | ix_foods_source_alive | confirmed |
+| `deleted_at` | timestamp with time zone | YES | Soft-delete time | UTC timestamptz | delete | schema.generated.md | confirmed |
+| `created_at` | timestamp with time zone | NO | Row creation | UTC timestamptz | insert | schema.generated.md | confirmed |
 
 ### food.recipe_cook_states (table)
-- **Grain:** one row per recipe cook state (checked steps/foods, timers).
-- **Canonical source:** `food.recipe_cook_states`.
-- **Rules:** `enforced` PK/FK recipe_id -> recipes.
+- **Purpose:** per-recipe cook session state (checked steps/foods, timers).
+- **Grain:** one row per recipe.
+- **Primary/candidate key:** `recipe_cook_states_pkey` on `recipe_id`. FK -> food.recipes.recipe_id.
+- **Canonical source and lifecycle:** created/updated during cooking; deleted on complete_recipe.
+- **Consumers:** recipe cook endpoints.
+- **Rules:** enforced PK/FK; convention JSONB checked_steps/checked_foods/timers.
+- **Evidence/confidence:** backend/pifitness/food/queries.py; schema.generated.md 1053-1067. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `recipe_id` | integer | NO | Recipe | FK -> food.recipes.recipe_id | request | recipe_cook_states_pkey | confirmed |
+| `checked_steps` | jsonb | NO | Checked step ids | json | client | schema.generated.md | confirmed |
+| `checked_foods` | jsonb | NO | Checked ingredient ids | json | client | schema.generated.md | confirmed |
+| `timers` | jsonb | NO | Timer state | json | client | schema.generated.md | confirmed |
+| `updated_at` | timestamp with time zone | NO | Last update | UTC timestamptz | update | schema.generated.md | confirmed |
 
 ### food.recipe_ingredients (table)
-- **Grain:** one row per ingredient line in a recipe.
-- **Canonical source:** `food.recipe_ingredients`.
-- **Rules:** `enforced` PK (recipe_id, ingredient_id); FKs to foods/recipes.
+- **Purpose:** ingredient lines in a recipe.
+- **Grain:** one row per (recipe, ingredient line).
+- **Primary/candidate key:** `recipe_ingredients_pkey` on (recipe_id, ingredient_id). FKs -> recipes/foods.
+- **Canonical source and lifecycle:** rewritten wholesale on recipe create/update.
+- **Consumers:** recipe detail, cook state.
+- **Rules:** enforced PK/FKs.
+- **Evidence/confidence:** backend/pifitness/food/queries.py; schema.generated.md 1068-1083. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `recipe_id` | integer | NO | Recipe | FK -> food.recipes.recipe_id | request | recipe_ingredients_pkey | confirmed |
+| `ingredient_id` | integer | NO | Line id within recipe | identifier | assigned | recipe_ingredients_pkey | confirmed |
+| `food_id` | integer | NO | Food used | FK -> food.foods.food_id | request | recipe_ingredients_food_id_fkey | confirmed |
+| `qty` | double precision | NO | Quantity | number | request | schema.generated.md | confirmed |
+| `unit` | text | NO | Unit | text | request | schema.generated.md | confirmed |
 
 ### food.recipe_step_foods (table)
-- **Grain:** one row per food used in a recipe step.
-- **Canonical source:** `food.recipe_step_foods`.
-- **Rules:** `enforced` PK (recipe_id, step_id, food_id, unit); FKs.
+- **Purpose:** foods used in a recipe step.
+- **Grain:** one row per (recipe, step, food, unit).
+- **Primary/candidate key:** `recipe_step_foods_pkey` on (recipe_id, step_id, food_id, unit). FKs -> recipes/recipe_steps/foods.
+- **Canonical source and lifecycle:** rewritten wholesale on recipe create/update.
+- **Consumers:** recipe detail, cook state.
+- **Rules:** enforced PK/FKs.
+- **Evidence/confidence:** backend/pifitness/food/queries.py; schema.generated.md 1084-1100. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `recipe_id` | integer | NO | Recipe | FK -> food.recipes.recipe_id | request | recipe_step_foods_pkey | confirmed |
+| `step_id` | integer | NO | Step | FK -> food.recipe_steps.step_id | request | recipe_step_foods_step_id_fkey | confirmed |
+| `food_id` | integer | NO | Food used | FK -> food.foods.food_id | request | recipe_step_foods_food_id_fkey | confirmed |
+| `qty` | double precision | NO | Quantity | number | request | schema.generated.md | confirmed |
+| `unit` | text | NO | Unit | text | request | schema.generated.md | confirmed |
 
 ### food.recipe_steps (table)
-- **Grain:** one row per step in a recipe.
-- **Canonical source:** `food.recipe_steps`.
-- **Rules:** `enforced` PK step_id; unique (recipe_id, step_no).
+- **Purpose:** ordered steps in a recipe.
+- **Grain:** one row per step.
+- **Primary/candidate key:** `recipe_steps_pkey` on `step_id`; unique `recipe_steps_recipe_id_step_no_key` on (recipe_id, step_no). FK -> recipes.recipe_id.
+- **Canonical source and lifecycle:** rewritten wholesale on recipe create/update.
+- **Consumers:** recipe detail, cook state.
+- **Rules:** enforced PK/unique/FK.
+- **Evidence/confidence:** backend/pifitness/food/queries.py; schema.generated.md 1101-1116. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `step_id` | integer | NO | Surrogate id | identifier | assigned | recipe_steps_pkey | confirmed |
+| `recipe_id` | integer | NO | Recipe | FK -> food.recipes.recipe_id | request | recipe_steps_recipe_id_fkey | confirmed |
+| `step_no` | integer | NO | Step order | number | request | recipe_steps_recipe_id_step_no_key | confirmed |
+| `instruction` | text | NO | Step text | free text | request | schema.generated.md | confirmed |
+| `timer_seconds` | integer | YES | Timer duration | seconds | request | schema.generated.md | confirmed |
 
 ### food.recipes (table)
+- **Purpose:** recipe catalog with aggregated nutrients and cook count.
 - **Grain:** one row per recipe.
-- **Canonical source:** `food.recipes`.
-- **Rules:** `enforced` PK recipe_id; soft-delete via is_deleted/deleted_at; FK food_id.
+- **Primary/candidate key:** `recipes_pkey` on `recipe_id`. FK `recipes_food_id_fkey` (nullable) -> food.foods.food_id.
+- **Canonical source and lifecycle:** created/updated/deleted via recipe endpoints; soft-delete via is_deleted/deleted_at; times_prepared increments on complete_recipe; recipe also owns a source='recipe' food row.
+- **Consumers:** recipe endpoints, diary (via recipe food).
+- **Rules:** enforced PK/FK; soft-delete; ix_recipes_* partial indexes.
+- **Evidence/confidence:** backend/pifitness/food/queries.py; schema.generated.md 1117-1139. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `recipe_id` | integer | NO | Surrogate id | identifier | insert | recipes_pkey | confirmed |
+| `title` | text | NO | Recipe title | free text | request | schema.generated.md | confirmed |
+| `category` | text | NO | Category | free text | request | ix_recipes_cat_alive | confirmed |
+| `times_prepared` | integer | NO | Cook count | count | complete_recipe | schema.generated.md | confirmed |
+| `food_id` | integer | YES | Linked food row (source=recipe) | FK -> food.foods.food_id | insert | recipes_food_id_fkey | confirmed |
+| `is_deleted` | boolean | NO | Soft-delete flag | boolean | delete | ix_recipes_alive_rank | confirmed |
+| `deleted_at` | timestamp with time zone | YES | Soft-delete time | UTC timestamptz | delete | schema.generated.md | confirmed |
+| `created_at` | timestamp with time zone | NO | Row creation | UTC timestamptz | insert | schema.generated.md | confirmed |
+| `servings_count` | integer | YES | Servings per recipe | count | request | schema.generated.md | confirmed |
+| `serving_unit` | text | YES | Serving unit label | text | request | schema.generated.md | confirmed |
 
 ### food.tri_tip_events (table)
-- **Grain:** one row per tri-tip cooking event.
-- **Canonical source:** `food.tri_tip_events`.
-- **Rules:** `convention` event metadata.
+- **Purpose:** tri-tip cooking event metadata.
+- **Grain:** one row per cook event.
+- **Primary/candidate key:** `tri_tip_events_pkey` on `tri_tip_id`.
+- **Canonical source and lifecycle:** created via tri-tip endpoints.
+- **Consumers:** tri-tip endpoints, tri_tip_readings.
+- **Rules:** enforced PK.
+- **Evidence/confidence:** backend/pifitness/food/queries.py; schema.generated.md 1140-1156. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `tri_tip_id` | integer | NO | Surrogate id | identifier | insert | tri_tip_events_pkey | confirmed |
+| `weight_lbs` | numeric | NO | Raw weight | lbs | request | schema.generated.md | confirmed |
+| `shape` | text | NO | Shape | text | request | schema.generated.md | confirmed |
+| `target_internal_temp_f` | numeric | NO | Target internal temp | �F | request | schema.generated.md | confirmed |
+| `status` | text | NO | Event status | text | request | schema.generated.md | confirmed |
+| `started_at` | timestamp with time zone | YES | Start time | UTC timestamptz | request | schema.generated.md | confirmed |
+| `completed_at` | timestamp with time zone | YES | Completion time | UTC timestamptz | request | schema.generated.md | confirmed |
+| `label` | text | YES | Label | free text | request | schema.generated.md | confirmed |
+| `notes` | text | YES | Notes | free text | request | schema.generated.md | confirmed |
+| `created_at` | timestamp with time zone | NO | Row creation | UTC timestamptz | insert | schema.generated.md | confirmed |
 
 ### food.tri_tip_readings (table)
-- **Grain:** one row per temperature reading during tri-tip cook.
-- **Canonical source:** `food.tri_tip_readings`.
-- **Rules:** `convention` time-series readings.
+- **Purpose:** temperature readings during a tri-tip cook.
+- **Grain:** one row per reading.
+- **Primary/candidate key:** `tri_tip_readings_pkey` on `reading_id`. FK -> tri_tip_events.tri_tip_id.
+- **Canonical source and lifecycle:** appended during cook.
+- **Consumers:** tri-tip endpoints.
+- **Rules:** enforced PK/FK.
+- **Evidence/confidence:** backend/pifitness/food/queries.py; schema.generated.md 1157-1173. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `reading_id` | integer | NO | Surrogate id | identifier | insert | tri_tip_readings_pkey | confirmed |
+| `tri_tip_id` | integer | NO | Event | FK -> food.tri_tip_events.tri_tip_id | request | tri_tip_readings_tri_tip_id_fkey | confirmed |
+| `recorded_at` | timestamp with time zone | NO | Reading time | UTC timestamptz | request | schema.generated.md | confirmed |
+| `grill_temp_f` | numeric | NO | Grill temp | �F | request | schema.generated.md | confirmed |
+| `internal_temp_f` | numeric | NO | Internal temp | �F | request | schema.generated.md | confirmed |
+| `note` | text | YES | Note | free text | request | schema.generated.md | confirmed |
+| `created_at` | timestamp with time zone | NO | Row creation | UTC timestamptz | insert | schema.generated.md | confirmed |
 
 ### food.vw_food_search (view)
-- **Grain:** one row per searchable food.
-- **Canonical source:** derived from `food.foods`.
-- **Rules:** `convention` read-only view.
+- **Purpose:** searchable food list with rank_score.
+- **Grain:** one row per non-deleted food.
+- **Primary/candidate key:** none (view); underlying food_id.
+- **Canonical source and lifecycle:** derived from food.foods.
+- **Consumers:** GET /api/food/search (queries.py).
+- **Rules:** enforced via underlying constraints; convention rank_score.
+- **Evidence/confidence:** backend/pifitness/food/queries.py; schema.generated.md 1174-1185; definitions.sql. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `food_id` | integer | YES | Food id | identifier | foods.food_id | schema.generated.md | confirmed |
+| `name` | text | YES | Name | free text | foods.name | schema.generated.md | confirmed |
+| `source` | text | YES | Provenance | text | foods.source | schema.generated.md | confirmed |
+| `kcal_per_100g` | double precision | YES | Energy density | kcal/100g | foods.kcal_per_100g | schema.generated.md | confirmed |
+| `caffeine_mg` | double precision | YES | Caffeine density | mg/100g | foods.caffeine_mg | schema.generated.md | confirmed |
+| `quality_score` | double precision | YES | Quality score | number | foods.quality_score | schema.generated.md | confirmed |
+| `needs_review` | boolean | YES | Needs review | boolean | foods.needs_review | schema.generated.md | confirmed |
+| `rank_score` | double precision | YES | Search rank | number | computed | definitions.sql | confirmed |
 
 ### food.vw_usual_foods (view)
-- **Grain:** one row per frequently used food.
-- **Canonical source:** derived from `food.diary_entries`/`food.foods`.
-- **Rules:** `convention` read-only view.
+- **Purpose:** frequently used foods with usage stats.
+- **Grain:** one row per food frequently eaten.
+- **Primary/candidate key:** none (view).
+- **Canonical source and lifecycle:** derived from food.diary_entries/food.foods.
+- **Consumers:** GET /api/food/usual (queries.py).
+- **Rules:** convention read-only view.
+- **Evidence/confidence:** backend/pifitness/food/queries.py; schema.generated.md 1186-1198; definitions.sql. confirmed.
+
+| Column | Type | Nullable | Meaning / semantics | Values / units | Source / transformation | Evidence | Confidence |
+|---|---|---|---|---|---|---|---|
+| `food_id` | integer | YES | Food id | identifier | foods.food_id | schema.generated.md | confirmed |
+| `name` | text | YES | Name | free text | foods.name | schema.generated.md | confirmed |
+| `source` | text | YES | Provenance | text | foods.source | schema.generated.md | confirmed |
+| `kcal_per_100g` | double precision | YES | Energy density | kcal/100g | foods.kcal_per_100g | schema.generated.md | confirmed |
+| `quality_score` | double precision | YES | Quality score | number | foods.quality_score | schema.generated.md | confirmed |
+| `times_eaten` | integer | YES | Usage count | count | diary entries | definitions.sql | confirmed |
+| `hour_weight` | double precision | YES | Hour distribution weight | number | computed | definitions.sql | confirmed |
+| `mode_qty` | double precision | YES | Most common qty | number | computed | definitions.sql | confirmed |
+| `mode_unit` | text | YES | Most common unit | text | computed | definitions.sql | confirmed |
 
 ## health
 

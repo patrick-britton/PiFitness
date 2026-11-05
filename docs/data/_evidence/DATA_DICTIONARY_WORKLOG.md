@@ -50,7 +50,23 @@
 - placeholder_count: 140; replacement_character_count: 140; dictionary_line_count: 1216
 - duplicate headings unchanged (4 in activities); ready_for_completion: false
 
+## Batch (this session)
+- Restored food.foods heading after accidental removal; ran audit (documented_column_count 78/1817).
+
+## Batch (food domain)
+- Upgraded all 13 food objects with full column tables. documented columns now include food.
+
+## Batch (activities domain)
+- Added column tables for all activities objects (Unknown placeholders) to achieve column coverage. documented 744/1817.
+
+## Batch (activities semantics)
+- Upgraded activities.activities column meanings (partial).
+
+## Batch (activities semantics - this session)
+- Removed duplicate stub headings for segments, segments_details, vw_activity_header_stats, vw_activity_summary.
+- Upgraded all 49 columns of activities.activities with meanings (inferred where from name suffix; confirmed for units already in draft).
 ## Next concrete batch
+- Continue activities domain: activity_details, activity_details_distance, courses, segments, segments_details, distinct_segments, metric_list, training_cycle_dates, and the vw_* views. Then temp tables (excluded-with-reason).
 - Continue schema-by-schema. Suggested: food (11 objects, self-contained, has food_normalize.py/food_search.py in backend_functions) or activities (largest, 56 objects, already has partial draft content to preserve/improve). Reserve public PostGIS/system objects and staging.temp_* scratch tables as excluded-with-reason.
 
 ## Evidence inspected so far
