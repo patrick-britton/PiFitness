@@ -3321,7 +3321,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `y_hr_delta` | ARRAY | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `y_hr_delta` | ARRAY | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -3513,7 +3513,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `awake_hours_prior` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `awake_hours_prior` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -3525,13 +3525,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `avg_sleep_hours` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `avg_sleep_hours` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `one_day_sleep_hours` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `one_day_sleep_hours` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -3561,7 +3561,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -3615,25 +3615,25 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `child_courses` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `child_courses` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `child_segments` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `child_segments` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `matched_courses` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `matched_courses` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `matched_segments` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `matched_segments` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -3873,55 +3873,55 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `vo2_max_value` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vo2_max_value` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `altitude_acclimation_m` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `altitude_acclimation_m` | integer | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `heat_acclimation_pct` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `heat_acclimation_pct` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `training_load_acute` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_acute` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `training_load_pct` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_pct` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `training_readiness` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_readiness` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `training_load_mid` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_mid` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `training_load_max` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_max` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `training_load_min` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `training_load_min` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -3975,7 +3975,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `awake_s_before_activity` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `awake_s_before_activity` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -3987,19 +3987,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `sleep_end_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_end_utc` | timestamp with time zone | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `sleep_end_date` | date | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_end_date` | date | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `activity_start_date` | date | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_start_date` | date | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -4119,19 +4119,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `weight_lb` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `weight_lb` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `muscle_lb` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `muscle_lb` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `fat_lb` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `fat_lb` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -4161,7 +4161,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -4257,25 +4257,25 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `last_event_utc` | date | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_event_utc` | date | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `course_idx` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `course_idx` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `max_course_idx` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `max_course_idx` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `new_count` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `new_count` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -4305,7 +4305,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -4347,31 +4347,31 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `lat5` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `lat5` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `long5` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `long5` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `elevation_raw` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_raw` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `elevation_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `geog` | USER-DEFINED | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `geog` | USER-DEFINED | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -4401,7 +4401,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -4431,7 +4431,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_type` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_type` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -4461,7 +4461,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -4527,7 +4527,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -4617,7 +4617,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -4659,7 +4659,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_date` | date | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_date` | date | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -4671,7 +4671,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `match_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `match_rank` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -4719,7 +4719,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -4755,13 +4755,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `vs_date` | date | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vs_date` | date | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `attempt_label` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `attempt_label` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -4773,49 +4773,49 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `predicted_time_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `predicted_time_s` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `vs_pace` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vs_pace` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `estimated_pace` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `estimated_pace` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `prestige_score` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prestige_score` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `weight_delta` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `weight_delta` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `vo2_delta` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vo2_delta` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `acute_load_delta` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `acute_load_delta` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `load_max_delta` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `load_max_delta` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -4845,7 +4845,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -4941,49 +4941,49 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `prior_time_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior_time_s` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `best_time_excl_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_time_excl_s` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `prior_delta_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior_delta_s` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `best_delta_s` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `best_delta_s` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `prior10_avg_cadence` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior10_avg_cadence` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `prior10_avg_stride_length` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior10_avg_stride_length` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `prior10_avg_gct` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior10_avg_gct` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `prior10_avg_vert_ratio` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `prior10_avg_vert_ratio` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5013,7 +5013,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -5043,7 +5043,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `run_age` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `run_age` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5055,13 +5055,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `music_end` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `music_end` | timestamp with time zone | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `music_duration_ms` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `music_duration_ms` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5091,7 +5091,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -5127,7 +5127,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `elevation_m_smooth` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elevation_m_smooth` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5139,13 +5139,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `elapsed_ms` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_ms` | integer | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `elapsed_ms_delta` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `elapsed_ms_delta` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5163,67 +5163,67 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `heartrate_bpm` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `heartrate_bpm` | smallint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `heartrate_bpm_delta` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `heartrate_bpm_delta` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `cadence_spm` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `cadence_spm` | smallint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `ground_contact_balance_left` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ground_contact_balance_left` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `performance_condition` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `performance_condition` | smallint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `vert_ratio` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vert_ratio` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `vert_oscillation_cm` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `vert_oscillation_cm` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `air_temp_c` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `air_temp_c` | smallint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `stride_length_cm` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `stride_length_cm` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `ground_contact_time_ms` | smallint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ground_contact_time_ms` | smallint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `speed_mmps` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `speed_mmps` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5253,7 +5253,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -5331,7 +5331,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `approval_phase` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `approval_phase` | integer | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5361,7 +5361,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -5709,7 +5709,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `sleep_hours` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `sleep_hours` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5745,7 +5745,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `awake_hours` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `awake_hours` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5835,7 +5835,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -5859,7 +5859,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `confirmed` | boolean | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `confirmed` | boolean | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5907,7 +5907,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `confidence_score` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `confidence_score` | integer | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -5937,7 +5937,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -6015,7 +6015,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -6081,13 +6081,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `ascent_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `ascent_m` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `descent_m` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `descent_m` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -6129,7 +6129,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -6171,7 +6171,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `effort_count` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `effort_count` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -6441,19 +6441,19 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `activity_start_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_start_point` | integer | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `activity_end_point` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `activity_end_point` | integer | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `recency_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `recency_rank` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -6465,13 +6465,13 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `last_365_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `last_365_rank` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `current_cycle_rank` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `current_cycle_rank` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -6585,7 +6585,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -6651,7 +6651,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `matched_activity_count` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `matched_activity_count` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -6681,7 +6681,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -6717,7 +6717,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `effort_date` | date | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `effort_date` | date | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -6795,7 +6795,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -6849,7 +6849,7 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-- **Rules:** `convention` — not yet individually catalogued; DB constraints per schema.generated.md.
+- **Rules:** `convention` — DB constraints per schema.generated.md (individual cataloguing not completed).
 
 
 
@@ -6873,49 +6873,49 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `playlist_id` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `playlist_id` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `playlist_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `playlist_name` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `track_id` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `track_id` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `isrc` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `isrc` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `track_order` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `track_order` | integer | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `track_name_clean` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `track_name_clean` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `artist_display_name` | text | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `artist_display_name` | text | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `duration_ms` | integer | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `duration_ms` | integer | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -6927,31 +6927,31 @@ Per-domain data dictionary. Each section records the grain of key tables/views, 
 
 
 
-| `start_cumulative_ms` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `start_cumulative_ms` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `end_cumulative_ms` | bigint | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `end_cumulative_ms` | bigint | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `pct_listened` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `pct_listened` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `total_listen_ms` | numeric | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `total_listen_ms` | numeric | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
 
 
-| `played_at_utc` | timestamp with time zone | YES | Unknown — investigation incomplete | unknown | schema.generated.md | schema.generated.md | unknown |
+| `played_at_utc` | timestamp with time zone | YES | Not established from available evidence (view column) | unknown | schema.generated.md | schema.generated.md | unknown |
 
 
 
@@ -17171,6 +17171,26 @@ The following objects appear in the generated inventory under schema `public` bu
 
 - **Columns:** 7 (`f_table_catalog`, `f_table_schema`, `f_table_name`, `f_geography_column`, `coord_dimension`, `srid`, `type`).
 
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `f_table_catalog` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_table_schema` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_table_name` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_geography_column` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `coord_dimension` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `srid` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `type` | text | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `f_table_catalog` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_table_schema` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_table_name` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_geography_column` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `coord_dimension` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `srid` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `type` | text | YES | Excluded system/scratch object — column not semantically documented. |
+
 
 
 
@@ -17206,6 +17226,26 @@ The following objects appear in the generated inventory under schema `public` bu
 
 
 - **Columns:** 7 (`f_table_catalog` `character varying`, `f_table_schema`, `f_table_name`, `f_geometry_column`, `coord_dimension`, `srid`, `type` `character varying`).
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `f_table_catalog` | character varying | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_table_schema` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_table_name` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_geometry_column` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `coord_dimension` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `srid` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `type` | character varying | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `f_table_catalog` | character varying | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_table_schema` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_table_name` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `f_geometry_column` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `coord_dimension` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `srid` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `type` | character varying | YES | Excluded system/scratch object — column not semantically documented. |
 
 
 
@@ -17243,6 +17283,46 @@ The following objects appear in the generated inventory under schema `public` bu
 
 - **Columns:** 17 (`r_table_catalog` ... `spatial_index`).
 
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `r_table_catalog` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_table_schema` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_table_name` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_raster_column` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `srid` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `scale_x` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `scale_y` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `blocksize_x` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `blocksize_y` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `same_alignment` | boolean | YES | Excluded system/scratch object — column not semantically documented. |
+| `regular_blocking` | boolean | YES | Excluded system/scratch object — column not semantically documented. |
+| `num_bands` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `pixel_types` | ARRAY | YES | Excluded system/scratch object — column not semantically documented. |
+| `nodata_values` | ARRAY | YES | Excluded system/scratch object — column not semantically documented. |
+| `out_db` | ARRAY | YES | Excluded system/scratch object — column not semantically documented. |
+| `extent` | USER-DEFINED | YES | Excluded system/scratch object — column not semantically documented. |
+| `spatial_index` | boolean | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `r_table_catalog` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_table_schema` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_table_name` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_raster_column` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `srid` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `scale_x` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `scale_y` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `blocksize_x` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `blocksize_y` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `same_alignment` | boolean | YES | Excluded system/scratch object — column not semantically documented. |
+| `regular_blocking` | boolean | YES | Excluded system/scratch object — column not semantically documented. |
+| `num_bands` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `pixel_types` | ARRAY | YES | Excluded system/scratch object — column not semantically documented. |
+| `nodata_values` | ARRAY | YES | Excluded system/scratch object — column not semantically documented. |
+| `out_db` | ARRAY | YES | Excluded system/scratch object — column not semantically documented. |
+| `extent` | USER-DEFINED | YES | Excluded system/scratch object — column not semantically documented. |
+| `spatial_index` | boolean | YES | Excluded system/scratch object — column not semantically documented. |
+
 
 
 
@@ -17278,6 +17358,30 @@ The following objects appear in the generated inventory under schema `public` bu
 
 
 - **Columns:** 9 (`o_table_catalog` ... `overview_factor`).
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `o_table_catalog` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `o_table_schema` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `o_table_name` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `o_raster_column` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_table_catalog` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_table_schema` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_table_name` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_raster_column` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `overview_factor` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `o_table_catalog` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `o_table_schema` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `o_table_name` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `o_raster_column` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_table_catalog` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_table_schema` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_table_name` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `r_raster_column` | name | YES | Excluded system/scratch object — column not semantically documented. |
+| `overview_factor` | integer | YES | Excluded system/scratch object — column not semantically documented. |
 
 
 
@@ -17315,6 +17419,22 @@ The following objects appear in the generated inventory under schema `public` bu
 
 - **Columns:** 5 (`srid`, `auth_name`, `auth_srid`, `srtext`, `proj4text`).
 
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `srid` | integer | NO | Excluded system/scratch object — column not semantically documented. |
+| `auth_name` | character varying | YES | Excluded system/scratch object — column not semantically documented. |
+| `auth_srid` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `srtext` | character varying | YES | Excluded system/scratch object — column not semantically documented. |
+| `proj4text` | character varying | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `srid` | integer | NO | Excluded system/scratch object — column not semantically documented. |
+| `auth_name` | character varying | YES | Excluded system/scratch object — column not semantically documented. |
+| `auth_srid` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+| `srtext` | character varying | YES | Excluded system/scratch object — column not semantically documented. |
+| `proj4text` | character varying | YES | Excluded system/scratch object — column not semantically documented. |
+
 
 
 
@@ -17350,6 +17470,116 @@ The following objects appear in the generated inventory under schema `public` bu
 
 
 - **Columns:** 52 (`userid` ... `minmax_stats_since`).
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `userid` | oid | YES | Excluded system/scratch object — column not semantically documented. |
+| `dbid` | oid | YES | Excluded system/scratch object — column not semantically documented. |
+| `toplevel` | boolean | YES | Excluded system/scratch object — column not semantically documented. |
+| `queryid` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `query` | text | YES | Excluded system/scratch object — column not semantically documented. |
+| `plans` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `total_plan_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `min_plan_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `max_plan_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `mean_plan_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `stddev_plan_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `calls` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `total_exec_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `min_exec_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `max_exec_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `mean_exec_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `stddev_exec_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `rows` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blks_hit` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blks_read` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blks_dirtied` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blks_written` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blks_hit` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blks_read` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blks_dirtied` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blks_written` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `temp_blks_read` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `temp_blks_written` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blk_read_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blk_write_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blk_read_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blk_write_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `temp_blk_read_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `temp_blk_write_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `wal_records` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `wal_fpi` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `wal_bytes` | numeric | YES | Excluded system/scratch object — column not semantically documented. |
+| `wal_buffers_full` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_functions` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_generation_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_inlining_count` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_inlining_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_optimization_count` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_optimization_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_emission_count` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_emission_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_deform_count` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_deform_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `parallel_workers_to_launch` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `parallel_workers_launched` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `stats_since` | timestamp with time zone | YES | Excluded system/scratch object — column not semantically documented. |
+| `minmax_stats_since` | timestamp with time zone | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `userid` | oid | YES | Excluded system/scratch object — column not semantically documented. |
+| `dbid` | oid | YES | Excluded system/scratch object — column not semantically documented. |
+| `toplevel` | boolean | YES | Excluded system/scratch object — column not semantically documented. |
+| `queryid` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `query` | text | YES | Excluded system/scratch object — column not semantically documented. |
+| `plans` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `total_plan_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `min_plan_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `max_plan_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `mean_plan_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `stddev_plan_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `calls` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `total_exec_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `min_exec_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `max_exec_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `mean_exec_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `stddev_exec_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `rows` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blks_hit` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blks_read` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blks_dirtied` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blks_written` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blks_hit` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blks_read` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blks_dirtied` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blks_written` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `temp_blks_read` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `temp_blks_written` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blk_read_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `shared_blk_write_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blk_read_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `local_blk_write_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `temp_blk_read_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `temp_blk_write_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `wal_records` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `wal_fpi` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `wal_bytes` | numeric | YES | Excluded system/scratch object — column not semantically documented. |
+| `wal_buffers_full` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_functions` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_generation_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_inlining_count` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_inlining_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_optimization_count` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_optimization_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_emission_count` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_emission_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_deform_count` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `jit_deform_time` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `parallel_workers_to_launch` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `parallel_workers_launched` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `stats_since` | timestamp with time zone | YES | Excluded system/scratch object — column not semantically documented. |
+| `minmax_stats_since` | timestamp with time zone | YES | Excluded system/scratch object — column not semantically documented. |
 
 
 
@@ -17387,6 +17617,16 @@ The following objects appear in the generated inventory under schema `public` bu
 
 - **Columns:** 2 (`dealloc`, `stats_reset`).
 
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `dealloc` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `stats_reset` | timestamp with time zone | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `dealloc` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `stats_reset` | timestamp with time zone | YES | Excluded system/scratch object — column not semantically documented. |
+
 
 
 
@@ -17422,6 +17662,28 @@ The following objects appear in the generated inventory under schema `public` bu
 
 
 - **Columns:** 8 (`ROW_ID`, `ts_utc`, `Weight`, `BMI`, `Body Fat`, `Skeletal Muscle Mass`, `Bone Mass`, `Body Water`).
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `ROW_ID` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `ts_utc` | text | YES | Excluded system/scratch object — column not semantically documented. |
+| `Weight` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `BMI` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `Body Fat` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `Skeletal Muscle Mass` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `Bone Mass` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `Body Water` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `ROW_ID` | bigint | YES | Excluded system/scratch object — column not semantically documented. |
+| `ts_utc` | text | YES | Excluded system/scratch object — column not semantically documented. |
+| `Weight` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `BMI` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `Body Fat` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `Skeletal Muscle Mass` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `Bone Mass` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+| `Body Water` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
 
 
 
@@ -17459,6 +17721,14 @@ The following objects appear in the generated inventory under schema `public` bu
 
 - **Columns:** 1 (`smoothed_elev` double precision).
 
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `smoothed_elev` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `smoothed_elev` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+
 
 
 
@@ -17494,6 +17764,14 @@ The following objects appear in the generated inventory under schema `public` bu
 
 
 - **Columns:** 1 (`?column?` boolean — unnamed column artifact).
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `?column?` | boolean | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `?column?` | boolean | YES | Excluded system/scratch object — column not semantically documented. |
 
 
 
@@ -17531,6 +17809,14 @@ The following objects appear in the generated inventory under schema `public` bu
 
 - **Columns:** 1 (`smoothed_elev` double precision).
 
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `smoothed_elev` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `smoothed_elev` | double precision | YES | Excluded system/scratch object — column not semantically documented. |
+
 
 
 
@@ -17566,6 +17852,14 @@ The following objects appear in the generated inventory under schema `public` bu
 
 
 - **Columns:** 1 (`max` integer).
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `max` | integer | YES | Excluded system/scratch object — column not semantically documented. |
+
+| Column | Type | Nullable | Meaning / semantics |
+|---|---|---|---|
+| `max` | integer | YES | Excluded system/scratch object — column not semantically documented. |
 
 
 

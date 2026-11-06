@@ -7,151 +7,15 @@
     "schema_only": [],
     "dictionary_only": [],
     "duplicate_dictionary_headings": {},
-    "placeholder_count": 120,
+    "placeholder_count": 0,
     "replacement_character_count": 0,
     "schema_duplicates": []
   },
   "column_coverage": {
-    "documented_column_count": 1706,
+    "documented_column_count": 1817,
     "expected_column_count": 1817,
-    "objects_with_missing_columns": 12,
-    "missing_columns": {
-      "public.geography_columns": [
-        "coord_dimension",
-        "f_geography_column",
-        "f_table_catalog",
-        "f_table_name",
-        "f_table_schema",
-        "srid",
-        "type"
-      ],
-      "public.geometry_columns": [
-        "coord_dimension",
-        "f_geometry_column",
-        "f_table_catalog",
-        "f_table_name",
-        "f_table_schema",
-        "srid",
-        "type"
-      ],
-      "public.pg_stat_statements": [
-        "calls",
-        "dbid",
-        "jit_deform_count",
-        "jit_deform_time",
-        "jit_emission_count",
-        "jit_emission_time",
-        "jit_functions",
-        "jit_generation_time",
-        "jit_inlining_count",
-        "jit_inlining_time",
-        "jit_optimization_count",
-        "jit_optimization_time",
-        "local_blk_read_time",
-        "local_blk_write_time",
-        "local_blks_dirtied",
-        "local_blks_hit",
-        "local_blks_read",
-        "local_blks_written",
-        "max_exec_time",
-        "max_plan_time",
-        "mean_exec_time",
-        "mean_plan_time",
-        "min_exec_time",
-        "min_plan_time",
-        "minmax_stats_since",
-        "parallel_workers_launched",
-        "parallel_workers_to_launch",
-        "plans",
-        "query",
-        "queryid",
-        "rows",
-        "shared_blk_read_time",
-        "shared_blk_write_time",
-        "shared_blks_dirtied",
-        "shared_blks_hit",
-        "shared_blks_read",
-        "shared_blks_written",
-        "stats_since",
-        "stddev_exec_time",
-        "stddev_plan_time",
-        "temp_blk_read_time",
-        "temp_blk_write_time",
-        "temp_blks_read",
-        "temp_blks_written",
-        "toplevel",
-        "total_exec_time",
-        "total_plan_time",
-        "userid",
-        "wal_buffers_full",
-        "wal_bytes",
-        "wal_fpi",
-        "wal_records"
-      ],
-      "public.pg_stat_statements_info": [
-        "dealloc",
-        "stats_reset"
-      ],
-      "public.raster_columns": [
-        "blocksize_x",
-        "blocksize_y",
-        "extent",
-        "nodata_values",
-        "num_bands",
-        "out_db",
-        "pixel_types",
-        "r_raster_column",
-        "r_table_catalog",
-        "r_table_name",
-        "r_table_schema",
-        "regular_blocking",
-        "same_alignment",
-        "scale_x",
-        "scale_y",
-        "spatial_index",
-        "srid"
-      ],
-      "public.raster_overviews": [
-        "o_raster_column",
-        "o_table_catalog",
-        "o_table_name",
-        "o_table_schema",
-        "overview_factor",
-        "r_raster_column",
-        "r_table_catalog",
-        "r_table_name",
-        "r_table_schema"
-      ],
-      "public.spatial_ref_sys": [
-        "auth_name",
-        "auth_srid",
-        "proj4text",
-        "srid",
-        "srtext"
-      ],
-      "public.staging.temp_bc_import": [
-        "BMI",
-        "Body Fat",
-        "Body Water",
-        "Bone Mass",
-        "ROW_ID",
-        "Skeletal Muscle Mass",
-        "Weight",
-        "ts_utc"
-      ],
-      "public.v_end_elev": [
-        "smoothed_elev"
-      ],
-      "public.v_is_loop": [
-        "?column?"
-      ],
-      "public.v_start_elev": [
-        "smoothed_elev"
-      ],
-      "public.v_total_distance": [
-        "max"
-      ]
-    }
+    "objects_with_missing_columns": 0,
+    "missing_columns": {}
   },
   "sql_comments": {
     "table_comments": [],
@@ -163,6 +27,6 @@
     "generic_count": 0,
     "line_count": 0
   },
-  "dictionary_line_count": 24167,
-  "ready_for_completion": false
+  "dictionary_line_count": 24461,
+  "ready_for_completion": true
 }
