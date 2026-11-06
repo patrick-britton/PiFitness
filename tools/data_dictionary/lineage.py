@@ -11,10 +11,11 @@ QUERY (agents; no database or credentials needed, reads docs/lineage/graph.json)
     python tools/data_dictionary/lineage.py show   <node>
     python tools/data_dictionary/lineage.py trace  <node> [--up|--down] [--depth 6] [--files] [--flat] [--only t1,t2]
                                           [--kinds k1,k2] [--min-conf low|medium|high] [--max-lines 150]
-    python tools/data_dictionary/lineage.py describe <node> [--direction both|up|down] [--depth 12]
-                                           [--min-conf medium] [--format text|json]
-                                           [--include-source] [--max-nodes 300]
-                                           [--max-source-lines 1600]
+    python tools/data_dictionary/lineage.py describe <node> [--direction both|up|down] [--depth 8]
+                                           [--section identity,population,upstream,consumers,coverage]
+                                           [--min-conf medium] [--format text|json] [--max-nodes 80]
+    python tools/data_dictionary/lineage.py evidence <node> [--related-to NODE] [--operation INSERT,UPDATE]
+                                           [--max-lines 240] [--max-items 12]
     python tools/data_dictionary/lineage.py check
 
 GRAPH MODEL
@@ -2101,15 +2102,16 @@ def _collect_direction(data, start, direction, depth, min_conf, kinds, max_nodes
         if current_depth >= depth:
             continue
         for neighbor, kind, conf in view.nbrs(current, direction):
+            is_new = neighbor not in distances
+            if is_new and len(distances) >= max_nodes:
+                truncated = True
+                continue
             source, target = (current, neighbor) if direction == "up" else (neighbor, current)
             key = (source, target, kind)
             row = edge_map.get(key)
             if row:
                 collected_edges[key] = row
-            if neighbor not in distances:
-                if len(distances) >= max_nodes:
-                    truncated = True
-                    continue
+            if is_new:
                 distances[neighbor] = current_depth + 1
                 queue.append(neighbor)
     nodes = [
@@ -2144,16 +2146,19 @@ def _writer_operation_groups(target_id, upstream_edges, nodes):
         seen.add(writer_id)
         evidence = edge["attributes"].get("evidence", [])
         operations = sorted({str(ev.get("operation", "UNKNOWN")) for ev in evidence if isinstance(ev, dict)})
+        population_ops = {"INSERT", "COPY_FROM", "MERGE", "PANDAS_TO_SQL", "ORM_INSERT"}
+        possible_ops = {"ORM_ADD (insert/update depends on ORM state)", "ORM_MERGE"}
+        mutation_ops = {"UPDATE", "DELETE", "TRUNCATE", "COPY_TO", "REFRESH", "ORM_UPDATE", "ORM_DELETE"}
         info = {
             "node": _node_summary(writer_id, nodes[writer_id]),
             "confidence": edge["confidence"],
             "operations": operations,
+            "population_operations": sorted(set(operations) & population_ops),
+            "ambiguous_operations": sorted(set(operations) & possible_ops),
+            "mutation_operations": sorted(set(operations) & mutation_ops),
             "evidence": evidence,
             "classification": "unclassified",
         }
-        population_ops = {"INSERT", "COPY_FROM", "MERGE", "PANDAS_TO_SQL", "ORM_INSERT"}
-        possible_ops = {"ORM_ADD (insert/update depends on ORM state)", "ORM_MERGE"}
-        mutation_ops = {"UPDATE", "DELETE", "TRUNCATE", "COPY_TO", "REFRESH", "ORM_UPDATE", "ORM_DELETE"}
         if any(op in population_ops for op in operations):
             info["classification"] = "population"
             primary.append(info)
@@ -2178,7 +2183,7 @@ def _collect_invocation_paths(data, writer_ids, min_conf, max_depth=6, max_paths
         if len(paths) >= max_paths:
             return
         if depth >= max_depth:
-            paths.append({"writer": reverse_path[-1], "path": list(reversed(reverse_path)), "truncated": True})
+            paths.append({"writer": reverse_path[0], "path": list(reversed(reverse_path)), "truncated": True})
             return
         callers = [(nid, kind) for nid, kind, _ in view.nbrs(callee, "down") if kind == "calls" and nid not in seen]
         if not callers:
@@ -2203,50 +2208,6 @@ def _collect_invocation_paths(data, writer_ids, min_conf, max_depth=6, max_paths
         key = tuple(item["path"])
         unique[key] = item
     return list(unique.values())[:max_paths]
-
-
-def _source_candidates(data, target_id, up_nodes, down_nodes, invocation_paths, relationship_edges):
-    ordered_ids = [target_id]
-    ordered_ids.extend(x["id"] for x in up_nodes)
-    ordered_ids.extend(x["id"] for x in down_nodes)
-    for path in invocation_paths:
-        ordered_ids.extend(path["path"])
-    seen_ids = set()
-    candidates = []
-    for nid in ordered_ids:
-        if nid in seen_ids or nid not in data["nodes"]:
-            continue
-        seen_ids.add(nid)
-        node = data["nodes"][nid]
-        for definition in node.get("defined_in", []):
-            if definition.get("file"):
-                candidates.append({"node_id": nid, "file": definition["file"],
-                                   "start_line": definition.get("line", 1),
-                                   "end_line": definition.get("end"), "source_kind": "repository_definition"})
-        if node.get("file"):
-            candidates.append({"node_id": nid, "file": node["file"],
-                               "start_line": node.get("line", 1), "end_line": node.get("end"),
-                               "source_kind": "source_node"})
-        if node.get("live_def"):
-            candidates.append({"node_id": nid, "file": node["live_def"], "start_line": 1,
-                               "end_line": None, "source_kind": "live_database_definition"})
-    for row in relationship_edges:
-        attrs = row.get("attributes", {})
-        for ev in attrs.get("evidence", []):
-            if isinstance(ev, dict) and ev.get("file") and ev.get("line"):
-                evidence_node = row["target"] if row["kind"] == "written_by" else row["source"]
-                candidates.append({"node_id": evidence_node, "file": ev["file"],
-                                   "start_line": ev.get("line", 1), "end_line": ev.get("end"),
-                                   "source_kind": ev.get("mechanism", "relationship_evidence")})
-    # Deduplicate exact ranges while preserving importance order.
-    seen = set()
-    result = []
-    for item in candidates:
-        key = (item["node_id"], item["file"], item["start_line"], item["end_line"], item["source_kind"])
-        if key not in seen:
-            seen.add(key)
-            result.append(item)
-    return result
 
 
 def _read_source_excerpts(root, candidates, max_lines):
@@ -2294,8 +2255,8 @@ def _read_source_excerpts(root, candidates, max_lines):
     return excerpts, warnings, {"used_lines": used, "max_lines": max_lines, "truncated": truncated}
 
 
-def build_describe_report(data, root, node_id, *, direction="both", depth=12, min_conf="medium",
-                          max_nodes=300, include_source=False, max_source_lines=1600):
+def build_describe_report(data, node_id, *, direction="both", depth=8, min_conf="medium",
+                          max_nodes=80):
     """Build a deterministic, structured report from the precomputed graph."""
     target_id = resolve_node(data, node_id)
     min_conf_value = CONF[min_conf]
@@ -2410,121 +2371,8 @@ def build_describe_report(data, root, node_id, *, direction="both", depth=12, mi
         "relationship_map": {"nodes": [_node_summary(nid, node) for nid, node in all_nodes.items()],
                              "edges": all_edges},
         "warnings": warnings,
-        "source_excerpts": [],
     }
-    if include_source:
-        candidates = _source_candidates(data, target_id, upstream["nodes"], downstream["nodes"], invocation_paths, all_edges)
-        excerpts, source_warnings, source_usage = _read_source_excerpts(root, candidates, max_source_lines)
-        report["source_excerpts"] = excerpts
-        report["source_usage"] = source_usage
-        for message in source_warnings:
-            report["warnings"].append({"kind": "source_excerpt_unavailable", "message": message})
-    else:
-        report["source_usage"] = {"included": False, "max_lines": max_source_lines}
     return report
-
-
-def _render_node_list(items):
-    if not items:
-        return "(none in the selected graph neighborhood)"
-    lines = []
-    for item in items:
-        marker = "!dynamic-sql " if item.get("dynamic_sql") else ""
-        lines.append(f"- d{item.get('depth', '?')} [{item.get('type')}] {marker}{item.get('name')} — {item.get('location') or 'no source location'}")
-    return "\n".join(lines)
-
-
-def render_describe_text(report):
-    target = report["target"]
-    lines = [
-        f"LINEAGE REPORT: {target['name']}",
-        f"Target: {target['id']} [{target['type']}]",
-        f"Graph: built {report['graph'].get('built_at')} | git {report['graph'].get('git_head') or 'unknown'} | "
-        f"database {report['graph'].get('database') or 'not captured'} | stale={report['graph'].get('is_stale')}",
-        "",
-        "== 1. OBJECT IDENTITY ==",
-        f"Comment: {target.get('comment') or '(none)'}",
-    ]
-    if target.get("primary_key"):
-        lines.append("Primary key: " + ", ".join(target["primary_key"]))
-    if target.get("columns"):
-        lines.append("Columns:")
-        for col in target["columns"]:
-            lines.append(f"  - {col[0]} {col[1]}" + (f" — {col[2]}" if len(col) > 2 else ""))
-    if target.get("indexes"):
-        lines.append("Indexes:")
-        for index in target["indexes"]:
-            flags = ", ".join(x for x, yes in (("PRIMARY KEY", index.get("is_primary")), ("UNIQUE", index.get("is_unique"))) if yes)
-            lines.append(f"  - {index.get('name')} [{index.get('access_method')}] "
-                         f"({', '.join(index.get('columns', []))})" + (f" — {flags}" if flags else ""))
-            if index.get("included_columns"):
-                lines.append("    included: " + ", ".join(index["included_columns"]))
-            if index.get("definition"):
-                lines.append("    " + index["definition"])
-    lines.extend(["", "== 2. POPULATION AND MODIFICATION =="])
-    pop = report["population"]
-    for key, title in (("primary_population_writers", "Population writers"),
-                       ("ambiguous_writers", "Ambiguous ORM persistence operations"),
-                       ("secondary_mutators", "Secondary mutations"),
-                       ("unclassified_writers", "Writer relationships without operation evidence")):
-        lines.append(title + ":")
-        group = pop.get(key, [])
-        if not group:
-            lines.append("  (none)")
-        for item in group:
-            nd = item["node"]
-            lines.append(f"  - [{item['confidence'].upper()}] {nd['type']} {nd['name']} — {nd.get('location') or 'no source location'}")
-            lines.append("    operations: " + (", ".join(item["operations"]) or "not classified"))
-            for ev in item.get("evidence", [])[:8]:
-                loc_text = f"{ev.get('file') or '?'}:{ev.get('line') or '?'}"
-                lines.append(f"    evidence: {ev.get('operation', 'UNKNOWN')} ({ev.get('mechanism', 'unknown')}) at {loc_text}")
-                if ev.get("statement"):
-                    lines.append(f"      {ev['statement']}")
-    lines.extend(["", "Invocation paths (callers of identified writers):"])
-    if not report.get("invocation_paths"):
-        lines.append("  (no caller chain resolved at the selected confidence threshold)")
-    for path in report.get("invocation_paths", []):
-        names = [report_node_name(report, nid) for nid in path["path"]]
-        lines.append("  - " + " -> ".join(names) + (" [truncated]" if path.get("truncated") else ""))
-    lines.extend(["", "== 3. UPSTREAM DEPENDENCIES ==", _render_node_list(report["upstream"]["nodes"]),
-                  "", "== 4. DOWNSTREAM CONSUMPTION =="])
-    groups = report.get("consumption", {})
-    group_titles = (("database_views", "Database views and derived relations"),
-                    ("backend_readers_and_processors", "Backend readers and processors"),
-                    ("api_endpoints", "API endpoints"),
-                    ("frontend_clients_components_and_hooks", "Frontend clients, components and hooks"),
-                    ("pages", "Pages"), ("other", "Other consumers"))
-    for key, title in group_titles:
-        lines.append(title + ":")
-        lines.append(_render_node_list(groups.get(key, [])))
-    lines.extend(["", "== 5. RELATIONSHIP MAP =="])
-    for edge in report["relationship_map"]["edges"]:
-        src = report_node_name(report, edge["source"])
-        dst = report_node_name(report, edge["target"])
-        lines.append(f"- {src} --{edge['kind']}--> {dst} [{edge['confidence'].upper()}]")
-        for ev in edge["attributes"].get("evidence", [])[:5]:
-            lines.append(f"    {ev.get('operation', 'UNKNOWN')} / {ev.get('mechanism', 'unknown')} "
-                         f"{ev.get('file') or ''}:{ev.get('line') or ''}")
-    lines.extend(["", "== 6. SOURCE EVIDENCE =="])
-    if report.get("source_excerpts"):
-        for excerpt in report["source_excerpts"]:
-            lines.append(f"--- {excerpt['file']}:{excerpt['start_line']}-{excerpt['end_line']} "
-                         f"[{excerpt['source_kind']} | {excerpt['node_id']}] ---")
-            lines.append(excerpt["text"])
-    else:
-        lines.append("Source excerpts not requested. Use --include-source to include relevant source ranges.")
-    if report.get("source_usage", {}).get("truncated"):
-        lines.append(f"[Source excerpts truncated at {report['source_usage']['used_lines']} lines; "
-                     f"limit {report['source_usage']['max_lines']}]")
-    lines.extend(["", "== 7. COVERAGE AND WARNINGS =="])
-    if report.get("coverage"):
-        lines.append(json.dumps(report["coverage"], sort_keys=True))
-    if report.get("warnings"):
-        for warning in report["warnings"]:
-            lines.append(f"- [{warning['kind']}] {warning.get('message') or warning.get('details') or ''}")
-    else:
-        lines.append("(no known coverage warnings)")
-    return "\n".join(lines)
 
 
 def report_node_name(report, node_id):
@@ -2539,14 +2387,404 @@ def report_node_name(report, node_id):
 
 
 def cmd_describe(data, a, root):
+    sections = parse_describe_sections(a.section)
     report = build_describe_report(
-        data, root, a.node, direction=a.direction, depth=a.depth, min_conf=a.min_conf,
-        max_nodes=a.max_nodes, include_source=a.include_source, max_source_lines=a.max_source_lines)
+        data, a.node, direction=a.direction, depth=a.depth, min_conf=a.min_conf,
+        max_nodes=a.max_nodes)
+    if a.format == "json":
+        print(json.dumps(compact_describe_report(report, sections, max_items=a.max_items), indent=2, sort_keys=True, default=str))
+    else:
+        print(render_describe_text(report, sections=sections, max_items=a.max_items))
+
+
+
+DESCRIBE_SECTIONS = ("identity", "population", "upstream", "consumers", "map", "coverage")
+DEFAULT_DESCRIBE_SECTIONS = ("identity", "population", "upstream", "consumers", "map", "coverage")
+
+
+def parse_describe_sections(values):
+    """Parse repeatable/comma-separated --section values."""
+    if not values:
+        return list(DEFAULT_DESCRIBE_SECTIONS)
+    selected = []
+    for value in values:
+        selected.extend(part.strip().lower() for part in value.split(",") if part.strip())
+    if "all" in selected:
+        return list(DESCRIBE_SECTIONS)
+    unknown = sorted(set(selected) - set(DESCRIBE_SECTIONS))
+    if unknown:
+        raise SystemExit(f"Unknown describe section(s): {', '.join(unknown)}. Choose: {', '.join(DESCRIBE_SECTIONS)} or all.")
+    return [section for section in DESCRIBE_SECTIONS if section in set(selected)]
+
+
+def _limited(items, limit):
+    return list(items[:limit])
+
+
+def _render_compact_nodes(items, limit=20):
+    if not items:
+        return ["  (none in the selected graph neighborhood)"]
+    lines = []
+    for item in _limited(items, limit):
+        dynamic = " !dynamic-sql" if item.get("dynamic_sql") else ""
+        loc_text = item.get("location") or "no source location"
+        lines.append(f"  - d{item.get('depth', '?')} [{item.get('type')}] {item.get('name')}{dynamic} — {loc_text}")
+    if len(items) > limit:
+        lines.append(f"  ... {len(items) - limit} more; narrow with --direction/--depth or request a section")
+    return lines
+
+
+def _render_compact_population(report, limit=12):
+    lines = []
+    pop = report.get("population", {})
+    groups = (
+        ("primary_population_writers", "Population writers"),
+        ("ambiguous_writers", "Ambiguous ORM persistence"),
+        ("secondary_mutators", "Secondary mutations"),
+        ("unclassified_writers", "Unclassified writer relationships"),
+    )
+    count = 0
+    for key, title in groups:
+        lines.append(title + ":")
+        items = pop.get(key, [])
+        if not items:
+            lines.append("  (none)")
+            continue
+        for item in items:
+            if count >= limit:
+                break
+            node = item["node"]
+            ops = ", ".join(item.get("operations", [])) or "operation evidence unavailable"
+            lines.append(f"  - [{item.get('confidence', 'unknown').upper()}] {node.get('type')} {node.get('name')} — {node.get('location') or 'no source location'}")
+            lines.append(f"    operations: {ops}")
+            if item.get("population_operations"):
+                lines.append("    population operation(s): " + ", ".join(item["population_operations"]))
+            if item.get("ambiguous_operations"):
+                lines.append("    ambiguous persistence: " + ", ".join(item["ambiguous_operations"]))
+            if item.get("mutation_operations") and item.get("classification") == "population":
+                lines.append("    same routine also mutates/removes: " + ", ".join(item["mutation_operations"]))
+            evidence = item.get("evidence", [])
+            for ev in evidence[:3]:
+                operation = ev.get("operation", "UNKNOWN")
+                source_loc = f"{ev.get('file') or '?'}:{ev.get('line') or '?'}"
+                lines.append(f"    evidence: {operation} at {source_loc} [{ev.get('mechanism', 'unknown')}]")
+            count += 1
+        if len(items) > max(0, limit - count):
+            lines.append("  ... additional writer relationships omitted by --max-items")
+    lines.append("Invocation paths (how identified writers are reached; not data dependencies):")
+    paths = report.get("invocation_paths", [])
+    if not paths:
+        lines.append("  (no caller chain resolved at the selected confidence threshold)")
+    for path_item in paths[:limit]:
+        names = [report_node_name(report, nid) for nid in path_item.get("path", [])]
+        lines.append("  - " + " -> ".join(names) + (" [truncated]" if path_item.get("truncated") else ""))
+    if len(paths) > limit:
+        lines.append(f"  ... {len(paths) - limit} additional paths omitted")
+    return lines
+
+
+def _render_compact_consumers(report, limit=20):
+    lines = []
+    groups = report.get("consumption", {})
+    titles = (
+        ("database_views", "Database views and derived relations"),
+        ("backend_readers_and_processors", "Backend readers and processors"),
+        ("api_endpoints", "API endpoints"),
+        ("frontend_clients_components_and_hooks", "Frontend clients, components and hooks"),
+        ("pages", "Pages"),
+        ("other", "Other consumers"),
+    )
+    total = 0
+    for key, title in titles:
+        items = groups.get(key, [])
+        lines.append(title + ":")
+        if not items:
+            lines.append("  (none)")
+            continue
+        remaining = max(0, limit - total)
+        lines.extend(_render_compact_nodes(items, remaining))
+        total += min(len(items), remaining)
+        if total >= limit and sum(len(groups.get(k, [])) for k, _ in titles) > total:
+            lines.append("  ... consumer list capped by --max-items")
+            break
+    return lines
+
+
+def compact_describe_report(report, sections, max_items=20):
+    """Return a section-filtered and size-bounded JSON object."""
+    out = {
+        "report_version": report.get("report_version"),
+        "sections_included": list(sections),
+        "target": {k: v for k, v in report.get("target", {}).items()
+                   if k not in {"columns", "primary_key", "indexes", "defined_in", "live_def"}},
+        "graph": report.get("graph"),
+    }
+    if "identity" in sections:
+        out["identity"] = {k: report.get("target", {}).get(k) for k in
+                            ("comment", "columns", "primary_key", "indexes", "location")
+                            if report.get("target", {}).get(k) not in (None, [], "")}
+    if "population" in sections:
+        population = report.get("population", {})
+        out["population"] = {
+            key: population.get(key, [])[:max_items]
+            for key in ("primary_population_writers", "ambiguous_writers", "secondary_mutators", "unclassified_writers")
+        }
+        out["invocation_paths"] = report.get("invocation_paths", [])[:max_items]
+    if "upstream" in sections:
+        group = report.get("upstream", {})
+        nodes, edges = group.get("nodes", []), group.get("edges", [])
+        out["upstream"] = {**group, "nodes": nodes[:max_items], "edges": edges[:max_items * 2],
+                            "truncated": bool(group.get("truncated") or len(nodes) > max_items or len(edges) > max_items * 2)}
+    if "consumers" in sections:
+        group = report.get("downstream", {})
+        nodes, edges = group.get("nodes", []), group.get("edges", [])
+        out["downstream"] = {**group, "nodes": nodes[:max_items * 2], "edges": edges[:max_items * 3],
+                              "truncated": bool(group.get("truncated") or len(nodes) > max_items * 2 or len(edges) > max_items * 3)}
+        out["consumption"] = {key: values[:max_items] for key, values in report.get("consumption", {}).items()}
+    if "map" in sections:
+        relationship_map = report.get("relationship_map", {})
+        edges = relationship_map.get("edges", [])
+        selected_edges = edges[:max_items * 3]
+        referenced = {edge[k] for edge in selected_edges for k in ("source", "target")}
+        referenced.add(report.get("target", {}).get("id"))
+        nodes = [node for node in relationship_map.get("nodes", []) if node.get("id") in referenced]
+        out["relationship_map"] = {"nodes": nodes, "edges": selected_edges,
+                                   "truncated": len(edges) > max_items * 3}
+    if "coverage" in sections:
+        out["coverage"] = report.get("coverage", {})
+        out["warnings"] = report.get("warnings", [])[:30]
+    return out
+
+
+def render_describe_text(report, sections=None, max_items=20):
+    """Render a compact agent-first report; source excerpts belong to `evidence`."""
+    sections = sections or list(DEFAULT_DESCRIBE_SECTIONS)
+    target = report["target"]
+    lines = [
+        f"LINEAGE: {target.get('name')}",
+        f"Node: {target.get('id')} [{target.get('type')}]",
+    ]
+    graph = report.get("graph", {})
+    lines.append(f"Graph: {graph.get('built_at') or 'unknown build'} | git {graph.get('git_head') or 'unknown'} | "
+                 f"db {graph.get('database') or 'not captured'} | stale={'YES' if graph.get('is_stale') else 'no'}")
+    lines.append("Confidence: HIGH = exact/catalog; MEDIUM = static heuristic; LOW = unverified.")
+
+    if "identity" in sections:
+        lines.extend(["", "[IDENTITY]"])
+        if target.get("comment"):
+            lines.append("Comment: " + target["comment"])
+        if target.get("primary_key"):
+            lines.append("Primary key: " + ", ".join(target["primary_key"]))
+        if target.get("columns"):
+            lines.append(f"Columns ({len(target['columns'])}):")
+            for col in target["columns"][:40]:
+                lines.append("  - " + " ".join(str(x) for x in col[:2]) + (f" — {col[2]}" if len(col) > 2 else ""))
+            if len(target["columns"]) > 40:
+                lines.append(f"  ... {len(target['columns']) - 40} more columns")
+        if target.get("indexes"):
+            lines.append(f"Indexes ({len(target['indexes'])}):")
+            for index in target["indexes"][:12]:
+                flags = ", ".join(x for x, yes in (("PRIMARY KEY", index.get("is_primary")), ("UNIQUE", index.get("is_unique"))) if yes)
+                desc = f" [{flags}]" if flags else ""
+                lines.append(f"  - {index.get('name')} ({index.get('access_method')}; {', '.join(index.get('columns', []))}){desc}")
+            if len(target["indexes"]) > 12:
+                lines.append(f"  ... {len(target['indexes']) - 12} more indexes")
+
+    if "population" in sections:
+        lines.extend(["", "[POPULATION AND MODIFICATION]"])
+        lines.extend(_render_compact_population(report, max_items))
+
+    if "upstream" in sections:
+        lines.extend(["", "[UPSTREAM DATA DEPENDENCIES]"])
+        lines.extend(_render_compact_nodes(report.get("upstream", {}).get("nodes", []), max_items))
+        if report.get("upstream", {}).get("truncated"):
+            lines.append("  WARNING: upstream traversal hit --max-nodes; increase the limit for more coverage.")
+
+    if "consumers" in sections:
+        lines.extend(["", "[DOWNSTREAM CONSUMPTION]"])
+        lines.extend(_render_compact_consumers(report, max_items))
+        if report.get("downstream", {}).get("truncated"):
+            lines.append("  WARNING: downstream traversal hit --max-nodes; increase the limit for more coverage.")
+
+    if "map" in sections:
+        lines.extend(["", "[RELATIONSHIP MAP]"])
+        edges = report.get("relationship_map", {}).get("edges", [])
+        for edge in edges[:max_items * 3]:
+            src, dst = report_node_name(report, edge["source"]), report_node_name(report, edge["target"])
+            lines.append(f"  - {src} --{edge['kind']}--> {dst} [{edge['confidence'].upper()}]")
+        if len(edges) > max_items * 3:
+            lines.append(f"  ... {len(edges) - max_items * 3} more edges")
+
+    if "coverage" in sections:
+        lines.extend(["", "[COVERAGE]"])
+        if report.get("coverage"):
+            lines.append(json.dumps(report["coverage"], sort_keys=True))
+        else:
+            lines.append("Coverage metadata unavailable (legacy graph).")
+        warnings = report.get("warnings", [])
+        if warnings:
+            for warning in warnings[:30]:
+                message = warning.get("message") or warning.get("details") or ""
+                if warning.get("details") and isinstance(warning["details"], list):
+                    message = "; ".join(str(x) for x in warning["details"])
+                lines.append(f"  - [{warning['kind']}] {message}")
+        else:
+            lines.append("  No known coverage warnings.")
+    lines.extend(["", "Source excerpts are deliberately separate. Use `lineage.py evidence <node>` for targeted source verification."])
+    return "\n".join(lines)
+
+
+def _evidence_source_candidates(data, node_id, edge_rows, max_items, *, include_definitions=True):
+    """Prioritize exact relationship statements before whole function definitions."""
+    candidates = []
+    node = data["nodes"][node_id]
+
+    # First: precise operation/call evidence attached to the selected graph edges.
+    related_ids = []
+    for row in edge_rows:
+        for ev in _edge_attrs(row).get("evidence", []):
+            if isinstance(ev, dict) and ev.get("file") and ev.get("line"):
+                # Operation evidence belongs to the code-bearing endpoint of the edge.
+                evidence_node_id = row[1] if row[2] == "written_by" else row[0]
+                candidates.append({"node_id": evidence_node_id, "file": ev["file"],
+                                   "start_line": ev.get("line", 1), "end_line": ev.get("end"),
+                                   "source_kind": ev.get("mechanism", "relationship_evidence")})
+        other_id = row[1] if row[0] == node_id else row[0]
+        if other_id not in related_ids:
+            related_ids.append(other_id)
+
+    # Second: the selected node's own source definitions, useful for understanding context.
+    if include_definitions:
+        for definition in node.get("defined_in", []):
+            if definition.get("file"):
+                candidates.append({"node_id": node_id, "file": definition["file"],
+                                   "start_line": definition.get("line", 1), "end_line": definition.get("end"),
+                                   "source_kind": "repository_definition"})
+        if node.get("file"):
+            candidates.append({"node_id": node_id, "file": node["file"],
+                               "start_line": node.get("line", 1), "end_line": node.get("end"),
+                               "source_kind": "source_node"})
+        if node.get("live_def"):
+            candidates.append({"node_id": node_id, "file": node["live_def"], "start_line": 1,
+                               "end_line": None, "source_kind": "live_database_definition"})
+
+        # Third: definitions of adjacent objects when an edge has no usable file evidence.
+        for other_id in related_ids:
+            other = data["nodes"].get(other_id, {})
+            for definition in other.get("defined_in", [])[:1]:
+                if definition.get("file"):
+                    candidates.append({"node_id": other_id, "file": definition["file"],
+                                       "start_line": definition.get("line", 1), "end_line": definition.get("end"),
+                                       "source_kind": "related_repository_definition"})
+            if other.get("live_def"):
+                candidates.append({"node_id": other_id, "file": other["live_def"], "start_line": 1,
+                                   "end_line": None, "source_kind": "related_live_database_definition"})
+
+    unique, result = set(), []
+    for item in candidates:
+        key = (item["node_id"], item["file"], item["start_line"], item["end_line"], item["source_kind"])
+        if key not in unique:
+            unique.add(key)
+            result.append(item)
+        if len(result) >= max_items:
+            break
+    return result
+
+
+def build_evidence_report(data, root, node, *, related_to=None, operations=None, max_lines=240, max_items=12):
+    """Retrieve bounded source evidence for one node, optionally narrowed to a relation/operation."""
+    node_id = resolve_node(data, node)
+    related_id = resolve_node(data, related_to) if related_to else None
+    operation_filter = {x.strip().upper() for x in (operations or []) if x.strip()}
+    selected_edges = []
+    for row in data.get("edges", []):
+        if node_id not in (row[0], row[1]):
+            continue
+        if related_id and related_id not in (row[0], row[1]):
+            continue
+        attrs = _edge_attrs(row)
+        evidence = attrs.get("evidence", [])
+        if operation_filter:
+            evidence = [ev for ev in evidence if isinstance(ev, dict) and str(ev.get("operation", "UNKNOWN")).upper() in operation_filter]
+            if not evidence:
+                continue
+            # Preserve only matching evidence in the report and source selection.
+            filtered_row = list(row[:4]) + [{**attrs, "evidence": evidence}]
+            selected_edges.append(filtered_row)
+        else:
+            selected_edges.append(row)
+    selected_edges.sort(key=lambda r: (r[2], r[0], r[1]))
+    candidates = _evidence_source_candidates(
+        data, node_id, selected_edges, max_items,
+        include_definitions=not (operation_filter and selected_edges))
+    excerpts, source_warnings, usage = _read_source_excerpts(root, candidates, max_lines)
+    edge_summaries = []
+    for row in selected_edges[:max_items * 2]:
+        edge_summaries.append({
+            "source": row[0], "target": row[1], "kind": row[2],
+            "confidence": _confidence_name(row[3]),
+            "evidence": _edge_attrs(row).get("evidence", []),
+        })
+    meta = data.get("meta", {})
+    runtime = data.get("_runtime", {})
+    return {
+        "report_version": 1,
+        "node": _node_summary(node_id, data["nodes"][node_id], details=True),
+        "related_to": related_id,
+        "operation_filter": sorted(operation_filter),
+        "graph": {"built_at": (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(meta["built_at"])) if meta.get("built_at") else None),
+                  "git_head": meta.get("git_head"), "database": (meta.get("db") or {}).get("database"),
+                  "is_stale": bool(runtime.get("is_stale")), "stale_reasons": runtime.get("stale_reasons", [])},
+        "edges": edge_summaries,
+        "source_excerpts": excerpts,
+        "source_usage": usage,
+        "warnings": source_warnings,
+    }
+
+
+def render_evidence_text(report):
+    node = report["node"]
+    lines = [f"LINEAGE EVIDENCE: {node.get('name')}", f"Node: {node.get('id')} [{node.get('type')}]"]
+    if report.get("related_to"):
+        lines.append(f"Relationship filter: {report['related_to']}")
+    if report.get("operation_filter"):
+        lines.append("Operation filter: " + ", ".join(report["operation_filter"]))
+    graph = report.get("graph", {})
+    lines.append(f"Graph: built {graph.get('built_at') or 'unknown'} | git {graph.get('git_head') or 'unknown'} | stale={'YES' if graph.get('is_stale') else 'no'}")
+    lines.extend(["", "[RELATIONSHIP EVIDENCE]"])
+    if not report.get("edges"):
+        lines.append("  (no matching relationship edges/evidence in this graph)")
+    for edge in report.get("edges", []):
+        lines.append(f"  {edge['source']} --{edge['kind']}--> {edge['target']} [{edge['confidence'].upper()}]")
+        evidence = edge.get("evidence", [])
+        if not evidence:
+            lines.append("    (edge has no operation-level evidence; inspect the definition)")
+        for ev in evidence[:8]:
+            location = f"{ev.get('file') or '?'}:{ev.get('line') or '?'}" + (f"-{ev['end']}" if ev.get("end") else "")
+            lines.append(f"    {ev.get('operation', 'UNKNOWN')} [{ev.get('mechanism', 'unknown')}] {location}")
+            if ev.get("statement"):
+                lines.append("      " + ev["statement"])
+    lines.extend(["", "[SOURCE EXCERPTS]"])
+    if not report.get("source_excerpts"):
+        lines.append("  (no readable source ranges were found; use the locations above to inspect manually)")
+    for excerpt in report.get("source_excerpts", []):
+        lines.append(f"--- {excerpt['file']}:{excerpt['start_line']}-{excerpt['end_line']} [{excerpt['source_kind']} | {excerpt['node_id']}] ---")
+        lines.append(excerpt["text"])
+    if report.get("source_usage", {}).get("truncated"):
+        lines.append(f"[Excerpt budget reached: {report['source_usage']['used_lines']}/{report['source_usage']['max_lines']} lines]")
+    for warning in report.get("warnings", []):
+        lines.append("WARNING: " + warning)
+    return "\n".join(lines)
+
+
+def cmd_evidence(data, a, root):
+    operations = [part for value in a.operation or [] for part in value.split(",")]
+    report = build_evidence_report(data, root, a.node, related_to=a.related_to,
+                                   operations=operations, max_lines=a.max_lines, max_items=a.max_items)
     if a.format == "json":
         print(json.dumps(report, indent=2, sort_keys=True, default=str))
     else:
-        print(render_describe_text(report))
-
+        print(render_evidence_text(report))
 
 def cmd_trace(data, a):
     nid = resolve_node(data, a.node)
@@ -2691,7 +2929,8 @@ def write_readme(out: Path, data: dict, g: Graph):
              "| `trace <node> --up` | where the data comes from (UI -> endpoint -> view/table -> loader -> source) |",
              "| `trace <node> --down` | what depends on it / where it is shown |",
              "| `trace <node> --files` | just the file:line ranges you need to read for that chain |",
-             "| `describe <node>` | bidirectional lineage dossier with operations, consumers, evidence and coverage |",
+             "| `describe <node>` | compact bidirectional structure: population, dependencies, consumers, relationship map and coverage |",
+             "| `evidence <node>` | bounded source excerpts and operation evidence for one node/relationship |",
              "| `check` | orphan tables, endpoints with no UI caller, dynamic SQL, drift |", "",
              "Edge `A -[kind]-> B` means A depends on B. `~` = medium confidence, `?` = low (name-based guess).",
              "Nodes flagged `!dynamic-sql` build SQL at runtime: read their definition, the graph may miss edges.",
@@ -2839,15 +3078,23 @@ def main():
     t.add_argument("--flat", action="store_true", help="flat list with distances instead of a tree")
     t.add_argument("--only", help="comma-separated node types to list (implies flat)")
     t.add_argument("--max-lines", type=int, default=150)
-    d = sub.add_parser("describe", help="one-shot upstream/downstream lineage report")
+    d = sub.add_parser("describe", help="compact upstream/downstream lineage overview")
     d.add_argument("node")
     d.add_argument("--direction", choices=("both", "up", "down"), default="both")
-    d.add_argument("--depth", type=int, default=12)
+    d.add_argument("--depth", type=int, default=8)
     d.add_argument("--min-conf", choices=list(CONF), default="medium")
     d.add_argument("--format", choices=("text", "json"), default="text")
-    d.add_argument("--include-source", action="store_true", help="include relevant source excerpts")
-    d.add_argument("--max-nodes", type=int, default=300)
-    d.add_argument("--max-source-lines", type=int, default=1600)
+    d.add_argument("--section", action="append", help="comma-separated sections: identity,population,upstream,consumers,map,coverage (default: all)")
+    d.add_argument("--max-nodes", type=int, default=80, help="maximum visited nodes per direction")
+    d.add_argument("--max-items", type=int, default=20, help="maximum entries rendered per report group")
+
+    ev = sub.add_parser("evidence", help="retrieve bounded source evidence for one node or relationship")
+    ev.add_argument("node")
+    ev.add_argument("--related-to", help="restrict relationship evidence to an adjacent node")
+    ev.add_argument("--operation", action="append", help="comma-separated operation filter, e.g. INSERT,UPDATE")
+    ev.add_argument("--max-lines", type=int, default=240, help="maximum source lines returned")
+    ev.add_argument("--max-items", type=int, default=12, help="maximum source ranges/relationships")
+    ev.add_argument("--format", choices=("text", "json"), default="text")
     sub.add_parser("check", help="lineage health report")
     a = ap.parse_args()
     if a.cmd == "build":
@@ -2855,9 +3102,13 @@ def main():
     root = find_root(a.root)
     data = load_graph(root, a.graph)
     if a.cmd == "describe":
-        if a.depth < 0 or a.max_nodes < 1 or a.max_source_lines < 1:
+        if a.depth < 0 or a.max_nodes < 1 or a.max_items < 1:
             raise SystemExit("describe limits must be positive (depth may be zero)")
         return cmd_describe(data, a, root)
+    if a.cmd == "evidence":
+        if a.max_lines < 1 or a.max_items < 1:
+            raise SystemExit("evidence limits must be positive")
+        return cmd_evidence(data, a, root)
     {"search": cmd_search, "show": cmd_show, "trace": cmd_trace, "check": cmd_check}[a.cmd](data, a)
 
 
