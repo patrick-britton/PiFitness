@@ -4,14 +4,18 @@
 lineage.py - build and query a data-lineage graph for a Python / Postgres / FastAPI / React repo.
 
 BUILD (human-triggered; needs read access to the DEV database catalog):
-    python tools/lineage.py build [--dsn URL] [--schemas public,etl] [--no-db] [--include-tests]
+    python tools/data_dictionary/lineage.py build [--dsn URL] [--schemas public,etl] [--no-db] [--include-tests]
 
 QUERY (agents; no database or credentials needed, reads docs/lineage/graph.json):
-    python tools/lineage.py search <words...> [--type T] [-n 25]
-    python tools/lineage.py show   <node>
-    python tools/lineage.py trace  <node> [--up|--down] [--depth 6] [--files] [--flat] [--only t1,t2]
+    python tools/data_dictionary/lineage.py search <words...> [--type T] [-n 25]
+    python tools/data_dictionary/lineage.py show   <node>
+    python tools/data_dictionary/lineage.py trace  <node> [--up|--down] [--depth 6] [--files] [--flat] [--only t1,t2]
                                           [--kinds k1,k2] [--min-conf low|medium|high] [--max-lines 150]
-    python tools/lineage.py check
+    python tools/data_dictionary/lineage.py describe <node> [--direction both|up|down] [--depth 12]
+                                           [--min-conf medium] [--format text|json]
+                                           [--include-source] [--max-nodes 300]
+                                           [--max-source-lines 1600]
+    python tools/data_dictionary/lineage.py check
 
 GRAPH MODEL
     Every edge is  src --kind--> dst  and means "src DEPENDS ON dst".
@@ -106,13 +110,25 @@ class Graph:
         if src == dst or src not in self.nodes or dst not in self.nodes:
             return
         c = CONF[conf] if isinstance(conf, str) else conf
+        evidence = attrs.pop("evidence", None)
         key = (src, dst, kind)
         cur = self.edges.get(key)
         if cur is None:
-            self.edges[key] = {"conf": c, "attrs": dict(attrs)}
+            cur = {"conf": c, "attrs": {}}
+            self.edges[key] = cur
         else:
             cur["conf"] = max(cur["conf"], c)
-            cur["attrs"].update(attrs)
+        cur["attrs"].update(attrs)
+        if evidence:
+            if isinstance(evidence, dict):
+                evidence = [evidence]
+            bucket = cur["attrs"].setdefault("evidence", [])
+            seen = {json.dumps(x, sort_keys=True, default=str) for x in bucket}
+            for item in evidence:
+                key_text = json.dumps(item, sort_keys=True, default=str)
+                if key_text not in seen:
+                    bucket.append(item)
+                    seen.add(key_text)
 
     def dump(self):
         out = []
@@ -196,7 +212,8 @@ def split_sql(text: str):
     def repl(m):
         s = m.group(0)
         if s.startswith("--") or s.startswith("/*"):
-            return " "
+            # Blank comments without changing source line numbers.
+            return "".join("\n" if ch == "\n" else " " for ch in s)
         if s[0] == '"':
             return s
         if s[0] == "'":
@@ -204,7 +221,9 @@ def split_sql(text: str):
         else:
             k = len(m.group("tag")) + 2
             strings.append(s[k:-k])
-        return "'S'"
+        # Keep the placeholder token but preserve any newlines inside the literal so
+        # statement evidence still points at the original source lines.
+        return "'S'" + ("\n" * s.count("\n"))
 
     return _SQL_SCAN.sub(repl, text), strings
 
@@ -212,6 +231,92 @@ def split_sql(text: str):
 def _parts(tok: str):
     return [(m.group(1).replace('""', '"') if m.group(1) is not None else m.group(2)).lower()
             for m in _PART.finditer(tok)]
+
+
+def _operation_for_statement(statement: str, edge_kind: str) -> str:
+    """Best-effort operation label for a SQL statement containing a lineage reference."""
+    text = statement.strip()
+    if edge_kind == "write":
+        patterns = (
+            (r"\bINSERT\s+INTO\b", "INSERT"),
+            (r"\bUPDATE\b", "UPDATE"),
+            (r"\bDELETE\s+FROM\b", "DELETE"),
+            (r"\bTRUNCATE\b", "TRUNCATE"),
+            (r"\bMERGE\s+INTO\b", "MERGE"),
+            (r"\bCOPY\b", "COPY"),
+            (r"\bREFRESH\b", "REFRESH"),
+        )
+        hits = [(re.search(rx, text, re.I), op) for rx, op in patterns]
+        hits = [(m, op) for m, op in hits if m]
+        if hits:
+            m, op = min(hits, key=lambda x: x[0].start())
+            if op == "COPY":
+                tail = text[m.end():]
+                return "COPY_FROM" if re.search(r"\bFROM\b", tail, re.I) else "COPY_TO"
+            return op
+        return "WRITE_UNKNOWN"
+    if edge_kind == "read":
+        if re.search(r"\bCOPY\b.*\bTO\b", text, re.I | re.S):
+            return "COPY_TO"
+        return "SELECT"
+    if edge_kind == "call":
+        if re.search(r"\bCALL\b", text, re.I):
+            return "CALL"
+        if re.search(r"\bPERFORM\b", text, re.I):
+            return "PERFORM"
+        return "FUNCTION_CALL"
+    return edge_kind.upper()
+
+
+def _operation_offset(statement: str, edge_kind: str) -> int:
+    patterns = {
+        "write": (r"\bINSERT\s+INTO\b", r"\bUPDATE\b", r"\bDELETE\s+FROM\b",
+                  r"\bTRUNCATE\b", r"\bMERGE\s+INTO\b", r"\bCOPY\b", r"\bREFRESH\b"),
+        "read": (r"\bSELECT\b", r"\bCOPY\b"),
+        "call": (r"\bCALL\b", r"\bPERFORM\b"),
+    }.get(edge_kind, ())
+    hits = [m.start() for pattern in patterns if (m := re.search(pattern, statement, re.I))]
+    return min(hits) if hits else 0
+
+
+def extract_sql_evidence(text: str, reg: Registry, *, file=None, base_line=None,
+                         mechanism="sql", confidence="medium") -> dict:
+    """Return {(reference_kind, node_id): [evidence...]} for semicolon-delimited SQL chunks.
+
+    This intentionally complements, rather than replaces, extract_refs(): the latter remains
+    the authoritative whole-body reference extractor. Evidence is best-effort and is always
+    accompanied by the graph edge's confidence level.
+    """
+    s2 = re.sub(r"%\(\w+\)s|%s|\{[^{}]*\}|\$\d+|(?<!:):[A-Za-z_]\w*", DYN, text)
+    code, _ = split_sql(s2)
+    out = collections.defaultdict(list)
+    start = 0
+    for match in list(re.finditer(r";", code)) + [None]:
+        end = match.end() if match else len(code)
+        chunk = code[start:end]
+        if chunk.strip():
+            refs, _, _ = extract_refs(chunk, reg)
+            for kind, target in refs:
+                op_offset = _operation_offset(chunk, kind)
+                evidence_pos = start + op_offset
+                start_line = (base_line + code.count("\n", 0, evidence_pos)) if base_line is not None else None
+                end_line = (base_line + code.count("\n", 0, max(start, end - 1))) if base_line is not None else None
+                statement = re.sub(r"\s+", " ", chunk.strip())[:280]
+                item = {
+                    "operation": _operation_for_statement(chunk, kind),
+                    "mechanism": mechanism,
+                    "confidence": confidence,
+                    "statement": statement,
+                }
+                if file:
+                    item["file"] = file
+                if start_line is not None:
+                    item["line"] = start_line
+                if end_line is not None:
+                    item["end"] = max(start_line, end_line)
+                out[(kind, target)].append(item)
+        start = end
+    return dict(out)
 
 
 def extract_refs(code: str, reg: Registry):
@@ -351,7 +456,7 @@ def is_test(rel: str) -> bool:
 
 
 def discover(root: Path, cfg: dict, include_tests: bool) -> dict:
-    out = {"py": [], "ts": [], "sql": []}
+    out = {"py": [], "ts": [], "sql": [], "tests_excluded": []}
     skip = set(cfg["exclude_dirs"])
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(d for d in dirnames if d not in skip and not d.startswith("."))
@@ -362,6 +467,7 @@ def discover(root: Path, cfg: dict, include_tests: bool) -> dict:
                 continue
             rel = (Path(dirpath) / f).relative_to(root).as_posix()
             if not include_tests and is_test(rel):
+                out["tests_excluded"].append(rel)
                 continue
             if any(fnmatch.fnmatch(rel, g) for g in cfg["exclude_globs"]):
                 continue
@@ -506,12 +612,45 @@ def load_db(dsn, schemas, g: Graph, reg: Registry, out: Path, warnings: list) ->
             WHERE {rel_where} ORDER BY c.oid, a.attnum""", p_rel):
             cols[oid].append([an, at, ac] if ac else [an, at])
 
+        indexes = collections.defaultdict(list)
+        index_sql = f"""
+            SELECT c.oid::bigint, ic.relname, am.amname, i.indisprimary, i.indisunique,
+                   pg_get_indexdef(i.indexrelid),
+                   ARRAY(SELECT a.attname
+                         FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord)
+                         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+                         WHERE k.ord <= i.indnkeyatts AND k.attnum > 0 ORDER BY k.ord),
+                   ARRAY(SELECT a.attname
+                         FROM unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord)
+                         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+                         WHERE k.ord > i.indnkeyatts AND k.attnum > 0 ORDER BY k.ord)
+            FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            JOIN pg_index i ON i.indrelid = c.oid
+            JOIN pg_class ic ON ic.oid = i.indexrelid
+            JOIN pg_am am ON am.oid = ic.relam
+            WHERE {rel_where} AND i.indisvalid
+            ORDER BY c.oid, ic.relname
+        """
+        for oid, idx_name, access_method, is_primary, is_unique, definition, key_cols, include_cols in _rows(conn, index_sql, p_rel):
+            indexes[oid].append({
+                "name": idx_name,
+                "access_method": access_method,
+                "is_primary": bool(is_primary),
+                "is_unique": bool(is_unique),
+                "columns": list(key_cols or []),
+                "included_columns": list(include_cols or []),
+                "definition": definition,
+            })
+
         rel_by_oid = {}
         tmap = {"r": "table", "p": "table", "v": "view", "m": "matview"}
         for oid, sc, nm, kd, cm, vdef in rels:
             t = tmap[kd]
             nid = f"{t}:{sc}.{nm}"
-            node = g.node(nid, t, f"{sc}.{nm}", schema=sc, comment=cm, columns=cols.get(oid), origin="db")
+            relation_indexes = indexes.get(oid, [])
+            primary_key = next((ix["columns"] for ix in relation_indexes if ix["is_primary"]), [])
+            node = g.node(nid, t, f"{sc}.{nm}", schema=sc, comment=cm, columns=cols.get(oid),
+                          indexes=relation_indexes, primary_key=primary_key, origin="db")
             rel_by_oid[oid] = nid
             reg.add_rel(sc, nm, nid)
             if vdef:
@@ -540,24 +679,36 @@ def load_db(dsn, schemas, g: Graph, reg: Registry, out: Path, warnings: list) ->
             p.write_text(fdef + "\n", encoding="utf-8")
             node["live_def"] = p.relative_to(out.parent).as_posix()
             if lang in ("plpgsql", "sql"):
-                bodies[nid] = src or fdef
+                body_text = src or fdef
+                body_pos = fdef.find(body_text) if src else 0
+                body_line = fdef[:body_pos].count("\n") + 1 if body_pos >= 0 else None
+                bodies[nid] = {"text": body_text, "file": node.get("live_def"), "base_line": body_line}
             else:
                 node["note"] = f"language {lang}: body not analysed"
 
         # function / procedure bodies
         rx_exec = re.compile(r"\bEXECUTE\b(?!\s+(?:FUNCTION|PROCEDURE))", re.I)
-        for nid, body in bodies.items():
+        for nid, body_info in bodies.items():
+            body = body_info["text"]
             code, strs = split_sql(body)
             refs, unk, dyn = extract_refs(code, reg)
+            evidence_by_ref = extract_sql_evidence(
+                body, reg, file=body_info.get("file"), base_line=body_info.get("base_line"),
+                mechanism="postgresql_routine", confidence="high")
             for s in strs:
                 if SQLISH.match(s):
                     r2, _, d2 = extract_refs(split_sql(re.sub(r"%[IsL]|%\d*\$[IsL]", DYN, s))[0], reg)
                     for kd, x in r2:
                         if (kd, x) not in refs:
-                            _emit_sql_edge(g, nid, kd, x, "low")
+                            _emit_sql_edge(g, nid, kd, x, "low", evidence=[{
+                                "operation": _operation_for_statement(s, kd),
+                                "mechanism": "dynamic_sql_literal",
+                                "confidence": "low",
+                                "statement": re.sub(r"\s+", " ", s.strip())[:280],
+                            }])
                     dyn = dyn or d2
             for kd, x in refs:
-                _emit_sql_edge(g, nid, kd, x, "high")
+                _emit_sql_edge(g, nid, kd, x, "high", evidence=evidence_by_ref.get((kd, x), []))
             node = g.nodes[nid]
             if dyn or rx_exec.search(code):
                 node["dynamic_sql"] = True
@@ -574,14 +725,20 @@ def load_db(dsn, schemas, g: Graph, reg: Registry, out: Path, warnings: list) ->
             if not src:
                 continue
             if refcls == "pg_class" and ro in rel_by_oid:
-                g.edge(src, rel_by_oid[ro], "derives_from", "high")
+                g.edge(src, rel_by_oid[ro], "derives_from", "high", evidence={
+                    "operation": "VIEW_DEPENDENCY", "mechanism": "postgresql_catalog_pg_depend",
+                    "confidence": "high", "file": g.nodes[src].get("live_def")})
             elif refcls == "pg_proc" and ro in fn_by_oid:
-                g.edge(src, fn_by_oid[ro], "calls", "high")
+                g.edge(src, fn_by_oid[ro], "calls", "high", evidence={
+                    "operation": "VIEW_FUNCTION_DEPENDENCY", "mechanism": "postgresql_catalog_pg_depend",
+                    "confidence": "high", "file": g.nodes[src].get("live_def")})
 
         for tgrel, tgfn, tgname in _rows(conn, "SELECT tgrelid::bigint, tgfoid::bigint, tgname FROM pg_trigger "
                                               "WHERE NOT tgisinternal"):
             if tgrel in rel_by_oid and tgfn in fn_by_oid:
-                g.edge(fn_by_oid[tgfn], rel_by_oid[tgrel], "triggered_by", "high", trigger=tgname)
+                g.edge(fn_by_oid[tgfn], rel_by_oid[tgrel], "triggered_by", "high", trigger=tgname,
+                       evidence={"operation": "TRIGGER", "mechanism": "postgresql_catalog",
+                                 "confidence": "high", "statement": tgname})
         for child, parent in _rows(conn, "SELECT conrelid::bigint, confrelid::bigint FROM pg_constraint "
                                          "WHERE contype = 'f'"):
             if child in rel_by_oid and parent in rel_by_oid:
@@ -597,7 +754,9 @@ def load_db(dsn, schemas, g: Graph, reg: Registry, out: Path, warnings: list) ->
                         refs, _, _ = extract_refs(split_sql(vdef or "")[0], reg)
                         for kd, x in refs:
                             if kd == "read":
-                                g.edge(vid, x, "derives_from", "medium")
+                                g.edge(vid, x, "derives_from", "medium", evidence={
+                                    "operation": "CONTINUOUS_AGGREGATE_DEPENDENCY",
+                                    "mechanism": "timescaledb_catalog", "confidence": "medium"})
             except Exception as e:  # noqa: BLE001
                 conn.rollback()
                 warnings.append(f"continuous aggregate lookup failed: {e}")
@@ -610,13 +769,13 @@ def load_db(dsn, schemas, g: Graph, reg: Registry, out: Path, warnings: list) ->
     return info
 
 
-def _emit_sql_edge(g: Graph, owner: str, kind: str, target: str, conf: str):
+def _emit_sql_edge(g: Graph, owner: str, kind: str, target: str, conf: str, evidence=None):
     if kind == "read":
-        g.edge(owner, target, "reads", conf)
+        g.edge(owner, target, "reads", conf, evidence=evidence)
     elif kind == "write":
-        g.edge(target, owner, "written_by", conf)
+        g.edge(target, owner, "written_by", conf, evidence=evidence)
     elif kind == "call":
-        g.edge(owner, target, "calls", conf)
+        g.edge(owner, target, "calls", conf, evidence=evidence)
 
 
 def names_from_defs(g: Graph, reg: Registry, defs: dict):
@@ -629,8 +788,10 @@ def names_from_defs(g: Graph, reg: Registry, defs: dict):
             g.node(nid, kind, f"{sc}.{nm}", schema=sc, origin="repo")
             reg.add_rel(sc, nm, nid)
         else:
-            nid = f"function:{sc}.{nm}"
-            g.node(nid, "function", f"{sc}.{nm}", schema=sc, origin="repo")
+            object_kind = locs[-1].get("kind", "function")
+            node_type = "procedure" if object_kind == "procedure" else "function"
+            nid = f"{node_type}:{sc}.{nm}"
+            g.node(nid, node_type, f"{sc}.{nm}", schema=sc, origin="repo")
             reg.add_func(sc, nm, nid)
 
 
@@ -708,10 +869,12 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
 
     mods, full_idx = {}, {}
     suf_idx = collections.defaultdict(list)
+    parse_errors = 0
     for rel in files:
         try:
             tree = ast.parse(read_text(root / rel), filename=rel)
         except (SyntaxError, ValueError) as e:
+            parse_errors += 1
             warnings.append(f"python parse failed: {rel}: {e}")
             continue
         parts = rel[:-3].split("/")
@@ -720,7 +883,7 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
         if not parts:
             continue
         mods[rel] = {"rel": rel, "tree": tree, "parts": parts, "imports": {}, "src_alias": {}, "defs": {},
-                     "consts": {}, "classes": {}, "fnodes": []}
+                     "consts": {}, "classes": {}, "fnodes": [], "orm_models": {}}
         full_idx[".".join(parts)] = rel
         for k in range(len(parts)):
             suf_idx[".".join(parts[k:])].append(rel)
@@ -800,6 +963,77 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
                         if isinstance(t, ast.Name):
                             m["consts"][t.id] = leaves
 
+    # ---- ORM model discovery (conservative, explicit __tablename__ mappings only)
+    # This supplements SQL parsing for common SQLAlchemy/SQLModel patterns. It does not
+    # attempt runtime type inference or infer relationships from arbitrary object access.
+    def class_table_decl(class_node):
+        table_name, schema_name = None, None
+        for st in class_node.body:
+            value = None
+            targets = []
+            if isinstance(st, ast.Assign):
+                targets, value = st.targets, st.value
+            elif isinstance(st, ast.AnnAssign):
+                targets, value = [st.target], st.value
+            for target in targets:
+                if not isinstance(target, ast.Name) or value is None:
+                    continue
+                if target.id == "__tablename__":
+                    table_name = const_str(value)
+                elif target.id == "__table_args__":
+                    candidates = [value]
+                    if isinstance(value, (ast.Tuple, ast.List)):
+                        candidates.extend(value.elts)
+                    for candidate in candidates:
+                        if isinstance(candidate, ast.Dict):
+                            for key, val in zip(candidate.keys, candidate.values):
+                                if const_str(key) == "schema":
+                                    schema_name = const_str(val)
+        return table_name, schema_name
+
+    orm_model_names = collections.defaultdict(dict)
+    for rel, module in mods.items():
+        for st in module["tree"].body:
+            if not isinstance(st, ast.ClassDef):
+                continue
+            table_name, schema_name = class_table_decl(st)
+            if not table_name:
+                continue
+            candidates = reg.find_rel(([schema_name] if schema_name else []) + [table_name])
+            if len(candidates) == 1:
+                table_id = candidates[0]
+            elif len(candidates) > 1:
+                # Avoid guessing when multiple schemas contain the same unqualified table.
+                continue
+            else:
+                inferred_schema = schema_name or "public"
+                table_id = f"table:{inferred_schema}.{table_name}"
+                g.node(table_id, "table", f"{inferred_schema}.{table_name}", schema=inferred_schema,
+                       origin="orm_model", note="Inferred from an explicit ORM __tablename__; verify against the database catalog")
+                reg.add_rel(inferred_schema, table_name, table_id)
+            module["orm_models"][st.name] = table_id
+            orm_model_names[rel][st.name] = table_id
+
+    def resolve_model_expr(module, expr):
+        if isinstance(expr, ast.Name):
+            if expr.id in module["orm_models"]:
+                return module["orm_models"][expr.id]
+            imp = module["imports"].get(expr.id)
+            if imp and imp.get("k") == "name" and imp.get("mod") in mods:
+                return mods[imp["mod"]]["orm_models"].get(imp.get("name"))
+            return None
+        parts = chain_of(expr)
+        if not parts or len(parts) < 2:
+            return None
+        imp = module["imports"].get(parts[0])
+        if imp and imp.get("k") == "module" and imp.get("mod") in mods:
+            return mods[imp["mod"]]["orm_models"].get(parts[1])
+        if imp and imp.get("k") == "dotted":
+            target_mod = resolve_mod(".".join(parts[:-1]), module["rel"])
+            if target_mod in mods:
+                return mods[target_mod]["orm_models"].get(parts[-1])
+        return None
+
     # ---- SQL string analysis (cached)
     @functools.lru_cache(maxsize=None)
     def sql_refs(s: str):
@@ -854,17 +1088,37 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
 
     def analyze(m, nodes, cls, self_id):
         ctx = {"reads": {}, "writes": {}, "calls": {}, "mentions": set(), "sources": {}, "dynamic": False,
-               "unknown": set()}
+               "unknown": set(), "evidence": collections.defaultdict(list)}
         skip: set = set()
+        local_models = {}
+        for root_node in nodes:
+            for candidate in ast.walk(root_node):
+                if not isinstance(candidate, (ast.Assign, ast.AnnAssign)) or candidate.value is None:
+                    continue
+                value = candidate.value
+                if not isinstance(value, ast.Call):
+                    continue
+                table_id = resolve_model_expr(m, value.func)
+                if not table_id:
+                    continue
+                targets = candidate.targets if isinstance(candidate, ast.Assign) else [candidate.target]
+                for target in targets:
+                    if isinstance(target, ast.Name):
+                        local_models[target.id] = table_id
 
         def put(d, k, c):
             d[k] = max(d.get(k, 0), c)
 
-        def on_string(s):
+        def on_string(s, source_node=None):
             if SQLISH.match(s):
                 refs, unk, dyn = sql_refs(s)
                 for kd, x in refs:
                     put({"read": ctx["reads"], "write": ctx["writes"], "call": ctx["calls"]}[kd], x, 2)
+                line = getattr(source_node, "lineno", None)
+                evidence_map = extract_sql_evidence(
+                    s, reg, file=m["rel"], base_line=line, mechanism="python_embedded_sql", confidence="medium")
+                for key, items in evidence_map.items():
+                    ctx["evidence"][key].extend(items)
                 ctx["unknown"].update(unk)
                 ctx["dynamic"] = ctx["dynamic"] or dyn
                 return
@@ -874,9 +1128,15 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
             elif st.lower().endswith(".sql"):
                 cands = sql_by_base.get(st.replace("\\", "/").rsplit("/", 1)[-1].lower(), [])
                 if len(cands) == 1:
-                    refs, unk, dyn = sql_refs(sql_file_text(cands[0]))
+                    file_sql = sql_file_text(cands[0])
+                    refs, unk, dyn = sql_refs(file_sql)
                     for kd, x in refs:
                         put({"read": ctx["reads"], "write": ctx["writes"], "call": ctx["calls"]}[kd], x, 2)
+                    evidence_map = extract_sql_evidence(
+                        file_sql, reg, file=cands[0], base_line=1,
+                        mechanism="python_referenced_sql_file", confidence="medium")
+                    for key, items in evidence_map.items():
+                        ctx["evidence"][key].extend(items)
                     ctx["dynamic"] = ctx["dynamic"] or dyn
             if " " not in st:
                 low = st.lower()
@@ -884,15 +1144,62 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
                     if h in low:
                         put(ctx["sources"], sname, 2)
 
-        def on_ref(parts, call_node=None):
+        def on_ref(parts, call_node=None, source_node=None):
             if parts[0] in m["src_alias"]:
                 put(ctx["sources"], m["src_alias"][parts[0]], 3)
             fid, strs = resolve_chain(m, parts, cls)
             if fid and fid != self_id:
                 put(ctx["calls"], fid, 3)
+                if source_node is not None:
+                    try:
+                        statement = ast.unparse(source_node)[:280]
+                    except Exception:  # noqa: BLE001
+                        statement = "Python function reference"
+                    ctx["evidence"][("call", fid)].append({
+                        "operation": "PYTHON_CALL", "mechanism": "python_static_analysis",
+                        "confidence": "high", "file": m["rel"],
+                        "line": getattr(source_node, "lineno", None),
+                        "end": getattr(source_node, "end_lineno", None),
+                        "statement": statement,
+                    })
             for s in strs or []:
-                on_string(s)
+                on_string(s, source_node)
             return fid or strs
+
+        def models_in_expr(expr):
+            found = set()
+            if expr is None:
+                return found
+            direct = resolve_model_expr(m, expr)
+            if direct:
+                found.add(direct)
+            if isinstance(expr, ast.Name) and expr.id in local_models:
+                found.add(local_models[expr.id])
+            for item in ast.walk(expr):
+                if isinstance(item, ast.Call):
+                    table_id = resolve_model_expr(m, item.func)
+                    if table_id:
+                        found.add(table_id)
+                elif isinstance(item, ast.Name) and item.id in local_models:
+                    found.add(local_models[item.id])
+            return found
+
+        def add_orm_evidence(table_id, operation, call_node):
+            is_read = operation == "ORM_READ"
+            put(ctx["reads"] if is_read else ctx["writes"], table_id, 2)
+            try:
+                statement = ast.unparse(call_node)[:280]
+            except Exception:  # noqa: BLE001
+                statement = ast.dump(call_node, include_attributes=False)[:280]
+            ctx["evidence"][("read" if is_read else "write", table_id)].append({
+                "operation": operation,
+                "mechanism": "python_orm_static_analysis",
+                "confidence": "medium",
+                "file": m["rel"],
+                "line": getattr(call_node, "lineno", None),
+                "end": getattr(call_node, "end_lineno", None),
+                "statement": statement,
+            })
 
         def visit_stringy(n):
             if isinstance(n, ast.JoinedStr):
@@ -919,13 +1226,27 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
                         if nm == "callproc":
                             for x in reg.find_func(low):
                                 put(ctx["calls"], x, 2)
+                                ctx["evidence"][("call", x)].append({
+                                    "operation": "PYTHON_CALLPROC", "mechanism": "python_database_api",
+                                    "confidence": "medium", "file": m["rel"],
+                                    "line": getattr(n, "lineno", None), "end": getattr(n, "end_lineno", None),
+                                    "statement": ast.unparse(n)[:280] if hasattr(ast, "unparse") else "callproc",
+                                })
                         else:
                             for x in reg.find_rel(low):
-                                put(ctx["reads"] if nm == "copy_to" else ctx["writes"], x, 2)
+                                is_read = nm == "copy_to"
+                                put(ctx["reads"] if is_read else ctx["writes"], x, 2)
+                                ctx["evidence"][("read" if is_read else "write", x)].append({
+                                    "operation": {"to_sql": "PANDAS_TO_SQL", "copy_from": "COPY_FROM", "copy_to": "COPY_TO"}.get(nm, nm.upper()),
+                                    "mechanism": "python_database_api", "confidence": "medium",
+                                    "file": m["rel"], "line": getattr(n, "lineno", None),
+                                    "end": getattr(n, "end_lineno", None),
+                                    "statement": ast.unparse(n)[:280] if hasattr(ast, "unparse") else nm,
+                                })
                 ch = chain_of(f)
                 if ch:
                     skip.add(id(f))
-                    res = on_ref(ch)
+                    res = on_ref(ch, source_node=n)
                     head_imported = ch[0] in m["imports"]
                 else:
                     res, head_imported = None, False
@@ -934,12 +1255,38 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
                     cand = meth_idx.get(nm, [])
                     if len(cand) == 1 and cand[0] != self_id:
                         put(ctx["calls"], cand[0], 1)
+                # Explicit, common SQLAlchemy / SQLModel patterns. These are heuristic medium-
+                # confidence edges; arbitrary ORM expression composition is not fully resolved.
+                if nm in {"query", "get"}:
+                    for arg in n.args[:1]:
+                        for table_id in models_in_expr(arg):
+                            add_orm_evidence(table_id, "ORM_READ", n)
+                elif nm in {"add", "add_all", "merge", "bulk_save_objects", "bulk_insert_mappings", "bulk_update_mappings"}:
+                    for arg in n.args[:1]:
+                        for table_id in models_in_expr(arg):
+                            operation = {
+                                "merge": "ORM_MERGE",
+                                "bulk_insert_mappings": "ORM_INSERT",
+                                "bulk_update_mappings": "ORM_UPDATE",
+                            }.get(nm, "ORM_ADD (insert/update depends on ORM state)")
+                            add_orm_evidence(table_id, operation, n)
+                elif nm in {"delete"}:
+                    for arg in n.args[:1]:
+                        for table_id in models_in_expr(arg):
+                            add_orm_evidence(table_id, "ORM_DELETE", n)
+            elif isinstance(f, ast.Name):
+                nm = f.id.lower()
+                operation = {"select": "ORM_READ", "update": "ORM_UPDATE", "insert": "ORM_INSERT", "delete": "ORM_DELETE"}.get(nm)
+                if operation:
+                    for arg in n.args[:1]:
+                        for table_id in models_in_expr(arg):
+                            add_orm_evidence(table_id, operation, n)
 
         def visit(n):
             if isinstance(n, (ast.Constant, ast.JoinedStr, ast.BinOp)):
                 s = flatten(n)
                 if s is not None:
-                    on_string(s)
+                    on_string(s, n)
                     visit_stringy(n)
                     return
                 if isinstance(n, ast.Constant):
@@ -948,12 +1295,12 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
                 on_call(n)
             elif isinstance(n, ast.Name):
                 if isinstance(n.ctx, ast.Load):
-                    on_ref([n.id])
+                    on_ref([n.id], source_node=n)
             elif isinstance(n, ast.Attribute):
                 if id(n) not in skip:
                     ch = chain_of(n)
                     if ch:
-                        on_ref(ch)
+                        on_ref(ch, source_node=n)
             for c in ast.iter_child_nodes(n):
                 visit(c)
 
@@ -965,11 +1312,11 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
     def emit(nid, ctx):
         node = g.nodes[nid]
         for x, c in ctx["reads"].items():
-            g.edge(nid, x, "reads", c)
+            g.edge(nid, x, "reads", c, evidence=ctx["evidence"].get(("read", x)))
         for x, c in ctx["writes"].items():
-            g.edge(x, nid, "written_by", c)
+            g.edge(x, nid, "written_by", c, evidence=ctx["evidence"].get(("write", x)))
         for x, c in ctx["calls"].items():
-            g.edge(nid, x, "calls", c)
+            g.edge(nid, x, "calls", c, evidence=ctx["evidence"].get(("call", x)))
         for x in ctx["mentions"]:
             if x not in ctx["reads"] and x not in ctx["writes"] and x not in ctx["calls"]:
                 g.edge(nid, x, "mentions", "low")
@@ -1083,7 +1430,8 @@ def analyze_python(root: Path, files: list, g: Graph, reg: Registry, cfg: dict, 
             g.node(eid, "endpoint", f"{method} {full}", file=h["file"], line=h["line"], end=h.get("end"),
                    route=full, method=method)
             g.edge(eid, hid, "handled_by", "high")
-    return {"modules": len(mods), "routes": len(routes)}
+    return {"modules": len(mods), "routes": len(routes), "parse_errors": parse_errors,
+            "orm_models_detected": sum(len(module.get("orm_models", {})) for module in mods.values())}
 
 
 # --------------------------------------------------------------------------------------
@@ -1507,7 +1855,7 @@ def analyze_typescript(root: Path, files: list, g: Graph, cfg: dict, out: Path, 
                 for f in fi["functions"]:
                     if "." not in f["qual"]:
                         g.edge(pid, f["_id"], "renders", "medium")
-    return {"ts_files": len(tsf)}
+    return {"ts_files": len(tsf), "parse_errors": len(data.get("errors", [])), "analysis_available": True}
 
 
 # --------------------------------------------------------------------------------------
@@ -1573,13 +1921,17 @@ def git_head(root):
 def load_graph(root, path_arg):
     p = Path(path_arg) if path_arg else root / OUT_DIR / "graph.json"
     if not p.exists():
-        raise SystemExit(f"No graph at {p}. Build it first:  python tools/lineage.py build")
+        raise SystemExit(f"No graph at {p}. Build it first:  python tools/data_dictionary/lineage.py build")
     data = json.loads(p.read_text(encoding="utf-8"))
     meta = data["meta"]
     changed = []
     for rel, mt in meta.get("files", {}).items():
         try:
-            if (root / rel).stat().st_mtime > meta["built_at"] and (root / rel).stat().st_mtime_ns // 1_000_000_000 != mt:
+            current_ns = (root / rel).stat().st_mtime_ns
+            if isinstance(mt, int) and mt > 10**12:
+                if current_ns != mt:
+                    changed.append(rel)
+            elif (root / rel).stat().st_mtime > meta["built_at"] and current_ns // 1_000_000_000 != mt:
                 changed.append(rel)
         except OSError:
             changed.append(rel)
@@ -1595,6 +1947,9 @@ def load_graph(root, path_arg):
     if notes:
         print("# WARNING graph may be stale: " + "; ".join(notes) + ". Ask the user to re-run `lineage.py build`.",
               file=sys.stderr)
+    data["_runtime"] = {"is_stale": bool(notes), "stale_reasons": notes,
+                        "checked_git_head": head, "built_at": meta.get("built_at"),
+                        "built_git_head": meta.get("git_head")}
     return data
 
 
@@ -1643,7 +1998,18 @@ def cmd_search(data, a):
     if len(scored) > a.n:
         print(f"... {len(scored) - a.n} more; narrow the query or raise -n")
     if not scored:
+        import difflib
+        keys = {}
+        for nid, n in data["nodes"].items():
+            if a.type and n["type"] != a.type:
+                continue
+            keys[nid.split(":", 1)[-1].lower()] = nid
+        close = difflib.get_close_matches(" ".join(terms), list(keys), n=5, cutoff=0.6)
         print("no matches")
+        if close:
+            print("did you mean:")
+            for c in close:
+                print(f"  {keys[c]}")
 
 
 def cmd_show(data, a):
@@ -1663,6 +2029,12 @@ def cmd_show(data, a):
         print(f"  unresolved relations referenced: {', '.join(n['unknown_rels'])}")
     if n.get("columns"):
         print("  columns  : " + ", ".join(f"{c[0]} {c[1]}" for c in n["columns"][:60]))
+    if n.get("primary_key"):
+        print("  primary key: " + ", ".join(n["primary_key"]))
+    if n.get("indexes"):
+        for ix in n["indexes"][:30]:
+            flags = " PRIMARY" if ix.get("is_primary") else " UNIQUE" if ix.get("is_unique") else ""
+            print(f"  index    : {ix.get('name')} [{ix.get('access_method')}] ({', '.join(ix.get('columns', []))}){flags}")
     for direction, title, table in (("up", "depends on", EDGE_UP), ("down", "used by", EDGE_DOWN)):
         rows = v.nbrs(nid, direction)
         if rows:
@@ -1686,6 +2058,494 @@ def bfs(view, start, direction, depth):
                 order.append(nb)
                 q.append(nb)
     return dist, order
+
+
+def _confidence_name(value):
+    return {1: "low", 2: "medium", 3: "high"}.get(value, "unknown")
+
+
+def _edge_attrs(row):
+    return row[4] if len(row) > 4 and isinstance(row[4], dict) else {}
+
+
+def _node_summary(nid, node, depth=None, direction=None, details=False):
+    out = {
+        "id": nid,
+        "type": node.get("type"),
+        "name": node.get("name"),
+        "schema": node.get("schema"),
+        "location": loc(node, full=True) or None,
+    }
+    if depth is not None:
+        out["depth"] = depth
+    if direction:
+        out["direction"] = direction
+    common_fields = ("comment", "doc", "note", "args", "lang", "origin", "dynamic_sql", "unknown_rels")
+    detail_fields = ("columns", "primary_key", "indexes", "defined_in", "live_def") if details else ()
+    for key in common_fields + detail_fields:
+        if node.get(key) not in (None, "", [], False):
+            out[key] = node[key]
+    return out
+
+
+def _collect_direction(data, start, direction, depth, min_conf, kinds, max_nodes):
+    view = View(data, min_conf, kinds)
+    edge_map = {(row[0], row[1], row[2]): row for row in data.get("edges", [])}
+    distances = {start: 0}
+    queue = collections.deque([start])
+    collected_edges = {}
+    truncated = False
+    while queue:
+        current = queue.popleft()
+        current_depth = distances[current]
+        if current_depth >= depth:
+            continue
+        for neighbor, kind, conf in view.nbrs(current, direction):
+            source, target = (current, neighbor) if direction == "up" else (neighbor, current)
+            key = (source, target, kind)
+            row = edge_map.get(key)
+            if row:
+                collected_edges[key] = row
+            if neighbor not in distances:
+                if len(distances) >= max_nodes:
+                    truncated = True
+                    continue
+                distances[neighbor] = current_depth + 1
+                queue.append(neighbor)
+    nodes = [
+        _node_summary(nid, data["nodes"][nid], depth=dist, direction=direction)
+        for nid, dist in sorted(distances.items(), key=lambda item: (item[1], data["nodes"][item[0]].get("type", ""),
+                                                                      data["nodes"][item[0]].get("name", "")))
+        if nid != start
+    ]
+    edges = []
+    for (source, target, kind), row in sorted(collected_edges.items()):
+        conf = row[3]
+        edges.append({
+            "source": source,
+            "target": target,
+            "kind": kind,
+            "confidence": _confidence_name(conf),
+            "confidence_value": conf,
+            "attributes": _edge_attrs(row),
+        })
+    return {"nodes": nodes, "edges": edges, "distances": distances, "truncated": truncated}
+
+
+def _writer_operation_groups(target_id, upstream_edges, nodes):
+    primary, possible, mutations, unclassified = [], [], [], []
+    seen = set()
+    for edge in upstream_edges:
+        if edge["source"] != target_id or edge["kind"] != "written_by":
+            continue
+        writer_id = edge["target"]
+        if writer_id in seen:
+            continue
+        seen.add(writer_id)
+        evidence = edge["attributes"].get("evidence", [])
+        operations = sorted({str(ev.get("operation", "UNKNOWN")) for ev in evidence if isinstance(ev, dict)})
+        info = {
+            "node": _node_summary(writer_id, nodes[writer_id]),
+            "confidence": edge["confidence"],
+            "operations": operations,
+            "evidence": evidence,
+            "classification": "unclassified",
+        }
+        population_ops = {"INSERT", "COPY_FROM", "MERGE", "PANDAS_TO_SQL", "ORM_INSERT"}
+        possible_ops = {"ORM_ADD (insert/update depends on ORM state)", "ORM_MERGE"}
+        mutation_ops = {"UPDATE", "DELETE", "TRUNCATE", "COPY_TO", "REFRESH", "ORM_UPDATE", "ORM_DELETE"}
+        if any(op in population_ops for op in operations):
+            info["classification"] = "population"
+            primary.append(info)
+        elif any(op in possible_ops for op in operations):
+            info["classification"] = "possible_population_or_mutation"
+            possible.append(info)
+        elif any(op in mutation_ops for op in operations):
+            info["classification"] = "mutation"
+            mutations.append(info)
+        else:
+            unclassified.append(info)
+    return {"primary_population_writers": primary, "ambiguous_writers": possible,
+            "secondary_mutators": mutations, "unclassified_writers": unclassified}
+
+
+def _collect_invocation_paths(data, writer_ids, min_conf, max_depth=6, max_paths=30):
+    """Find repository callers of writer routines without confusing calls with data lineage."""
+    view = View(data, min_conf, {"calls", "handled_by"})
+    paths = []
+
+    def walk(callee, reverse_path, seen, depth):
+        if len(paths) >= max_paths:
+            return
+        if depth >= max_depth:
+            paths.append({"writer": reverse_path[-1], "path": list(reversed(reverse_path)), "truncated": True})
+            return
+        callers = [(nid, kind) for nid, kind, _ in view.nbrs(callee, "down") if kind == "calls" and nid not in seen]
+        if not callers:
+            # The outermost repository function may be registered as a FastAPI route handler.
+            entrypoints = [(nid, kind) for nid, kind, _ in view.nbrs(callee, "down") if kind == "handled_by"]
+            if entrypoints:
+                for endpoint_id, _ in entrypoints:
+                    paths.append({"writer": reverse_path[0], "path": [endpoint_id] + list(reversed(reverse_path)),
+                                  "truncated": False})
+            else:
+                paths.append({"writer": reverse_path[0], "path": list(reversed(reverse_path)), "truncated": False})
+            return
+        for caller, _ in callers:
+            walk(caller, reverse_path + [caller], seen | {caller}, depth + 1)
+
+    for writer in writer_ids:
+        if writer in data["nodes"]:
+            walk(writer, [writer], {writer}, 0)
+    # Deduplicate and make output stable.
+    unique = {}
+    for item in paths:
+        key = tuple(item["path"])
+        unique[key] = item
+    return list(unique.values())[:max_paths]
+
+
+def _source_candidates(data, target_id, up_nodes, down_nodes, invocation_paths, relationship_edges):
+    ordered_ids = [target_id]
+    ordered_ids.extend(x["id"] for x in up_nodes)
+    ordered_ids.extend(x["id"] for x in down_nodes)
+    for path in invocation_paths:
+        ordered_ids.extend(path["path"])
+    seen_ids = set()
+    candidates = []
+    for nid in ordered_ids:
+        if nid in seen_ids or nid not in data["nodes"]:
+            continue
+        seen_ids.add(nid)
+        node = data["nodes"][nid]
+        for definition in node.get("defined_in", []):
+            if definition.get("file"):
+                candidates.append({"node_id": nid, "file": definition["file"],
+                                   "start_line": definition.get("line", 1),
+                                   "end_line": definition.get("end"), "source_kind": "repository_definition"})
+        if node.get("file"):
+            candidates.append({"node_id": nid, "file": node["file"],
+                               "start_line": node.get("line", 1), "end_line": node.get("end"),
+                               "source_kind": "source_node"})
+        if node.get("live_def"):
+            candidates.append({"node_id": nid, "file": node["live_def"], "start_line": 1,
+                               "end_line": None, "source_kind": "live_database_definition"})
+    for row in relationship_edges:
+        attrs = row.get("attributes", {})
+        for ev in attrs.get("evidence", []):
+            if isinstance(ev, dict) and ev.get("file") and ev.get("line"):
+                evidence_node = row["target"] if row["kind"] == "written_by" else row["source"]
+                candidates.append({"node_id": evidence_node, "file": ev["file"],
+                                   "start_line": ev.get("line", 1), "end_line": ev.get("end"),
+                                   "source_kind": ev.get("mechanism", "relationship_evidence")})
+    # Deduplicate exact ranges while preserving importance order.
+    seen = set()
+    result = []
+    for item in candidates:
+        key = (item["node_id"], item["file"], item["start_line"], item["end_line"], item["source_kind"])
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result
+
+
+def _read_source_excerpts(root, candidates, max_lines):
+    root = root.resolve()
+    excerpts, warnings = [], []
+    used = 0
+    truncated = False
+    for candidate in candidates:
+        if used >= max_lines:
+            truncated = True
+            break
+        rel = candidate["file"]
+        try:
+            path = (root / rel).resolve()
+            path.relative_to(root)
+            if not path.is_file():
+                warnings.append(f"source file not found: {rel}")
+                continue
+            lines = read_text(path).splitlines()
+        except (OSError, ValueError):
+            warnings.append(f"source file unavailable or outside repository: {rel}")
+            continue
+        if not lines:
+            continue
+        start = max(1, int(candidate.get("start_line") or 1))
+        if start > len(lines):
+            warnings.append(f"source line {start} is beyond end of file: {rel}")
+            continue
+        end_value = candidate.get("end_line")
+        end = int(end_value) if end_value else min(len(lines), start + 39)
+        end = min(max(start, end), len(lines))
+        remaining = max_lines - used
+        if end - start + 1 > remaining:
+            end = start + remaining - 1
+            truncated = True
+        excerpt_text = "\n".join(f"{idx}: {lines[idx - 1]}" for idx in range(start, end + 1))
+        excerpts.append({
+            **candidate,
+            "end_line": end,
+            "text": excerpt_text,
+        })
+        used += end - start + 1
+        if truncated:
+            break
+    return excerpts, warnings, {"used_lines": used, "max_lines": max_lines, "truncated": truncated}
+
+
+def build_describe_report(data, root, node_id, *, direction="both", depth=12, min_conf="medium",
+                          max_nodes=300, include_source=False, max_source_lines=1600):
+    """Build a deterministic, structured report from the precomputed graph."""
+    target_id = resolve_node(data, node_id)
+    min_conf_value = CONF[min_conf]
+    kinds = {kind for kind in EDGE_UP if kind != "fk"}
+    upstream = {"nodes": [], "edges": [], "distances": {}, "truncated": False}
+    downstream = {"nodes": [], "edges": [], "distances": {}, "truncated": False}
+    if direction in ("both", "up"):
+        upstream = _collect_direction(data, target_id, "up", depth, min_conf_value, kinds, max_nodes)
+    if direction in ("both", "down"):
+        downstream = _collect_direction(data, target_id, "down", depth, min_conf_value, kinds, max_nodes)
+
+    all_nodes = {target_id: data["nodes"][target_id]}
+    for group in (upstream, downstream):
+        for item in group["nodes"]:
+            all_nodes[item["id"]] = data["nodes"][item["id"]]
+    all_edges_by_key = {}
+    for group in (upstream, downstream):
+        for edge in group["edges"]:
+            all_edges_by_key[(edge["source"], edge["target"], edge["kind"])] = edge
+    all_edges = list(all_edges_by_key.values())
+
+    writers = _writer_operation_groups(target_id, upstream["edges"], all_nodes)
+    writer_ids = []
+    for key in ("primary_population_writers", "ambiguous_writers", "secondary_mutators", "unclassified_writers"):
+        writer_ids.extend(item["node"]["id"] for item in writers[key])
+    invocation_paths = _collect_invocation_paths(data, writer_ids, min_conf_value)
+    for path_item in invocation_paths:
+        for invocation_id in path_item["path"]:
+            if invocation_id in data["nodes"]:
+                all_nodes.setdefault(invocation_id, data["nodes"][invocation_id])
+    raw_edge_map = {(row[0], row[1], row[2]): row for row in data.get("edges", [])}
+    for path_item in invocation_paths:
+        path_ids = path_item["path"]
+        for index in range(len(path_ids) - 1):
+            source_id, target_id2 = path_ids[index], path_ids[index + 1]
+            kind = "handled_by" if data["nodes"].get(source_id, {}).get("type") == "endpoint" else "calls"
+            row = raw_edge_map.get((source_id, target_id2, kind))
+            if row:
+                conf_value = row[3]
+                all_edges_by_key[(source_id, target_id2, kind)] = {
+                    "source": source_id, "target": target_id2, "kind": kind,
+                    "confidence": _confidence_name(conf_value), "confidence_value": conf_value,
+                    "attributes": _edge_attrs(row),
+                }
+    all_edges = list(all_edges_by_key.values())
+    consumers = collections.defaultdict(list)
+    for item in downstream["nodes"]:
+        consumers[item["type"]].append(item)
+    consumer_groups = {
+        "database_views": consumers.get("view", []) + consumers.get("matview", []),
+        "backend_readers_and_processors": consumers.get("py", []) + consumers.get("function", []) + consumers.get("procedure", []),
+        "api_endpoints": consumers.get("endpoint", []),
+        "frontend_clients_components_and_hooks": consumers.get("ts", []) + consumers.get("component", []) + consumers.get("hook", []),
+        "pages": consumers.get("page", []),
+        "other": [item for t, values in consumers.items()
+                   if t not in {"view", "matview", "py", "function", "procedure", "endpoint", "ts", "component", "hook", "page"}
+                   for item in values],
+    }
+
+    meta = data.get("meta", {})
+    coverage = meta.get("coverage", {})
+    dynamic_nodes = [nid for nid, n in all_nodes.items() if n.get("dynamic_sql")]
+    unknown_nodes = [{"id": nid, "relations": n.get("unknown_rels", [])}
+                     for nid, n in all_nodes.items() if n.get("unknown_rels")]
+    warnings = []
+    runtime = data.get("_runtime", {})
+    if runtime.get("is_stale"):
+        warnings.append({"kind": "stale_graph", "details": runtime.get("stale_reasons", [])})
+    if not coverage:
+        warnings.append({"kind": "legacy_graph_metadata", "message": "This graph predates coverage metadata; completeness cannot be established."})
+    if not meta.get("db"):
+        warnings.append({"kind": "database_catalog_unavailable", "message": "No database catalog was captured; live columns, indexes, and catalog dependencies may be incomplete."})
+    if coverage.get("tests_included") is False:
+        warnings.append({"kind": "tests_excluded", "count": coverage.get("tests_excluded_count", 0),
+                         "message": f"Test scanning was disabled for this build; {coverage.get('tests_excluded_count', 0)} discovered test file(s) were excluded. Rebuild with --include-tests to include test surfaces."})
+    if coverage.get("typescript_analysis") == "skipped":
+        warnings.append({"kind": "typescript_analysis_skipped", "message": "Frontend analysis did not complete; frontend dependencies may be missing."})
+    if coverage.get("python_parse_errors", 0) or coverage.get("typescript_parse_errors", 0):
+        warnings.append({"kind": "parse_errors", "python": coverage.get("python_parse_errors", 0),
+                         "typescript": coverage.get("typescript_parse_errors", 0)})
+    if dynamic_nodes:
+        warnings.append({"kind": "dynamic_sql", "nodes": dynamic_nodes,
+                         "message": "References in dynamically constructed SQL may be incomplete."})
+    if unknown_nodes:
+        warnings.append({"kind": "unknown_relations", "nodes": unknown_nodes,
+                         "message": "Some relation references could not be resolved to catalog or repository nodes."})
+    if any(n.get("origin") == "orm_model" for n in all_nodes.values()):
+        warnings.append({"kind": "orm_inferred_table", "message": "At least one table node was inferred from an ORM declaration rather than confirmed by the database catalog."})
+    if upstream["truncated"] or downstream["truncated"]:
+        warnings.append({"kind": "neighborhood_truncated", "message": f"The traversal reached the --max-nodes limit ({max_nodes}). Increase it to inspect additional nodes."})
+
+    report = {
+        "report_version": 1,
+        "target": _node_summary(target_id, data["nodes"][target_id], details=True),
+        "graph": {
+            "built_at": (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(meta["built_at"]))
+                         if meta.get("built_at") else None),
+            "built_at_epoch": meta.get("built_at"),
+            "git_head": meta.get("git_head"),
+            "database": (meta.get("db") or {}).get("database"),
+            "server_version": (meta.get("db") or {}).get("server_version"),
+            "is_stale": bool(runtime.get("is_stale")),
+            "stale_reasons": runtime.get("stale_reasons", []),
+            "graph_version": meta.get("version"),
+        },
+        "coverage": coverage,
+        "population": writers,
+        "invocation_paths": invocation_paths,
+        "upstream": {"nodes": upstream["nodes"], "edges": upstream["edges"], "truncated": upstream["truncated"]},
+        "downstream": {"nodes": downstream["nodes"], "edges": downstream["edges"], "truncated": downstream["truncated"]},
+        "consumption": consumer_groups,
+        "relationship_map": {"nodes": [_node_summary(nid, node) for nid, node in all_nodes.items()],
+                             "edges": all_edges},
+        "warnings": warnings,
+        "source_excerpts": [],
+    }
+    if include_source:
+        candidates = _source_candidates(data, target_id, upstream["nodes"], downstream["nodes"], invocation_paths, all_edges)
+        excerpts, source_warnings, source_usage = _read_source_excerpts(root, candidates, max_source_lines)
+        report["source_excerpts"] = excerpts
+        report["source_usage"] = source_usage
+        for message in source_warnings:
+            report["warnings"].append({"kind": "source_excerpt_unavailable", "message": message})
+    else:
+        report["source_usage"] = {"included": False, "max_lines": max_source_lines}
+    return report
+
+
+def _render_node_list(items):
+    if not items:
+        return "(none in the selected graph neighborhood)"
+    lines = []
+    for item in items:
+        marker = "!dynamic-sql " if item.get("dynamic_sql") else ""
+        lines.append(f"- d{item.get('depth', '?')} [{item.get('type')}] {marker}{item.get('name')} — {item.get('location') or 'no source location'}")
+    return "\n".join(lines)
+
+
+def render_describe_text(report):
+    target = report["target"]
+    lines = [
+        f"LINEAGE REPORT: {target['name']}",
+        f"Target: {target['id']} [{target['type']}]",
+        f"Graph: built {report['graph'].get('built_at')} | git {report['graph'].get('git_head') or 'unknown'} | "
+        f"database {report['graph'].get('database') or 'not captured'} | stale={report['graph'].get('is_stale')}",
+        "",
+        "== 1. OBJECT IDENTITY ==",
+        f"Comment: {target.get('comment') or '(none)'}",
+    ]
+    if target.get("primary_key"):
+        lines.append("Primary key: " + ", ".join(target["primary_key"]))
+    if target.get("columns"):
+        lines.append("Columns:")
+        for col in target["columns"]:
+            lines.append(f"  - {col[0]} {col[1]}" + (f" — {col[2]}" if len(col) > 2 else ""))
+    if target.get("indexes"):
+        lines.append("Indexes:")
+        for index in target["indexes"]:
+            flags = ", ".join(x for x, yes in (("PRIMARY KEY", index.get("is_primary")), ("UNIQUE", index.get("is_unique"))) if yes)
+            lines.append(f"  - {index.get('name')} [{index.get('access_method')}] "
+                         f"({', '.join(index.get('columns', []))})" + (f" — {flags}" if flags else ""))
+            if index.get("included_columns"):
+                lines.append("    included: " + ", ".join(index["included_columns"]))
+            if index.get("definition"):
+                lines.append("    " + index["definition"])
+    lines.extend(["", "== 2. POPULATION AND MODIFICATION =="])
+    pop = report["population"]
+    for key, title in (("primary_population_writers", "Population writers"),
+                       ("ambiguous_writers", "Ambiguous ORM persistence operations"),
+                       ("secondary_mutators", "Secondary mutations"),
+                       ("unclassified_writers", "Writer relationships without operation evidence")):
+        lines.append(title + ":")
+        group = pop.get(key, [])
+        if not group:
+            lines.append("  (none)")
+        for item in group:
+            nd = item["node"]
+            lines.append(f"  - [{item['confidence'].upper()}] {nd['type']} {nd['name']} — {nd.get('location') or 'no source location'}")
+            lines.append("    operations: " + (", ".join(item["operations"]) or "not classified"))
+            for ev in item.get("evidence", [])[:8]:
+                loc_text = f"{ev.get('file') or '?'}:{ev.get('line') or '?'}"
+                lines.append(f"    evidence: {ev.get('operation', 'UNKNOWN')} ({ev.get('mechanism', 'unknown')}) at {loc_text}")
+                if ev.get("statement"):
+                    lines.append(f"      {ev['statement']}")
+    lines.extend(["", "Invocation paths (callers of identified writers):"])
+    if not report.get("invocation_paths"):
+        lines.append("  (no caller chain resolved at the selected confidence threshold)")
+    for path in report.get("invocation_paths", []):
+        names = [report_node_name(report, nid) for nid in path["path"]]
+        lines.append("  - " + " -> ".join(names) + (" [truncated]" if path.get("truncated") else ""))
+    lines.extend(["", "== 3. UPSTREAM DEPENDENCIES ==", _render_node_list(report["upstream"]["nodes"]),
+                  "", "== 4. DOWNSTREAM CONSUMPTION =="])
+    groups = report.get("consumption", {})
+    group_titles = (("database_views", "Database views and derived relations"),
+                    ("backend_readers_and_processors", "Backend readers and processors"),
+                    ("api_endpoints", "API endpoints"),
+                    ("frontend_clients_components_and_hooks", "Frontend clients, components and hooks"),
+                    ("pages", "Pages"), ("other", "Other consumers"))
+    for key, title in group_titles:
+        lines.append(title + ":")
+        lines.append(_render_node_list(groups.get(key, [])))
+    lines.extend(["", "== 5. RELATIONSHIP MAP =="])
+    for edge in report["relationship_map"]["edges"]:
+        src = report_node_name(report, edge["source"])
+        dst = report_node_name(report, edge["target"])
+        lines.append(f"- {src} --{edge['kind']}--> {dst} [{edge['confidence'].upper()}]")
+        for ev in edge["attributes"].get("evidence", [])[:5]:
+            lines.append(f"    {ev.get('operation', 'UNKNOWN')} / {ev.get('mechanism', 'unknown')} "
+                         f"{ev.get('file') or ''}:{ev.get('line') or ''}")
+    lines.extend(["", "== 6. SOURCE EVIDENCE =="])
+    if report.get("source_excerpts"):
+        for excerpt in report["source_excerpts"]:
+            lines.append(f"--- {excerpt['file']}:{excerpt['start_line']}-{excerpt['end_line']} "
+                         f"[{excerpt['source_kind']} | {excerpt['node_id']}] ---")
+            lines.append(excerpt["text"])
+    else:
+        lines.append("Source excerpts not requested. Use --include-source to include relevant source ranges.")
+    if report.get("source_usage", {}).get("truncated"):
+        lines.append(f"[Source excerpts truncated at {report['source_usage']['used_lines']} lines; "
+                     f"limit {report['source_usage']['max_lines']}]")
+    lines.extend(["", "== 7. COVERAGE AND WARNINGS =="])
+    if report.get("coverage"):
+        lines.append(json.dumps(report["coverage"], sort_keys=True))
+    if report.get("warnings"):
+        for warning in report["warnings"]:
+            lines.append(f"- [{warning['kind']}] {warning.get('message') or warning.get('details') or ''}")
+    else:
+        lines.append("(no known coverage warnings)")
+    return "\n".join(lines)
+
+
+def report_node_name(report, node_id):
+    for node in report.get("relationship_map", {}).get("nodes", []):
+        if node["id"] == node_id:
+            return node.get("name", node_id)
+    for group in (report.get("upstream", {}).get("nodes", []), report.get("downstream", {}).get("nodes", [])):
+        for node in group:
+            if node["id"] == node_id:
+                return node.get("name", node_id)
+    return report.get("target", {}).get("name") if report.get("target", {}).get("id") == node_id else node_id
+
+
+def cmd_describe(data, a, root):
+    report = build_describe_report(
+        data, root, a.node, direction=a.direction, depth=a.depth, min_conf=a.min_conf,
+        max_nodes=a.max_nodes, include_source=a.include_source, max_source_lines=a.max_source_lines)
+    if a.format == "json":
+        print(json.dumps(report, indent=2, sort_keys=True, default=str))
+    else:
+        print(render_describe_text(report))
 
 
 def cmd_trace(data, a):
@@ -1760,10 +2620,22 @@ def cmd_check(data, a):
         in_e[d].add((k, s, c))
     def has(m, nid, kind, conf=1):
         return any(k == kind and c >= conf for k, _, c in m[nid])
-    print("== tables with no writer found (loaded outside this repo, or the writer is dynamic/unparsed) ==")
+    print("== tables with no population operation identified ==")
     for nid, n in sorted(nodes.items()):
-        if n["type"] == "table" and not has(out_e, nid, "written_by"):
-            print(f"  {n['name']}")
+        if n["type"] != "table":
+            continue
+        writer_rows = [row for row in data["edges"] if row[0] == nid and row[2] == "written_by"]
+        operations = set()
+        for row in writer_rows:
+            for ev in _edge_attrs(row).get("evidence", []):
+                if isinstance(ev, dict):
+                    operations.add(str(ev.get("operation", "UNKNOWN")))
+        population_ops = {"INSERT", "COPY_FROM", "MERGE", "PANDAS_TO_SQL", "ORM_INSERT"}
+        possible_ops = {"ORM_ADD (insert/update depends on ORM state)", "ORM_MERGE"}
+        if not operations.intersection(population_ops | possible_ops):
+            note = ", ".join(sorted(operations)) if operations else (
+                "writer edge exists but operation evidence is unavailable" if writer_rows else "no writer edge found")
+            print(f"  {n['name']}  ({note})")
     print("\n== tables/views nothing reads (dead, or only used via dynamic SQL) ==")
     for nid, n in sorted(nodes.items()):
         if n["type"] in ("table", "view", "matview") and not any(k in ("reads", "derives_from", "mentions") for k, _, _ in in_e[nid]):
@@ -1812,13 +2684,14 @@ def write_readme(out: Path, data: dict, g: Graph):
     v = View({"nodes": g.nodes, "edges": data["edges"]}, 2, {k for k in EDGE_UP if k != "fk"})
     counts = collections.Counter(n["type"] for n in g.nodes.values())
     lines = ["# Data lineage (generated - do not edit)", "",
-             "Query with `python tools/lineage.py <command>` - never read graph.json directly.", "",
+             "Query with `python tools/data_dictionary/lineage.py <command>` - never read graph.json directly.", "",
              "| command | use |", "|---|---|",
              "| `search <words>` | find node ids by name, doc/comment text or column name |",
              "| `show <node>` | location, columns, direct dependencies and dependents |",
              "| `trace <node> --up` | where the data comes from (UI -> endpoint -> view/table -> loader -> source) |",
              "| `trace <node> --down` | what depends on it / where it is shown |",
              "| `trace <node> --files` | just the file:line ranges you need to read for that chain |",
+             "| `describe <node>` | bidirectional lineage dossier with operations, consumers, evidence and coverage |",
              "| `check` | orphan tables, endpoints with no UI caller, dynamic SQL, drift |", "",
              "Edge `A -[kind]-> B` means A depends on B. `~` = medium confidence, `?` = low (name-based guess).",
              "Nodes flagged `!dynamic-sql` build SQL at runtime: read their definition, the graph may miss edges.",
@@ -1885,21 +2758,48 @@ def cmd_build(a):
     meta_files = {}
     for rel in files["py"] + files["ts"] + files["sql"]:
         try:
-            meta_files[rel] = (root / rel).stat().st_mtime_ns // 1_000_000_000
+            meta_files[rel] = (root / rel).stat().st_mtime_ns
         except OSError:
             pass
-    meta = {"version": 1, "built_at": time.time(), "git_head": git_head(root), "db": db_info,
-            "counts": dict(collections.Counter(n["type"] for n in g.nodes.values())), "files": meta_files}
+    built_at = time.time()
+    orm_edges = sum(1 for row in g.dump() if len(row) > 4 and any(
+        ev.get("mechanism") == "python_orm_static_analysis"
+        for ev in row[4].get("evidence", []) if isinstance(ev, dict)))
+    dynamic_nodes = sum(1 for n in g.nodes.values() if n.get("dynamic_sql"))
+    unknown_relations = sum(len(n.get("unknown_rels", [])) for n in g.nodes.values())
+    coverage = {
+        "database_catalog": db_info is not None,
+        "python_analysis": True,
+        "python_files_scanned": len(files["py"]),
+        "typescript_files_discovered": len(files["ts"]),
+        "sql_files_discovered": len(files["sql"]),
+        "typescript_analysis": "complete" if ts_info.get("analysis_available") else (
+            "not_applicable" if not files["ts"] else "skipped"),
+        "tests_included": bool(a.include_tests),
+        "tests_excluded_count": len(files.get("tests_excluded", [])),
+        "python_parse_errors": py_info.get("parse_errors", 0),
+        "typescript_parse_errors": ts_info.get("parse_errors", 0),
+        "dynamic_sql_nodes": dynamic_nodes,
+        "unknown_relation_references": unknown_relations,
+        "orm_model_tables": sum(1 for n in g.nodes.values() if n.get("origin") == "orm_model"),
+        "orm_models_detected": py_info.get("orm_models_detected", 0),
+        "orm_evidence_edges": orm_edges,
+        "orm_analysis": "conservative_static_patterns",
+    }
+    meta = {"version": 2, "built_at": built_at, "git_head": git_head(root), "db": db_info,
+            "counts": dict(collections.Counter(n["type"] for n in g.nodes.values())),
+            "coverage": coverage, "files": meta_files}
     data = {"meta": meta, "nodes": g.nodes, "edges": g.dump()}
     (out / "graph.json").write_text(json.dumps(data, separators=(",", ":"), sort_keys=True), encoding="utf-8")
     write_readme(out, data, g)
     print(f"analysed {py_info.get('modules', 0)} python modules ({py_info.get('routes', 0)} FastAPI routes), "
-          f"{ts_info.get('ts_files', 0)} ts/js files")
+          f"{ts_info.get('ts_files', 0)} ts/js files; excluded tests {len(files.get('tests_excluded', []))}")
     kinds = collections.Counter(k for (_, _, k) in g.edges)
     confs = collections.Counter(e["conf"] for e in g.edges.values())
     print(f"nodes {len(g.nodes)}: " + ", ".join(f"{k} {c}" for k, c in sorted(meta["counts"].items())))
     print(f"edges {len(g.edges)}: " + ", ".join(f"{k} {c}" for k, c in sorted(kinds.items())))
     print(f"confidence: high {confs[3]}, medium {confs[2]}, low {confs[1]}")
+    print("coverage: " + json.dumps(coverage, sort_keys=True))
     for w in warnings:
         warn(w)
     print(f"wrote {out / 'graph.json'} in {time.time() - t0:.1f}s  (agent guide: {out / 'README.md'})")
@@ -1939,12 +2839,25 @@ def main():
     t.add_argument("--flat", action="store_true", help="flat list with distances instead of a tree")
     t.add_argument("--only", help="comma-separated node types to list (implies flat)")
     t.add_argument("--max-lines", type=int, default=150)
+    d = sub.add_parser("describe", help="one-shot upstream/downstream lineage report")
+    d.add_argument("node")
+    d.add_argument("--direction", choices=("both", "up", "down"), default="both")
+    d.add_argument("--depth", type=int, default=12)
+    d.add_argument("--min-conf", choices=list(CONF), default="medium")
+    d.add_argument("--format", choices=("text", "json"), default="text")
+    d.add_argument("--include-source", action="store_true", help="include relevant source excerpts")
+    d.add_argument("--max-nodes", type=int, default=300)
+    d.add_argument("--max-source-lines", type=int, default=1600)
     sub.add_parser("check", help="lineage health report")
     a = ap.parse_args()
     if a.cmd == "build":
         return cmd_build(a)
     root = find_root(a.root)
     data = load_graph(root, a.graph)
+    if a.cmd == "describe":
+        if a.depth < 0 or a.max_nodes < 1 or a.max_source_lines < 1:
+            raise SystemExit("describe limits must be positive (depth may be zero)")
+        return cmd_describe(data, a, root)
     {"search": cmd_search, "show": cmd_show, "trace": cmd_trace, "check": cmd_check}[a.cmd](data, a)
 
 
