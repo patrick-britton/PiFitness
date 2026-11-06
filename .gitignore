@@ -218,9 +218,6 @@ __marimo__/
 # Spotify Auth
 # .spotify_cache moved to local_storage/ (ignored via /local_storage/ below)
 
-# All SQL
-/sql_pages
-*.sql
 
 # DB restore dumps live under .db_restore/ (ignored below)
 .db_restore/
@@ -272,6 +269,7 @@ frontend/vit2.txt
 result*.txt
 fix_test_*.py
 docs/reorg/blocks/
+docs/lineage/
 
 # Test triage artifacts
 .test_triage_backup/
