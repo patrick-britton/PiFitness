@@ -119,6 +119,10 @@ if ! psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
   pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" "$dump_path"
 fi
 
+# Stamp the test marker (D8).
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
+  -c "ALTER DATABASE \"$TEST_DB\" SET pifitness.env = 'test';" >/dev/null
+
 echo "Step 5: apply pending migrations"
 if [[ -x "$PRD_DIR/deploy/scripts/run_migrations.sh" ]]; then
   DB_NAME="$TEST_DB" "$PRD_DIR/deploy/scripts/run_migrations.sh"

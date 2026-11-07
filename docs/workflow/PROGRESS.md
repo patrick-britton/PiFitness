@@ -465,3 +465,5 @@ date | task | model | event | evidence
 2026-11-07 | 5.5a | cline | DONE | Created 3 files. systemd-analyze not available on Windows; unit reviewed manually.
 2026-11-07 | 5.5b | cline | START | Create test-up.sh and test-down.sh with --dry-run.
 2026-11-07 | 5.5b | cline | DONE | Verify: git bash dry-run prints plan; shellcheck unavailable (script reviewed). Mode 100755.
+2026-11-07 | 5.5c | cline | START | Update test-down with --keep-db, marker check, health check; stamp marker in test-up.
+2026-11-07 | 5.5c | cline | DONE | bash -n clean; dry-run verified; marker guard implemented.
