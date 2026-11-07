@@ -12,7 +12,8 @@ Steps:
   5. Recreate pifitness_dev from the template (CREATE DATABASE ... TEMPLATE).
   6. Drop the template.
   7. Stamp the D8 marker: ALTER DATABASE pifitness_dev SET pifitness.env = 'dev'.
-  8. Print elapsed reset time.
+  8. Replay pending migrations from deploy/migrations/ onto pifitness_dev.
+  9. Print elapsed reset time.
 
 This is a DEV-only safety tool. It never touches PRD.
 """
@@ -32,6 +33,11 @@ import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 from pifitness.core.config import get_settings
+
+# tools/db/ is next to this file; migrate.py lives there and is import-safe
+# (its main() is guarded by __name__ == "__main__").
+sys.path.insert(0, os.path.dirname(__file__))
+import migrate  # noqa: E402
 
 
 ADMIN_DB = "postgres"
@@ -122,8 +128,58 @@ def main():
     dev_conn.close()
     print("  stamped pifitness.env = 'dev' on pifitness_dev")
 
+    # Replay pending migrations so DEV converges to the migration baseline
+    # after the template clone (or after a PRD restore via sync-prod-to-dev.ps1).
+    _replay_pending_migrations()
+
     elapsed = time.perf_counter() - t0
     print(f"dev_reset: complete in {elapsed:.2f}s")
+
+def _replay_pending_migrations():
+    """Apply pending dbmate migrations from deploy/migrations/ onto DEV.
+
+    Runs after the template clone or a PRD restore so pifitness_dev converges
+    to the current migration baseline. Each applied migration is recorded in
+    schema_migrations, exactly as migrate.py up does.
+
+    Migration 001 (INT-19c) is PRD-only: its header says "NOT executed by
+    agents" and its up pre-check requires the _migration schema, which does
+    not exist on post-INT19b DEV. It is skipped deliberately and stays pending.
+    """
+    scripts_dir = os.path.dirname(__file__)
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    import migrate  # noqa: E402
+
+    conn = migrate._dev_conn()
+    cur = conn.cursor()
+    migrate._ensure_schema_migrations(cur)
+    applied = migrate._applied_versions(cur)
+    files = migrate._list_migration_files()  # (version, fname, fpath), sorted
+
+    pending = [(v, fn, fp) for v, fn, fp in files if v not in applied]
+    if not pending:
+        print("  no pending migrations to replay")
+        conn.close()
+        return
+
+    for version, fname, fp in pending:
+        if version == 1:
+            # 001__int19b_move_tokens_to_api_services.sql is PRD-only.
+            print(f"  skipping {fname}: PRD-only migration, not executed on DEV")
+            continue
+        up_sql, _ = migrate._parse_sections(fp)
+        if not up_sql:
+            print(f"  skipping {fname}: no -- migrate:up section found.")
+            continue
+        print(f"  replaying {fname} ...")
+        cur.execute(up_sql)
+        cur.execute(
+            "INSERT INTO schema_migrations (version) VALUES (%s)", (version,)
+        )
+        conn.commit()
+        print(f"    {fname} applied.")
+    conn.close()
 
 
 if __name__ == "__main__":

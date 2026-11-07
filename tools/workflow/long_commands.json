@@ -1,5 +1,6 @@
 {
   "verify": "C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe tools/verify.py --scope all",
   "pytest": "C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe -m pytest tests/ -m \"not slow and not integration and not live\" -q",
-  "tsc": "Set-Location frontend\\pifitness; npx tsc --noEmit"
+  "tsc": "Set-Location frontend\\pifitness; npx tsc --noEmit",
+  "dev-reset": "C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe tools/db/dev_reset.py"
 }

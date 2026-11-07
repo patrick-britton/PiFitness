@@ -273,3 +273,19 @@ date | task | model | event | evidence
 2026-11-06 | 3.4 | human | START | create lineage.py and skill.
 2026-11-06 | 3.4 | human | DONE | tool exists that populates /docs/lineage, skill verified to read from that tool.
 
+2026-11-06 | 3.6 | cline | START | Making dev_reset.py replay pending migrations after template clone and PRD restore; verify: deliberate test migration survives dev_reset.py
+2026-11-06 | 3.6 | cline | DONE | dev_reset.py now replays pending migrations after the template clone and after a PRD restore; deliberate sentinel migration 016__dev_reset_replay_sentinel.sql applied on first run (exit=0, 88.40s) and survived a second full reset (exit=0, 71.84s, no pending migrations except PRD-only 001 skipped); verify --scope all exit=0 FORCED=4
+    $ python tools/db/dev_reset.py  (run 1, via run_long.ps1 -Preset dev-reset, exit=0, 88.40s)
+    skipping 001__int19b_move_tokens_to_api_services.sql: PRD-only migration, not executed on DEV
+    replaying 002__int25_repoint_get_spotify_client.sql ... applied.
+    replaying 003__int31d_repoint_garmin_dispatchers.sql ... applied.
+    replaying 004__int35_repoint_pirate_dispatchers.sql ... applied.
+    replaying 005__int38_repoint_worker_tasks.sql ... applied.
+    replaying 016__dev_reset_replay_sentinel.sql ... applied.
+    dev_reset: complete in 88.40s
+    $ python tools/db/dev_reset.py  (run 2, via run_long.ps1 -Preset dev-reset, exit=0, 71.84s)
+    skipping 001__int19b_move_tokens_to_api_services.sql: PRD-only migration, not executed on DEV
+    dev_reset: complete in 71.84s   (no pending migrations; sentinel 016 survived in cloned template)
+    $ python tools/verify.py --scope all  (via run_long.ps1 -Preset verify, exit=0, 70s)
+    VERIFY all exit=0
+    FORCED=4
