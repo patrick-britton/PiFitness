@@ -129,7 +129,7 @@ ing tests. | 3 each | the named baseline shrank; verify exits 0 |
 | 3.4 | build `lineage.py` and lineage skill to generate agent-assisted toolsuite | C:\Users\rickb\vsProjects\PiFitness\tools\data_dictionary\lineage.py, C:\Users\rickb\vsProjects\PiFitness\docs\lineage | skill passes basic test |
 | 3.6 | Make `dev_reset.py` replay pending migrations after the template clone and after a PRD restore. | 2 | a deliberate test migration survives `dev_reset.py` |
 | 3.7 | Measure B20 with `EXPLAIN ANALYZE` on DEV for row counts and plan shape; human runs one read-only `EXPLAIN` on PRD for Pi timing (dev timings do not transfer). Overlap audit findings go to the backlog. | 2 | numbers recorded in backlog item B20 |
-| 3.8 | Exit check and reviewer pack. | pack | review recorded |
+
 | 3.9 | (B2) Record `deploy/migrations/` as the single migration home in Phase 3 text; check INT19b__-style naming vs D3 "numbered files". | docs/workflow/PLAN.md | `git grep -n "single home" docs/workflow/PLAN.md` exits 0; migration naming reviewed vs D3 |
 | 3.10 | (B3) Decide fate of `scripts/` and `scripts/repo_audit/`: retool useful parts into `tools/audit/` or delete; check overlap with `tools/audit/p1_facts.py`. | scripts/repo_audit, tools/audit | `git ls-files scripts/repo_audit` exits 0; decision recorded in PROGRESS |
 | 3.11 | (B5) Hash-compare `.features/descriptions/json_food_responses/` to `docs/sample_json_food_payloads/`; decide what `.features/descriptions/` still holds. | .features/descriptions, docs/sample_json_food_payloads | `test -d .features/descriptions` exits 0; comparison recorded in PROGRESS |
@@ -141,6 +141,7 @@ ing tests. | 3 each | the named baseline shrank; verify exits 0 |
 | 3.17 | (B36) Confirm `.features/designs_active/` keep decision; Phase 4 workflow may use it. | docs/REPO_MAP.md | `git grep -n "designs_active" -- '*.py' '*.ts' '*.tsx'` runs; keep recorded |
 | 3.18 | (B37) Confirm `backend/api/` keep decision; marker `__init__.py` referenced in comments, nothing imports it. | backend/api | `git grep -n "backend/api" -- '*.py' '*.ts' '*.tsx'` runs; keep recorded |
 | 3.19 | (B38) Schedule `scripts/repo_audit/` removal (superseded by tools/repo_health.py at 2.5); references in docs/REPO_MAP.md and docs/architecture/dynamic-targets.md. | scripts/repo_audit, docs/REPO_MAP.md | `git ls-files scripts/repo_audit` exits 0; removal scheduled in PROGRESS |
+| 3.20 | Exit check and reviewer pack. | pack | review recorded |
 
 ### Phase 4: Workflow engine (strong model for 4.1 and 4.3)
 
