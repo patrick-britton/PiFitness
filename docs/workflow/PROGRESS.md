@@ -455,3 +455,5 @@ date | task | model | event | evidence
 2026-11-07 | 5.0 | cline | DONE | Verify: OPEN_PHASE<=5_COUNT=8 (B1 escalated; B4/B13/B16-B18/B21/B22 mapped to Phase 5 rows 5.4/5.2/5.1/5.4); all other items moved to Phase 6/8 or escalated. GROOM-ESCALATE logged. Row 5.8 appended for B28/B29/B30/B33.
 2026-11-07 | 5.1 | cline | START | Rewrite bootstrap.sh as ~30-line stub (D16): fetch ref (default main), archive deploy/, print change summary, --dry-run, exec deploy_react.sh. Branch deletion/tagging are Pi-side human steps.
 2026-11-07 | 5.1 | cline | DONE | Verify: bash -n deploy/scripts/bootstrap.sh -> syntax OK (exit 0). Dry-run on Pi not executable in DEV; stub prints plan and exits 0 when --dry-run.
+2026-11-07 | 5.2 | cline | START | Remove test step (D13); rename deploy_react.sh -> deploy.sh; update bootstrap ref. Package sync (D18), systemd collapse (B17), nginx rename deferred to human/Pi.
+2026-11-07 | 5.2 | cline | DONE | Verify: bash -n deploy/scripts/deploy.sh -> syntax OK (exit 0); bash -n deploy/scripts/bootstrap.sh -> syntax OK. Deploy verify is human-run on Pi.

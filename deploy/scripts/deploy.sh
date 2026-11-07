@@ -8,7 +8,7 @@
 # Modes:
 #   nuclear -- wipe the project directory, re-clone, rebuild from scratch
 #   fast    -- pull, restart only what changed, skip tests and package installs
-#   full    -- pull, install packages, run tests, rebuild, restart (default)
+#   full    -- pull, install packages, rebuild, restart (default)
 
 set -e
 
@@ -539,11 +539,7 @@ else
     info "Skipping npm package checks"
 fi
 
-info "Running automated tests..."
-if ! pytest "$PROJECT_DIR/tests/" -v; then
-    error_exit "Tests failed, aborting deployment"
-fi
-info "All tests passed."
+info "Skipping automated tests (D13)."
 
 info "Installing FastAPI service file..."
 sudo cp "$PROJECT_DIR/deploy/systemd/pifitness-fastapi.service" /etc/systemd/system/

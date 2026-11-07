@@ -21,7 +21,7 @@ chmod +x "$DEPLOY_DIR"/*.sh 2>/dev/null || true
 printf 'Change summary (origin/%s):\n' "$REF"
 git -C "$PROJECT_DIR" log --oneline "HEAD..origin/$REF" 2>/dev/null || true
 if $DRY_RUN; then
-  echo "DRY-RUN: would execute deploy/scripts/deploy_react.sh"
+  echo "DRY-RUN: would execute deploy/scripts/deploy.sh"
   exit 0
 fi
-exec bash "$DEPLOY_DIR/deploy_react.sh"
+exec bash "$DEPLOY_DIR/deploy.sh"
