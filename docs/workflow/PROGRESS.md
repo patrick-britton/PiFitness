@@ -270,7 +270,6 @@ date | task | model | event | evidence
 2026-11-04 | 3.2 | cline | DONE | verify --scope db exit=0
 2026-11-04 | 3.3.0 | cline | START | COMMENT backfill draft for exercises domain
 2026-11-04 | 3.3.0 | cline | DONE | human has approved all comments -- though these will need to be revised in the future.
-2026-11-04 | 3.4 | cline | START | create docs/data/dictionary.md exercises domain section
-2026-11-04 | 3.4 | cline | DONE | docs/data/dictionary.md created with exercises domain section: grain, canonical source, enforced/convention rules
-2026-11-04 | 3.4 | cline | DONE | added remaining domain sections (activities, api_services, food, health, logging, music, staging, tasks, volleyball)
-2026-11-04 | 3.4 | cline | DONE | regenerated dictionary.md listing every table/view per domain (excluding information_schema, public, pg_catalog)
+2026-11-06 | 3.4 | human | START | create lineage.py and skill.
+2026-11-06 | 3.4 | human | DONE | tool exists that populates /docs/lineage, skill verified to read from that tool.
+
