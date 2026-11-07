@@ -396,3 +396,20 @@ date | task | model | event | evidence
     - **Check added:** pending
     - **Outcome:** pending
     EXIT=0
+2026-11-07 | 4.5 | cline | START | TASK_ID=4.5; PLAN.md L156: synthetic fixture feature with deliberate flaws; Files=3; Done-when: each gate fires. Scope: .features/designs_active/fx5_design.md, fx5_log.md, fx5_bugs.md
+2026-11-07 | 4.5 | cline | DONE | Verify: each gate fires against the fx5 fixture (.features/designs_active/fx5_design.md, fx5_log.md, fx5_bugs.md). done fx5 T01 -> exit 1 (no start entry; task closed without start). bug fx5 T01 checkout times out -> exit 1 (duplicate bug rejected). check fx5 --anchors -> exit 1 (MISSING-FILE missing-file.txt; anchors 2 ok, 1 bad). set fx5 feature complete -> exit 1 (4 acceptance criteria not ticked). All four gates fire as designed.
+    $ .venv\Scripts\python.exe tools\workflow\fd.py done fx5 T01
+    fd.py: error: T01: no start entry; run 'fd.py start fx5 T01' first (or --force)
+    EXIT_DONE=1
+    $ .venv\Scripts\python.exe tools\workflow\fd.py bug fx5 T01 "checkout times out"
+    fd.py: error: duplicate bug: fx5-1-1 already recorded for Task T01 (symptom: checkout times out)
+    EXIT_BUG=1
+    $ .venv\Scripts\python.exe tools\workflow\fd.py check fx5 --anchors
+    MISSING-FILE T01 modify: missing-file.txt
+    anchors: 2 ok, 1 bad, 0 unresolved (repo root: C:\Users\rickb\vsProjects\PiFitness)
+    check: 0 errors, 1 warnings
+    EXIT_CHECK=1
+    $ .venv\Scripts\python.exe tools\workflow\fd.py set fx5 feature complete
+    fd.py: error: 4 acceptance criteria are not ticked (tick them in the file, or --force)
+    EXIT_SET=1
+
