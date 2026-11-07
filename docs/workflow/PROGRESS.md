@@ -413,3 +413,41 @@ date | task | model | event | evidence
     fd.py: error: 4 acceptance criteria are not ticked (tick them in the file, or --force)
     EXIT_SET=1
 
+2026-11-07 | 4.6 | cline | START | TASK_ID=4.6; PLAN.md L157 row: phase 4 exit check and reviewer pack; Files pack (.audit/reviews/phase-4.md); Done-when: scripted fake feature runs start, done, interruption, resume. Scope: scripted fake feature fx6 under .features/designs_active/ (gitignored fixture, not committed) plus reviewer pack and PROGRESS.md.
+    $ .venv\Scripts\python.exe tools\workflow\fd.py start fx6 T01
+    started T01 -> .features\designs_active\fx6_log.md
+    verify: git status --short
+    EXIT=0
+    $ .venv\Scripts\python.exe tools\workflow\fd.py done fx6 T01
+    gate DONE: T01 -> exit=0
+    cmd: git status --short
+    tail:
+     M docs/workflow/PROGRESS.md
+    EXIT=0
+    $ .venv\Scripts\python.exe tools\workflow\fd.py set fx6 T02 interrupted
+    T02 -> interrupted; resume: 1/3 tasks complete | next=T02 | blocked-by=none
+    EXIT=0
+2026-11-07 | 4.6 | cline | DONE | Verify: scripted fake feature run fx6 (start, done, interruption, resume) - all exit=0; reviewer pack written to .audit/reviews/phase-4.md.
+
+    $ .venv\Scripts\python.exe tools\workflow\fd.py resume fx6
+    resume: next task T02 [interrupted]
+    == brief fx6 T02 ==
+    status: interrupted
+    verify: git status --short
+    detail: interrupted mid-task; resume target
+    -- recent log
+    - 2026-11-07 T01 start: verify='git status --short'
+    - 2026-11-07 T01 done: exit=0 cmd='git status --short' tail=' M docs/workflow/PROGRESS.md'
+    -- git context (C:\Users\rickb\vsProjects\PiFitness)
+    branch: agent/phase-3
+    status:
+      M docs/workflow/PROGRESS.md
+    commits since <task start>: (no start entry logged)
+    -- verify run
+    exit=0
+    tail:
+     M docs/workflow/PROGRESS.md
+    EXIT=0
+    $ .venv\Scripts\python.exe tools\workflow\fd.py check fx6
+    check: 0 errors, 0 warnings
+    EXIT=0
