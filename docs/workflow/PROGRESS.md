@@ -325,3 +325,16 @@ date | task | model | event | evidence
 2026-11-06 | Phase 3 exit | human | PASSED | Reviewer pack written to .audit/reviews/phase-3.md (57 lines). Contains all Phase 3 exit criteria (3.0-3.19), latest verified evidence from PROGRESS.md, baseline/ FORCED/scope cross-checks, and Files to attach section. Review recorded: no criteria FAILs identified; all Phase 3 tasks have START+DONE entries in PROGRESS.md; git diff main --stat shows 82 files changed, 170179 insertions, 3564 deletions; no baseline growth in tools/baselines; FORCED=4 is expected verify.py behavior.2026-11-06 | 4.0.0 | cline | START | Backlog grooming Phase 4: read PLAN.md phase 4 and 5 rows, BACKLOG.md, PROGRESS.md last 40 rows
 2026-11-06 | 4.0.0 | cline | GROOM-ESCALATE | B1 Size Large (split into features); cannot fit <=3 files / one verify command; deferred out of Phase 4 scope
 2026-11-06 | 4.0.0 | cline | DONE | Verify: Select-String docs/workflow/BACKLOG.md '| open |' -> only B1 open (Phase 1, Large) = GROOM-ESCALATED; all other open items Phase <= 4 closed (tasks 3.7/3.10/3.11/3.18/3.19 or D4) or deferred to Phase > 4 with one-line reason; B7/B10 at Phase 4 with reasons. BACKLOG.md diff touches only Status/Phase cells. Done-when satisfied.
+2026-11-06 | 4.0.1 | cline | START | TASK_ID=4.0.1. PLAN.md L151 row: Files "3 per step"; move .features/tools/fd.py to tools/workflow/fd.py; fix references in .clinerules/workflows/*.md and REPO_MAP.md. Done-when: git grep -n ".features/tools" empty; existing commands still run. Discovery: fd.py EXISTS on disk, UNTRACKED; .clinerules/workflows/ddrb.md and plan-task.md have NO fd.py references (nothing to fix); REPO_MAP.md L42/L46/L48 cite .features/tools/fd.py (in scope).
+2026-11-06 | 4.0.1 | cline | DONE | TASK_ID=4.0.1. Verify: git grep -n ".features/tools" -> exit 0. Remaining hits only outside scope: PLAN.md L151 (task row itself, immutable), PROGRESS.md L265 (phase-3 history) and L328 (this START), BACKLOG.md L18 (B10 open item - not to be touched), tools/audit/p1_facts.py L15/L988 (out-of-scope default skip list), tools/baselines/folder-map.txt L15 (baseline record). Scope files clean: REPO_MAP.md L42/L46/L48 now cite tools/workflow/fd.py; .clinerules/workflows/ddrb.md and plan-task.md have no fd.py references. And: .venv\Scripts\python.exe tools\workflow\fd.py --help -> HELP_EXIT=0; Test-Path .features\tools\fd.py = False; Test-Path tools\workflow\fd.py = True (existing commands still run from new location).
+    $ git grep -n '.features/tools'
+    docs/REPO_MAP.md:48: | .features/tools/ | ... (folder-name cell only; no .features/tools/fd.py reference remains)
+    docs/workflow/BACKLOG.md:18: ... B10 (open item - not fixed, out of scope)
+    docs/workflow/PLAN.md:151: ... (4.0.1 row itself; PLAN.md not edited)
+    docs/workflow/PROGRESS.md:265/329: history incl. this START
+    tools/audit/p1_facts.py:15/988: skip-list default (out of scope)
+    tools/baselines/folder-map.txt:15: baseline record (out of scope)
+    GREP_EXIT=0
+    $ .venv\Scripts\python.exe tools\workflow\fd.py --help  ->  HELP_EXIT=0 (usage printed)
+    Test-Path .features\tools\fd.py = False; Test-Path tools\workflow\fd.py = True
+    git status --short:  M docs/REPO_MAP.md,  M docs/workflow/PROGRESS.md, ?? tools/workflow/fd.py

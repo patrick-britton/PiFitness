@@ -39,13 +39,13 @@ Folder purposes live here. How the folders work together lives in `docs/ARCHITEC
 | .audit/p1/ | Phase 1 evidence: inventory, deps, backend, frontend, refs, comments and backlog files (.audit/p1/deps.md) | generated+agent | application source code or anything the app imports | - |
 | .clinerules/ | Always-loaded agent rules and verified environment facts (.clinerules/environment.md) | human | skill definitions or feature-specific designs | - |
 | .clinerules/workflows/ | Step-by-step agent workflow procedures (.clinerules/workflows/feature-design.md) | human | global rules or skill definitions | - |
-| .features/ | Feature lifecycle files: designs, descriptions, workflow tooling (.features/tools/fd.py) | human+agent | production application code | - |
+| .features/ | Feature lifecycle files: designs, descriptions, workflow tooling (tools/workflow/fd.py) | human+agent | production application code | - |
 
 | .features/descriptions/ | Legacy home of feature descriptions and food JSON copies; food payloads now live in docs/sample_json_food_payloads/ (empty) | human | production source code or approved designs | - |
 | .features/descriptions/json_food_responses/ | Legacy copy of food API JSON samples, superseded by docs/sample_json_food_payloads/ (docs/sample_json_food_payloads/almond_responses.json) | human | implementation code or schema definitions | - |
-| .features/designs_active/ | Designs for features in progress (empty today; kept only if the Phase 4 workflow uses it) (.features/tools/fd.py) | human+agent | implementation code or approved designs | - |
+| .features/designs_active/ | Designs for features in progress (empty today; kept only if the Phase 4 workflow uses it) (tools/workflow/fd.py) | human+agent | implementation code or approved designs | - |
 
-| .features/tools/ | Feature workflow tooling (.features/tools/fd.py) | human+agent | feature designs or description files | - |
+| .features/tools/ | Feature workflow tooling (tools/workflow/fd.py) | human+agent | feature designs or description files | - |
 | .features/zz_workfow_archive/ | Archived documents from earlier workflows, kept for reference (.features/zz_workfow_archive/bug-analysis.md) | human | active feature designs or current workflow rules | - |
 | .vscode/ | VS Code workspace settings and extension recommendations (.vscode/extensions.json) | human | application source code or build output | - |
 | agents/ | Script the Pi runs on a schedule that calls the background task executor; retained until deployment services are rewritten (agents/background_task_execution.py) | human | skill definitions, agent rules or application logic | backend/pifitness/worker/ |
