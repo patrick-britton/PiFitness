@@ -28,6 +28,10 @@ WRITE COMMANDS
   log <id> "text"           append '- YYYY-MM-DD text' to the log sidecar
   bug <id> T03 "summary"    append a bug skeleton to the bugs sidecar, print its id
   migrate <id>              move an inline Progress Log / Known Issues into sidecars
+  start <id> T##            record a start entry for task T## in the progress log
+  done <id> T## [--force]   evidence gate: run the task's Verify command, record
+                            exit code and output tail; refuses without a matching
+                            start; --force logs FORCED instead (D12)
 
 Files (all under <features-dir>/designs_active/, default .features):
   <id>_design.md   hot state (frontmatter, Resume Here, ACs, OQs, Task Plan)
@@ -40,6 +44,7 @@ import argparse
 import datetime
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -553,6 +558,27 @@ def read_log_lines(path):
     return [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.startswith("- ")]
 
 
+def log_events(logp, tid):
+    """Return [(event, line)] for start/done/forced log entries about task tid,
+    in file order. An entry looks like '- 2026-11-06 T01 done: exit=0 cmd=...'."""
+    out = []
+    for ln in read_log_lines(logp):
+        parts = ln.split(None, 2)
+        if len(parts) < 3:
+            continue
+        m = re.match(r"^(T\d+)\s+(start|done|forced)\b", parts[2], re.I)
+        if m and m.group(1).upper() == tid.upper():
+            out.append((m.group(2).lower(), ln))
+    return out
+
+
+def run_verify(cmd, root):
+    """Run a task Verify command and return (exit code, combined output)."""
+    p = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=str(root))
+    out = (p.stdout or "") + (p.stderr or "")
+    return p.returncode, out
+
+
 def parse_bugs(path):
     if not path.exists():
         return []
@@ -708,6 +734,45 @@ def cmd_log(c):
     for ln in lines[-c.a.n:]:
         print(ln)
     return 0
+
+
+def cmd_start(c):
+    """Record a start entry for task T## in the progress-log sidecar."""
+    d = c.doc()
+    t = d.by_id(c.a.task)
+    verify = body(t.f.get("verify", [""]))
+    append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
+                "- %s %s start: verify=%r" % (today(), t.id, verify))
+    print("started %s -> %s" % (t.id, c.logp))
+    print("verify: %s" % verify)
+    return 0
+
+
+def cmd_done(c):
+    """Evidence gate: run the task's Verify command, record exit code and tail.
+
+    Refuses without a matching start entry unless --force (logs FORCED per D12)."""
+    d = c.doc()
+    t = d.by_id(c.a.task)
+    ev = log_events(c.logp, t.id)
+    if not any(e == "start" for e, _ in ev) and not c.a.force:
+        raise FdError("%s: no start entry; run 'fd.py start %s %s' first (or --force)"
+                      % (t.id, c.a.id, t.id))
+    verify = body(t.f.get("verify", [""]))
+    exit_code, out = run_verify(verify, c.root)
+    tail = "\n".join(out.splitlines()[-20:]) if out else ""
+    tag = "forced" if c.a.force else "done"
+    append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
+                "- %s %s %s: exit=%d cmd=%r tail=%r" % (today(), t.id, tag,
+                                                        exit_code, verify, tail))
+    print("gate %s: %s -> exit=%d" % (tag.upper(), t.id, exit_code))
+    print("cmd: %s" % verify)
+    if tail:
+        print("tail:")
+        print(tail)
+    else:
+        print("tail: (no output)")
+    return exit_code
 
 
 def cmd_bug(c):
@@ -883,6 +948,11 @@ def build_parser():
     p = add("bugs", cmd_bugs, "list bugs")
     p.add_argument("--pending", action="store_true")
     p.add_argument("--show", default=None)
+    p = add("start", cmd_start, "record a start entry for a task")
+    p.add_argument("task", help="task id (T##)")
+    p = add("done", cmd_done, "evidence gate: run a task's Verify command")
+    p.add_argument("task", help="task id (T##)")
+    p.add_argument("--force", action="store_true")
     p = add("check", cmd_check, "validate the design file")
     p.add_argument("tasks", nargs="*")
     p.add_argument("--anchors", action="store_true")

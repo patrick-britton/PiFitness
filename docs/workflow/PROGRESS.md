@@ -338,3 +338,11 @@ date | task | model | event | evidence
     $ .venv\Scripts\python.exe tools\workflow\fd.py --help  ->  HELP_EXIT=0 (usage printed)
     Test-Path .features\tools\fd.py = False; Test-Path tools\workflow\fd.py = True
     git status --short:  M docs/REPO_MAP.md,  M docs/workflow/PROGRESS.md, ?? tools/workflow/fd.py
+2026-11-07 | 4.1 | cline | START | TASK_ID=4.1; PLAN.md L152: evidence gate (done T## runs task verify, exit code + output tail, refuses without start, --force => FORCED per D12; structured log lines tied to task/AC IDs); scope: tools/workflow/fd.py; done-when: synthetic fixture, gate fires
+2026-11-07 | 4.1 | cline | DONE | Verify: .venv\Scripts\python.exe tools\workflow\fd.py --dir C:\tmp\fdgate\.features done fx T01 -> exit=0 (gate fires). Also confirmed: done without matching start refuses with exit 1; start then done ran echo fixture-ok and recorded exit=0 + tail; done --force on a failing verify logged FORCED with exit=1 and tail. Structured log lines tied to task IDs (date, event, exit code, cmd, tail) written to the progress-log sidecar per D12.
+    $ .venv\Scripts\python.exe tools\workflow\fd.py --dir C:\tmp\fdgate\.features done fx T01
+    gate DONE: T01 -> exit=0
+    cmd: echo fixture-ok
+    tail:
+    fixture-ok
+    EXIT=0
