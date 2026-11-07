@@ -27,6 +27,8 @@ WRITE COMMANDS
   set <id> resume           recompute Resume Here (progress/next/blocked-by)
   log <id> "text"           append '- YYYY-MM-DD text' to the log sidecar
   bug <id> T03 "summary"    append a bug skeleton to the bugs sidecar, print its id
+  backlog add <B-ID> <item> append one item to docs/workflow/BACKLOG.md
+                            (append-only; omitted id = next ID, reserved B27-B34 skipped)
   migrate <id>              move an inline Progress Log / Known Issues into sidecars
   start <id> T##            record a start entry for task T## in the progress log
   done <id> T## [--force]   evidence gate: run the task's Verify command, record
@@ -601,13 +603,40 @@ def is_pending(b):
     return first_word(b["outcome"]) in ("", "pending")
 
 
+BACKLOG_ID_RE = re.compile(r"^B(\d+)$")
+# B27-B34 are reserved by PLAN section 5 (D6); IDs continue from B35.
+BACKLOG_RESERVED = set(range(27, 35))
+
+
+def backlog_ids(path):
+    ids = set()
+    for ln in path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^\|\s*(B\d+)\s*\|", ln)
+        if m:
+            ids.add("B%s" % m.group(1))
+    return ids
+
+
+def next_backlog_id(path):
+    best = 0
+    for ln in path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^\|\s*(B(\d+))\s*\|", ln)
+        if m:
+            best = max(best, int(m.group(2)))
+    nid = best + 1
+    while nid in BACKLOG_RESERVED:
+        nid += 1
+    return "B%d" % nid
+
+
 # --------------------------------------------------------------------------- commands
 
 class Ctx:
     def __init__(self, a):
         self.a = a
-        self.features = Path(a.dir)
-        self.design, self.logp, self.bugp = paths_for(self.features, a.id)
+        self.features = Path(getattr(a, "dir", None) or os.environ.get("FD_FEATURES_DIR", ".features"))
+        self.design, self.logp, self.bugp = paths_for(
+            self.features, getattr(a, "id", None) or "B0")
         self.root = Path(a.root) if a.root else self.features.resolve().parent
 
     def doc(self):
@@ -801,6 +830,44 @@ def cmd_bug(c):
     return 0
 
 
+def cmd_backlog_add(c):
+    """Append one item to docs/workflow/BACKLOG.md (append-only).
+
+    Existing rows are never edited. Give an explicit id (e.g. B27); omit it
+    to get the next ID (reserved B27-B34 are skipped).
+    """
+    backlog = c.root / "docs" / "workflow" / "BACKLOG.md"
+    if not backlog.exists():
+        raise FdError("backlog not found: %s" % backlog)
+    bid = c.a.id
+    tokens = list(c.a.item or [])
+    if bid and BACKLOG_ID_RE.match(bid):
+        bid = "B%s" % BACKLOG_ID_RE.match(bid).group(1)
+    else:
+        if bid:
+            tokens.insert(0, bid)
+        bid = next_backlog_id(backlog)
+    if not tokens:
+        raise FdError("backlog add: item text is required")
+    item = " ".join(t.strip() for t in tokens)
+    if "|" in item:
+        raise FdError("backlog add: item text may not contain '|'")
+    existing = backlog_ids(backlog)
+    if bid in existing:
+        raise FdError("backlog add: %s already exists (append-only; existing rows are never edited)" % bid)
+    row = "| %s | %s | %s | %s | %s | %s | %s |" % (
+        bid, item, c.a.source, c.a.suggested_phase, c.a.size, c.a.status, c.a.phase)
+    raw = backlog.read_text(encoding="utf-8", newline="")
+    nl = "\r\n" if "\r\n" in raw else "\n"
+    if not raw.endswith(nl):
+        raw += nl
+    with open(backlog, "w", encoding="utf-8", newline="") as fh:
+        fh.write(raw + row + nl)
+    print("appended %s -> %s" % (bid, backlog))
+    print(row)
+    return 0
+
+
 def cmd_bugs(c):
     bugs = parse_bugs(c.bugp)
     if c.a.show:
@@ -961,6 +1028,17 @@ def build_parser():
     p.add_argument("value", nargs="?")
     p.add_argument("--force", action="store_true")
     add("migrate", cmd_migrate, "move inline log/bugs into sidecars")
+    p = sub.add_parser("backlog", help="backlog file operations")
+    bsub = p.add_subparsers(dest="backlog_cmd", required=True)
+    pa = bsub.add_parser("add", help="append one item to the backlog")
+    pa.add_argument("id", nargs="?", default=None, help="backlog id (e.g. B27); omitted = next ID")
+    pa.add_argument("item", nargs="*", help="item text")
+    pa.add_argument("--source", default="fd.py backlog add")
+    pa.add_argument("--suggested-phase", default="Phase 5")
+    pa.add_argument("--size", default="Small")
+    pa.add_argument("--status", default="open")
+    pa.add_argument("--phase", default="5")
+    pa.set_defaults(fn=cmd_backlog_add)
     return ap
 
 

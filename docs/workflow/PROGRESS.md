@@ -346,3 +346,9 @@ date | task | model | event | evidence
     tail:
     fixture-ok
     EXIT=0
+2026-11-07 | 4.2 | cline | START | TASK_ID=4.2; PLAN.md L153: backlog add (next ID, append-only), import B1-B26 as-is (already imported by 1.5.6: BACKLOG.md has B1-B26 plus B35-B39). Scope: tools/workflow/fd.py + docs/workflow/BACKLOG.md. Done-when: fd.py backlog add appends B27.
+2026-11-07 | 4.2 | cline | DONE | Verify: .venv\Scripts\python.exe tools\workflow\fd.py backlog add B27 "Postgres on the Pi: listen_addresses = '*', pg_hba.conf admits 192.168.86.0/24 with password auth, no host firewall (ufw not installed). Port 5432 is closed from outside, so exposure is LAN-only. Move DataGrip to an SSH tunnel, then bind to localhost and drop the LAN line (Appendix D walkthrough)." --source "PLAN.md (B27)" --status "closed - done (1.5.1)" -> exit=0
+    $ .venv\Scripts\python.exe tools\workflow\fd.py backlog add B27 "Postgres on the Pi: listen_addresses = '*', pg_hba.conf admits 192.168.86.0/24 with password auth, no host firewall (ufw not installed). Port 5432 is closed from outside, so exposure is LAN-only. Move DataGrip to an SSH tunnel, then bind to localhost and drop the LAN line (Appendix D walkthrough)." --source "PLAN.md (B27)" --status "closed - done (1.5.1)" 
+    appended B27 -> docs/workflow/BACKLOG.md
+    | B27 | Postgres on the Pi: listen_addresses = '*', pg_hba.conf admits 192.168.86.0/24 with password auth, no host firewall (ufw not installed). Port 5432 is closed from outside, so exposure is LAN-only. Move DataGrip to an SSH tunnel, then bind to localhost and drop the LAN line (Appendix D walkthrough). | PLAN.md (B27) | Phase 5 | Small | closed - done (1.5.1) | 5 |
+    EXIT=0
