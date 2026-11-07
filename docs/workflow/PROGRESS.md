@@ -289,3 +289,12 @@ date | task | model | event | evidence
     $ python tools/verify.py --scope all  (via run_long.ps1 -Preset verify, exit=0, 70s)
     VERIFY all exit=0
     FORCED=4
+2026-11-06 | 3.7 | cline | START | Measure B20 via EXPLAIN ANALYZE on DEV (food.diary_entries full scan; logging.* SELECT * no LIMIT); record row counts and plan shape in BACKLOG.md B20
+2026-11-06 | 3.7 | cline | DONE | Measured B20 on DEV with EXPLAIN (ANALYZE, BUFFERS) via %TEMP%\b20_measure.py (PG localhost:15432/pifitness_dev/dev, read-only); numbers recorded in BACKLOG.md B20; overlap logged as B39
+    DIARY_ENTRIES_ROWS=113
+    Seq Scan on diary_entries (cost=0.00..4.07, actual 0.009..0.020 ms, 113 rows)
+    LOGGING_TABLES=api_logins,application_events,db_size_log,db_stats,health_checks,music_db_info,task_executions + 6 views
+    ROWS logging.application_events=155706; api_logins=38110; db_size_log=8645; db_stats=205; health_checks=306; music_db_info=15; task_executions=5470
+    Index Scan Backward using application_events_pkey ... Execution Time: 112.143 ms
+    Index Scan Backward using api_logins_pkey ... Execution Time: 57.809 ms
+    SKIP health_checks: column event_time_utc does not exist  <- overlap finding (B39)
