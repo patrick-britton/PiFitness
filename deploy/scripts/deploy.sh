@@ -167,7 +167,7 @@ if [[ "$NUCLEAR" == "true" ]]; then
     rm -rf ~/.pm2
     unset NEXT_PUBLIC_API_URL
     export NEXT_PUBLIC_APP_ENV=production
-    pm2 start npm --name pifitness-next -- run start -- --port 3000
+    pm2 start npm --name pifitness-next -- run start -- --port 3000 --hostname 127.0.0.1
     pm2 save --force
 
     NGINX_TEMPLATE="$PROJECT_DIR/deploy/nginx/nginx-react.conf"
@@ -224,7 +224,7 @@ if [[ "$FAST" == "true" ]]; then
         cd "$FRONTEND_DIR"
         unset NEXT_PUBLIC_API_URL
         export NEXT_PUBLIC_APP_ENV=production
-        pm2 start npm --name pifitness-next -- run start -- --port 3000
+        pm2 start npm --name pifitness-next -- run start -- --port 3000 --hostname 127.0.0.1
         pm2 save --force
         cd "$PROJECT_DIR"
 
@@ -303,7 +303,7 @@ if [[ "$FAST" == "true" ]]; then
                 unset NEXT_PUBLIC_API_URL
                 export NEXT_PUBLIC_APP_ENV=production
                 rm -f ~/.pm2/dump.pm2
-                pm2 start npm --name pifitness-next -- run start -- --port 3000
+                pm2 start npm --name pifitness-next -- run start -- --port 3000 --hostname 127.0.0.1
                 pm2 save --force
                 cd "$PROJECT_DIR"
             fi
@@ -415,7 +415,7 @@ if [[ "$FAST" == "true" ]]; then
         npm run build
         pm2 delete pifitness-next 2>/dev/null || true
         rm -f ~/.pm2/dump.pm2
-        pm2 start npm --name pifitness-next -- run start -- --port 3000
+        pm2 start npm --name pifitness-next -- run start -- --port 3000 --hostname 127.0.0.1
         pm2 save --force
         cd "$PROJECT_DIR"
         info "Next.js rebuilt and restarted."
@@ -428,7 +428,7 @@ if [[ "$FAST" == "true" ]]; then
         npm run build
         pm2 delete pifitness-next 2>/dev/null || true
         rm -f ~/.pm2/dump.pm2
-        pm2 start npm --name pifitness-next -- run start -- --port 3000
+        pm2 start npm --name pifitness-next -- run start -- --port 3000 --hostname 127.0.0.1
         pm2 save --force
         cd "$PROJECT_DIR"
         info "Both services restarted."
@@ -593,7 +593,7 @@ rm -rf .next
 info "Building Next.js application..."
 npm run build
 
-pm2 start npm --name pifitness-next -- run start -- --port 3000
+pm2 start npm --name pifitness-next -- run start -- --port 3000 --hostname 127.0.0.1
 pm2 save --force
 
 if ! pm2 show pifitness-next | grep -q "status.*online"; then

@@ -4,10 +4,10 @@ module.exports = {
       name: 'pifitness-next-test',
       cwd: '/home/god/PiFitness-test/frontend/pifitness',
       script: 'node_modules/.bin/next',
-      args: 'start -p 3001',
+      args: 'start -p 3000 -H 127.0.0.1',
       env: {
         NODE_ENV: 'production',
-        PORT: '3001',
+        PORT: '3000',
         NEXT_PUBLIC_APP_ENV: 'test',
       },
       autorestart: true,
