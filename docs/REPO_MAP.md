@@ -41,8 +41,8 @@ Folder purposes live here. How the folders work together lives in `docs/ARCHITEC
 | .clinerules/workflows/ | Step-by-step agent workflow procedures (.clinerules/workflows/feature-design.md) | human | global rules or skill definitions | - |
 | .features/ | Feature lifecycle files: designs, descriptions, workflow tooling (.features/tools/fd.py) | human+agent | production application code | - |
 
-| .features/descriptions/ | Legacy home of feature descriptions and food JSON copies; food payloads now live in docs/sample_json_food_payloads/ (.features/descriptions/json_food_responses/almond_responses.json) | human | production source code or approved designs | - |
-| .features/descriptions/json_food_responses/ | Legacy copy of food API JSON samples, superseded by docs/sample_json_food_payloads/ (.features/descriptions/json_food_responses/almond_responses.json) | human | implementation code or schema definitions | - |
+| .features/descriptions/ | Legacy home of feature descriptions and food JSON copies; food payloads now live in docs/sample_json_food_payloads/ (docs/sample_json_food_payloads/almond_responses.json) | human | production source code or approved designs | - |
+| .features/descriptions/json_food_responses/ | Legacy copy of food API JSON samples, superseded by docs/sample_json_food_payloads/ (docs/sample_json_food_payloads/almond_responses.json) | human | implementation code or schema definitions | - |
 | .features/designs_active/ | Designs for features in progress (empty today; kept only if the Phase 4 workflow uses it) (.features/tools/fd.py) | human+agent | implementation code or approved designs | - |
 
 | .features/tools/ | Feature workflow tooling (.features/tools/fd.py) | human+agent | feature designs or description files | - |
