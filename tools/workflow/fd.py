@@ -20,6 +20,10 @@ READ COMMANDS
   bugs <id> [--pending|--show BUG-ID]   list bugs from the bugs sidecar
   check <id> [T01 ...] [--anchors]      validate structure; --anchors verifies that
                             anchored files/symbols exist in the repo
+  brief <id> T##    resume context for a task: status, recent log, git status,
+                    current branch, commits since task start, verify run
+  resume <id>       brief the next executable task (interrupted first); full
+                    context with no human re-explanation
 
 WRITE COMMANDS
   set <id> T03 <todo|interrupted|complete> [--force]
@@ -803,6 +807,107 @@ def cmd_done(c):
         print("tail: (no output)")
     return exit_code
 
+def git_out(root, *args):
+    """Run a git command; never raise. Return (rc, stripped stdout)."""
+    p = subprocess.run(["git", *args], capture_output=True, text=True, cwd=str(root))
+    return p.returncode, (p.stdout or "").strip()
+
+
+def task_start_date(logp, tid):
+    """Earliest date this task has a log 'start' entry, or None."""
+    found = []
+    for ln in read_log_lines(logp):
+        m = re.match(r"- (\d{4}-\d{2}-\d{2})\s+(T\d+)\s+start\b", ln, re.I)
+        if m and m.group(2).upper() == tid.upper():
+            found.append(m.group(1))
+    return min(found) if found else None
+
+
+def brief_log_lines(c, t, limit=10):
+    """Recent log: this task's events first, then the feature log tail."""
+    ev = [ln for _, ln in log_events(c.logp, t.id)]
+    if ev:
+        return ev[-limit:]
+    return read_log_lines(c.logp)[-limit:]
+
+
+def print_brief(c, d, t):
+    """Print resume context for a task: status, recent log, git, verify run."""
+    print("== brief %s %s ==" % (c.a.id, t.id))
+    print("status: %s" % d.task_status(t))
+    deps = d.deps(t)
+    if deps:
+        print("depends-on: %s" % ", ".join(deps))
+    verify = body(t.f.get("verify", [""]))
+    if verify:
+        print("verify: %s" % verify)
+    detail = body(t.f.get("detail", [""]))
+    if detail:
+        print("detail: %s" % detail)
+    print("-- recent log")
+    for ln in brief_log_lines(c, t):
+        print(ln)
+    print("-- git context (%s)" % c.root)
+    rc, branch = git_out(c.root, "branch", "--show-current")
+    print("branch: %s" % (branch if rc == 0 else "(not a git repository)"))
+    rc, porc = git_out(c.root, "status", "--porcelain")
+    if rc != 0:
+        print("status: (git unavailable)")
+    elif not porc:
+        print("status: clean")
+    else:
+        print("status:")
+        for ln in porc.splitlines():
+            print("  " + ln)
+    start = task_start_date(c.logp, t.id)
+    if start:
+        rc, commits = git_out(c.root, "log", "--oneline", "--since=%s 00:00:00" % start)
+        print("commits since %s:" % start)
+        if rc != 0 or not commits:
+            print("  (none)")
+        else:
+            for ln in commits.splitlines():
+                print("  " + ln)
+    else:
+        print("commits since <task start>: (no start entry logged)")
+    print("-- verify run")
+    if not verify:
+        print("(no verify command on the task)")
+        return
+    exit_code, out = run_verify(verify, c.root)
+    tail = "\n".join(out.splitlines()[-20:]) if out else ""
+    print("exit=%d" % exit_code)
+    if tail:
+        print("tail:")
+        print(tail)
+    else:
+        print("tail: (no output)")
+
+
+def cmd_brief(c):
+    """Brief a task for resume: status, recent log, git context, verify run."""
+    d = c.doc()
+    t = d.by_id(c.a.task)
+    print_brief(c, d, t)
+    return 0
+
+
+def cmd_resume(c):
+    """Resume the next executable task (interrupted first), with full context."""
+    d = c.doc()
+    fatal = [p for p in d.validate() if p[1]]
+    if fatal:
+        print_problems(fatal)
+        raise FdError("structural problems; fix the design file before continuing")
+    nxt, blk, reason = pick_next(d)
+    if nxt is None:
+        print("resume: nothing to resume (%s)" % reason)
+        return 0
+    if blk:
+        print("resume: blocked by %s" % ", ".join(blk))
+    print("resume: next task %s [%s]" % (nxt.id, d.task_status(nxt)))
+    print_brief(c, d, nxt)
+    return 0
 
 def cmd_bug(c):
     d = c.doc()
@@ -1020,6 +1125,9 @@ def build_parser():
     p = add("done", cmd_done, "evidence gate: run a task's Verify command")
     p.add_argument("task", help="task id (T##)")
     p.add_argument("--force", action="store_true")
+    p = add("brief", cmd_brief, "brief a task for resume: status, recent log, git context, verify run")
+    p.add_argument("task", help="task id (T##)")
+    p = add("resume", cmd_resume, "resume the next executable task (interrupted first), with full context")
     p = add("check", cmd_check, "validate the design file")
     p.add_argument("tasks", nargs="*")
     p.add_argument("--anchors", action="store_true")

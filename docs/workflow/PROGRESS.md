@@ -352,3 +352,27 @@ date | task | model | event | evidence
     appended B27 -> docs/workflow/BACKLOG.md
     | B27 | Postgres on the Pi: listen_addresses = '*', pg_hba.conf admits 192.168.86.0/24 with password auth, no host firewall (ufw not installed). Port 5432 is closed from outside, so exposure is LAN-only. Move DataGrip to an SSH tunnel, then bind to localhost and drop the LAN line (Appendix D walkthrough). | PLAN.md (B27) | Phase 5 | Small | closed - done (1.5.1) | 5 |
     EXIT=0
+2026-11-07 | 4.3 | cline | START | TASK_ID=4.3; PLAN.md L154: brief T## and resume -- brief: status, recent log, git status --porcelain, current branch, commits since task start, verify run; resume: auto-select next/interrupted task and brief it; Depends on D2; scope: tools/workflow/fd.py + docs/workflow/PROGRESS.md (Files=2); done-when: an interrupted fixture task resumes with no human input
+2026-11-07 | 4.3 | cline | DONE | Verify: fd.py resume fix on the interrupted fixture (fix/T01) in scratch git repo C:\tmp\fdresume -> exit=0; fd.py brief fix T01 -> exit=0. Resume auto-selected the interrupted task and printed status, recent log, git status --porcelain, current branch, commits since task start, and ran the verify (exit=0, tail verify-ok) with no human input. Done-when satisfied: an interrupted fixture task resumes with no human input
+    $ .venv\Scripts\python.exe tools\workflow\fd.py --dir C:\tmp\fdresume\.features resume fix
+    resume: next task T01 [interrupted]
+    == brief fix T01 ==
+    status: interrupted
+    verify: echo verify-ok
+    detail: the task that was interrupted mid-work
+    -- recent log
+    - 2026-11-07 T01 start: verify=echo verify-ok
+    -- git context (C:\tmp\fdresume)
+    branch: master
+    status:
+      M .features/designs_active/fix_design.md
+      ?? .features/designs_active/fix_log.md
+    commits since 2026-11-07:
+      c0b1bb4 design: interrupted fixture task T01
+      dfaf5aa design: interrupted fixture task T01
+      b26c562 init: scratch verification repo
+    -- verify run
+    exit=0
+    tail:
+    verify-ok
+    EXIT=0
