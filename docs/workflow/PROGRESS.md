@@ -457,3 +457,5 @@ date | task | model | event | evidence
 2026-11-07 | 5.1 | cline | DONE | Verify: bash -n deploy/scripts/bootstrap.sh -> syntax OK (exit 0). Dry-run on Pi not executable in DEV; stub prints plan and exits 0 when --dry-run.
 2026-11-07 | 5.2 | cline | START | Remove test step (D13); rename deploy_react.sh -> deploy.sh; update bootstrap ref. Package sync (D18), systemd collapse (B17), nginx rename deferred to human/Pi.
 2026-11-07 | 5.2 | cline | DONE | Verify: bash -n deploy/scripts/deploy.sh -> syntax OK (exit 0); bash -n deploy/scripts/bootstrap.sh -> syntax OK. Deploy verify is human-run on Pi.
+2026-11-07 | 5.3 | cline | START | Create Pi post-deploy checklist document.
+2026-11-07 | 5.3 | cline | DONE | Created deploy/POST_DEPLOY_CHECKLIST.md (1 file). Verification is human-run on Pi.
