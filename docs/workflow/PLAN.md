@@ -143,7 +143,7 @@ ing tests. | 3 each | the named baseline shrank; verify exits 0 |
 | 3.19 | (B38) Schedule `scripts/repo_audit/` removal (superseded by tools/repo_health.py at 2.5); references in docs/REPO_MAP.md and docs/architecture/dynamic-targets.md. | scripts/repo_audit, docs/REPO_MAP.md | `git ls-files scripts/repo_audit` exits 0; removal scheduled in PROGRESS |
 | 3.20 | Exit check and reviewer pack. | pack | review recorded |
 
-### Phase 4: Workflow engine (strong model for 4.1 and 4.3)
+### Phase 4: Workflow engine (strong model for 4.1 and 4.3)/
 
 | ID | Task | Files | Done when |
 |---|---|---|---|
@@ -220,14 +220,15 @@ The last task of each phase writes `.audit/reviews/phase-<N>.md` from the templa
 
 ```
 You are an independent reviewer. You did not build this. 
-You are forbidden from using the editor/create/delete tools. You may read any file needed to run or interpret a command. If completing a step appears to require a file edit, stop and report it as a tooling defect (T) instead.
+You are forbidden from using the editor/create/delete tools for any file other than `PLAN.md`. You may read any file needed to run or interpret a command. If completing a step appears to require a file edit, stop and report it as a tooling defect (T) instead.
 Repo: PiFitness. Phase [N] of docs/workflow/PLAN.md. Read only the files attached.
 1. For each exit criterion below, run the command yourself and paste the last 20 lines of output.
    Do not trust PROGRESS.md claims.
 2. Check: any baseline growth (git diff main -- tools/baselines, added lines only), any FORCED lines
    in PROGRESS.md, any file touched outside its task's listed files, any new fact stated in two places.
 3. Report PASS or FAIL per criterion with the evidence. List defects as: file, problem, severity. For each FAIL, say whether it looks like a work defect (W), a criterion defect (C) or a tool defect (T), and why.
-4. Stop. Do not propose redesigns beyond the criteria.
+4. If there are failures, make a recommendation to PASS with Errors or FAIL.
+   - If Fail, record the remediation tasks into PLAN.md at the end of the phase you are reviewing.
 
 verify.py --scope all may take 60–120 s; if your runner times out at 30 s, use the provided long-command launcher with its existing presets, or report a tooling defect.
 
