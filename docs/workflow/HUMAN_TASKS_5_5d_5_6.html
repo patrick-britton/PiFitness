@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Human Tasks 5.5d and 5.6 - Full Guide</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 24px; line-height: 1.5; }
+h1,h2,h3 { color:#1f3864; }
+.step { margin:14px 0; padding:12px; border:1px solid #ddd; border-radius:6px; }
+.code { background:#f4f4f4; padding:10px; font-family:Consolas,monospace; white-space:pre-wrap; margin:8px 0; }
+.expected { color:#2e7d32; }
+.warn { color:#b26a00; font-weight:bold; }
+.danger { color:#c62828; font-weight:bold; }
+label { display:block; }
+input[type=checkbox] { margin-right:8px; }
+</style>
+</head>
+<body>
+<h1>Human Tasks 5.5d and 5.6 - Full Explicit Guide</h1>
+<p><strong>Scope:</strong> This guide covers pushing the phase branch, fetching it to the Pi, running test-up/test-down, applying migrations, phone testing, and full rollback. It addresses production downtime and recovery.</p>
+<h2>0. Downtime and rollback summary</h2>
+<div class="step">
+<p class="danger">Downtime: YES. test-up stops PRD services and timers for the duration of testing. Plan a maintenance window.</p>
+<p><strong>Rollback principle:</strong> PRD data is never written during testing. test-down restarts PRD from its untouched checkout. If test-down fails, use the rollback commands in Section 8.</p>
+<p><strong>TEST DB:</strong> test-up creates <code>pifitness_test</code> from the stopped PRD DB. If it already exists, test-up drops/recreates it. Ensure the <code>dev</code> role can create databases.</p>
+</div>
+
+<h2>1. Push and fetch the phase branch (DEV to Pi)</h2>
+<div class="step">
+<p>Description: Push the agent branch from DEV, then fetch it on the Pi.</p>
+<div class="code">On DEV:
+git push origin agent/phase-3</div>
+<p class="expected">Expected: branch pushed; no errors.</p>
+<div class="code">On Pi:
+cd ~/PiFitness
+git fetch origin
+git branch -a | grep agent/phase-3</div>
+<p class="expected">Expected: branch listed as origin/agent/phase-3.</p>
+</div>
+<h2>2. Baseline (before testing)</h2>
+<div class="step">
+<p>Description: Record PRD commit and row counts.</p>
+<div class="code">cd ~/PiFitness
+git rev-parse HEAD
+git status --short
+<div class="code">psql -U dev -d pifitness -c "SELECT schemaname,tablename,n_live_tup FROM pg_stat_user_tables ORDER BY tablename;" &gt; /tmp/prd_counts_before.txt
+cat /tmp/prd_counts_before.txt
+<p class="expected">Expected: row counts saved; no git changes.</p>
+</div>
+
+<h2>3. Test-up (creates test DB and test checkout)</h2>
+<div class="step">
+<p>Description: Run test-up against the phase branch. This stops PRD services, so downtime begins.</p>
+<div class="code">~/PiFitness/deploy/scripts/test-up.sh agent/phase-3
+<p class="expected">Expected: prints 8 steps and <code>test-up complete.</code>; creates <code>~/.pifitness-test-state</code> and <code>~/PiFitness-test</code>.</p>
+<div class="code">cat ~/.pifitness-test-state
+systemctl --user status pifitness-fastapi-test.service
+pm2 status
+<p class="expected">Expected: state file shows PRD_COMMIT, DUMP_PATH, REF; test service active; pm2 shows pifitness-next-test.</p>
+</div>
+
+<h2>4. Venv and migrations (Task 5.6)</h2>
+<div class="step">
+<p>Description: Create test venv, editable install, apply and time migrations.</p>
+<div class="code">cd ~/PiFitness-test/backend
+python3 -m venv .venv
+.venv/bin/pip install -e .
+.venv/bin/python -c "import pifitness; print(pifitness.__file__)"
+<p class="expected">Expected: editable install resolves <code>pifitness</code> to <code>~/PiFitness-test/backend/pifitness</code>.</p>
+<div class="code">cd ~/PiFitness-test
+time for f in deploy/migrations/*.sql; do echo "applying $f"; psql -U dev -d pifitness_test -v ON_ERROR_STOP=1 -f "$f"; done
+<p class="expected">Expected: all migration SQL files apply without error; record elapsed time.</p>
+</div>
+
+<h2>5. Phone testing (Task 5.6)</h2>
+<div class="step">
+<p>Description: Start test units and walk features over HTTPS on phone.</p>
+<div class="code">systemctl --user start pifitness-fastapi-test.service
+pm2 start ~/PiFitness-test/deploy/scripts/ecosystem.config.js
+curl -k https://localhost/api/health
+<p class="expected">Expected: health returns 200; frontend reachable via HTTPS hostname.</p>
+<p>Walk: login, activities, health dashboard, food, music, settings. Record failures as backlog IDs; do not fix now.</p>
+</div>
+
+<h2>6. Test-down (restore PRD)</h2>
+<div class="step">
+<p>Description: Stop test units, drop test DB (marker must be test), restart PRD.</p>
+<div class="code">~/PiFitness/deploy/scripts/test-down.sh
+<p class="expected">Expected: <code>test-down complete.</code>; state file removed; PRD service active.</p>
+<div class="code">systemctl --user status pifitness-fastapi.service
+curl -k https://localhost/api/health
+psql -U dev -d pifitness -c "SELECT schemaname,tablename,n_live_tup FROM pg_stat_user_tables ORDER BY tablename;" &gt; /tmp/prd_counts_after.txt
+diff /tmp/prd_counts_before.txt /tmp/prd_counts_after.txt && echo "ROW COUNTS MATCH"
+<h2>7. Failure injection drill (Task 5.5d)</h2>
+<div class="step">
+<p>Description: Run test-up, interrupt mid-run, then recover with test-down.</p>
+<div class="code">~/PiFitness/deploy/scripts/test-up.sh agent/phase-3
+# Press Ctrl+C during Step 6 (checkout) or later
+<div class="code">~/PiFitness/deploy/scripts/test-down.sh
+systemctl --user status pifitness-fastapi.service
+curl -k https://localhost/api/health
+<p class="expected">Expected: PRD recovers; health 200; row counts match baseline.</p>
+</div>
+
+<h2>8. Rollback plan (if PRD not healthy)</h2>
+<div class="step">
+<p class="danger">Use only if test-down fails or PRD remains unhealthy.</p>
+<div class="code"># Stop anything running
+sudo systemctl stop pifitness-fastapi-test.service 2>/dev/null || true
+pm2 delete pifitness-next-test 2>/dev/null || true
+
+# Restart PRD from original checkout
+cd ~/PiFitness
+git checkout --detach $(git rev-parse HEAD)
+sudo systemctl start pifitness-fastapi.service
+sudo systemctl start pifitness_agent.timer pifitness-hardware-health.timer
+<div class="code">curl -k https://localhost/api/health
+psql -U dev -d pifitness -c "SELECT count(*) FROM activities;"
+<p class="expected">Expected: health 200 and DB accessible. If not, redeploy previous <code>prd-YYYYMMDD</code> tag.</p>
+</div>
+</body>
+</html>
