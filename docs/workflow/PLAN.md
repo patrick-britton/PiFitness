@@ -1,6 +1,6 @@
 # PiFitness Agentic Workflow: Plan
 
-**Status.** Phase 1.5 is done. Phase 2 has not started.
+**Status.** Phase 4 is mid-progress. Phase 1.5, 2, 3 complete.
 
 ---
 
