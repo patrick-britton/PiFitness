@@ -171,6 +171,7 @@ ing tests. | 3 each | the named baseline shrank; verify exits 0 |
 | 5.5d | **[human]** Run test-up then test-down. Then inject a failure mid-`test-up`, run `test-down`, confirm PRD is healthy and its row counts match before and after. | none | counts recorded in PROGRESS |
 | 5.6 | **[human]** First test deployment: `test-up` the branch carrying the 9 migrations; apply and time them; walk the changed features on the phone over HTTPS; `test-down`. Failures go to the backlog and are the first Fix-tier work after the merge. The fresh test venv also exposes undeclared dependencies. Expect a large jump, not just 9 migrations: PRD runs the 16 Oct commit with the old layout (`deployment/`, root `backend_functions/`), so also confirm the editable install (`pip install -e`) resolves `pifitness` at the new layout. | none | migrations applied cleanly to the PRD copy |
 | 5.7 | Exit check and reviewer pack. | pack | full deploy from `main` after the test run; rollback steps written |
+| 5.8 | (B28, B29, B30, B33) Deploy hygiene: bind uvicorn and Next.js to 127.0.0.1 in the systemd/nginx files; reconcile the installed unit's drop-in and env file against the repo unit (B29); document the venv cleanup command (B30); add `next-env.d.ts` to `.gitignore` (B33). | 3 | `git grep -n '0.0.0.0:8000\|0.0.0.0:3000' deploy/` prints nothing |
 
 ### Phase 6: Templates (strong model plus human)
 

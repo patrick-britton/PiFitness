@@ -450,4 +450,6 @@ date | task | model | event | evidence
     EXIT=0
     $ .venv\Scripts\python.exe tools\workflow\fd.py check fx6
     check: 0 errors, 0 warnings
-    EXIT=0
+    EXIT=02026-11-07 | 5.0 | cline | START | Backlog grooming Phase 5: read PLAN.md Phase 5/6 rows, BACKLOG.md, PROGRESS last 40 rows
+2026-11-07 | 5.0 | cline | GROOM-ESCALATE | B1 Size Large (split into features); B7,B10 second deferral (fd.py folders/location); B9,B12,B14,B15,B19,B35,B36,B39 second deferral to Phase 6
+2026-11-07 | 5.0 | cline | DONE | Verify: OPEN_PHASE<=5_COUNT=8 (B1 escalated; B4/B13/B16-B18/B21/B22 mapped to Phase 5 rows 5.4/5.2/5.1/5.4); all other items moved to Phase 6/8 or escalated. GROOM-ESCALATE logged. Row 5.8 appended for B28/B29/B30/B33.
