@@ -30,7 +30,7 @@ WRITE COMMANDS
   set <id> feature <draft|reviewed|in-progress|complete> [--force]
   set <id> resume           recompute Resume Here (progress/next/blocked-by)
   log <id> "text"           append '- YYYY-MM-DD text' to the log sidecar
-  bug <id> T03 "summary"    append a bug skeleton to the bugs sidecar, print its id
+  bug <id> T03 "summary" [--symptom text] [--ac AC-1]  symptom, root cause, fix, check added; linked to Task or AC; duplicates rejected
   backlog add <B-ID> <item> append one item to docs/workflow/BACKLOG.md
                             (append-only; omitted id = next ID, reserved B27-B34 skipped)
   migrate <id>              move an inline Progress Log / Known Issues into sidecars
@@ -596,8 +596,17 @@ def parse_bugs(path):
         if not m:
             continue
         task = re.search(r"\*\*Task:\*\*\s*(.*)", p)
+        ac = re.search(r"\*\*AC:\*\*\s*(.*)", p)
         outc = re.search(r"\*\*Outcome:\*\*\s*(.*)", p)
+        sym = re.search(r"\*\*Symptom:\*\*\s*(.*)", p)
+        if ac:
+            linkkind, linkid = "AC", ac.group(1).strip()
+        else:
+            linkkind, linkid = "Task", task.group(1).strip() if task else "?"
+        symptom = sym.group(1).strip() if sym else ""
         out.append({"id": m.group(1), "summary": m.group(2).strip(), "text": p.rstrip(),
+                    "linkkind": linkkind, "linkid": linkid.upper(),
+                    "symptom": symptom, "symptom-key": norm_key(symptom),
                     "task": task.group(1).strip() if task else "?",
                     "outcome": outc.group(1).strip() if outc else "pending"})
     return out
@@ -918,15 +927,23 @@ def cmd_bug(c):
                 for m in [re.match(re.escape(prefix) + r"(\d+)$", b["id"])] if m]
     bid = "%s%d" % (prefix, max(existing or [0]) + 1)
     summary = c.a.summary.strip()
+    symptom = (c.a.symptom or summary).strip()
+    if c.a.ac:
+        linkkind, linkid = "AC", c.a.ac.strip()
+    else:
+        linkkind, linkid = "Task", t.id
+    key = (linkkind, linkid.upper(), norm_key(symptom))
+    for b in parse_bugs(c.bugp):
+        if (b.get("linkkind"), b.get("linkid"), b.get("symptom-key")) == key:
+            raise FdError("duplicate bug: %s already recorded for %s %s (symptom: %s)"
+                          % (b["id"], linkkind, linkid, symptom))
     skeleton = "\n".join([
         "", "### Bug %s \u2014 %s" % (bid, summary),
-        "- **Detected:** %s - <how it was observed>" % today(),
-        "- **Task:** %s" % t.id,
-        "- **Location:** `path` \u2192 `symbol`",
+        "- **%s:** %s" % (linkkind, linkid),
+        "- **Symptom:** %s" % symptom,
         "- **Root cause:** pending",
-        "- **Resolution:** pending",
-        "- **Rationale:** pending",
-        "- **Recurrence prevention:** pending",
+        "- **Fix:** pending",
+        "- **Check added:** pending",
         "- **Outcome:** pending", ""])
     append_line(c.bugp, "# Known Issues / Bugs - %s" % c.a.id, skeleton)
     append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
@@ -1117,6 +1134,8 @@ def build_parser():
     p = add("bug", cmd_bug, "record a bug skeleton")
     p.add_argument("task")
     p.add_argument("summary")
+    p.add_argument("--symptom", default=None, help="symptom description (default: the summary)")
+    p.add_argument("--ac", default=None, help="link to an acceptance criterion (e.g. AC-1) instead of the task")
     p = add("bugs", cmd_bugs, "list bugs")
     p.add_argument("--pending", action="store_true")
     p.add_argument("--show", default=None)

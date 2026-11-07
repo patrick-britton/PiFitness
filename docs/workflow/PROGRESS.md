@@ -376,3 +376,23 @@ date | task | model | event | evidence
     tail:
     verify-ok
     EXIT=0
+2026-11-07 | 4.4 | cline | START | TASK_ID=4.4; PLAN.md L155 row: slim bug schema (symptom, root cause, fix, check added) linked to task or AC with duplicate check; Files=2 (tools/workflow/fd.py + docs/workflow/PROGRESS.md); Done-when: duplicate fixture rejected; 4.1-4.3 already DONE so no deferral
+2026-11-07 | 4.4 | cline | DONE | TASK_ID=4.4. Done-when: duplicate fixture rejected. Fixture C:/tmp/fd44/.features (fx_design.md with T01). .venv\Scripts\python.exe tools\workflow\fd.py --dir C:/tmp/fd44/.features bug fx T01 symptom checkout times out -> bug id: fx-1-1, exit=0. Repeat identical bug -> fd.py: error: duplicate bug: fx-1-1 already recorded for Task T01 (symptom: checkout times out), exit=1 (duplicate rejected, not appended). Different symptom vs T01 (slow checkout) -> fx-1-2, exit=0. --ac AC-1 symptom AC-linked symptom -> fx-1-3, exit=0; repeat --ac AC-1 -> exit=1. bugs fx --pending lists fx-1-1/fx-1-2/fx-1-3; bugs fx --show fx-1-1 prints slim schema: Task, Symptom, Root cause, Fix, Check added, Outcome.
+    $ .venv\Scripts\python.exe tools\workflow\fd.py --dir C:/tmp/fd44/.features bug fx T01 symptom checkout times out
+    bug id: fx-1-1
+    file: C:/tmp/fd44/.features/designs_active/fx_bugs.md
+    Fill in the pending fields by editing that entry; never guess a root cause.
+    EXIT=0
+    $ .venv\Scripts\python.exe tools\workflow\fd.py --dir C:/tmp/fd44/.features bug fx T01 symptom checkout times out
+    fd.py: error: duplicate bug: fx-1-1 already recorded for Task T01 (symptom: checkout times out)
+    EXIT=1
+    # done-when: duplicate fixture rejected (second identical bug refused, exit 1)
+    $ .venv\Scripts\python.exe tools\workflow\fd.py --dir C:/tmp/fd44/.features bugs fx --show fx-1-1
+    ### Bug fx-1-1 - checkout times out
+    - **Task:** T01
+    - **Symptom:** checkout times out
+    - **Root cause:** pending
+    - **Fix:** pending
+    - **Check added:** pending
+    - **Outcome:** pending
+    EXIT=0
