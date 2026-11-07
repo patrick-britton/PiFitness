@@ -3,8 +3,8 @@ import signal
 import sys
 from pathlib import Path
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).parent.parent))  # /home/god/PiFitness
+# Add backend to sys.path
+sys.path.append(str(Path(__file__).parent.parent.parent))  # /home/god/PiFitness/backend
 
 from pifitness.worker.ultimate_task_executioner_v2 import ultimate_task_executioner
 

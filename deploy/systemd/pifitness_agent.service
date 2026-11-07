@@ -7,10 +7,10 @@ Wants=postgresql.service
 Type=oneshot
 User=god
 Group=god
-WorkingDirectory=/home/god/PiFitness
+WorkingDirectory=/home/god/PiFitness/backend
 Environment="PATH=/home/god/PiFitness/venv/bin:/usr/local/bin:/usr/bin:/bin"
 EnvironmentFile=/home/god/PiFitness/.env
-ExecStart=/home/god/PiFitness/venv/bin/python3 -m agents.background_task_execution
+ExecStart=/home/god/PiFitness/venv/bin/python3 -m pifitness.worker.background_task_execution
 StandardOutput=journal
 StandardError=journal
 

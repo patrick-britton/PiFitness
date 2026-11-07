@@ -3,4 +3,4 @@ Description=PiFitness hardware health snapshot
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/pifitness-hw-health.py
+ExecStart=/usr/local/bin/pifitness-hardware-health.py

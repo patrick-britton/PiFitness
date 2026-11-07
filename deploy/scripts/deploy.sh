@@ -135,9 +135,9 @@ if [[ "$NUCLEAR" == "true" ]]; then
     HEALTH_SRC="$SELF_DIR/health"
     if [[ -d "$HEALTH_SRC" ]]; then
         info "Installing hardware health helper and timer..."
-        sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
-        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
-        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
+        sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
+        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
+        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
     fi
 
     AGENT_SRC="$SELF_DIR/agent"
@@ -148,7 +148,7 @@ if [[ "$NUCLEAR" == "true" ]]; then
     fi
 
     sudo systemctl daemon-reload
-    sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+    sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
     sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
     sudo systemctl enable pifitness-fastapi.service
@@ -245,9 +245,9 @@ if [[ "$FAST" == "true" ]]; then
         HEALTH_SRC="$SELF_DIR/health"
         if [[ -d "$HEALTH_SRC" ]]; then
             info "Installing hardware health helper and timer..."
-            sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
+            sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
+            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
+            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
         fi
 
         AGENT_SRC="$SELF_DIR/agent"
@@ -258,7 +258,7 @@ if [[ "$FAST" == "true" ]]; then
         fi
 
         sudo systemctl daemon-reload
-        sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+        sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
         sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
         info "Services and nginx realigned for react-ui."
@@ -322,9 +322,9 @@ if [[ "$FAST" == "true" ]]; then
         HEALTH_SRC="$SELF_DIR/health"
         if [[ -d "$HEALTH_SRC" ]]; then
             info "Installing hardware health helper and timer..."
-            sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
+            sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
+            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
+            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
         fi
 
         AGENT_SRC="$SELF_DIR/agent"
@@ -335,7 +335,7 @@ if [[ "$FAST" == "true" ]]; then
         fi
 
         sudo systemctl daemon-reload
-        sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+        sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
         sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
         exit 0
@@ -379,9 +379,9 @@ if [[ "$FAST" == "true" ]]; then
         HEALTH_SRC="$SELF_DIR/health"
         if [[ -d "$HEALTH_SRC" ]]; then
             info "Installing hardware health helper and timer..."
-            sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
+            sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
+            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
+            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
         fi
 
         AGENT_SRC="$SELF_DIR/agent"
@@ -392,7 +392,7 @@ if [[ "$FAST" == "true" ]]; then
         fi
 
         sudo systemctl daemon-reload
-        sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+        sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
         sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
         exit 0
@@ -442,9 +442,9 @@ if [[ "$FAST" == "true" ]]; then
     HEALTH_SRC="$SELF_DIR/health"
     if [[ -d "$HEALTH_SRC" ]]; then
         info "Installing hardware health helper and timer..."
-        sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
-        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
-        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
+        sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
+        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
+        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
     fi
 
     AGENT_SRC="$SELF_DIR/agent"
@@ -455,7 +455,7 @@ if [[ "$FAST" == "true" ]]; then
     fi
 
     sudo systemctl daemon-reload
-    sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+    sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
     sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
     info "Fast deployment of react-ui completed."
@@ -552,9 +552,9 @@ SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HEALTH_SRC="$SELF_DIR/health"
 if [[ -d "$HEALTH_SRC" ]]; then
     info "Installing hardware health helper and timer..."
-    sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hw-health.py"      /usr/local/bin/pifitness-hw-health.py
-    sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.service" /etc/systemd/system/
-    sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hw-health.timer"   /etc/systemd/system/
+    sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
+    sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
+    sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
 fi
 
 AGENT_SRC="$SELF_DIR/agent"
@@ -565,7 +565,7 @@ if [[ -d "$AGENT_SRC" ]]; then
 fi
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now pifitness-hw-health.timer 2>/dev/null || true
+sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
 sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
 info "Setting up Next.js server..."

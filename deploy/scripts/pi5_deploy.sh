@@ -195,7 +195,7 @@ if [[ "$BRANCH" == "react-ui" && "$package_choice" == "1" ]]; then
 fi
 
 # Install/update systemd service files
-sudo cp /home/god/PiFitness/deploy/systemd/pifitness-hw-health.service /etc/systemd/system/
+sudo cp /home/god/PiFitness/deploy/systemd/pifitness-hardware-health.service /etc/systemd/system/
 sudo cp /home/god/PiFitness/deploy/systemd/pifitness-fastapi.service /etc/systemd/system/
 sudo systemctl daemon-reload
 

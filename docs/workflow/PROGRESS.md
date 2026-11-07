@@ -459,3 +459,5 @@ date | task | model | event | evidence
 2026-11-07 | 5.2 | cline | DONE | Verify: bash -n deploy/scripts/deploy.sh -> syntax OK (exit 0); bash -n deploy/scripts/bootstrap.sh -> syntax OK. Deploy verify is human-run on Pi.
 2026-11-07 | 5.3 | cline | START | Create Pi post-deploy checklist document.
 2026-11-07 | 5.3 | cline | DONE | Created deploy/POST_DEPLOY_CHECKLIST.md (1 file). Verification is human-run on Pi.
+2026-11-07 | 5.4 | cline | START | Fix B21 (DEPLOYMENT_GUIDE), B4 (move worker script), B22 (rename hw-health), cert expiry recorded.
+2026-11-07 | 5.4 | cline | DONE | Verify: bash -n deploy.sh syntax OK; python ssl cert check -> notAfter Dec 31 2026. Working tree clean pending commit.

@@ -6,7 +6,7 @@ on any failure before declaring the deploy complete.
 ## 1. Service health
 
 - [ ] `sudo systemctl is-active pifitness-fastapi.service` -> `active`
-- [ ] `sudo systemctl is-active pifitness-hw-health.timer` -> `active`
+- [ ] `sudo systemctl is-active pifitness-hardware-health.timer` -> `active`
 - [ ] `sudo systemctl is-active pifitness_agent.timer` -> `active`
 - [ ] `pm2 show pifitness-next` reports `status: online`
 - [ ] `sudo systemctl is-active nginx` -> `active`
@@ -15,6 +15,7 @@ on any failure before declaring the deploy complete.
 
 - [ ] `curl -s http://localhost:8000/api/health` returns `{"status":"ok"}` (or equivalent)
 - [ ] `curl -sI https://pifitness.duckdns.org/api/health` returns `200 OK`
+- [ ] HTTPS certificate valid (Let's Encrypt, issuer YE2); expires 2026-12-31
 
 ## 3. Build-time env vars
 
@@ -25,7 +26,7 @@ on any failure before declaring the deploy complete.
 
 - [ ] `sudo systemctl list-timers --no-pager | grep pifitness` shows next trigger within expected window
 - [ ] `journalctl -u pifitness_agent.service -n 5 --no-pager` shows a recent successful run
-- [ ] `journalctl -u pifitness-hw-health.service -n 5 --no-pager` shows a recent successful run
+- [ ] `journalctl -u pifitness-hardware-health.service -n 5 --no-pager` shows a recent successful run
 
 ## 5. Two heavy queries (performance sanity)
 
