@@ -10,7 +10,7 @@ User=god
 Group=god
 WorkingDirectory=/home/god/PiFitness-test
 EnvironmentFile=/home/god/PiFitness-test/.env.test
-ExecStart=/home/god/PiFitness-test/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8001
+ExecStart=~/PiFitness-test/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
@@ -20,7 +20,7 @@ StandardError=journal
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=read-only
-ReadWritePaths=/home/god/PiFitness-test /home/god/Documents/PiFitness_Local
+ReadWritePaths=/home/god/PiFitness-test
 
 [Install]
 WantedBy=multi-user.target
