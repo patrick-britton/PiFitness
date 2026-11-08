@@ -123,6 +123,8 @@ if command -v curl >/dev/null 2>&1; then
   fi
 else
   echo "  curl not available; skipping health check"
+fi
+
 echo "Step 4: drop test DB (marker check before any drop)"
 if [[ $keep_db -eq 1 ]]; then
   echo "  --keep-db set; skipping drop"
@@ -148,4 +150,3 @@ echo "Step 6: remove state file (cleanup complete)"
 rm -f "$STATE_FILE"
 
 echo "test-down complete."
-fi

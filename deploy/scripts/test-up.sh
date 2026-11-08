@@ -203,7 +203,12 @@ trap 'write_state' INT TERM
 fastapi_active="$(systemctl is-active pifitness-fastapi.service 2>/dev/null || echo unknown)"
 agent_timer_active="$(systemctl is-active pifitness_agent.timer 2>/dev/null || echo unknown)"
 hardware_health_timer_active="$(systemctl is-active pifitness-hardware-health.timer 2>/dev/null || echo unknown)"
-pm2_nextprod_active="$(pm2 describe pifitness-next >/dev/null 2>&1 && echo online || echo unknown)"
+# pm2 describe exits 0 for a registered process even when it is stopped, so
+# probe the status text itself: pifitness-next is "online" only when running.
+pm2_nextprod_active="unknown"
+if pm2 describe pifitness-next >/dev/null 2>&1 && pm2 describe pifitness-next 2>/dev/null | grep -qi 'online'; then
+  pm2_nextprod_active="online"
+fi
 
 current_phase="initial"
 write_state
@@ -213,6 +218,22 @@ echo "Step 3: stop PRD services and timers"
 sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
 sudo systemctl stop pifitness_agent.timer 2>/dev/null || true
 sudo systemctl stop pifitness-hardware-health.timer 2>/dev/null || true
+pm2 stop pifitness-next 2>/dev/null || true
+
+echo "  verify PRD writers are quiesced before cloning the database"
+fastapi_state="$(systemctl is-active pifitness-fastapi.service 2>/dev/null || echo unknown)"
+agent_timer_state="$(systemctl is-active pifitness_agent.timer 2>/dev/null || echo unknown)"
+hardware_health_timer_state="$(systemctl is-active pifitness-hardware-health.timer 2>/dev/null || echo unknown)"
+pm2_next_state="stopped"
+if pm2 describe pifitness-next >/dev/null 2>&1 && pm2 describe pifitness-next 2>/dev/null | grep -qi 'online'; then
+  pm2_next_state="online"
+fi
+if [[ "$fastapi_state" == "active" || "$agent_timer_state" == "active" \
+      || "$hardware_health_timer_state" == "active" || "$pm2_next_state" == "online" ]]; then
+  echo "ERROR: PRD writers still active after stop (fastapi=$fastapi_state agent.timer=$agent_timer_state hardware-health.timer=$hardware_health_timer_state pm2-next=$pm2_next_state)" >&2
+  exit 1
+fi
+echo "  PRD quiesced: fastapi=$fastapi_state agent.timer=$agent_timer_state hardware-health.timer=$hardware_health_timer_state pm2-next=$pm2_next_state"
 current_phase="prd-stopped"
 write_state
 
