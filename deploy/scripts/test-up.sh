@@ -11,6 +11,25 @@ DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-15432}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/Documents/DB_Backups}"
 
+# Canonicalize and validate a directory path before any destructive use.
+# Refuses: empty paths, "/", and symlinks. Returns the canonical absolute path.
+canonicalize_path() {
+  local path="$1"
+  if [[ -z "$path" ]]; then
+    echo "ERROR: empty path" >&2
+    return 1
+  fi
+  if [[ "$path" == "/" ]]; then
+    echo "ERROR: path is root: $path" >&2
+    return 1
+  fi
+  if [[ -L "$path" ]]; then
+    echo "ERROR: path is a symlink: $path" >&2
+    return 1
+  fi
+  realpath -m "$path"
+}
+
 dry_run=0
 ref=""
 
@@ -71,7 +90,8 @@ steps=(
   "stop PRD services and timers"
   "create $TEST_DB from PRD (template clone, fallback pg_dump/pg_restore)"
   "apply pending migrations to $TEST_DB"
-  "check out $ref into $TEST_DIR (own venv and build)"
+  "fetch $ref from origin and resolve to full SHA"
+  "check out resolved SHA into $TEST_DIR (own venv and build)"
   "start test units"
   "write $STATE_FILE"
 )
@@ -163,10 +183,32 @@ else
   echo "  no migration runner found; skipping"
 fi
 
-echo "Step 6: check out ref into test dir"
+# --- Path validation: refuse unsafe TEST_DIR/PRD_DIR before any rm -rf ---
+PRD_DIR="$(canonicalize_path "$PRD_DIR")" || exit 1
+TEST_DIR="$(canonicalize_path "$TEST_DIR")" || exit 1
+
+if [[ "$TEST_DIR" == "$PRD_DIR" ]]; then
+  echo "ERROR: TEST_DIR must not equal PRD_DIR: $TEST_DIR" >&2
+  exit 1
+fi
+
+# TEST_DIR must not be an ancestor of PRD_DIR (would put PRD under TEST_DIR)
+case "$PRD_DIR" in
+  "$TEST_DIR"/*)
+    echo "ERROR: TEST_DIR is an ancestor of PRD_DIR: $TEST_DIR" >&2
+    exit 1
+    ;;
+esac
+
+echo "Step 6: fetch $ref from origin and resolve to full SHA"
+git -C "$PRD_DIR" fetch origin "$ref"
+resolved_sha="$(git -C "$PRD_DIR" rev-parse FETCH_HEAD)"
+echo "  resolved $ref to $resolved_sha"
+
+echo "Step 7: check out resolved SHA into test dir"
 rm -rf "$TEST_DIR"
 git clone "$PRD_DIR" "$TEST_DIR"
-git -C "$TEST_DIR" checkout "$ref"
+git -C "$TEST_DIR" checkout "$resolved_sha"
 
 # Copy the validated external test env into the test checkout so the test
 # unit's EnvironmentFile exists before the unit is started.
@@ -174,13 +216,13 @@ cp "$TEST_ENV_FILE" "$TEST_DIR/.env.test"
 chmod 0600 "$TEST_DIR/.env.test"
 echo "  test env copied to $TEST_DIR/.env.test"
 
-echo "Step 7: start test units"
+echo "Step 8: start test units"
 sudo systemctl start pifitness-fastapi-test.service 2>/dev/null || true
 if [[ -f "$TEST_DIR/deploy/scripts/ecosystem.config.js" ]]; then
   pm2 start "$TEST_DIR/deploy/scripts/ecosystem.config.js" 2>/dev/null || true
 fi
 
-echo "Step 8: write state file"
-printf 'PRD_COMMIT=%s\nDUMP_PATH=%s\nREF=%s\n' "$prd_commit" "$dump_path" "$ref" > "$STATE_FILE"
+echo "Step 9: write state file"
+printf 'PRD_COMMIT=%s\nDUMP_PATH=%s\nREF=%s\nRESOLVED_SHA=%s\n' "$prd_commit" "$dump_path" "$ref" "$resolved_sha" > "$STATE_FILE"
 
 echo "test-up complete."
