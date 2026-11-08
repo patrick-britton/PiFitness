@@ -90,6 +90,39 @@ if [[ $dry_run -eq 1 ]]; then
   exit 0
 fi
 
+# Preflight: require and validate the external test env file before touching PRD.
+TEST_ENV_FILE="${HOME}/.config/pifitness/test.env"
+if [[ ! -f "$TEST_ENV_FILE" ]]; then
+  echo "ERROR: test env file not found: $TEST_ENV_FILE" >&2
+  echo "  Copy the tracked test env example in deploy/ to $TEST_ENV_FILE and fill in secrets." >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+set -a
+. "$TEST_ENV_FILE"
+set +a
+
+if [[ "${APP_ENV:-}" != "test" ]]; then
+  echo "ERROR: APP_ENV must be 'test' in $TEST_ENV_FILE (got '${APP_ENV:-}')" >&2
+  exit 1
+fi
+if [[ "${PG_DB:-}" != "$TEST_DB" ]]; then
+  echo "ERROR: PG_DB must be '$TEST_DB' in $TEST_ENV_FILE (got '${PG_DB:-}')" >&2
+  exit 1
+fi
+if [[ "${PG_HOST:-}" != "$DB_HOST" || "${PG_PORT:-}" != "$DB_PORT" ]]; then
+  echo "ERROR: PG_HOST/PG_PORT must match $DB_HOST:$DB_PORT in $TEST_ENV_FILE" >&2
+  exit 1
+fi
+for integration in SPOTIFY_ENABLED GARMIN_ENABLED PIRATE_ENABLED; do
+  if [[ "${!integration:-false}" == "true" ]]; then
+    echo "ERROR: $integration must be disabled in test mode in $TEST_ENV_FILE" >&2
+    exit 1
+  fi
+done
+chmod 0600 "$TEST_ENV_FILE"
+echo "  test env file validated: $TEST_ENV_FILE"
+
 echo "Step 1: record PRD commit"
 prd_commit="$(git -C "$PRD_DIR" rev-parse HEAD)"
 echo "  PRD commit: $prd_commit"
@@ -134,6 +167,12 @@ echo "Step 6: check out ref into test dir"
 rm -rf "$TEST_DIR"
 git clone "$PRD_DIR" "$TEST_DIR"
 git -C "$TEST_DIR" checkout "$ref"
+
+# Copy the validated external test env into the test checkout so the test
+# unit's EnvironmentFile exists before the unit is started.
+cp "$TEST_ENV_FILE" "$TEST_DIR/.env.test"
+chmod 0600 "$TEST_DIR/.env.test"
+echo "  test env copied to $TEST_DIR/.env.test"
 
 echo "Step 7: start test units"
 sudo systemctl start pifitness-fastapi-test.service 2>/dev/null || true
