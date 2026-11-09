@@ -161,6 +161,19 @@ if ! pg_dump -Fc -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$PRD_DB" -f "$dum
   echo "ERROR: dump failed" >&2
   exit 1
 fi
+# Dump-before-stop order (D3, not amended): the dump is taken while PRD
+# writers are still running, so the test DB snapshots PRD at dump time;
+# writers are quiesced in Step 3 before the clone, and PRD writes between
+# the dump and the quiesce are not captured. Preserve the dump as a
+# disaster-recovery artifact; test-down never restores PRD from it.
+if [[ ! -s "$dump_path" ]]; then
+  echo "ERROR: dump is missing or empty: $dump_path" >&2
+  exit 1
+fi
+if ! pg_restore --list "$dump_path" >/dev/null 2>&1; then
+  echo "ERROR: dump archive is invalid: $dump_path" >&2
+  exit 1
+fi
 
 # --- Durable test state (D3) --------------------------------------------
 # current_phase records the last completed major transition. The state file is
@@ -238,22 +251,58 @@ current_phase="prd-stopped"
 write_state
 
 echo "Step 4: create test DB"
-if ! psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
-     -c "DROP DATABASE IF EXISTS \"$TEST_DB\";" >/dev/null 2>&1; then
-  true
+
+# If the TEST DB already exists, inspect its marker before touching it:
+# drop/recreate only when it is marked for test use (pifitness.env='test');
+# refuse if it is unmarked or marked otherwise.
+if psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
+     "SELECT 1 FROM pg_database WHERE datname='$TEST_DB';" 2>/dev/null | grep -q 1; then
+  existing_marker="$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" -tAc \
+    "SELECT current_setting('pifitness.env', true);" 2>/dev/null | tr -d '[:space:]')"
+  if [[ "$existing_marker" == "test" ]]; then
+    echo "  $TEST_DB exists and is marked test; dropping and recreating"
+    # Never suppress a failed DROP: a failed drop stops here instead of
+    # continuing onto a database that may not have been replaced.
+    if ! psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
+        -c "DROP DATABASE \"$TEST_DB\""; then
+      echo "ERROR: failed to drop $TEST_DB" >&2
+      exit 1
+    fi
+  else
+    echo "ERROR: refusing to drop/recreate $TEST_DB (marker='${existing_marker:-<none>}')" >&2
+    exit 1
+  fi
 fi
-if ! psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
+if psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
      -c "CREATE DATABASE \"$TEST_DB\" TEMPLATE \"$PRD_DB\";"; then
-  echo "  template clone failed; falling back to pg_restore"
-  dropdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" --if-exists "$TEST_DB" 2>/dev/null || true
+  echo "  $TEST_DB created from template $PRD_DB"
+else
+  echo "  template clone failed; falling back to pg_dump/pg_restore"
+  dropdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" --if-exists "$TEST_DB"
   createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$TEST_DB"
-  pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" "$dump_path"
+  # TimescaleDB: prepare the empty database for hypertable restore.
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" \
+    -c "SELECT timescaledb_pre_restore();" >/dev/null
+  if ! pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" "$dump_path"; then
+    echo "ERROR: pg_restore of $dump_path into $TEST_DB failed" >&2
+    exit 1
+  fi
+  # TimescaleDB: finalize the hypertable restore.
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" \
+    -c "SELECT timescaledb_post_restore();" >/dev/null
 fi
 
-# Stamp the test marker (D8).
+# Stamp the test marker (D8) only after successful creation/restore, then
+# connect to that exact host/port/database and verify the marker.
 psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
   -c "ALTER DATABASE \"$TEST_DB\" SET pifitness.env = 'test';" >/dev/null
 current_phase="test-db-created"
+marker="$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" -tAc \
+  "SELECT current_setting('pifitness.env', true);" 2>/dev/null | tr -d '[:space:]')"
+if [[ "$marker" != "test" ]]; then
+  echo "ERROR: $TEST_DB is not marked for test use (marker='${marker:-<none>}')" >&2
+  exit 1
+fi
 write_state
 
 echo "Step 5: apply pending migrations"

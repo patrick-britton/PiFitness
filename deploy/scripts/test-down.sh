@@ -65,6 +65,17 @@ done
 # Canonicalize paths before any destructive use (same guard as test-up).
 PRD_DIR="$(canonicalize_path "$PRD_DIR")" || exit 1
 TEST_DIR="$(canonicalize_path "$TEST_DIR")" || exit 1
+
+# Recheck configuration before any destructive command: PRD and TEST DB
+# names must differ, and test-down must connect to the same host/port
+# test-up used (the state file can override both, so capture them first).
+if [[ "$PRD_DB" == "$TEST_DB" ]]; then
+  echo "ERROR: PRD and TEST DB names must differ" >&2
+  exit 1
+fi
+CONFIGURED_DB_HOST="${DB_HOST:-localhost}"
+CONFIGURED_DB_PORT="${DB_PORT:-15432}"
+
 # --- Load durable state (D3) -------------------------------------------
 # test-up wrote ~/.pifitness-test-state before stopping any PRD process; it
 # records what was active (FastAPI, each timer, production PM2 pifitness-next)
@@ -77,6 +88,17 @@ if [[ -f "$STATE_FILE" ]]; then
   set -a
   . "$STATE_FILE"
   set +a
+fi
+
+# Recheck against the recorded state: fail closed if test-down would connect
+# to a different cluster or database pair than the one test-up used.
+if [[ "${DB_HOST:-}" != "$CONFIGURED_DB_HOST" || "${DB_PORT:-}" != "$CONFIGURED_DB_PORT" ]]; then
+  echo "ERROR: recorded DB host/port $DB_HOST:$DB_PORT does not match configured $CONFIGURED_DB_HOST:$CONFIGURED_DB_PORT" >&2
+  exit 1
+fi
+if [[ "${PRD_DB:-}" == "${TEST_DB:-}" ]]; then
+  echo "ERROR: PRD and TEST DB names must differ" >&2
+  exit 1
 fi
 
 echo "Step 1: stop test units"
@@ -125,6 +147,8 @@ else
   echo "  curl not available; skipping health check"
 fi
 
+# The PRD dump preserved by test-up is a disaster-recovery artifact only:
+# test-down never restores PRD from it, so PRD data remains untouched.
 echo "Step 4: drop test DB (marker check before any drop)"
 if [[ $keep_db -eq 1 ]]; then
   echo "  --keep-db set; skipping drop"

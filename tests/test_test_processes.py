@@ -85,11 +85,26 @@ STUB_BODIES = {
     "pg_dump": (
         "#!/usr/bin/env bash\n"
         'echo "PG_DUMP $*" >> "$STUB_LOG"\n'
+        'dump_file=""\n'
+        "while [ $# -gt 0 ]; do\n"
+        '  case "$1" in\n'
+        '    -f) dump_file="$2"; shift 2 ;;\n'
+        '    *) shift ;;\n'
+        "  esac\n"
+        "done\n"
+        'if [ -n "$dump_file" ]; then\n'
+        '  printf "dump-data\\n" > "$dump_file"\n'
+        "fi\n"
         "exit 0\n"
     ),
     "psql": (
         "#!/usr/bin/env bash\n"
         'echo "PSQL $*" >> "$STUB_LOG"\n'
+    'case "$*" in\n'
+    "  *current_setting*)\n"
+    '    echo "test"\n'
+    "    ;;\n"
+    "esac\n"
         "exit 0\n"
     ),
     "dropdb": (
