@@ -31,6 +31,27 @@ canonicalize_path() {
   realpath -m "$path"
 }
 
+# Failpoints for the human recovery drill.
+# A failpoint engages only when PIFITNESS_FAILPOINT_<name>=1 is set
+# (opt-in, disabled by default). Engaging it additionally requires the
+# test-only acknowledgement PIFITNESS_FAILPOINT_ACK=test-only; without
+# it the script exits before the failpoint fires. Use these only for the
+# human recovery drill, never in ordinary runs.
+failpoint() {
+  local name="$1"
+  local msg="$2"
+  local env_var="PIFITNESS_FAILPOINT_${name^^}"
+  if [[ "${!env_var:-0}" != "1" ]]; then
+    return 0
+  fi
+  if [[ "${PIFITNESS_FAILPOINT_ACK:-}" != "test-only" ]]; then
+    echo "ERROR: failpoint $name enabled but test-only acknowledgement missing (set PIFITNESS_FAILPOINT_ACK=test-only)" >&2
+    exit 2
+  fi
+  echo "FAILPOINT $name engaged: $msg" >&2
+  exit 1
+}
+
 dry_run=0
 ref=""
 
@@ -410,6 +431,11 @@ if ! "$TEST_DIR/venv/bin/python" "$migration_runner" status 2>&1 | tee -a "$migr
 fi
 current_phase="migrations-applied"
 write_state
+
+# Failpoint for the human recovery drill: inject a failure right before
+# the test stack is started. The durable state file (phase=migrations-applied)
+# is left intact so test-down can recover.
+failpoint "pre_start" "simulate failure before starting test units"
 
 echo "Step 9: start test units"
 # Start the test FastAPI unit. A start failure is fatal and runs recovery.
