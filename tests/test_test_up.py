@@ -6,9 +6,12 @@ and validate PRD_DIR and TEST_DIR; refuse symlinks, empty paths, "/", the PRD
 directory, and any path that is an ancestor of PRD.
 """
 
+import http.server
 import os
 import shutil
+import socket
 import subprocess
+import threading
 
 import pytest
 
@@ -370,7 +373,15 @@ def test_test_up_migration_invokes_test_checkout_runner_and_starts_services(tmp_
     advance_test_ref(origin, MIGRATION_CHECKOUT_FILES, "seed migration runner on test-ref")
     write_stubs(bin_dir)
     write_runner_stubs(bin_dir)
-    proc, log = run_test_up(prd, test_dir, home, bin_dir)
+    write_runtime_stubs(bin_dir)
+    servers, urls = start_local_servers([8000, 3000, 0])
+    os.environ["HTTPS_HOSTNAME"] = urls[2]
+    try:
+        proc, log = run_test_up(prd, test_dir, home, bin_dir)
+    finally:
+        for server in servers:
+            server.server_close()
+        os.environ.pop("HTTPS_HOSTNAME", None)
     assert proc.returncode == 0, proc.stderr
     migrate_calls = [
         entry for entry in log if entry.startswith("VENV_PYTHON ") and "migrate.py" in entry
@@ -435,3 +446,183 @@ def test_test_up_missing_migration_runner_fails_closed(tmp_path):
         if entry.startswith(("SYSTEMCTL start", "PM2 start"))
     ]
     assert not starts, "no test service may start when the runner is missing: %r" % log
+
+
+# ---------------------------------------------------------------------------
+# Test stack start and positive verification (D3, task 5.19)
+# ---------------------------------------------------------------------------
+
+_CUSTOM_SYSTEMCTL_STUB = """\
+#!/usr/bin/env bash
+echo "SYSTEMCTL $*" >> "$STUB_LOG"
+case "$1" in
+  is-active)
+    case "$2" in
+      pifitness-fastapi-test.service) echo "active" ;;
+      *) echo inactive ;;
+    esac ;;
+  start|stop|restart) ;;
+  *) ;;
+esac
+exit 0
+"""
+
+_CUSTOM_PM2_STUB = """\
+#!/usr/bin/env bash
+echo "PM2 $*" >> "$STUB_LOG"
+case "$1" in
+  describe)
+    if [ "$2" = "pifitness-next-test" ]; then echo "status: online"; fi
+    exit 0 ;;
+  start|stop|restart|delete) exit 0 ;;
+  *) exit 0 ;;
+esac
+"""
+
+_CUSTOM_CURL_STUB = """\
+#!/usr/bin/env bash
+echo "CURL $*" >> "$STUB_LOG"
+echo '{"status":"ok","database":"ok"}'
+exit 0
+"""
+
+
+def write_runtime_stubs(bin_dir):
+    """Override systemctl/pm2/curl stubs so the test stack verification passes."""
+    bin_dir = str(bin_dir)
+    for name, body in (("systemctl", _CUSTOM_SYSTEMCTL_STUB),
+                       ("pm2", _CUSTOM_PM2_STUB),
+                       ("curl", _CUSTOM_CURL_STUB)):
+        stub = os.path.join(bin_dir, name)
+        with open(stub, "w", encoding="utf-8") as fh:
+            fh.write(body)
+        os.chmod(stub, 0o755)
+
+
+class _OkHandler(http.server.BaseHTTPRequestHandler):
+    """Minimal HTTP server standing in for the test stack.
+
+    Returns a JSON body with a `status` field so test-up's FastAPI health
+    probe (which greps for `"status"`) succeeds, and 200 for the Next.js and
+    HTTPS probes. Git bash on Windows resolves real /usr/bin/curl.exe rather
+    than any stub on PATH, so these real local servers let real curl succeed
+    without touching the network.
+    """
+
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'{"status":"ok","database":"ok"}\n')
+
+    def log_message(self, *args):
+        pass
+
+
+def start_local_servers(ports):
+    """Start throwaway HTTP servers on the given loopback ports (use 0 for a
+    free port).
+
+    Returns (servers, urls) parallel to `ports`. Callers must shut servers
+    down after use. Git bash on Windows shadows stubbed `curl` with
+    /usr/bin/curl.exe, so real curl is used; these servers let those real curl
+    probes succeed without touching the network. `test-up.sh` hardcodes
+    127.0.0.1:8000 and 127.0.0.1:3000, so those ports are bound explicitly.
+    """
+    http.server.ThreadingHTTPServer.allow_reuse_address = True
+    servers = []
+    urls = []
+    for port in ports:
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", port), _OkHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        servers.append(server)
+        urls.append("http://127.0.0.1:{}".format(server.server_address[1]))
+    return servers, urls
+
+
+@pytest.mark.unit
+def test_test_up_starts_test_units_fatal_without_silent_skip():
+    text = read_script("test-up.sh")
+    start = text.index('echo "Step 9: start test units"')
+    verify = text.index('echo "Step 10: verify the complete test stack"')
+    complete = text.index('echo "test-up complete."')
+    block = text[start:verify]
+    assert start < verify < complete
+    assert 'sudo systemctl start pifitness-fastapi-test.service' in block
+    assert 'pm2 start "$TEST_DIR/deploy/scripts/ecosystem.config.js"' in block
+    assert "|| true" not in block
+
+
+@pytest.mark.unit
+def test_test_up_verifies_complete_test_stack_before_completion():
+    text = read_script("test-up.sh")
+    verify = text.index('echo "Step 10: verify the complete test stack"')
+    complete = text.index('echo "test-up complete."')
+    tail = text[verify:complete]
+    for probe in (
+        "systemctl is-active pifitness-fastapi-test.service",
+        "pm2 describe pifitness-next-test",
+        "health_body",
+        '"status"',
+        "curl -fsS http://127.0.0.1:8000/api/health",
+        "curl -fsS http://127.0.0.1:3000",
+        "$HTTPS_HOSTNAME",
+        "current_setting('pifitness.env', true)",
+        "recover_and_fail",
+    ):
+        assert probe in tail, "missing verification probe: %s" % probe
+    assert "test-down.sh" in text
+
+
+@pytest.mark.unit
+def test_test_up_exits_nonzero_when_test_service_not_active(tmp_path):
+    if not bash_available():
+        pytest.skip("Git bash and git are required")
+    prd, test_dir, home, bin_dir = sandbox(tmp_path)
+    origin = os.path.join(os.path.dirname(prd), "origin.git")
+    advance_test_ref(origin, MIGRATION_CHECKOUT_FILES, "seed migration runner on test-ref")
+    write_stubs(bin_dir)
+    write_runner_stubs(bin_dir)
+    proc, log = run_test_up(prd, test_dir, home, bin_dir)
+    assert proc.returncode != 0, proc.stdout
+    assert "test-up complete." not in proc.stdout
+    state_file = os.path.join(home, ".pifitness-test-state")
+    assert os.path.isfile(state_file), "state file must be left intact on failure"
+    assert "SYSTEMCTL start pifitness-fastapi-test.service" in log
+    assert "SYSTEMCTL is-active pifitness-fastapi-test.service" in log
+
+
+@pytest.mark.unit
+def test_test_up_exits_zero_when_all_checks_pass(tmp_path):
+    if not bash_available():
+        pytest.skip("Git bash and git are required")
+    prd, test_dir, home, bin_dir = sandbox(tmp_path)
+    origin = os.path.join(os.path.dirname(prd), "origin.git")
+    advance_test_ref(origin, MIGRATION_CHECKOUT_FILES, "seed migration runner on test-ref")
+    write_stubs(bin_dir)
+    write_runner_stubs(bin_dir)
+    write_runtime_stubs(bin_dir)
+    servers, urls = start_local_servers([8000, 3000, 0])
+    https_url = urls[2]
+    os.environ["HTTPS_HOSTNAME"] = https_url
+    try:
+        proc, log = run_test_up(prd, test_dir, home, bin_dir)
+    finally:
+        for server in servers:
+            server.server_close()
+        os.environ.pop("HTTPS_HOSTNAME", None)
+    assert proc.returncode == 0, proc.stderr
+    assert "test-up complete." in proc.stdout
+    starts = [entry for entry in log if entry.startswith(("SYSTEMCTL start", "PM2 start"))]
+    assert "SYSTEMCTL start pifitness-fastapi-test.service" in starts
+    assert any(entry.startswith("PM2 start") for entry in starts), log
+    assert "SYSTEMCTL is-active pifitness-fastapi-test.service" in log
+    assert "PM2 describe pifitness-next-test" in log
+    # curl is resolved by Git bash to /usr/bin/curl.exe (not any stub on PATH),
+    # so real-curl probes do not appear in the stub log. Their success is
+    # already proved by proc.returncode == 0 and "test-up complete." above:
+    # any probe failure calls recover_and_fail and exits nonzero.
+    assert any("current_setting('pifitness.env', true)" in entry for entry in log), log
+    start_idx = log.index("SYSTEMCTL start pifitness-fastapi-test.service")
+    verify_idx = log.index("SYSTEMCTL is-active pifitness-fastapi-test.service")
+    assert start_idx < verify_idx, "verification must run after start: %r" % log

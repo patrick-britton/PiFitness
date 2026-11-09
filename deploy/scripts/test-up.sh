@@ -9,6 +9,7 @@ TEST_DB="${TEST_DB:-pifitness_test}"
 DB_USER="${DB_USER:-dev}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-15432}"
+HTTPS_HOSTNAME="${HTTPS_HOSTNAME:-https://pifitness.duckdns.org}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/Documents/DB_Backups}"
 
 # Canonicalize and validate a directory path before any destructive use.
@@ -209,6 +210,16 @@ write_state() {
   mv -f "$tmp" "$STATE_FILE"
 }
 
+# recover_and_fail: log a fatal check failure, run the defined recovery path
+# (test-down.sh) to restore PRD services and clean up the test stack, then
+# exit nonzero. The durable state file is left intact for test-down to read.
+recover_and_fail() {
+  echo "ERROR: $1" >&2
+  echo "Running recovery path (test-down.sh)..." >&2
+  "$(dirname "$0")/test-down.sh" >&2 || true
+  exit 1
+}
+
 # Crash/Ctrl+C safety: persist the current phase so test-down can decide what
 # was already done and what still needs restoring.
 trap 'write_state' INT TERM
@@ -401,12 +412,51 @@ current_phase="migrations-applied"
 write_state
 
 echo "Step 9: start test units"
-sudo systemctl start pifitness-fastapi-test.service 2>/dev/null || true
-if [[ -f "$TEST_DIR/deploy/scripts/ecosystem.config.js" ]]; then
-  pm2 start "$TEST_DIR/deploy/scripts/ecosystem.config.js" 2>/dev/null || true
+# Start the test FastAPI unit. A start failure is fatal and runs recovery.
+if ! sudo systemctl start pifitness-fastapi-test.service 2>/dev/null; then
+  recover_and_fail "failed to start test FastAPI unit pifitness-fastapi-test.service"
+fi
+# Start the test Next.js frontend under PM2. A start failure is fatal and runs recovery.
+if ! pm2 start "$TEST_DIR/deploy/scripts/ecosystem.config.js" 2>/dev/null; then
+  recover_and_fail "failed to start PM2 test process pifitness-next-test"
 fi
 current_phase="test-units-started"
 write_state
+
+echo "Step 10: verify the complete test stack"
+# systemd must report the test FastAPI unit active.
+fastapi_active="$(systemctl is-active pifitness-fastapi-test.service 2>/dev/null || echo unknown)"
+if [[ "$fastapi_active" != "active" ]]; then
+  recover_and_fail "test FastAPI unit is not active (state=$fastapi_active)"
+fi
+# PM2 must report the named test process online.
+if ! pm2 describe pifitness-next-test 2>/dev/null | grep -qi 'online'; then
+  recover_and_fail "PM2 test process pifitness-next-test is not online"
+fi
+# FastAPI must answer directly on 127.0.0.1:8000 with a real status body;
+# a generic HTTP 200 alone is insufficient.
+if ! health_body="$(curl -fsS http://127.0.0.1:8000/api/health 2>/dev/null)"; then
+  recover_and_fail "FastAPI health check on 127.0.0.1:8000 failed"
+fi
+if ! printf '%s' "$health_body" | grep -q '"status"'; then
+  recover_and_fail "FastAPI health check did not return a valid status body"
+fi
+# Next.js must answer directly on 127.0.0.1:3000.
+if ! curl -fsS http://127.0.0.1:3000 >/dev/null 2>&1; then
+  recover_and_fail "Next.js did not respond on 127.0.0.1:3000"
+fi
+# The unchanged HTTPS hostname must route to the test stack.
+if ! curl -fkS "$HTTPS_HOSTNAME" >/dev/null 2>&1; then
+  recover_and_fail "HTTPS hostname $HTTPS_HOSTNAME does not route to the test stack"
+fi
+# The health check must verify the test environment and TEST DB marker; a
+# generic HTTP 200 alone is insufficient. Confirm the TEST DB carries the
+# 'test' marker so the backend is connected to the marked TEST database.
+marker="$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" -tAc \
+  "SELECT current_setting('pifitness.env', true);" 2>/dev/null | tr -d '[:space:]')"
+if [[ "$marker" != "test" ]]; then
+  recover_and_fail "$TEST_DB is not marked for test use (marker='${marker:-<none>}')"
+fi
 
 current_phase="complete"
 write_state
