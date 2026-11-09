@@ -72,6 +72,7 @@ fi
 # Canonicalize and validate paths before any destructive use.
 PRD_DIR="$(canonicalize_path "$PRD_DIR")" || exit 1
 TEST_DIR="$(canonicalize_path "$TEST_DIR")" || exit 1
+export TEST_DIR
 
 if [[ "$TEST_DIR" == "$PRD_DIR" ]]; then
   echo "ERROR: TEST_DIR must not equal PRD_DIR: $TEST_DIR" >&2
@@ -93,10 +94,10 @@ steps=(
   "write durable test state ($STATE_FILE)"
   "stop PRD services and timers"
   "create $TEST_DB from PRD (template clone, fallback pg_dump/pg_restore)"
-  "apply pending migrations to $TEST_DB"
   "fetch $ref from origin and resolve to full SHA"
   "check out resolved SHA into $TEST_DIR (own venv and build)"
   "provision test checkout (venv, Python requirements, frontend build)"
+  "apply pending migrations to $TEST_DB (pinned checkout's migration runner)"
   "start test units"
   "write final test state"
 )
@@ -306,23 +307,16 @@ if [[ "$marker" != "test" ]]; then
 fi
 write_state
 
-echo "Step 5: apply pending migrations"
-if [[ -x "$PRD_DIR/deploy/scripts/run_migrations.sh" ]]; then
-  DB_NAME="$TEST_DB" "$PRD_DIR/deploy/scripts/run_migrations.sh"
-else
-  echo "  no migration runner found; skipping"
-fi
-current_phase="migrations-applied"
-write_state
 
-echo "Step 6: fetch $ref from origin and resolve to full SHA"
+
+echo "Step 5: fetch $ref from origin and resolve to full SHA"
 git -C "$PRD_DIR" fetch origin "$ref"
 resolved_sha="$(git -C "$PRD_DIR" rev-parse FETCH_HEAD)"
 echo "  resolved $ref to $resolved_sha"
 current_phase="ref-resolved"
 write_state
 
-echo "Step 7: check out resolved SHA into test dir"
+echo "Step 6: check out resolved SHA into test dir"
 rm -rf "$TEST_DIR"
 git clone "$PRD_DIR" "$TEST_DIR"
 git -C "$TEST_DIR" checkout "$resolved_sha"
@@ -335,15 +329,15 @@ echo "  test env copied to $TEST_DIR/.env.test"
 current_phase="checkout-done"
 write_state
 
-echo "Step 8: provision test checkout (venv, Python requirements, frontend build)"
+echo "Step 7: provision test checkout (venv, Python requirements, frontend build)"
 # Remove any inherited artifacts from the PRD checkout before provisioning.
 rm -rf "$TEST_DIR/venv" "$TEST_DIR/frontend/pifitness/node_modules" "$TEST_DIR/frontend/pifitness/.next" "$TEST_DIR/.env"
 # Create the backend venv inside the test checkout.
 python3 -m venv "$TEST_DIR/venv"
 # Install current runtime requirements (Phase 5 package-sync approach).
-"$TEST_DIR/venv/bin/pip install" -r "$TEST_DIR/backend/requirements.txt"
+"$TEST_DIR/venv/bin/pip" install -r "$TEST_DIR/backend/requirements.txt"
 # Install the backend editable package from the checked-out tree.
-"$TEST_DIR/venv/bin/pip install" -e "$TEST_DIR/backend"
+"$TEST_DIR/venv/bin/pip" install -e "$TEST_DIR/backend"
 # Confirm pifitness resolves inside the test checkout backend package.
 installed_pifitness="$("$TEST_DIR/venv/bin/python" -c "import pifitness; print(pifitness.__file__)")" || {
   echo "ERROR: failed to import pifitness in test checkout venv" >&2
@@ -368,6 +362,42 @@ esac
   NEXT_PUBLIC_APP_ENV=test npm run build
 )
 current_phase="checkout-provisioned"
+write_state
+
+echo "Step 8: apply pending migrations to $TEST_DB"
+# Run the migration tool from the pinned test checkout, never from the PRD
+# checkout and never with a raw for *.sql / psql -f loop. The absent
+# run_migrations.sh lookup is replaced by this direct invocation: a missing
+# runner is a hard failure (no silent skip), and a runner failure stops here
+# so no test service starts and the durable state stays sufficient for
+# test-down.
+migration_runner="$TEST_DIR/tools/db/migrate.py"
+if [[ ! -f "$migration_runner" ]]; then
+  echo "ERROR: migration runner missing from test checkout: $migration_runner" >&2
+  exit 1
+fi
+export APP_ENV=test
+export PG_DB="$TEST_DB"
+migration_log="$TEST_DIR/migration-apply.log"
+: > "$migration_log"
+echo "  migration status before:"
+if ! "$TEST_DIR/venv/bin/python" "$migration_runner" status 2>&1 | tee -a "$migration_log"; then
+  echo "ERROR: migration status check failed; see $migration_log" >&2
+  exit 1
+fi
+migration_start="$(date +%s)"
+if ! "$TEST_DIR/venv/bin/python" "$migration_runner" up 2>&1 | tee -a "$migration_log"; then
+  echo "ERROR: migration runner failed; test services will not start; see $migration_log" >&2
+  exit 1
+fi
+migration_end="$(date +%s)"
+echo "  migrations completed in $(( migration_end - migration_start ))s"
+echo "  migration status after:"
+if ! "$TEST_DIR/venv/bin/python" "$migration_runner" status 2>&1 | tee -a "$migration_log"; then
+  echo "ERROR: post-migration status check failed; see $migration_log" >&2
+  exit 1
+fi
+current_phase="migrations-applied"
 write_state
 
 echo "Step 9: start test units"
