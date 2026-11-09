@@ -5,9 +5,13 @@ Usage:
     python tools/db/migrate.py status        Show applied vs pending migrations
     python tools/db/migrate.py up            Apply all pending migrations
     python tools/db/migrate.py down          Roll back the last applied migration
-    python tools/db/migrate.py baseline      Mark current DEV schema as the baseline (version 0)
+    python tools/db/migrate.py baseline      Mark current schema as the baseline (version 0)
 
-DEV-only: refuses to run unless APP_ENV=dev and the database pifitness.env marker is 'dev'.
+The migration tool runs only against a confirmed local database:
+    APP_ENV=dev  -> pifitness_dev, marker must be 'dev'
+    APP_ENV=test -> pifitness_test, marker must be 'test'
+PRD (APP_ENV unset/prod), remote hosts, unmarked databases, and any mismatch
+between the environment-implied database name and the configured database are refused.
 Never touches PRD.
 """
 
@@ -15,14 +19,13 @@ import os
 import re
 import sys
 
-os.environ.setdefault("APP_ENV", "dev")
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
+from dotenv import load_dotenv
 
 import psycopg2
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
-from pifitness.core.config import get_settings
+_ENV_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "backend", ".env")
+if os.path.exists(_ENV_PATH):
+    load_dotenv(_ENV_PATH)
 
 MIGRATIONS_DIR = os.path.join(
     os.path.dirname(__file__), "..", "..", "deploy", "migrations"
@@ -35,22 +38,51 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 """
 
 
+APP_ENV_DEV = "dev"
+APP_ENV_TEST = "test"
+DB_DEV = "pifitness_dev"
+DB_TEST = "pifitness_test"
+LOCAL_HOSTS = {"localhost", "127.0.0.1"}
+
+
 def _conn_params():
-    s = get_settings()
     return dict(
-        host=s.db_host,
-        port=s.db_port,
-        user=s.db_user,
-        password=s.db_password,
-        sslmode=s.db_sslmode,
+        host=os.getenv("PG_HOST", "localhost"),
+        port=int(os.getenv("PG_PORT", "15432")),
+        user=os.getenv("PG_USER", "dev"),
+        password=os.getenv("PG_PASSWORD", ""),
+        sslmode=os.getenv("PGSSLMODE", "disable"),
     )
 
 
-def _dev_conn():
-    params = _conn_params()
-    params["dbname"] = "pifitness_dev"
-    c = psycopg2.connect(**params)
-    return c
+def _resolve_db_name(app_env):
+    """Return the database name implied by APP_ENV, or refuse non-migration targets."""
+    if app_env == APP_ENV_DEV:
+        return DB_DEV
+    if app_env == APP_ENV_TEST:
+        return DB_TEST
+    raise RuntimeError(
+        "migrations are not permitted for APP_ENV=%s; "
+        "run with APP_ENV=dev (pifitness_dev) or APP_ENV=test (pifitness_test)"
+        % (app_env or "unset")
+    )
+
+
+def _validate_target(app_env, params):
+    """Refuse remote hosts and database names that contradict APP_ENV."""
+    host = params.get("host", "localhost")
+    if host not in LOCAL_HOSTS:
+        raise RuntimeError(
+            "refusing to migrate remote host %r; migrations run only against localhost"
+            % (host,)
+        )
+    configured_db = os.getenv("PG_DB")
+    if configured_db is not None and configured_db != _resolve_db_name(app_env):
+        raise RuntimeError(
+            "PG_DB=%r does not match the database implied by APP_ENV=%s (%r); "
+            "refusing to migrate"
+            % (configured_db, app_env or "unset", _resolve_db_name(app_env))
+        )
 
 
 def _ensure_schema_migrations(cur):
@@ -71,6 +103,39 @@ def _list_migration_files():
     return files
 
 
+def _connect(dbname):
+    params = _conn_params()
+    params["dbname"] = dbname
+    return psycopg2.connect(**params)
+
+
+def _read_marker(cur):
+    cur.execute("SHOW pifitness.env")
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def _guard(app_env, marker):
+    """Require a confirmed, matching marker on the migration target.
+
+    The migration tool is stricter than the general startup guard: an unmarked
+    database is refused because the marker is the only evidence that the target
+    is the intended DEV or TEST database.
+    """
+    if marker is None:
+        target = DB_DEV if app_env == APP_ENV_DEV else DB_TEST
+        raise RuntimeError(
+            "database %s is unmarked (pifitness.env is not set); refusing to migrate"
+            % (target,)
+        )
+    expected_mark = "dev" if app_env == APP_ENV_DEV else "test"
+    if marker != expected_mark:
+        raise RuntimeError(
+            "APP_ENV=%s but database marker is %r; refusing to migrate (expected %r)"
+            % (app_env, marker, expected_mark)
+        )
+
+
 def _parse_sections(filepath):
     with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
@@ -86,10 +151,15 @@ def _applied_versions(cur):
     return {row[0] for row in cur.fetchall()}
 
 
-def cmd_status():
-    conn = _dev_conn()
+def cmd_status(app_env):
+    dbname = _resolve_db_name(app_env)
+    params = _conn_params()
+    _validate_target(app_env, params)
+    conn = _connect(dbname)
     cur = conn.cursor()
     _ensure_schema_migrations(cur)
+    marker = _read_marker(cur)
+    _guard(app_env, marker)
     applied = _applied_versions(cur)
     conn.commit()
     migrations = _list_migration_files()
@@ -102,10 +172,15 @@ def cmd_status():
     conn.close()
 
 
-def cmd_up():
-    conn = _dev_conn()
+def cmd_up(app_env):
+    dbname = _resolve_db_name(app_env)
+    params = _conn_params()
+    _validate_target(app_env, params)
+    conn = _connect(dbname)
     cur = conn.cursor()
     _ensure_schema_migrations(cur)
+    marker = _read_marker(cur)
+    _guard(app_env, marker)
     applied = _applied_versions(cur)
     migrations = _list_migration_files()
     pending = [(v, fn, fp) for v, fn, fp in migrations if v not in applied]
@@ -129,10 +204,15 @@ def cmd_up():
     conn.close()
 
 
-def cmd_down():
-    conn = _dev_conn()
+def cmd_down(app_env):
+    dbname = _resolve_db_name(app_env)
+    params = _conn_params()
+    _validate_target(app_env, params)
+    conn = _connect(dbname)
     cur = conn.cursor()
     _ensure_schema_migrations(cur)
+    marker = _read_marker(cur)
+    _guard(app_env, marker)
     applied = _applied_versions(cur)
     migrations = _list_migration_files()
     applied_map = {v: (fn, fp) for v, fn, fp in migrations if v in applied}
@@ -155,10 +235,15 @@ def cmd_down():
     conn.close()
 
 
-def cmd_baseline():
-    conn = _dev_conn()
+def cmd_baseline(app_env):
+    dbname = _resolve_db_name(app_env)
+    params = _conn_params()
+    _validate_target(app_env, params)
+    conn = _connect(dbname)
     cur = conn.cursor()
     _ensure_schema_migrations(cur)
+    marker = _read_marker(cur)
+    _guard(app_env, marker)
     cur.execute("SELECT 1 FROM schema_migrations WHERE version = 0")
     if cur.fetchone():
         print("Baseline already recorded (version 0 present in schema_migrations).")
@@ -176,14 +261,15 @@ def main():
         print("Usage: python tools/db/migrate.py {status|up|down|baseline}")
         sys.exit(1)
     command = sys.argv[1].lower()
+    app_env = os.getenv("APP_ENV", "")
     if command == "status":
-        cmd_status()
+        cmd_status(app_env)
     elif command == "up":
-        cmd_up()
+        cmd_up(app_env)
     elif command == "down":
-        cmd_down()
+        cmd_down(app_env)
     elif command == "baseline":
-        cmd_baseline()
+        cmd_baseline(app_env)
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
