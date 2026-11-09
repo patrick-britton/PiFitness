@@ -10,6 +10,7 @@ DB_USER="${DB_USER:-dev}"
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-15432}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1/api/health}"
+HTTPS_HOSTNAME="${HTTPS_HOSTNAME:-https://pifitness.duckdns.org}"
 
 # Canonicalize and validate a directory path before any destructive use.
 # Refuses: empty paths, "/", and symlinks. Returns the canonical absolute path.
@@ -47,6 +48,7 @@ while [[ $# -gt 0 ]]; do
       fi
       echo "  restore PRD services/timers from $STATE_FILE"
       echo "  call $HEALTH_URL"
+      echo "  call $HTTPS_HOSTNAME"
       echo "  remove $TEST_DIR"
       echo "  remove $STATE_FILE"
       exit 0
@@ -62,17 +64,28 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Canonicalize paths before any destructive use (same guard as test-up).
+# --- Validate configuration before any destructive action -----------------
+# Canonicalize and validate directory paths (same guard as test-up), then
+# recheck DB names and host/port against the recorded state before touching
+# anything.
 PRD_DIR="$(canonicalize_path "$PRD_DIR")" || exit 1
 TEST_DIR="$(canonicalize_path "$TEST_DIR")" || exit 1
 
-# Recheck configuration before any destructive command: PRD and TEST DB
-# names must differ, and test-down must connect to the same host/port
-# test-up used (the state file can override both, so capture them first).
 if [[ "$PRD_DB" == "$TEST_DB" ]]; then
   echo "ERROR: PRD and TEST DB names must differ" >&2
   exit 1
 fi
+if [[ "$TEST_DIR" == "$PRD_DIR" ]]; then
+  echo "ERROR: TEST_DIR must not equal PRD_DIR: $TEST_DIR" >&2
+  exit 1
+fi
+case "$PRD_DIR" in
+  "$TEST_DIR"/*)
+    echo "ERROR: TEST_DIR is an ancestor of PRD_DIR: $TEST_DIR" >&2
+    exit 1
+    ;;
+esac
+
 CONFIGURED_DB_HOST="${DB_HOST:-localhost}"
 CONFIGURED_DB_PORT="${DB_PORT:-15432}"
 
@@ -131,20 +144,31 @@ else
   echo "  pifitness-hardware-health.timer was not active before test-up; leaving stopped"
 fi
 if [[ "${PM2_NEXTPROD_ACTIVE:-unknown}" == "online" ]]; then
-  pm2 restart pifitness-next 2>/dev/null || true
-  echo "  production PM2 pifitness-next was online before test-up; restart attempted"
+  if ! pm2 restart pifitness-next; then
+    echo "ERROR: failed to restart production PM2 pifitness-next (was online before test-up)" >&2
+    exit 1
+  fi
+  echo "  production PM2 pifitness-next was online before test-up; restarted"
 else
   echo "  production PM2 pifitness-next was not online before test-up; leaving stopped"
 fi
 
 echo "Step 3: health check (PRD API must respond before cleanup)"
-if command -v curl >/dev/null 2>&1; then
-  if ! curl -fsS "$HEALTH_URL"; then
-    echo "ERROR: PRD health check failed at $HEALTH_URL; state file retained for retry" >&2
-    exit 1
-  fi
-else
-  echo "  curl not available; skipping health check"
+# curl is required: a missing curl or a failed health check aborts here,
+# before the TEST database or checkout is touched, and the state file is
+# retained so the run can be retried.
+if ! command -v curl >/dev/null 2>&1; then
+  echo "ERROR: curl is required for the PRD health check" >&2
+  exit 1
+fi
+if ! curl -fsS "$HEALTH_URL" >/dev/null; then
+  echo "ERROR: PRD health check failed at $HEALTH_URL; state file retained for retry" >&2
+  exit 1
+fi
+# The unchanged public HTTPS hostname must route to the restored PRD API.
+if ! curl -fkS "$HTTPS_HOSTNAME" >/dev/null 2>&1; then
+  echo "ERROR: PRD health check failed at HTTPS hostname $HTTPS_HOSTNAME; state file retained for retry" >&2
+  exit 1
 fi
 
 # The PRD dump preserved by test-up is a disaster-recovery artifact only:
@@ -168,6 +192,18 @@ else
 fi
 
 echo "Step 5: remove test checkout"
+# Harden checkout removal with the same canonical-path guard as test-up:
+# refuse TEST_DIR equal to or an ancestor of PRD_DIR before any rm -rf.
+if [[ "$TEST_DIR" == "$PRD_DIR" ]]; then
+  echo "ERROR: TEST_DIR must not equal PRD_DIR: $TEST_DIR" >&2
+  exit 1
+fi
+case "$PRD_DIR" in
+  "$TEST_DIR"/*)
+    echo "ERROR: TEST_DIR is an ancestor of PRD_DIR: $TEST_DIR" >&2
+    exit 1
+    ;;
+esac
 rm -rf "$TEST_DIR"
 
 echo "Step 6: remove state file (cleanup complete)"
