@@ -96,6 +96,7 @@ steps=(
   "apply pending migrations to $TEST_DB"
   "fetch $ref from origin and resolve to full SHA"
   "check out resolved SHA into $TEST_DIR (own venv and build)"
+  "provision test checkout (venv, Python requirements, frontend build)"
   "start test units"
   "write final test state"
 )
@@ -334,7 +335,42 @@ echo "  test env copied to $TEST_DIR/.env.test"
 current_phase="checkout-done"
 write_state
 
-echo "Step 8: start test units"
+echo "Step 8: provision test checkout (venv, Python requirements, frontend build)"
+# Remove any inherited artifacts from the PRD checkout before provisioning.
+rm -rf "$TEST_DIR/venv" "$TEST_DIR/frontend/pifitness/node_modules" "$TEST_DIR/frontend/pifitness/.next" "$TEST_DIR/.env"
+# Create the backend venv inside the test checkout.
+python3 -m venv "$TEST_DIR/venv"
+# Install current runtime requirements (Phase 5 package-sync approach).
+"$TEST_DIR/venv/bin/pip install" -r "$TEST_DIR/backend/requirements.txt"
+# Install the backend editable package from the checked-out tree.
+"$TEST_DIR/venv/bin/pip install" -e "$TEST_DIR/backend"
+# Confirm pifitness resolves inside the test checkout backend package.
+installed_pifitness="$("$TEST_DIR/venv/bin/python" -c "import pifitness; print(pifitness.__file__)")" || {
+  echo "ERROR: failed to import pifitness in test checkout venv" >&2
+  exit 1
+}
+case "$installed_pifitness" in
+  "$TEST_DIR"/backend/pifitness/*)
+    echo "  pifitness resolves to $installed_pifitness" ;;
+  *)
+    echo "ERROR: pifitness does not resolve to test checkout backend: $installed_pifitness" >&2
+    exit 1 ;;
+esac
+# Install frontend dependencies reproducibly from the committed lockfile.
+(
+  cd "$TEST_DIR/frontend/pifitness"
+  npm ci
+)
+# Build the frontend with test build-time environment. NEXT_PUBLIC_API_URL
+# remains unset unless the application contract requires a same-origin value.
+(
+  cd "$TEST_DIR/frontend/pifitness"
+  NEXT_PUBLIC_APP_ENV=test npm run build
+)
+current_phase="checkout-provisioned"
+write_state
+
+echo "Step 9: start test units"
 sudo systemctl start pifitness-fastapi-test.service 2>/dev/null || true
 if [[ -f "$TEST_DIR/deploy/scripts/ecosystem.config.js" ]]; then
   pm2 start "$TEST_DIR/deploy/scripts/ecosystem.config.js" 2>/dev/null || true
