@@ -58,6 +58,8 @@ esac
 SOURCE_REPO="/home/god/PiFitness"
 UV_BIN="/home/god/.local/bin/uv"
 PYTHON_BIN="/usr/bin/python3"
+NODE_BIN="/usr/bin/node"
+NPM_BIN="/usr/bin/npm"
 
 if [[ ! "$COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
     fail "A full 40-character commit SHA is required."
@@ -66,6 +68,8 @@ fi
 [[ -f "$ENV_FILE" ]] || fail "Missing environment file: $ENV_FILE"
 [[ -x "$UV_BIN" ]] || fail "uv not found or not executable: $UV_BIN"
 [[ -x "$PYTHON_BIN" ]] || fail "Python not found: $PYTHON_BIN"
+[[ -x "$NODE_BIN" ]] || fail "Node.js not found: $NODE_BIN"
+[[ -x "$NPM_BIN" ]] || fail "npm not found: $NPM_BIN"
 
 command -v pg_dump >/dev/null 2>&1 ||
     fail "Required PostgreSQL executable pg_dump is missing."
@@ -184,6 +188,26 @@ with sync_playwright() as p:
     browser.close()
 PY
 )
+
+echo
+echo "Installing TEST frontend dependencies and building..."
+
+FRONTEND_DIR="$STAGE_DIR/frontend/pifitness"
+
+[[ -f "$FRONTEND_DIR/package.json" ]] ||
+    fail "Frontend package.json is missing."
+
+[[ -f "$FRONTEND_DIR/package-lock.json" ]] ||
+    fail "Frontend package-lock.json is missing."
+
+(
+    cd "$FRONTEND_DIR"
+    "$NPM_BIN" ci
+    "$NPM_BIN" run build
+)
+
+echo
+echo "Frontend dependencies installed and production build verified."
 
 echo
 echo "All pre-deployment checks passed."
