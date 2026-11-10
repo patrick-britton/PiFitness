@@ -105,7 +105,11 @@ vi.mock('maplibre-gl', () => {
     remove() {}
   }
   class NavigationControl {}
-  return { default: { Map, NavigationControl } };
+  return {
+  Map,
+  NavigationControl,
+  setWorkerUrl: vi.fn(),
+};
 });
 
 const COORDS = [

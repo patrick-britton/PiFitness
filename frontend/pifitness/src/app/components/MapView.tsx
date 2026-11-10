@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import { maplibregl } from '@/lib/maplibre';
 
 interface MapViewProps {
   /** Optional center coordinates [lng, lat] */

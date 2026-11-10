@@ -58,7 +58,11 @@ vi.mock('maplibre-gl', () => {
     remove() {}
   }
   class NavigationControl {}
-  return { default: { Map, NavigationControl } };
+  return {
+  Map,
+  NavigationControl,
+  setWorkerUrl: vi.fn(),
+};
 });
 
 vi.mock('../MapStyleSelector', () => ({ default: () => <div data-testid="style-selector" /> }));
