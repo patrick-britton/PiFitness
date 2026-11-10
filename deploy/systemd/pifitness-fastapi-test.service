@@ -1,5 +1,5 @@
 [Unit]
-Description=PiFitness FastAPI Backend (test mode)
+Description=PiFitness FastAPI Backend (TEST)
 After=network.target postgresql.service
 Wants=postgresql.service
 Conflicts=pifitness-fastapi.service
@@ -9,18 +9,17 @@ Type=simple
 User=god
 Group=god
 WorkingDirectory=/home/god/PiFitness-test
-EnvironmentFile=/home/god/PiFitness-test/.env.test
-ExecStart=~/PiFitness-test/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
+EnvironmentFile=/home/god/.config/pifitness/test.env
+ExecStart=/home/god/PiFitness-test/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 
-# Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=read-only
-ReadWritePaths=/home/god/PiFitness-test
+ReadWritePaths=/home/god/PiFitness-test /home/god/Documents/PiFitness_Test_Local
 
 [Install]
 WantedBy=multi-user.target
