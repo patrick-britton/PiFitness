@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PiFitness Human Task Prep — Tasks 5.22 & 5.23</title>
+</head>
+<body>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background: #f5f7fa; color: #1f2937; line-height: 1.5; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  header { background: #111827; color: #fff; padding: 20px 0; margin-bottom: 24px; }
+  header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+  header .subtitle { font-size: 13px; color: #9ca3af; margin-top: 4px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 6px; }
+  .badge-prd { background: #fef3c7; color: #92400e; }
+  .badge-tst { background: #dbeafe; color: #1e40af; }
+  .badge-dev { background: #d1fae5; color: #065f46; }
+  .badge-pi { background: #fee2e2; color: #991b1b; }
+  .badge-local { background: #e0e7ff; color: #3730a3; }
+  .progress-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .progress-card h2 { margin: 0 0 12px 0; font-size: 15px; font-weight: 600; }
+  #progress-summary { font-size: 13px; color: #4b5563; margin-bottom: 12px; }
+  .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
+  #progress-fill { height: 100%; background: #10b981; width: 0%; transition: width 0.3s; }
+  .task-section { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
+  .task-header { background: #f3f4f6; padding: 16px; border-bottom: 1px solid #e5e7eb; }
+  .task-header h2 { margin: 0; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .task-header .task-id { background: #374151; color: #fff; padding: 2px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+  .task-header p { margin: 6px 0 0 0; font-size: 13px; color: #4b5563; }
+  .task-body { padding: 0; }
+  .step { border-bottom: 1px solid #e5e7eb; padding: 18px; position: relative; }
+  .step:last-child { border-bottom: none; }
+  .step-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  .step-number { flex-shrink: 0; background: #10b981; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+  .step-title { font-size: 14px; font-weight: 600; color: #111827; margin: 0; }
+  .step-done-checkbox { margin-left: auto; align-self: center; }
+  .step-meta { font-size: 12px; color: #6b7280; margin-bottom: 10px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .step-meta span { display: flex; align-items: center; gap: 4px; }
+  .step-content { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 768px) { .step-content { grid-template-columns: 1fr; } }
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  .field-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #374151; margin-bottom: 4px; display: block; }
+  .field-value { font-size: 13px; color: #111827; white-space: pre-wrap; word-break: break-word; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 10px; }
+  .command-block { background: #111827; color: #e5e7eb; border-radius: 4px; padding: 10px; font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; border-left: 3px solid #10b981; }
+  .command-block.code { border-left-color: #3b82f6; }
+  .command-block.warn { border-left-color: #f59e0b; }
+  .output-area { width: 100%; min-height: 70px; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px; font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace; font-size: 11px; color: #374151; background: #fff; resize: vertical; outline: none; transition: border-color 0.2s; }
+  .output-area:focus { border-color: #3b82f6; }
+  .stop-recovery { margin-top: 10px; padding: 10px; border-radius: 4px; font-size: 12.5px; }
+  .stop-if { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+  .recovery { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+  .stop-recovery b { display: block; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .local-files { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .local-files h2 { margin: 0 0 12px 0; font-size: 16px; font-weight: 600; }
+  .local-files table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .local-files th { text-align: left; padding: 8px 6px; border-bottom: 2px solid #e5e7eb; color: #374151; font-weight: 600; }
+  .local-files td { padding: 8px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  .local-files tr:nth-child(even) td { background: #f9fafb; }
+  .report-section { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .report-section h2 { margin: 0 0 12px 0; font-size: 16px; font-weight: 600; }
+  .btn-create-report { background: #111827; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
+  .btn-create-report:hover { background: #1f2937; }
+  .btn-create-report:active { background: #374151; }
+  #report-output { width: 100%; min-height: 200px; border: 1px solid #d1d5db; border-radius: 4px; padding: 12px; font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace; font-size: 11px; color: #374151; background: #f9fafb; resize: vertical; white-space: pre-wrap; outline: none; }
+  #report-output:focus { border-color: #3b82f6; }
+  .hint { font-size: 12px; color: #6b7280; font-style: italic; margin-top: 4px; }
+  .checkbox-container { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #4b5563; }
+  .checkbox-container input { width: 16px; height: 16px; accent-color: #10b981; }
+  .step.done .step-number { background: #10b981; }
+  .step.done .step-title { color: #047857; }
+</style>
+<div class="container">
+<header>
+  <h1>PiFitness Human Task Prep — Tasks 5.22 & 5.23</h1>
+  <div class="subtitle">Pi recovery drill and first real test deployment with phone acceptance &bull; Follow each step in order on the Remote PI via SSH &bull; Record console output in the boxes below</div>
+</header>
+<div class="progress-card">
+  <h2>Progress</h2>
+  <div id="progress-summary">0 steps completed</div>
+  <div class="progress-bar"><div id="progress-fill"></div></div>
+</div>
+<div class="local-files">
+  <h2>Local Files for Independent Agent Testing</h2>
+  <p class="hint">The following files exist on your Local PC (repository working tree) and can be reviewed or tested by an independent agent before the Pi-side human run. Files marked <strong>[runtime]</strong> are executed on the PI during the human tasks.</p>
+  <table>
+    <thead>
+      <tr><th>File (Local PC)</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>deploy/scripts/test-up.sh</code></td><td>[runtime] Main test-up script: validates test env, records PRD commit, dumps PRD DB, writes durable state, stops PRD writers, clones TEST DB, fetches test ref, provisions checkout, applies migrations, starts test units, verifies stack. Contains the <code>pre_start</code> failpoint for the recovery drill.</td></tr>
+      <tr><td><code>deploy/scripts/test-down.sh</code></td><td>[runtime] Main test-down script: stops test units, restores PRD services/timers/PM2 from state record, health-checks PRD, drops TEST DB (marker-checked unless --keep-db), removes test checkout and state file. Contains the <code>during_restore</code> failpoint for the recovery drill.</td></tr>
+      <tr><td><code>deploy/.env.test.example</code></td><td>Tracked, secret-free test environment template. Specifies APP_ENV=test, PG_HOST=localhost, PG_PORT=15432, PG_DB=pifitness_test, PG_USER=dev, PGSSLMODE=disable, BOX=local, integrations disabled. Copy to <code>~/.config/pifitness/test.env</code> and fill in secrets before running test-up.</td></tr>
+      <tr><td><code>deploy/systemd/pifitness-fastapi-test.service</code></td><td>Test FastAPI systemd unit file. Runs from <code>~/PiFitness-test</code> with its own venv, <code>Conflicts=pifitness-fastapi.service</code>, test-only EnvironmentFile.</td></tr>
+      <tr><td><code>deploy/systemd/pifitness-fastapi.service</td><td>Production FastAPI systemd unit file. Binds to 127.0.0.1:8000, uses production venv and environment file.</td></tr>
+      <tr><td><code>deploy/scripts/ecosystem.config.js</code></td><td>PM2 ecosystem config for Next.js frontend. Production uses <code>pifitness-next</code>; test uses <code>pifitness-next-test</code>. Sets <code>NEXT_PUBLIC_APP_ENV=test</code> for test builds.</td></tr>
+      <tr><td><code>tools/db/migrate.py</code></td><td>Database migration runner (dbmate-based). Invoked from the pinned test checkout against the TEST database in APP_ENV=test mode.</td></tr>
+      <tr><td><code>tests/test_test_up.py</td><td>Unit tests for test-up.sh: ref resolution, path validation, step ordering, migration invocation, stack verification, failpoint behavior.</td></tr>
+      <tr><td><code>tests/test_test_down.py</td><td>Unit tests for test-down.sh: state loading, PRD restoration, marker check before drop, critical failures not suppressed.</td></tr>
+      <tr><td><code>tests/test_test_state.py</td><td>Unit tests for the durable state file: atomic write, phase persistence, crash trap, secret-free content.</td></tr>
+      <tr><td><code>tests/test_test_processes.py</td><td>Unit tests for process management: stop/start order, exact prior-state restoration, no pkill or port-based killing.</td></tr>
+      <tr><td><code>tests/test_test_deploy_scripts.py</td><td>Failure-injection tests for test-up/test-down: every transition under injected command failure, failpoint hooks (<code>pre_start</code>, <code>during_restore</code>), no PRD DB destruction.</td></tr>
+      <tr><td><code>tests/test_migrate_env_guard.py</td><td>Unit tests for migration environment guard: DEV/TEST marker enforcement, PRD and unmarked DB rejection.</td></tr>
+      <tr><td><code>docs/workflow/PLAN.md</td><td>Source plan document containing tasks 5.22 and 5.23 definitions, done-when criteria, and failpoint references.</td></tr>
+      <tr><td><code>docs/workflow/PROGRESS.md</td><td>Append-only task event log. Human records 5.22/5.23 evidence here (failpoint, command output, PRD process states, DB identity/marker, before/after row counts).</td></tr>
+      <tr><td><code>docs/workflow/PI_FINDINGS.md</td><td>Most recent PI execution status. PI hostname <code>pfpi</code>, production checkout <code>~/PiFitness</code> on <code>react-ui</code> branch, PI already live hosting PRD.</td></tr>
+      <tr><td><code>docs/workflow/BACKLOG.md</td><td>Backlog of open items. Task 5.23 failures should be added here, not fixed inside this deployment task.</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="task-section">
+  <div class="task-header">
+    <h2><span class="task-id">TASK 5.22</span> Pi Recovery Drill</h2>
+    <p>[human] Replaces old 5.5d. Schedule a maintenance window. First run a normal test-up and test-down with --keep-db; verify PRD is restored before continuing. Then use only the explicit failpoints from 5.21 to interrupt test-up at selected transitions after the durable state checkpoint. For each drill, run test-down and verify PRD FastAPI, PM2 frontend, timers/services, HTTPS health, production commit, and exact baseline data checks. Do not use an arbitrary Ctrl+C point that occurs before state is written. Retain the dump and TEST DB until the recovery evidence is reviewed. Record the failpoint, command output, PRD process states, DB identity/marker, and before/after exact row counts in PROGRESS.md.</p>
+  </div>
+  <div class="task-body">
+
+    <div class="step" id="step-5-22-1">
+      <div class="step-header">
+        <div class="step-number">1</div>
+        <h3 class="step-title">Schedule a maintenance window</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 1 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Pick a quiet time when the Pi app can be temporarily taken offline. Keep a second SSH session open throughout the drill so you do not lose access if services stop.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">(No command — planning step. Confirm the window with stakeholders and note the start time below.)</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">Maintenance window agreed and start time recorded. You are logged into the PI via SSH with a second session ready.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> No maintenance window can be scheduled or you cannot establish two SSH sessions to the PI.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Reschedule the window. Do not proceed until you have a confirmed outage window and two SSH sessions open.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Record the maintenance window start time and confirmation..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-2">
+      <div class="step-header">
+        <div class="step-number">2</div>
+        <h3 class="step-title">Verify the test environment file exists</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 2 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Confirm that ~/.config/pifitness/test.env exists on the PI with APP_ENV=test, PG_DB=pifitness_test, PG_HOST=localhost, PG_PORT=15432, integrations disabled. test-up validates this before stopping any PRD service.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">ls -la ~/.config/pifitness/test.env
+cat ~/.config/pifitness/test.env</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">File exists with mode 0600. Contents include APP_ENV=test, PG_DB=pifitness_test, PG_HOST=localhost, PG_PORT=15432, PGSSLMODE=disable, BOX=local, SPOTIFY_ENABLED=false, GARMIN_ENABLED=false, PIRATE_ENABLED=false.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> File missing, APP_ENV not "test", PG_DB names the PRD database, host/port mismatch, or any integration enabled.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Copy deploy/.env.test.example from Local PC to ~/.config/pifitness/test.env on the PI, fill in secrets, chmod 0600, re-run this step.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste ls -la and cat output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-3">
+      <div class="step-header">
+        <div class="step-number">3</div>
+        <h3 class="step-title">Run test-up dry-run to validate the plan</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 3 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Execute test-up with --dry-run to print planned steps without making changes. Confirms ref resolves and preflight checks pass before touching PRD.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">cd ~/PiFitness
+deploy/scripts/test-up.sh --dry-run agent/phase-3</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">Dry-run prints planned steps with ref, PRD_DIR, TEST_DIR, PRD_DB, TEST_DB. No services stopped, no databases touched. Exit code 0.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Dry-run exits nonzero, or any validation error (missing test.env, bad config, path issues).</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Fix configuration issue and re-run dry-run. Do not proceed to live test-up until dry-run passes.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste the full dry-run output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-4">
+      <div class="step-header">
+        <div class="step-number">4</div>
+        <h3 class="step-title">Run normal test-up (first cycle)</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 4 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Execute full test-up: records PRD commit, dumps PRD DB, writes durable state, stops PRD writers, clones TEST DB, fetches test ref and resolves SHA, checks out test SHA, provisions venv/frontend, applies migrations, starts test units, verifies stack.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">cd ~/PiFitness
+deploy/scripts/test-up.sh agent/phase-3</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">"test-up complete." printed. Test FastAPI active, PM2 pifitness-next-test online, FastAPI on 127.0.0.1:8000 with valid status body, Next.js on 127.0.0.1:3000, HTTPS https://pifitness.duckdns.org routes to test stack, TEST DB marker is 'test'. Record resolved SHA and PRD commit.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Any step fails. test-up runs test-down as recovery automatically.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> recover_and_fail runs test-down automatically. Review error, fix issue, re-run test-up. State file (~/.pifitness-test-state) left intact.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste the full test-up output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-5">
+      <div class="step-header">
+        <div class="step-number">5</div>
+        <h3 class="step-title">Run test-down with --keep-db (first cycle)</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 5 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Execute test-down with --keep-db to restore PRD services and keep TEST DB. Stops test units, restores PRD FastAPI/timers/PM2 from state record, health-checks PRD, skips TEST DB drop, removes test checkout and state file.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">cd ~/PiFitness
+deploy/scripts/test-down.sh --keep-db</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">"test-down complete." printed. PRD FastAPI restarted (if active before), PM2 pifitness-next restarted (if online before), timers restored, PRD health passes at http://127.0.0.1/api/health and https://pifitness.duckdns.org. TEST DB retained.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> PRD health check fails at either URL. State file retained for retry.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Retry test-down. State file retained on failure. Do not delete TEST DB/checkout until PRD health passes.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste the full test-down output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-6">
+      <div class="step-header">
+        <div class="step-number">6</div>
+        <h3 class="step-title">Verify PRD restored after first cycle</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 6 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Confirm PRD back to recorded state: FastAPI active, PM2 pifitness-next online, timers active, HTTPS healthy, production commit matches recorded PRD commit, baseline data checks match.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">sudo systemctl is-active pifitness-fastapi.service
+pm2 describe pifitness-next | grep -qi online
+sudo systemctl is-active pifitness_agent.timer
+sudo systemctl is-active pifitness-hardware-health.timer
+curl -fsS http://127.0.0.1/api/health
+curl -fkS https://pifitness.duckdns.org
+git -C ~/PiFitness rev-parse HEAD</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">FastAPI active, pifitness-next online, both timers active (if active before), health checks return 200 with valid body, HTTPS routes to PRD, git commit matches PRD commit from step 4.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Any PRD service not restored, HTTPS health fails, or production commit does not match recorded value.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Manually restore missing PRD service/timer/PM2. Do not proceed to failpoint drills until PRD fully restored.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste verification output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-7">
+      <div class="step-header">
+        <div class="step-number">7</div>
+        <h3 class="step-title">Recovery drill — failpoint pre_start (interrupt before test units start)</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 7 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Run test-up with the pre_start failpoint engaged. This interrupts test-up after the durable state checkpoint (phase=migrations-applied) but before test units start. The state file is left intact so test-down can recover. Do NOT use an arbitrary Ctrl+C before state is written.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">cd ~/PiFitness
+PIFITNESS_FAILPOINT_PRE_START=1 PIFITNESS_FAILPOINT_ACK=test-only deploy/scripts/test-up.sh agent/phase-3</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">test-up exits with "FAILPOINT pre_start engaged: simulate failure before starting test units". Test FastAPI and PM2 test units are NOT started. State file exists at ~/.pifitness-test-state with phase=migrations-applied. PRD is stopped (quiesced).</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Failpoint does not engage (wrong env vars), or test-up proceeds past the failpoint and starts test units.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Verify PIFITNESS_FAILPOINT_PRE_START=1 and PIFITNESS_FAILPOINT_ACK=test-only are both set. Re-run the command. Record the failpoint name and output.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste failpoint engagement output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-8">
+      <div class="step-header">
+        <div class="step-number">8</div>
+        <h3 class="step-title">Run test-down to recover from pre_start drill</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 8 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Run test-down with --keep-db to restore PRD services after the pre_start failpoint drill. test-down loads the state file, sees PRD was stopped, restores exactly what was active before, health-checks PRD, and cleans up.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">cd ~/PiFitness
+deploy/scripts/test-down.sh --keep-db</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">"test-down complete." printed. PRD FastAPI restarted (if active before drill), PM2 pifitness-next restarted (if online before), timers restored. PRD health passes at http://127.0.0.1/api/health and https://pifitness.duckdns.org. TEST DB retained.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> PRD health check fails or any PRD service is not restored.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Retry test-down. State file retained for retry. Record PRD process states after recovery.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste test-down recovery output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-9">
+      <div class="step-header">
+        <div class="step-number">9</div>
+        <h3 class="step-title">Verify PRD restored after pre_start drill</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 9 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Confirm PRD is fully restored after the pre_start recovery drill: FastAPI, PM2 frontend, timers/services, HTTPS health, production commit, and exact baseline data checks all match the recorded pre-drill state.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">sudo systemctl is-active pifitness-fastapi.service
+pm2 describe pifitness-next | grep -qi online
+sudo systemctl is-active pifitness_agent.timer
+sudo systemctl is-active pifitness-hardware-health.timer
+curl -fsS http://127.0.0.1/api/health
+curl -fkS https://pifitness.duckdns.org
+git -C ~/PiFitness rev-parse HEAD</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">All PRD services active and healthy, production commit matches the recorded value, baseline data checks match before/after. Record PRD process states, DB identity/marker, and before/after exact row counts.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Any check does not match the pre-drill recorded state.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Investigate and manually restore any mismatch. Record evidence in PROGRESS.md before proceeding.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste verification output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-10">
+      <div class="step-header">
+        <div class="step-number">10</div>
+        <h3 class="step-title">Recovery drill — failpoint during_restore (interrupt test-down during PRD restore)</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 10 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Run test-down with the during_restore failpoint engaged. This interrupts test-down during PRD restore, before the health check, TEST DB drop, or checkout removal. The state file is left intact so the drill can be retried.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">cd ~/PiFitness
+PIFITNESS_FAILPOINT_DURING_RESTORE=1 PIFITNESS_FAILPOINT_ACK=test-only deploy/scripts/test-down.sh --keep-db</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">test-down exits with "FAILPOINT during_restore engaged: simulate failure during PRD restore (recovery drill)". State file remains intact. No destructive actions (DROP_DB, RM) are performed. Test units are already stopped.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Failpoint does not engage, or destructive actions (DROP_DB, RM, checkout removal) occur despite the failpoint.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Verify both env vars are set. Re-run test-down without the failpoint to complete the restore.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste during_restore failpoint output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-11">
+      <div class="step-header">
+        <div class="step-number">11</div>
+        <h3 class="step-title">Complete PRD restore after during_restore drill</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 11 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Re-run test-down without the failpoint to complete the PRD restore after the during_restore drill. This restores all PRD services, health-checks PRD, and cleans up the test stack.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">cd ~/PiFitness
+deploy/scripts/test-down.sh --keep-db</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">"test-down complete." printed. PRD FastAPI, PM2 pifitness-next, and timers restored to their pre-drill active state. PRD health passes at http://127.0.0.1/api/health and https://pifitness.duckdns.org.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> PRD health check fails or any service is not restored.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Retry test-down. State file retained for retry. Investigate any PRD service that fails to restart.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste test-down completion output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-22-12">
+      <div class="step-header">
+        <div class="step-number">12</div>
+        <h3 class="step-title">Record recovery evidence in PROGRESS.md</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI / Local PC</span></span>
+        <span>Step 12 of 12 &bull; Task 5.22</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Record the failpoint(s) used, command output, PRD process states, DB identity/marker, and before/after exact row counts in PROGRESS.md. Retain the PRD dump and TEST DB until the recovery evidence is reviewed. Any failure returns to agent remediation before 5.23.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">(Edit docs/workflow/PROGRESS.md on the Local PC, append one line per event with format: date | task | model | event | evidence)</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">PROGRESS.md contains START and DONE (or BLOCKED) entries for task 5.22 with evidence including failpoint names, command output, PRD process states, DB identity/marker, and before/after exact row counts.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Any recovery drill failed and PRD was not restored. Do not proceed to 5.23 until agent remediation completes.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Return to agent remediation. Fix the underlying issue, then re-attempt the drill.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste PROGRESS.md entries..."></textarea>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="task-section">
+  <div class="task-header">
+    <h2><span class="task-id">TASK 5.23</span> First Real Test Deployment and Phone Acceptance</h2>
+    <p>[human] Replaces old 5.6. Use the branch and SHA recorded by test-up. Confirm migration status against the actual PRD-copy baseline (do not assume the old "9 migrations" text is current). Record exact pending/applied versions and elapsed time. Confirm the fresh backend venv's editable install resolves pifitness inside the test checkout and the frontend was built with test configuration. Walk the changed features on a phone through https://pifitness.duckdns.org while the test stack owns the normal ports. Run test-down with --keep-db on the first acceptance run; inspect failures and retain evidence before any later cleanup. Add failures to the backlog; do not fix feature defects inside this deployment task.</p>
+  </div>
+  <div class="task-body">
+
+    <div class="step" id="step-5-23-1">
+      <div class="step-header">
+        <div class="step-number">1</div>
+        <h3 class="step-title">Confirm the branch and SHA recorded by test-up</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 1 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Use the branch and SHA recorded by test-up. The test implementation and migration code must come from the requested ref, not from the older PRD checkout.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">cat ~/.pifitness-test-state
+git -C ~/PiFitness-test rev-parse HEAD
+git -C ~/PiFitness-test log --oneline -1</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">State file shows REF and RESOLVED_SHA. The test checkout at ~/PiFitness-test is on the resolved SHA. Both match values recorded during test-up.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> State file missing, or test checkout SHA does not match resolved SHA from test-up.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Re-run test-up with the correct ref. Do not proceed until test checkout matches recorded SHA.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste state file and git output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-2">
+      <div class="step-header">
+        <div class="step-number">2</div>
+        <h3 class="step-title">Confirm migration status against PRD-copy baseline</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 2 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Check migration status on the TEST DB (a copy of PRD). Do not assume the old "9 migrations" text is current — determine the actual pending set from migration status, not a hard-coded count.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">export APP_ENV=test
+export PG_DB=pifitness_test
+~/PiFitness-test/venv/bin/python ~/PiFitness-test/tools/db/migrate.py status</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">Migration status shows exact pending and applied versions against the PRD-copy baseline. Record each version number.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Migration status command fails, or the TEST DB marker is not 'test'.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Verify the migration runner exists at ~/PiFitness-test/tools/db/migrate.py. Check the TEST DB marker with psql. Re-run status.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste migration status output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-3">
+      <div class="step-header">
+        <div class="step-number">3</div>
+        <h3 class="step-title">Record pending/applied versions and elapsed time</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 3 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Document the exact migration versions applied/skipped and the elapsed time from the migration-apply.log produced by test-up step 8.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">cat ~/PiFitness-test/migration-apply.log</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">Migration-apply.log shows status before, versions applied, errors (if any), and elapsed time ("migrations completed in Ns"). Record exact pending/applied versions and elapsed time.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> migration-apply.log is missing or shows errors.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Re-run migrations via test-up step 8. Do not proceed until migration log is clean.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste migration-apply.log contents..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-4">
+      <div class="step-header">
+        <div class="step-number">4</div>
+        <h3 class="step-title">Confirm editable install resolves pifitness in test checkout</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 4 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Confirm the fresh backend venv's editable install resolves the pifitness package inside the test checkout (~/PiFitness-test/backend/pifitness), not the PRD checkout.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">~/PiFitness-test/venv/bin/python -c "import pifitness; print(pifitness.__file__)"</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">Output path is under ~/PiFitness-test/backend/pifitness/ (e.g., /home/god/PiFitness-test/backend/pifitness/__init__.py). Confirms editable install resolves to the test package.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Import fails, or pifitness resolves to a path outside ~/PiFitness-test (e.g., PRD checkout or system site-packages).</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Re-provision the test checkout (re-run test-up step 7) or reinstall the editable package: ~/PiFitness-test/venv/bin/pip install -e ~/PiFitness-test/backend</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste import pifitness output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-5">
+      <div class="step-header">
+        <div class="step-number">5</div>
+        <h3 class="step-title">Confirm frontend built with test configuration</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 5 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Confirm the frontend was built with NEXT_PUBLIC_APP_ENV=test at build time (test-up step 7). The runtime setting alone is not proof — the compiled frontend must contain the test value.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">ls -la ~/PiFitness-test/frontend/pifitness/.next/
+grep -r "APP_ENV" ~/PiFitness-test/frontend/pifitness/.next/ 2>/dev/null | head -20
+cat ~/PiFitness-test/frontend/pifitness/.next/build-manifest.json 2>/dev/null | head -30</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">.next directory exists (build completed). Build artifacts show test configuration was applied. NEXT_PUBLIC_APP_ENV=test was set during npm run build.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> .next directory missing, or no evidence of test build configuration.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Re-run the frontend build with NEXT_PUBLIC_APP_ENV=test: cd ~/PiFitness-test/frontend/pifitness && NEXT_PUBLIC_APP_ENV=test npm run build</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste .next directory and build evidence..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-6">
+      <div class="step-header">
+        <div class="step-number">6</div>
+        <h3 class="step-title">Phone walkthrough — authentication</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-tst">TST</span> <span class="badge badge-pi">Phone</span></span>
+        <span>Step 6 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">On a phone, open https://pifitness.duckdns.org while the test stack owns the normal ports. Verify authentication works (login/logout, session handling).</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">(Phone action — open https://pifitness.duckdns.org on the phone and complete the authentication flow.)</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">Authentication succeeds on the phone over HTTPS. Login/logout works. Session persists across page navigation.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Authentication fails, HTTPS certificate error, or page does not load on the phone.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Verify test stack is running. Check nginx configuration. Record the failure.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Describe phone authentication result..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-7">
+      <div class="step-header">
+        <div class="step-number">7</div>
+        <h3 class="step-title">Phone walkthrough — API calls</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-tst">TST</span> <span class="badge badge-pi">Phone</span></span>
+        <span>Step 7 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">On the phone, verify API calls work through HTTPS to the test backend. Check that API endpoints return data and errors are handled properly.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">(Phone action — navigate through the app on the phone and observe API calls succeeding.)</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">API calls from the phone reach the test backend over HTTPS and return expected data. No CORS or connection errors.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> API calls fail or return errors on the phone.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Verify test FastAPI active on 127.0.0.1:8000 and nginx proxies correctly. Record the failure.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Describe phone API call results..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-8">
+      <div class="step-header">
+        <div class="step-number">8</div>
+        <h3 class="step-title">Phone walkthrough — frontend navigation</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-tst">TST</span> <span class="badge badge-pi">Phone</span></span>
+        <span>Step 8 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">On the phone, navigate through all major frontend pages/routes. Verify navigation works, pages load, and PWA install is testable.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">(Phone action — tap through navigation menu, visit each major page on the phone.)</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">All frontend pages load on the phone. Navigation between pages works without errors. Layout is usable on mobile.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Pages fail to load, navigation breaks, or layout is broken on mobile.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Verify Next.js test process online on 127.0.0.1:3000. Check frontend build artifacts. Record the failure.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Describe phone navigation results..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-9">
+      <div class="step-header">
+        <div class="step-number">9</div>
+        <h3 class="step-title">Phone walkthrough — changed feature workflows</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-tst">TST</span> <span class="badge badge-pi">Phone</span></span>
+        <span>Step 9 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Walk through the changed feature workflows on the phone. Verify each changed feature works end-to-end through the test stack over HTTPS.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">(Phone action — exercise each changed feature from the test deployment on the phone.)</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">All changed feature workflows function correctly on the phone over HTTPS. Record any issues observed.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> A changed feature is broken on the phone.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Do NOT fix feature defects inside this task. Record the failure, add it to the backlog, and continue with remaining checks.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Describe changed feature walkthrough results..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-10">
+      <div class="step-header">
+        <div class="step-number">10</div>
+        <h3 class="step-title">Run test-down with --keep-db (first acceptance run)</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI</span></span>
+        <span>Step 10 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Run test-down with --keep-db on the first acceptance run to restore PRD. Inspect failures and retain evidence before any later cleanup. TEST DB kept (--keep-db) so evidence can be reviewed.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">cd ~/PiFitness
+deploy/scripts/test-down.sh --keep-db</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">"test-down complete." printed. PRD FastAPI, PM2 pifitness-next, timers restored. PRD health passes at http://127.0.0.1/api/health and https://pifitness.duckdns.org. TEST DB retained.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> PRD health check fails or any service is not restored.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Retry test-down. State file retained for retry. Do not delete TEST DB/checkout until evidence reviewed.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="Paste test-down output..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-11">
+      <div class="step-header">
+        <div class="step-number">11</div>
+        <h3 class="step-title">Inspect failures and retain evidence</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-prd">PRD</span> <span class="badge badge-pi">Remote PI / Local PC</span></span>
+        <span>Step 11 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Review all test outputs from the phone walkthrough and test-down. Identify failures. Retain evidence before any later cleanup. Do not fix feature defects inside this deployment task.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">(Review all console output boxes above, test-up logs at ~/PiFitness-test/migration-apply.log, phone test notes.)</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">All failures identified and documented. Evidence retained (TEST DB kept, console output saved in boxes above).</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> Critical failures prevent PRD restoration.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Fix PRD restoration issues first. Feature defects go to the backlog.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="List failures and evidence retained..."></textarea>
+      </div>
+    </div>
+
+    <div class="step" id="step-5-23-12">
+      <div class="step-header">
+        <div class="step-number">12</div>
+        <h3 class="step-title">Add failures to the backlog</h3>
+        <label class="checkbox-container step-done-checkbox"><input type="checkbox"> Done</label>
+      </div>
+      <div class="step-meta">
+        <span><span class="badge badge-dev">DEV</span> <span class="badge badge-local">Local PC</span></span>
+        <span>Step 12 of 12 &bull; Task 5.23</span>
+      </div>
+      <div class="step-content">
+        <div class="field">
+          <span class="field-label">Description</span>
+          <div class="field-value">Add feature defects found during phone acceptance to docs/workflow/BACKLOG.md as the next ID. Do not fix feature defects inside this deployment task.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Command(s)</span>
+          <div class="command-block">(Edit docs/workflow/BACKLOG.md on the Local PC, add each failure as a new backlog item.)</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Expected Outcome</span>
+          <div class="field-value">All feature defects from Task 5.23 recorded in BACKLOG.md. PROGRESS.md contains 5.23 evidence. TEST DB and dump retained until evidence reviewed.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stop If</span>
+          <div class="stop-recovery stop-if"><b>Stop if:</b> PRD was not restored by test-down.</div>
+        </div>
+        <div class="field">
+          <span class="field-label">Recovery</span>
+          <div class="stop-recovery recovery"><b>Recovery:</b> Re-run test-down until PRD restored, then record evidence and backlog items.</div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Console Output</span>
+        <textarea class="output-area" placeholder="List backlog entries added..."></textarea>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="report-section">
+  <h2>Generate Report</h2>
+  <p class="hint">Click the button below to create a report indicating how far you progressed. The report concatenates all console output boxes into a markdown-like format that can be copy-pasted for agentic analysis.</p>
+  <button class="btn-create-report" id="btn-create-report" onclick="generateReport()">Create Report</button>
+  <textarea id="report-output" readonly placeholder="Click 'Create Report' to generate the report..."></textarea>
+</div>
+</div>
+<script>
+const steps = [];
+function registerStep(taskId, stepId) {
+  const el = document.getElementById(stepId);
+  if (!el) return;
+  const checkbox = el.querySelector('.step-done-checkbox input');
+  const output = el.querySelector('.output-area');
+  steps.push({ taskId, stepId, el, checkbox, output });
+  checkbox.addEventListener('change', () => updateProgress());
+  output.addEventListener('input', () => updateProgress());
+}
+function updateProgress() {
+  const total = steps.length;
+  let done = 0;
+  steps.forEach(s => {
+    if (s.checkbox.checked) { s.el.classList.add('done'); done++; }
+    else { s.el.classList.remove('done'); }
+  });
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-summary').textContent = done + ' of ' + total + ' steps completed';
+}
+function generateReport() {
+  const doneCount = steps.filter(s => s.checkbox.checked).length;
+  const totalCount = steps.length;
+  const pct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
+  const lines = [];
+  lines.push('# PiFitness Human Task Report — Tasks 5.22 & 5.23');
+  lines.push('');
+  lines.push('Generated: ' + new Date().toISOString());
+  lines.push('Progress: ' + doneCount + ' of ' + totalCount + ' steps completed (' + pct + '%)');
+  lines.push('');
+  lines.push('## Step Output');
+  lines.push('');
+  steps.forEach((s, i) => {
+    const checked = s.checkbox.checked ? '[x]' : '[ ]';
+    const outputVal = s.output.value.trim();
+    lines.push('### Step ' + (i + 1) + ': ' + s.stepId + ' ' + checked);
+    lines.push('');
+    if (outputVal) { lines.push('```'); lines.push(outputVal); lines.push('```'); }
+    else { lines.push('_(no console output recorded)_'); }
+    lines.push('');
+  });
+  lines.push('## Notes');
+  lines.push('');
+  lines.push('- Record any observations, failures, or follow-up items here.');
+  lines.push('- Failures from Task 5.23 should be added to `docs/workflow/BACKLOG.md`, not fixed inside this task.');
+  lines.push('- Retain the PRD dump and TEST DB until the recovery evidence is reviewed.');
+  document.getElementById('report-output').value = lines.join('\n');
+  document.getElementById('report-output').focus();
+  document.getElementById('report-output').select();
+}
+document.addEventListener('DOMContentLoaded', function() {
+  registerStep('5.22', 'step-5-22-1');
+  registerStep('5.22', 'step-5-22-2');
+  registerStep('5.22', 'step-5-22-3');
+  registerStep('5.22', 'step-5-22-4');
+  registerStep('5.22', 'step-5-22-5');
+  registerStep('5.22', 'step-5-22-6');
+  registerStep('5.22', 'step-5-22-7');
+  registerStep('5.22', 'step-5-22-8');
+  registerStep('5.22', 'step-5-22-9');
+  registerStep('5.22', 'step-5-22-10');
+  registerStep('5.22', 'step-5-22-11');
+  registerStep('5.22', 'step-5-22-12');
+  registerStep('5.23', 'step-5-23-1');
+  registerStep('5.23', 'step-5-23-2');
+  registerStep('5.23', 'step-5-23-3');
+  registerStep('5.23', 'step-5-23-4');
+  registerStep('5.23', 'step-5-23-5');
+  registerStep('5.23', 'step-5-23-6');
+  registerStep('5.23', 'step-5-23-7');
+  registerStep('5.23', 'step-5-23-8');
+  registerStep('5.23', 'step-5-23-9');
+  registerStep('5.23', 'step-5-23-10');
+  registerStep('5.23', 'step-5-23-11');
+  registerStep('5.23', 'step-5-23-12');
+  updateProgress();
+});
+</script>
+</body>
+</html>

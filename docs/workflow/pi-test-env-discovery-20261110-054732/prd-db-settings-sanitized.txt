@@ -1,0 +1,6 @@
+=== non-secret PG settings only ===
+PG_HOST=localhost
+PG_USER=devuser
+PG_PORT=5432
+PG_DB=personal_fitness
+PGSSLMODE=disable

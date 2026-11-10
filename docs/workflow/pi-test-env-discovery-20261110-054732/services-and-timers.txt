@@ -1,0 +1,37 @@
+=== matching installed units ===
+  pifitness-fastapi.service                                   loaded    active   running PiFitness FastAPI Backend
+  pifitness-hw-health.service                                 loaded    inactive dead    PiFitness hardware health snapshot
+  pifitness_agent.service                                     loaded    inactive dead    PiFitness Background Task Execution
+  pifitness-hw-health.timer                                   loaded    active   waiting Run PiFitness hardware health snapshot hourly
+  pifitness_agent.timer                                       loaded    active   waiting Run PiFitness Background Task Execution every 30 minutes
+=== expected timer properties ===
+--- pifitness_agent.timer ---
+Triggers=pifitness_agent.service
+LoadState=loaded
+ActiveState=active
+SubState=waiting
+UnitFileState=enabled
+--- pifitness-hardware-health.timer ---
+Triggers=
+LoadState=not-found
+ActiveState=inactive
+SubState=dead
+UnitFileState=
+=== known/related service states ===
+--- pifitness-fastapi.service ---
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+--- pifitness_agent.service ---
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+UnitFileState=static
+--- pifitness-hardware-health.service ---
+LoadState=not-found
+ActiveState=inactive
+SubState=dead
+UnitFileState=
+=== PM2 app names/status/cwd only (no environment) ===
+pifitness-next	online	/home/god/PiFitness/frontend/pifitness

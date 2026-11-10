@@ -1,0 +1,4 @@
+        db        |  role   | server_addr | server_port |        server_version         | env_marker
+------------------+---------+-------------+-------------+-------------------------------+------------
+ personal_fitness | devuser | ::1         |        5432 | 18.6 (Debian 18.6-1.pgdg13+2) |
+(1 row)
