@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+cd /
 
 usage() {
     echo "Usage: bootstrap.sh --environment prd|test --commit SHA"
