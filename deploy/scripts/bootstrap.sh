@@ -2,10 +2,11 @@
 set -Eeuo pipefail
 
 usage() {
-    echo "Usage: bash deploy/scripts/bootstrap.sh --environment prd|test"
+    echo "Usage: bash deploy/scripts/bootstrap.sh --environment prd|test --commit SHA"
 }
 
 ENVIRONMENT=""
+COMMIT=""
 
 while (($#)); do
     case "$1" in
@@ -14,10 +15,10 @@ while (($#)); do
             ENVIRONMENT="${2,,}"
             shift 2
             ;;
-        --environment=*)
-            ENVIRONMENT="${1#*=}"
-            ENVIRONMENT="${ENVIRONMENT,,}"
-            shift
+        --commit)
+            [[ $# -ge 2 ]] || { usage; exit 64; }
+            COMMIT="$2"
+            shift 2
             ;;
         --help|-h)
             usage
@@ -49,9 +50,15 @@ case "$ENVIRONMENT" in
         ;;
 esac
 
+if [[ ! "$COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    echo "ERROR: A full 40-character Git commit SHA is required." >&2
+    exit 64
+fi
+
 echo "PiFitness bootstrap"
 echo "Environment:     $ENVIRONMENT"
 echo "Git branch:      $GIT_BRANCH"
+echo "Commit:          $COMMIT"
 echo "Application:     $APP_DIR"
 echo "Environment file: $ENV_FILE"
 
