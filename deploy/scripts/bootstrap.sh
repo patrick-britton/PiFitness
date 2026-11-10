@@ -62,7 +62,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 if ! git -C "$SOURCE_REPO" cat-file -e "${COMMIT}^{commit}" 2>/dev/null; then
-    echo "ERROR: Commit not available in source repository: $COMMIT" >&2
+    echo "ERROR: Commit not available: $COMMIT" >&2
     exit 1
 fi
 
@@ -72,16 +72,49 @@ if ! git -C "$SOURCE_REPO" merge-base --is-ancestor \
     exit 1
 fi
 
+ENV_LINK="$APP_DIR/backend/.env"
+
+ensure_env_link() {
+    if [[ -L "$ENV_LINK" ]]; then
+        ACTUAL=$(readlink -f "$ENV_LINK")
+        EXPECTED=$(readlink -f "$ENV_FILE")
+        if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "ERROR: Existing environment link points elsewhere: $ENV_LINK" >&2
+            exit 1
+        fi
+    elif [[ -e "$ENV_LINK" ]]; then
+        echo "ERROR: Unexpected file exists at $ENV_LINK" >&2
+        exit 1
+    else
+        ln -s "$ENV_FILE" "$ENV_LINK"
+    fi
+
+    [[ -f "$ENV_LINK" ]] || {
+        echo "ERROR: Environment link is not usable: $ENV_LINK" >&2
+        exit 1
+    }
+}
+
 if [[ -e "$APP_DIR" || -L "$APP_DIR" ]]; then
-    echo "ERROR: TEST application path already exists: $APP_DIR" >&2
-    echo "Refusing to overwrite it."
-    exit 1
+    if ! git -C "$SOURCE_REPO" worktree list --porcelain |
+        grep -Fqx "worktree $APP_DIR"; then
+        echo "ERROR: Existing TEST path is not a registered worktree." >&2
+        exit 1
+    fi
+
+    ensure_env_link
+
+    echo "Existing TEST checkout verified."
+    echo "Current checkout: $(git -C "$APP_DIR" rev-parse HEAD)"
+    echo "Environment link verified: $ENV_LINK"
+    echo "Checkout update is not yet implemented."
+    exit 0
 fi
 
-echo "Creating TEST checkout..."
-echo "Commit: $COMMIT"
-
+echo "Creating TEST checkout at $COMMIT..."
 git -C "$SOURCE_REPO" worktree add --detach "$APP_DIR" "$COMMIT"
+
+ensure_env_link
 
 ACTUAL_COMMIT=$(git -C "$APP_DIR" rev-parse HEAD)
 
@@ -92,8 +125,6 @@ fi
 
 echo
 echo "TEST checkout created successfully."
-echo "Path:   $APP_DIR"
+echo "Path: $APP_DIR"
 echo "Commit: $ACTUAL_COMMIT"
-echo
-echo "No dependencies installed. No migrations applied."
-echo "No services changed."
+echo "Environment link: $ENV_LINK"
