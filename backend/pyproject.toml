@@ -33,5 +33,6 @@ dev = [
     "pytest-asyncio==1.4.0",
 ]
 
-[tool.setuptools]
-packages = ["pifitness"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pifitness*", "backend_functions*"]
