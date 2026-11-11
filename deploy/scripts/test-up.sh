@@ -396,48 +396,12 @@ esac
 current_phase="checkout-provisioned"
 write_state
 
-echo "Step 8: apply pending migrations to $TEST_DB"
-# Run the migration tool from the pinned test checkout, never from the PRD
-# checkout and never with a raw for *.sql / psql -f loop. The absent
-# run_migrations.sh lookup is replaced by this direct invocation: a missing
-# runner is a hard failure (no silent skip), and a runner failure stops here
-# so no test service starts and the durable state stays sufficient for
-# test-down.
-migration_runner="$TEST_DIR/tools/db/migrate.py"
-if [[ ! -f "$migration_runner" ]]; then
-  echo "ERROR: migration runner missing from test checkout: $migration_runner" >&2
-  exit 1
-fi
-export APP_ENV=test
-export PG_DB="$TEST_DB"
-migration_log="$TEST_DIR/migration-apply.log"
-: > "$migration_log"
-echo "  migration status before:"
-if ! "$TEST_DIR/venv/bin/python" "$migration_runner" status 2>&1 | tee -a "$migration_log"; then
-  echo "ERROR: migration status check failed; see $migration_log" >&2
-  exit 1
-fi
-migration_start="$(date +%s)"
-if ! "$TEST_DIR/venv/bin/python" "$migration_runner" up 2>&1 | tee -a "$migration_log"; then
-  echo "ERROR: migration runner failed; test services will not start; see $migration_log" >&2
-  exit 1
-fi
-migration_end="$(date +%s)"
-echo "  migrations completed in $(( migration_end - migration_start ))s"
-echo "  migration status after:"
-if ! "$TEST_DIR/venv/bin/python" "$migration_runner" status 2>&1 | tee -a "$migration_log"; then
-  echo "ERROR: post-migration status check failed; see $migration_log" >&2
-  exit 1
-fi
-current_phase="migrations-applied"
-write_state
-
 # Failpoint for the human recovery drill: inject a failure right before
-# the test stack is started. The durable state file (phase=migrations-applied)
+# the test stack is started. The durable state file (phase=checkout-provisioned)
 # is left intact so test-down can recover.
 failpoint "pre_start" "simulate failure before starting test units"
 
-echo "Step 9: start test units"
+echo "Step 8: start test units"
 # Start the test FastAPI unit. A start failure is fatal and runs recovery.
 if ! sudo systemctl start pifitness-fastapi-test.service 2>/dev/null; then
   recover_and_fail "failed to start test FastAPI unit pifitness-fastapi-test.service"
@@ -449,7 +413,7 @@ fi
 current_phase="test-units-started"
 write_state
 
-echo "Step 10: verify the complete test stack"
+echo "Step 9: verify the complete test stack"
 # systemd must report the test FastAPI unit active.
 fastapi_active="$(systemctl is-active pifitness-fastapi-test.service 2>/dev/null || echo unknown)"
 if [[ "$fastapi_active" != "active" ]]; then

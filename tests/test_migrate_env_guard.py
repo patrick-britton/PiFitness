@@ -1,182 +1,603 @@
-"""Guard tests for tools/db/migrate.py environment and marker rules.
+"""Safety and configuration tests for tools/db/migrate.py.
 
-DEV migration succeeds only with the DEV marker; TEST migration succeeds only
-with explicit APP_ENV=test plus the TEST marker; PRD, unmarked, remote, and
-mismatched targets are refused.
+The runner takes all connection settings from an explicitly selected env file.
+DEV and TEST require their matching database marker. PRD must be unmarked and
+requires explicit --allow-prd authorization. Target checks must precede DDL,
+and status must never write to the database.
 """
 
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
-
 import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
 import db.migrate as migrate
 
 
-class FakeCursor:
-    def __init__(self, marker):
-        self.marker = marker
-        self.executed = []
+# ---------------------------------------------------------------------------
+# Configuration helpers
+# ---------------------------------------------------------------------------
 
-    def execute(self, sql):
-        self.executed.append(sql)
+
+def _config(app_env="dev", dbname="fitness_dev", host="localhost", port="5432"):
+    return {
+        "APP_ENV": app_env,
+        "PG_HOST": host,
+        "PG_PORT": str(port),
+        "PG_DB": dbname,
+        "PG_USER": "migration_user",
+        "PG_PASSWORD": "migration_password",
+        "PGSSLMODE": "disable",
+    }
+
+
+def _write_env(path, **overrides):
+    values = {
+        "APP_ENV": "dev",
+        "PG_HOST": "localhost",
+        "PG_PORT": "5432",
+        "PG_DB": "fitness_dev",
+        "PG_USER": "migration_user",
+        "PG_PASSWORD": "migration_password",
+        "PGSSLMODE": "disable",
+    }
+    values.update(overrides)
+    path.write_text(
+        "\n".join(f"{key}={value}" for key, value in values.items()) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.mark.regression
+def test_env_file_is_the_only_source_of_connection_values(tmp_path, monkeypatch):
+    env_file = _write_env(
+        tmp_path / "migration.env",
+        APP_ENV="TEST",
+        PG_HOST="LOCALHOST",
+        PG_DB="fitness_test_from_file",
+        PG_PASSWORD="file-password",
+    )
+    monkeypatch.setenv("APP_ENV", "prod")
+    monkeypatch.setenv("PG_DB", "personal_fitness")
+    monkeypatch.setenv("PG_PASSWORD", "inherited-password")
+
+    config = migrate._load_env_file(str(env_file))
+
+    assert config["APP_ENV"] == "test"
+    assert config["PG_HOST"] == "localhost"
+    assert config["PG_DB"] == "fitness_test_from_file"
+    assert config["PG_PASSWORD"] == "file-password"
+
+
+@pytest.mark.regression
+def test_env_file_does_not_interpolate_inherited_variables(tmp_path, monkeypatch):
+    env_file = _write_env(
+        tmp_path / "migration.env",
+        PG_PASSWORD="${MIGRATION_SECRET}",
+    )
+    monkeypatch.setenv("MIGRATION_SECRET", "must-not-be-expanded")
+
+    config = migrate._load_env_file(str(env_file))
+
+    assert config["PG_PASSWORD"] == "${MIGRATION_SECRET}"
+
+
+@pytest.mark.regression
+def test_missing_env_file_is_refused(tmp_path):
+    with pytest.raises(RuntimeError, match="does not exist"):
+        migrate._load_env_file(str(tmp_path / "missing.env"))
+
+
+@pytest.mark.regression
+def test_missing_required_settings_are_refused(tmp_path):
+    env_file = tmp_path / "incomplete.env"
+    env_file.write_text(
+        "APP_ENV=test\nPG_HOST=localhost\nPG_DB=fitness_test\nPG_USER=runner\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="PG_PASSWORD"):
+        migrate._load_env_file(str(env_file))
+
+
+@pytest.mark.regression
+def test_unsupported_environment_is_refused(tmp_path):
+    env_file = _write_env(tmp_path / "migration.env", APP_ENV="staging")
+
+    with pytest.raises(RuntimeError, match="Unsupported APP_ENV"):
+        migrate._load_env_file(str(env_file))
+
+
+@pytest.mark.regression
+@pytest.mark.parametrize("port", ["not-a-port", "0", "65536"])
+def test_invalid_port_is_refused(tmp_path, port):
+    env_file = _write_env(tmp_path / "migration.env", PG_PORT=port)
+
+    with pytest.raises(RuntimeError, match="PG_PORT"):
+        migrate._load_env_file(str(env_file))
+
+
+@pytest.mark.regression
+def test_missing_port_defaults_to_postgresql_default(tmp_path):
+    env_file = _write_env(tmp_path / "migration.env")
+    env_file.write_text(
+        env_file.read_text(encoding="utf-8").replace("PG_PORT=5432\n", ""),
+        encoding="utf-8",
+    )
+
+    assert migrate._load_env_file(str(env_file))["PG_PORT"] == "5432"
+
+
+# ---------------------------------------------------------------------------
+# Fake database connection for safety-order and command tests
+# ---------------------------------------------------------------------------
+
+
+class FakeCursor:
+    def __init__(
+        self,
+        *,
+        dbname,
+        marker,
+        port=5432,
+        server_addr="127.0.0.1",
+        table_exists=False,
+        applied=(),
+        baseline_exists=False,
+    ):
+        self.dbname = dbname
+        self.marker = marker
+        self.port = port
+        self.server_addr = server_addr
+        self.table_exists = table_exists
+        self.applied = list(applied)
+        self.baseline_exists = baseline_exists
+        self.executed = []
+        self._one = None
+        self._all = []
+        self.closed = False
+
+    def execute(self, sql, params=None):
+        normalized = " ".join(sql.split())
+        self.executed.append((normalized, params))
+        self._one = None
+        self._all = []
+
+        if "current_database()" in normalized:
+            self._one = (self.dbname, self.server_addr, self.port)
+        elif "current_setting('pifitness.env', true)" in normalized:
+            self._one = (self.marker,)
+        elif "to_regclass('schema_migrations')" in normalized:
+            self._one = ("schema_migrations",) if self.table_exists else (None,)
+        elif normalized.startswith("SELECT version FROM schema_migrations"):
+            self._all = [(version,) for version in self.applied]
+        elif normalized.startswith("SELECT 1 FROM schema_migrations"):
+            self._one = (0,) if self.baseline_exists else None
+        elif normalized.startswith("INSERT INTO schema_migrations") and params:
+            if params[0] == 0:
+                self.baseline_exists = True
+            else:
+                self.applied.append(params[0])
+        elif normalized.startswith("DELETE FROM schema_migrations") and params:
+            self.applied = [value for value in self.applied if value != params[0]]
 
     def fetchone(self):
-        for sql in reversed(self.executed):
-            if "pifitness.env" in sql:
-                return (self.marker,)
-        return None
+        return self._one
 
     def fetchall(self):
-        return []
-
-    def close(self):
-        pass
-
-
-class FakeConn:
-    def __init__(self, marker):
-        self.marker = marker
-        self.closed = False
-        self.committed = False
-
-    def cursor(self):
-        return FakeCursor(self.marker)
-
-    def commit(self):
-        self.committed = True
+        return list(self._all)
 
     def close(self):
         self.closed = True
 
 
-def _install_fake_conn(monkeypatch, marker):
-    conn = FakeConn(marker)
-    monkeypatch.setattr(migrate, "_connect", lambda dbname: conn)
-    return conn
+class FakeConnection:
+    def __init__(self, cursor):
+        self.fake_cursor = cursor
+        self.committed = 0
+        self.rolled_back = 0
+        self.closed = False
+
+    def cursor(self):
+        return self.fake_cursor
+
+    def commit(self):
+        self.committed += 1
+
+    def rollback(self):
+        self.rolled_back += 1
+
+    def close(self):
+        self.closed = True
+
+
+def _install_fake_connection(
+    monkeypatch,
+    config,
+    marker,
+    *,
+    actual_dbname=None,
+    actual_port=None,
+    server_addr="127.0.0.1",
+    table_exists=False,
+    applied=(),
+    baseline_exists=False,
+):
+    cursor = FakeCursor(
+        dbname=actual_dbname or config["PG_DB"],
+        marker=marker,
+        port=int(actual_port if actual_port is not None else config["PG_PORT"]),
+        server_addr=server_addr,
+        table_exists=table_exists,
+        applied=applied,
+        baseline_exists=baseline_exists,
+    )
+    conn = FakeConnection(cursor)
+    connect_calls = []
+
+    def fake_connect(dbname, params):
+        connect_calls.append((dbname, dict(params)))
+        return conn
+
+    monkeypatch.setattr(migrate, "_connect", fake_connect)
+    return conn, cursor, connect_calls
+
+
+# ---------------------------------------------------------------------------
+# Environment and marker guards
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.regression
-def test_dev_status_succeeds_with_dev_marker(monkeypatch):
-    """APP_ENV=dev against pifitness_dev with marker dev runs normally."""
-    monkeypatch.setenv("APP_ENV", "dev")
-    monkeypatch.setenv("PG_DB", "pifitness_dev")
-    monkeypatch.setenv("PG_HOST", "localhost")
-    _install_fake_conn(monkeypatch, "dev")
-    migrate.cmd_status("dev")  # must not raise
+@pytest.mark.parametrize(
+    "app_env,marker",
+    [("dev", "dev"), ("test", "test"), ("prod", None)],
+)
+def test_matching_environment_marker_is_accepted(app_env, marker):
+    migrate._guard(app_env, marker)
 
 
 @pytest.mark.regression
-def test_dev_status_refuses_test_marker(monkeypatch):
-    """APP_ENV=dev against a database marked test is refused."""
-    monkeypatch.setenv("APP_ENV", "dev")
-    monkeypatch.setenv("PG_DB", "pifitness_dev")
-    monkeypatch.setenv("PG_HOST", "localhost")
-    _install_fake_conn(monkeypatch, "test")
-    with pytest.raises(RuntimeError, match="marker is 'test'"):
-        migrate.cmd_status("dev")
+@pytest.mark.parametrize(
+    "app_env,marker",
+    [("dev", None), ("dev", "test"), ("test", None), ("test", "dev")],
+)
+def test_dev_and_test_require_their_exact_marker(app_env, marker):
+    with pytest.raises(RuntimeError):
+        migrate._guard(app_env, marker)
 
 
 @pytest.mark.regression
-def test_dev_status_refuses_unmarked(monkeypatch):
-    """APP_ENV=dev against an unmarked database is refused."""
-    monkeypatch.setenv("APP_ENV", "dev")
-    monkeypatch.setenv("PG_DB", "pifitness_dev")
-    monkeypatch.setenv("PG_HOST", "localhost")
-    _install_fake_conn(monkeypatch, None)
-    with pytest.raises(RuntimeError, match="unmarked"):
-        migrate.cmd_status("dev")
+@pytest.mark.parametrize("marker", ["dev", "test", "unexpected"])
+def test_prd_must_remain_unmarked(marker):
+    with pytest.raises(RuntimeError, match="PRD must remain unmarked"):
+        migrate._guard("prod", marker)
 
 
 @pytest.mark.regression
-def test_test_status_succeeds_with_test_marker(monkeypatch):
-    """APP_ENV=test against pifitness_test with marker test runs normally."""
-    monkeypatch.setenv("APP_ENV", "test")
-    monkeypatch.setenv("PG_DB", "pifitness_test")
-    monkeypatch.setenv("PG_HOST", "localhost")
-    _install_fake_conn(monkeypatch, "test")
-    migrate.cmd_status("test")  # must not raise
+def test_unknown_app_env_is_refused():
+    with pytest.raises(RuntimeError, match="Unsupported APP_ENV"):
+        migrate._guard("", None)
 
 
 @pytest.mark.regression
-def test_test_status_refuses_dev_marker(monkeypatch):
-    """APP_ENV=test against a database marked dev is refused."""
-    monkeypatch.setenv("APP_ENV", "test")
-    monkeypatch.setenv("PG_DB", "pifitness_test")
-    monkeypatch.setenv("PG_HOST", "localhost")
-    _install_fake_conn(monkeypatch, "dev")
-    with pytest.raises(RuntimeError, match="marker is 'dev'"):
-        migrate.cmd_status("test")
+def test_prd_requires_explicit_authorization_before_connecting(monkeypatch):
+    config = _config("prod", "personal_fitness")
+    connect_called = False
+
+    def forbidden_connect(*args, **kwargs):
+        nonlocal connect_called
+        connect_called = True
+        raise AssertionError("connection must not be attempted")
+
+    monkeypatch.setattr(migrate, "_connect", forbidden_connect)
+
+    with pytest.raises(RuntimeError, match="--allow-prd"):
+        migrate._open_validated_connection(config)
+    assert not connect_called
 
 
 @pytest.mark.regression
-def test_test_status_refuses_unmarked(monkeypatch):
-    """APP_ENV=test against an unmarked database is refused."""
-    monkeypatch.setenv("APP_ENV", "test")
-    monkeypatch.setenv("PG_DB", "pifitness_test")
-    monkeypatch.setenv("PG_HOST", "localhost")
-    _install_fake_conn(monkeypatch, None)
-    with pytest.raises(RuntimeError, match="unmarked"):
-        migrate.cmd_status("test")
+def test_prd_with_explicit_authorization_and_no_marker_can_connect(monkeypatch):
+    config = _config("prod", "personal_fitness")
+    conn, _, calls = _install_fake_connection(monkeypatch, config, None)
+
+    opened_conn, cursor = migrate._open_validated_connection(
+        config, allow_prd=True
+    )
+
+    assert opened_conn is conn
+    assert len(calls) == 1
+    cursor.close()
+    opened_conn.close()
 
 
 @pytest.mark.regression
-def test_prd_unset_refused(monkeypatch):
-    """APP_ENV unset (PRD) is refused."""
-    monkeypatch.delenv("APP_ENV", raising=False)
-    monkeypatch.setenv("PG_DB", "pifitness_dev")
-    _install_fake_conn(monkeypatch, None)
-    with pytest.raises(RuntimeError, match="not permitted for APP_ENV"):
-        migrate.cmd_status("")
+def test_allow_prd_is_rejected_for_dev_and_test():
+    for app_env, dbname in (("dev", "fitness_dev"), ("test", "fitness_test")):
+        config = _config(app_env, dbname)
+        with pytest.raises(RuntimeError, match="only with APP_ENV=prod"):
+            migrate._validate_target(
+                config, migrate._conn_params(config), allow_prd=True
+            )
 
 
 @pytest.mark.regression
-def test_prod_refused(monkeypatch):
-    """APP_ENV=prod is refused."""
-    monkeypatch.setenv("APP_ENV", "prod")
-    monkeypatch.setenv("PG_DB", "pifitness_dev")
-    _install_fake_conn(monkeypatch, None)
-    with pytest.raises(RuntimeError, match="not permitted for APP_ENV"):
-        migrate.cmd_status("prod")
+def test_remote_host_is_refused_before_connecting(monkeypatch):
+    config = _config("test", "fitness_test", host="10.0.0.5")
+    connect_called = False
 
+    def forbidden_connect(*args, **kwargs):
+        nonlocal connect_called
+        connect_called = True
+        raise AssertionError("remote connection must not be attempted")
 
-@pytest.mark.regression
-def test_remote_host_refused(monkeypatch):
-    """A remote PG_HOST is refused."""
-    monkeypatch.setenv("APP_ENV", "dev")
-    monkeypatch.setenv("PG_HOST", "10.0.0.1")
-    monkeypatch.setenv("PG_DB", "pifitness_dev")
-    _install_fake_conn(monkeypatch, "dev")
+    monkeypatch.setattr(migrate, "_connect", forbidden_connect)
+
     with pytest.raises(RuntimeError, match="remote host"):
-        migrate.cmd_status("dev")
+        migrate._open_validated_connection(config)
+    assert not connect_called
+
+
+# ---------------------------------------------------------------------------
+# Actual PostgreSQL identity checks
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.regression
-def test_dev_db_in_test_mode_refused(monkeypatch):
-    """PG_DB=pifitness_dev with APP_ENV=test is a mismatch and is refused."""
-    monkeypatch.setenv("APP_ENV", "test")
-    monkeypatch.setenv("PG_HOST", "localhost")
-    monkeypatch.setenv("PG_DB", "pifitness_dev")
-    _install_fake_conn(monkeypatch, "test")
-    with pytest.raises(RuntimeError, match="does not match the database implied"):
-        migrate.cmd_status("test")
+def test_connection_identity_accepts_matching_loopback_database_and_port():
+    cursor = FakeCursor(
+        dbname="fitness_test",
+        marker="test",
+        port=5432,
+        server_addr="127.0.0.1",
+    )
+    cursor.execute = lambda sql: setattr(
+        cursor, "_one", ("fitness_test", "127.0.0.1", 5432)
+    )
+
+    migrate._validate_connection_identity(
+        cursor,
+        "fitness_test",
+        {"port": 5432},
+    )
 
 
 @pytest.mark.regression
-def test_test_db_in_dev_mode_refused(monkeypatch):
-    """PG_DB=pifitness_test with APP_ENV=dev is a mismatch and is refused."""
-    monkeypatch.setenv("APP_ENV", "dev")
-    monkeypatch.setenv("PG_HOST", "localhost")
-    monkeypatch.setenv("PG_DB", "pifitness_test")
-    _install_fake_conn(monkeypatch, "dev")
-    with pytest.raises(RuntimeError, match="does not match the database implied"):
-        migrate.cmd_status("dev")
+@pytest.mark.parametrize(
+    "dbname,server_addr,port,match",
+    [
+        ("wrong_db", "127.0.0.1", 5432, "database"),
+        ("fitness_test", "192.168.1.20", 5432, "not loopback"),
+        ("fitness_test", None, 5432, "did not report a TCP"),
+        ("fitness_test", "127.0.0.1", 15432, "port"),
+    ],
+)
+def test_connection_identity_rejects_wrong_database_or_endpoint(
+    dbname, server_addr, port, match
+):
+    cursor = FakeCursor(
+        dbname=dbname,
+        marker="test",
+        port=port,
+        server_addr=server_addr,
+    )
+
+    def result_for_identity(sql):
+        cursor._one = (dbname, server_addr, port)
+
+    cursor.execute = result_for_identity
+    with pytest.raises(RuntimeError, match=match):
+        migrate._validate_connection_identity(
+            cursor,
+            "fitness_test",
+            {"port": 5432},
+        )
 
 
 @pytest.mark.regression
-def test_db_name_resolution(monkeypatch):
-    """APP_ENV implies the correct database name."""
-    assert migrate._resolve_db_name("dev") == "pifitness_dev"
-    assert migrate._resolve_db_name("test") == "pifitness_test"
+def test_open_connection_checks_identity_and_marker_before_returning(monkeypatch):
+    config = _config("test", "fitness_test")
+    conn, cursor, _ = _install_fake_connection(monkeypatch, config, "test")
+
+    returned_conn, returned_cursor = migrate._open_validated_connection(config)
+
+    statements = [sql for sql, _ in cursor.executed]
+    assert "current_database(), inet_server_addr(), inet_server_port()" in statements[0]
+    assert "current_setting('pifitness.env', true)" in statements[1]
+    assert returned_conn is conn
+    assert returned_cursor is cursor
+
+
+@pytest.mark.regression
+def test_failed_marker_check_closes_connection_before_raising(monkeypatch):
+    config = _config("test", "fitness_test")
+    conn, cursor, _ = _install_fake_connection(monkeypatch, config, "dev")
+
+    with pytest.raises(RuntimeError, match="marker"):
+        migrate._open_validated_connection(config)
+
+    assert cursor.closed
+    assert conn.closed
+
+
+@pytest.mark.regression
+def test_wrong_actual_database_is_rejected_before_marker_or_ddl(monkeypatch):
+    config = _config("test", "fitness_test")
+    conn, cursor, _ = _install_fake_connection(
+        monkeypatch,
+        config,
+        "test",
+        actual_dbname="personal_fitness",
+    )
+
+    with pytest.raises(RuntimeError, match="expected 'fitness_test'"):
+        migrate._open_validated_connection(config)
+
+    statements = [sql for sql, _ in cursor.executed]
+    assert len(statements) == 1
+    assert cursor.closed
+    assert conn.closed
+
+
+# ---------------------------------------------------------------------------
+# Command behavior and DDL ordering
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.regression
+def test_status_is_read_only_when_migration_table_is_missing(
+    monkeypatch, tmp_path, capsys
+):
+    config = _config("test", "fitness_test")
+    conn, cursor, _ = _install_fake_connection(
+        monkeypatch, config, "test", table_exists=False
+    )
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    (tmp_path / "001__first.sql").write_text("-- migrate:up\nSELECT 1;\n")
+    (tmp_path / "README.txt").write_text("not a migration")
+
+    migrate.cmd_status(config)
+
+    statements = [sql.upper() for sql, _ in cursor.executed]
+    assert any("TO_REGCLASS('SCHEMA_MIGRATIONS')" in sql for sql in statements)
+    assert not any("CREATE TABLE" in sql for sql in statements)
+    assert not any("INSERT INTO" in sql or "DELETE FROM" in sql for sql in statements)
+    assert "pending" in capsys.readouterr().out
+    assert cursor.closed
+    assert conn.closed
+
+
+@pytest.mark.regression
+def test_status_reads_applied_versions_without_writing(
+    monkeypatch, tmp_path, capsys
+):
+    config = _config("dev", "fitness_dev")
+    conn, cursor, _ = _install_fake_connection(
+        monkeypatch,
+        config,
+        "dev",
+        table_exists=True,
+        applied=(1,),
+    )
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    (tmp_path / "001__first.sql").write_text("-- migrate:up\nSELECT 1;\n")
+    (tmp_path / "002__second.sql").write_text("-- migrate:up\nSELECT 2;\n")
+
+    migrate.cmd_status(config)
+
+    output = capsys.readouterr().out
+    assert "001__first.sql" in output and "applied" in output
+    assert "002__second.sql" in output and "pending" in output
+    assert not any("CREATE TABLE" in sql.upper() for sql, _ in cursor.executed)
+    assert not any("INSERT INTO" in sql.upper() for sql, _ in cursor.executed)
+    assert cursor.closed
+    assert conn.closed
+
+
+@pytest.mark.regression
+def test_up_checks_identity_and_marker_before_creating_migration_table(
+    monkeypatch, tmp_path
+):
+    config = _config("test", "fitness_test")
+    conn, cursor, _ = _install_fake_connection(monkeypatch, config, "test")
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+
+    migrate.cmd_up(config)
+
+    statements = [sql for sql, _ in cursor.executed]
+    identity_index = next(i for i, sql in enumerate(statements) if "current_database()" in sql)
+    marker_index = next(i for i, sql in enumerate(statements) if "current_setting('pifitness.env', true)" in sql)
+    ddl_index = next(i for i, sql in enumerate(statements) if "CREATE TABLE" in sql)
+    assert identity_index < marker_index < ddl_index
+    assert conn.committed >= 1
+    assert cursor.closed
+    assert conn.closed
+
+
+@pytest.mark.regression
+def test_baseline_checks_target_before_creating_migration_table(monkeypatch, tmp_path):
+    config = _config("dev", "fitness_dev")
+    conn, cursor, _ = _install_fake_connection(monkeypatch, config, "dev")
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+
+    migrate.cmd_baseline(config)
+
+    statements = [sql for sql, _ in cursor.executed]
+    marker_index = next(i for i, sql in enumerate(statements) if "current_setting('pifitness.env', true)" in sql)
+    ddl_index = next(i for i, sql in enumerate(statements) if "CREATE TABLE" in sql)
+    assert marker_index < ddl_index
+    assert cursor.closed
+    assert conn.closed
+
+
+# ---------------------------------------------------------------------------
+# CLI contract
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.regression
+def test_cli_requires_explicit_env_file():
+    parser = migrate._build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["status"])
+
+
+@pytest.mark.regression
+def test_cli_loads_selected_env_file_and_passes_prd_authorization(
+    monkeypatch, tmp_path
+):
+    env_file = _write_env(
+        tmp_path / "prd-migrate.env",
+        APP_ENV="prod",
+        PG_DB="personal_fitness",
+    )
+    observed = {}
+
+    def fake_status(config, allow_prd=False):
+        observed["config"] = config
+        observed["allow_prd"] = allow_prd
+
+    monkeypatch.setattr(migrate, "cmd_status", fake_status)
+
+    result = migrate.main(
+        ["status", "--env-file", str(env_file), "--allow-prd"]
+    )
+
+    assert result == 0
+    assert observed["config"]["APP_ENV"] == "prod"
+    assert observed["config"]["PG_DB"] == "personal_fitness"
+    assert observed["allow_prd"] is True
+
+
+@pytest.mark.regression
+def test_cli_refuses_prd_without_allow_flag(tmp_path, capsys):
+    env_file = _write_env(
+        tmp_path / "prd-migrate.env",
+        APP_ENV="prod",
+        PG_DB="personal_fitness",
+    )
+
+    result = migrate.main(["status", "--env-file", str(env_file)])
+
+    assert result == 1
+    assert "--allow-prd" in capsys.readouterr().err
+
+
+@pytest.mark.regression
+def test_cli_refuses_allow_prd_for_test(tmp_path, capsys):
+    env_file = _write_env(
+        tmp_path / "test-migrate.env",
+        APP_ENV="test",
+        PG_DB="fitness_test",
+    )
+
+    result = migrate.main(
+        ["status", "--env-file", str(env_file), "--allow-prd"]
+    )
+
+    assert result == 1
+    assert "only with APP_ENV=prod" in capsys.readouterr().err

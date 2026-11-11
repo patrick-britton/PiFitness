@@ -1,8 +1,11 @@
-{
+﻿{
     "dev-reset":  "C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe tools/db/dev_reset.py",
     "verify":  "C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe tools/verify.py --scope all",
     "scoped-pytest":  "C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe -m pytest tests/test_test_db.py tests/test_test_processes.py tests/test_test_state.py tests/test_test_up.py -q",
     "tsc":  "Set-Location frontend\\pifitness; npx tsc --noEmit",
     "pytest":  "C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe -m pytest tests/ -m \"not slow and not integration and not live\" -q",
-    "deploy-pytest":  "C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe -m pytest tests/test_test_up.py tests/test_test_down.py tests/test_test_deploy_scripts.py -q"
+    "deploy-pytest":  "C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe -m pytest tests/test_test_up.py tests/test_test_down.py tests/test_test_deploy_scripts.py -q",
+    "focused-regression":  "C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe -m pytest tests/test_test_up.py tests/test_test_deploy_scripts.py tests/test_test_processes.py -q"
 }
+
+
