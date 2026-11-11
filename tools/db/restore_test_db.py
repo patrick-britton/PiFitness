@@ -433,52 +433,12 @@ def _create_test_database(admin_conn, *, test_db: str, test_role: str, prd_db: s
         cur.close()
 
 
-def _timescaledb_version(extension_specs: list[dict[str, str]]) -> str | None:
-    return next((item["version"] for item in extension_specs if item["name"] == "timescaledb"), None)
-
-
-def _install_timescaledb(
-    admin_config: dict[str, str], test_db: str,
-    extension_specs: list[dict[str, str]],
-) -> None:
-    """Install TimescaleDB before invoking its pre-restore hook.
-
-    Other extensions are created by pg_restore as the PRD administrator. Only
-    TimescaleDB must exist before pg_restore starts because its pre-restore
-    function is called first.
-    """
-    extension = next((item for item in extension_specs if item["name"] == "timescaledb"), None)
-    if extension is None:
-        return
-    if extension["schema"] not in {"public", "pg_catalog"}:
-        raise RecoveryError(
-            "TimescaleDB is installed in schema %r; automatic restore currently requires "
-            "its schema to be public or pg_catalog. TEST has not been changed." % extension["schema"]
-        )
-    conn = _connect(admin_config, test_db)
-    conn.autocommit = True
-    cur = conn.cursor()
-    try:
-        cur.execute(
-            "CREATE EXTENSION IF NOT EXISTS %s WITH SCHEMA %s VERSION %s"
-            % (
-                _trusted_qident(extension["name"]),
-                _trusted_qident(extension["schema"]),
-                _qliteral(extension["version"]),
-            )
-        )
-    finally:
-        cur.close()
-        conn.close()
-
-
 def _restore_archive(
     backup: Path,
     test_db: str,
     admin_config: dict[str, str],
     *,
     temp_dir: Path,
-    timescaledb_version: str | None,
     runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
 ) -> None:
     restore_bin = shutil.which("pg_restore")
@@ -491,37 +451,15 @@ def _restore_archive(
     env["PGSSLMODE"] = admin_config.get("PGSSLMODE", "disable")
 
     # Extensions were installed as the PRD administrator before the restore.
-    # The existing test-up.sh fallback uses these TimescaleDB hooks around
-    # pg_restore. Restore ordinary database objects as the PRD administrator,
-    # then transfer only database-local objects to the TEST application role.
-    # Avoid REASSIGN OWNED because it can also alter cluster-shared ownership.
-    if timescaledb_version:
-        conn = _connect(admin_config, test_db)
-        conn.autocommit = True
-        cur = conn.cursor()
-        try:
-            cur.execute("SELECT timescaledb_pre_restore()")
-        finally:
-            cur.close()
-            conn.close()
-
+    # Restore ordinary database objects as the PRD administrator, then transfer
+    # only database-local objects to the TEST application role. Avoid REASSIGN
+    # OWNED because it can also alter cluster-shared ownership.
     args = [
         restore_bin, "--exit-on-error", "--no-owner", "--no-acl",
         "--host", admin_config["PG_HOST"], "--port", admin_config["PG_PORT"],
         "--username", admin_config["PG_USER"], "--dbname", test_db, str(backup),
     ]
     _safe_run(args, env=env, runner=runner)
-
-    if timescaledb_version:
-        conn = _connect(admin_config, test_db)
-        conn.autocommit = True
-        cur = conn.cursor()
-        try:
-            cur.execute("SELECT timescaledb_post_restore()")
-        finally:
-            cur.close()
-            conn.close()
-
 
 def _provision_ownership(
     admin_config: dict[str, str], test_db: str, test_role: str,
@@ -898,9 +836,7 @@ def restore_test_database(
         # versions are cluster-installed. Verify every exact PRD extension
         # version before dropping TEST, then recreate them under the admin role.
         extension_specs = _load_extension_specs(prd_config, prd_db)
-        timescaledb_version = _timescaledb_version(extension_specs)
         state["extensions"] = extension_specs
-        state["timescaledb_version"] = timescaledb_version
         state["status"] = "restore_preflight_passed"
         _json_write(state_path, state)
 
@@ -923,10 +859,8 @@ def restore_test_database(
             os.chmod(temp_dir, 0o700)
             state["status"] = "restore_started"
             _json_write(state_path, state)
-            _install_timescaledb(prd_config, test_db, extension_specs)
             _restore_archive(
-                backup, test_db, prd_config, temp_dir=temp_dir,
-                timescaledb_version=timescaledb_version, runner=runner,
+                backup, test_db, prd_config, temp_dir=temp_dir, runner=runner,
             )
 
         state["status"] = "archive_restored"
@@ -991,7 +925,6 @@ def restore_test_database(
             "backup_path": str(backup),
             "backup_timestamp_utc": backup_time,
             "backup_sha256": backup_sha256,
-            "timescaledb_version": timescaledb_version,
             "previous_test_database_discarded": state["previous_test_database_oid"] is not None,
             "prd_database_identity_unchanged": state["prd_database_identity_unchanged"],
             "database_oid": state["new_test_database_oid"],

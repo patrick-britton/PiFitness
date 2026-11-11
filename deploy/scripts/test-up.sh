@@ -314,16 +314,10 @@ else
   echo "  template clone failed; falling back to pg_dump/pg_restore"
   dropdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" --if-exists "$TEST_DB"
   createdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$TEST_DB"
-  # TimescaleDB: prepare the empty database for hypertable restore.
-  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" \
-    -c "SELECT timescaledb_pre_restore();" >/dev/null
   if ! pg_restore -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" "$dump_path"; then
     echo "ERROR: pg_restore of $dump_path into $TEST_DB failed" >&2
     exit 1
   fi
-  # TimescaleDB: finalize the hypertable restore.
-  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$TEST_DB" \
-    -c "SELECT timescaledb_post_restore();" >/dev/null
 fi
 
 # Stamp the test marker (D8) only after successful creation/restore, then
