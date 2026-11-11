@@ -348,6 +348,14 @@ def test_diff_file_is_forwarded_to_comparator(monkeypatch, tmp_path):
     assert seen["diff_file"] == path
 
 
+@pytest.mark.unit
+def test_cli_defaults_to_existing_application_env_files():
+    args = inspect_test_db._build_parser().parse_args(["--allow-prd"])
+
+    assert args.test_env_file == inspect_test_db.migration_runner.DEFAULT_TEST_ENV_FILE
+    assert args.prd_env_file == inspect_test_db.migration_runner.DEFAULT_PRD_ENV_FILE
+
+
 def test_cli_requires_explicit_prd_authorization(capsys):
     code = inspect_test_db.main(
         [

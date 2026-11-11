@@ -57,24 +57,27 @@ case "$ENVIRONMENT" in
 esac
 
 SOURCE_REPO="/home/god/PiFitness"
+PRD_ENV_FILE="$SOURCE_REPO/backend/.env"
 UV_BIN="/home/god/.local/bin/uv"
 PYTHON_BIN="/usr/bin/python3"
 NODE_BIN="/usr/bin/node"
 NPM_BIN="/usr/bin/npm"
+EVIDENCE_DIR="/home/god/Documents/PiFitness_Test_Evidence"
 
 if [[ ! "$COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
     fail "A full 40-character commit SHA is required."
 fi
 
-[[ -f "$ENV_FILE" ]] || fail "Missing environment file: $ENV_FILE"
+[[ -f "$ENV_FILE" ]] || fail "Missing TEST environment file: $ENV_FILE"
+[[ -f "$PRD_ENV_FILE" ]] || fail "Missing PRD environment file: $PRD_ENV_FILE"
 [[ -x "$UV_BIN" ]] || fail "uv not found or not executable: $UV_BIN"
 [[ -x "$PYTHON_BIN" ]] || fail "Python not found: $PYTHON_BIN"
 [[ -x "$NODE_BIN" ]] || fail "Node.js not found: $NODE_BIN"
 [[ -x "$NPM_BIN" ]] || fail "npm not found: $NPM_BIN"
 
-command -v pg_dump >/dev/null 2>&1 ||
-    fail "Required PostgreSQL executable pg_dump is missing."
-
+# Do not reconcile the persistent TEST environment while its API is running.
+# Full PRD service/timer inventory and suspension are a later, separately
+# tested workflow stage; this check is only the existing venv-safety guard.
 if systemctl is-active --quiet pifitness-fastapi-test.service; then
     fail "TEST FastAPI service is active. Stop it before reconciling its shared Python environment."
 fi
@@ -110,16 +113,12 @@ if [[ -e "$STAGE_DIR" || -L "$STAGE_DIR" ]]; then
 fi
 
 cleanup() {
+    # A failed preflight must never promote a partially prepared checkout.
+    # Promotion happens only in the explicit success path below.
     if git -C "$SOURCE_REPO" worktree list --porcelain |
         grep -Fqx "worktree $STAGE_DIR"; then
-
-        if [[ ! -e "$APP_DIR" && ! -L "$APP_DIR" ]]; then
-            git -C "$SOURCE_REPO" worktree move \
-                "$STAGE_DIR" "$APP_DIR" ||
-                git -C "$SOURCE_REPO" worktree remove --force "$STAGE_DIR"
-        else
-            git -C "$SOURCE_REPO" worktree remove --force "$STAGE_DIR"
-        fi
+        git -C "$SOURCE_REPO" worktree remove --force "$STAGE_DIR" ||
+            echo "WARNING: failed to remove staging worktree $STAGE_DIR" >&2
     fi
 }
 trap cleanup EXIT
@@ -157,6 +156,24 @@ echo "Synchronizing TEST Python dependencies..."
             --no-editable \
             --python "$PYTHON_BIN"
 )
+
+# MigraDiff is a pinned deployment-inspection dependency, deliberately kept
+# separate from the application's backend dependency group. Install it into
+# the same persistent TEST venv after uv sync so each checkout gets the exact
+# comparison engine required by compare_schema.py.
+SCHEMA_COMPARE_REQUIREMENTS="$STAGE_DIR/tools/db/requirements-schema-compare.txt"
+[[ -f "$SCHEMA_COMPARE_REQUIREMENTS" ]] ||
+    fail "Pinned schema-comparison requirements file is missing: $SCHEMA_COMPARE_REQUIREMENTS"
+
+"$UV_BIN" pip install \
+    --python "$VENV_DIR/bin/python" \
+    --requirement "$SCHEMA_COMPARE_REQUIREMENTS"
+
+# Confirm the exact comparator version before any database inspection.
+MIGRADIFF_VERSION=$("$VENV_DIR/bin/python" -c \
+    'import importlib.metadata; print(importlib.metadata.version("migradiff"))')
+[[ "$MIGRADIFF_VERSION" == "1.7.2" ]] ||
+    fail "Expected MigraDiff 1.7.2, found $MIGRADIFF_VERSION."
 
 echo
 echo "Verifying application imports..."
@@ -211,14 +228,112 @@ echo
 echo "Frontend dependencies installed and production build verified."
 
 echo
-echo "All pre-deployment checks passed."
+echo "Inspecting TEST database against PRD (read-only)..."
+mkdir -p "$EVIDENCE_DIR"
+chmod 0700 "$EVIDENCE_DIR"
+RUN_ID="$(date +%Y%m%d_%H%M%S)_${COMMIT:0:12}_$$"
+INSPECTION_REPORT="$EVIDENCE_DIR/test-db-inspection-${RUN_ID}.json"
+INSPECTION_ERROR="$EVIDENCE_DIR/test-db-inspection-${RUN_ID}.stderr"
+SCHEMA_DIFF_FILE="$EVIDENCE_DIR/test-prd-schema-diff-${RUN_ID}.json"
 
-if [[ -e "$APP_DIR" || -L "$APP_DIR" ]]; then
-    echo "Replacing previous TEST checkout..."
-    git -C "$SOURCE_REPO" worktree remove --force "$APP_DIR"
+# The inspector validates both existing environment files, database names,
+# actual PostgreSQL identities, PRD's absent marker, and TEST's marker before
+# invoking MigraDiff. It performs no DDL and never applies generated SQL.
+if ! (
+    umask 077
+    "$VENV_DIR/bin/python" "$STAGE_DIR/tools/db/inspect_test_db.py" \
+        --test-env-file "$ENV_FILE" \
+        --prd-env-file "$PRD_ENV_FILE" \
+        --allow-prd \
+        --diff-file "$SCHEMA_DIFF_FILE" \
+        >"$INSPECTION_REPORT" 2>"$INSPECTION_ERROR"
+); then
+    [[ ! -f "$INSPECTION_REPORT" ]] || cat "$INSPECTION_REPORT" >&2
+    [[ ! -s "$INSPECTION_ERROR" ]] || cat "$INSPECTION_ERROR" >&2
+    fail "Read-only TEST/PRD database inspection failed. Existing TEST database and checkout were not modified."
 fi
 
-git -C "$SOURCE_REPO" worktree move "$STAGE_DIR" "$APP_DIR"
+chmod 0600 "$INSPECTION_REPORT"
+[[ ! -s "$INSPECTION_ERROR" ]] || chmod 0600 "$INSPECTION_ERROR"
+echo "Database inspection report: $INSPECTION_REPORT"
+[[ ! -f "$SCHEMA_DIFF_FILE" ]] || echo "Schema comparison artifact: $SCHEMA_DIFF_FILE"
+cat "$INSPECTION_REPORT"
+
+DB_DECISION_FIELDS=$("$VENV_DIR/bin/python" - "$INSPECTION_REPORT" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+
+decision = report.get("decision") or {}
+action = decision.get("action", "abort")
+offer_refresh = "true" if decision.get("offer_refresh") is True else "false"
+print(action + "|" + offer_refresh)
+PY
+)
+IFS='|' read -r DB_ACTION DB_OFFER_REFRESH <<< "$DB_DECISION_FIELDS"
+
+case "$DB_ACTION" in
+    reuse_test)
+        if [[ "$DB_OFFER_REFRESH" == "true" ]]; then
+            [[ -t 0 ]] || fail "TEST and PRD are compatible, but the optional PRD freshness choice requires an interactive terminal."
+            echo
+            read -r -p "TEST schema is compatible with PRD. Refresh TEST from the latest PRD nightly backup for freshness? [y/N]: " refresh_choice
+            case "${refresh_choice,,}" in
+                y|yes)
+                    fail "PRD refresh was requested, but backup restore and rollback are the next integration step. No database or existing checkout was modified."
+                    ;;
+                n|no|"")
+                    echo "Keeping the existing TEST database."
+                    ;;
+                *)
+                    fail "Please answer yes or no. No database or existing checkout was modified."
+                    ;;
+            esac
+        fi
+        ;;
+    create_from_prd|refresh_from_prd)
+        fail "Database policy requires '$DB_ACTION'. Restoring the latest PRD nightly backup and preserving the previous TEST database are the next integration step. No database or existing checkout was modified."
+        ;;
+    abort)
+        fail "Database policy returned abort. See the inspection report above."
+        ;;
+    *)
+        fail "Database inspector returned unknown decision '$DB_ACTION'."
+        ;;
+esac
+
+echo
+echo "All checkout, build, and read-only database preflight checks passed."
+echo "TEST database decision: $DB_ACTION"
+
+PREVIOUS_DIR="${APP_DIR}.previous.$$"
+if [[ -e "$APP_DIR" || -L "$APP_DIR" ]]; then
+    [[ ! -e "$PREVIOUS_DIR" && ! -L "$PREVIOUS_DIR" ]] ||
+        fail "Previous-checkout preservation path already exists: $PREVIOUS_DIR"
+
+    echo "Temporarily preserving the current TEST checkout..."
+    git -C "$SOURCE_REPO" worktree move "$APP_DIR" "$PREVIOUS_DIR"
+
+    if ! git -C "$SOURCE_REPO" worktree move "$STAGE_DIR" "$APP_DIR"; then
+        echo "ERROR: failed to promote the staged TEST checkout; restoring the previous checkout..." >&2
+        if git -C "$SOURCE_REPO" worktree move "$PREVIOUS_DIR" "$APP_DIR"; then
+            fail "Staged checkout promotion failed. Previous TEST checkout was restored."
+        else
+            fail "Staged checkout promotion and automatic checkout restoration both failed. Previous checkout remains at $PREVIOUS_DIR; manual recovery is required."
+        fi
+    fi
+
+    # This bootstrap increment ends after the preflight/checkout stage. Later
+    # acceptance/rollback integration will retain this worktree for the full
+    # TEST window instead of removing it here.
+    if ! git -C "$SOURCE_REPO" worktree remove --force "$PREVIOUS_DIR"; then
+        echo "WARNING: new TEST checkout is active, but previous checkout cleanup failed: $PREVIOUS_DIR" >&2
+    fi
+else
+    git -C "$SOURCE_REPO" worktree move "$STAGE_DIR" "$APP_DIR"
+fi
 
 trap - EXIT
 
@@ -237,7 +352,7 @@ ls -l "$APP_DIR/backend/.env"
 
 echo
 echo "Dependencies synchronized from committed uv.lock."
-echo "Application import verified."
-echo "Playwright Chromium verified."
-echo "No migrations applied."
+echo "MigraDiff 1.7.2 verified."
+echo "TEST/PRD schema inspection completed read-only."
+echo "No database refresh or migrations applied in this integration step."
 echo "No services changed."

@@ -8,29 +8,30 @@ pure decision policy in `tools/db/test_db_policy.py`. It never creates,
 renames, drops, refreshes, or modifies a database and never applies generated
 SQL.
 
-## Required inputs
+## Configuration sources
 
-The inspector requires two explicit migration environment files:
+The inspector reads the two existing environment files; no migration-specific
+`.env` files or duplicate connection settings are required:
 
-- TEST: `/home/god/.config/pifitness/test-migrate.env`
-- PRD: `/home/god/.config/pifitness/prd-migrate.env`
+- TEST: `/home/god/.config/pifitness/test.env` (`APP_ENV=test`)
+- PRD: `/home/god/PiFitness/backend/.env` (`APP_ENV=prod`)
 
-Both files must target the same local PostgreSQL endpoint. TEST must have
-`APP_ENV=test`; PRD must have `APP_ENV=prod`. Their database names must be
-different. The actual database names, server address, and port are verified
-from PostgreSQL rather than inferred from file names.
+Each file supplies its own `PG_HOST`, `PG_PORT`, `PG_DB`, `PG_USER`, and
+`PG_PASSWORD`. The inspector does not print credentials and does not let
+inherited shell variables override file values. Explicit `--test-env-file` and
+`--prd-env-file` arguments remain available when a nonstandard path is needed.
 
-The PRD remains intentionally unmarked. TEST is expected to carry the exact
-`pifitness.env='test'` marker.
+The actual database names, server address, and port are verified from
+PostgreSQL rather than inferred from file names. The PRD remains intentionally
+unmarked. TEST is expected to carry the exact `pifitness.env='test'` marker.
 
 ## Example
 
-Read-only inspection, defaulting to reuse when TEST is structurally identical:
+On the Pi, the canonical paths are defaults, so a normal read-only inspection is:
 
 ```bash
-python tools/db/inspect_test_db.py \
-  --test-env-file /home/god/.config/pifitness/test-migrate.env \
-  --prd-env-file /home/god/.config/pifitness/prd-migrate.env \
+/home/god/PiFitness-test/venv/bin/python \
+  /home/god/PiFitness-test/tools/db/inspect_test_db.py \
   --allow-prd \
   --diff-file /home/god/Documents/PiFitness_Test_Evidence/schema-diff.json
 ```
@@ -38,6 +39,9 @@ python tools/db/inspect_test_db.py \
 To record an explicit operator preference for refreshing TEST from PRD when
 schemas are compatible, add `--refresh-from-prd`. This changes only the
 reported decision; the inspector still performs no database modification.
+
+To override either configuration path, use `--test-env-file PATH` or
+`--prd-env-file PATH`.
 
 ## Decision results
 
@@ -54,7 +58,7 @@ A `refresh_from_prd` decision for an existing TEST database has
 preserve the current TEST database before it replaces anything.
 
 A database that exists but disallows connections, or is a PostgreSQL template,
-is treated as an inspection error. If the TEST migration identity cannot
+is treated as an inspection error. If the TEST application identity cannot
 connect to inspect a wrong/missing marker, the inspector aborts; it does not
 assume that the database is safe to replace.
 

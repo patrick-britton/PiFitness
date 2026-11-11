@@ -9,7 +9,20 @@ python tools/db/migrate.py status --env-file PATH --format jsonl
 python tools/db/migrate.py up --env-file PATH --format jsonl
 ```
 
-PRD still requires `--allow-prd`. The explicit `--env-file` requirement and all host, database identity, port, and marker checks remain in force.
+`--env-file` points directly to the existing application configuration; it does not require a separate migration-specific file. On the Pi, use:
+
+- TEST: `/home/god/.config/pifitness/test.env` (`APP_ENV=test`)
+- PRD: `/home/god/PiFitness/backend/.env` (`APP_ENV=prod`)
+
+For example:
+
+```bash
+python tools/db/migrate.py status --env-file /home/god/.config/pifitness/test.env --format jsonl
+python tools/db/migrate.py up --env-file /home/god/.config/pifitness/test.env --format jsonl
+python tools/db/migrate.py status --env-file /home/god/PiFitness/backend/.env --allow-prd --format jsonl
+```
+
+PRD still requires `--allow-prd`. The explicit `--env-file` requirement and all host, database identity, port, and marker checks remain in force. Each command reads the connection settings and `PG_PASSWORD` from the selected existing file; inherited shell values do not override them.
 
 ## JSON Lines events
 
@@ -21,7 +34,7 @@ Deployment orchestration should parse stdout as JSONL and use the process exit c
 
 ## Checksum ledger upgrade
 
-Newly applied migrations store version, filename, and SHA-256 in `schema_migrations`. Existing ledgers are upgraded with nullable `filename` and `checksum` columns only during a write-capable command; `status` remains read-only.
+Newly applied migrations store version, filename, and SHA-256 in `schema_migrations`. Checksums are computed over migration contents after normalizing CRLF and lone CR line endings to LF; all other file content remains significant. This makes the checksum stable across Windows and Linux checkouts. Existing ledgers are upgraded with nullable `filename` and `checksum` columns only during a write-capable command; `status` remains read-only.
 
 Previously applied rows from the old ledger have no trustworthy checksum. `status` labels these `legacy_unverified` and sets `safe_to_apply` false. `up` refuses to proceed until an operator has reviewed the current migration files and explicitly runs:
 

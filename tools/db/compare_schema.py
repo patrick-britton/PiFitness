@@ -2,7 +2,7 @@
 """Read-only TEST/PRD PostgreSQL schema comparison using MigraDiff.
 
 This wrapper owns only PiFitness-specific safety and policy boundaries:
-- explicit TEST/PRD migration env files;
+- the existing TEST and PRD application environment files;
 - local endpoint, database identity, and marker verification;
 - temporary, private libpq password file (passwords never appear in argv);
 - structured MigraDiff JSON parsing;
@@ -454,8 +454,16 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Read-only TEST/PRD PostgreSQL schema comparison using MigraDiff."
     )
-    parser.add_argument("--test-env-file", required=True, help="TEST migration env file")
-    parser.add_argument("--prd-env-file", required=True, help="PRD migration env file")
+    parser.add_argument(
+        "--test-env-file",
+        default=migration_runner.DEFAULT_TEST_ENV_FILE,
+        help="existing TEST application env file (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--prd-env-file",
+        default=migration_runner.DEFAULT_PRD_ENV_FILE,
+        help="existing PRD application env file (default: %(default)s)",
+    )
     parser.add_argument(
         "--allow-prd",
         action="store_true",

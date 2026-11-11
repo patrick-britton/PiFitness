@@ -324,8 +324,16 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Read-only inspection and database decision for TEST vs PRD."
     )
-    parser.add_argument("--test-env-file", required=True, help="TEST migration env file")
-    parser.add_argument("--prd-env-file", required=True, help="PRD migration env file")
+    parser.add_argument(
+        "--test-env-file",
+        default=migration_runner.DEFAULT_TEST_ENV_FILE,
+        help="existing TEST application env file (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--prd-env-file",
+        default=migration_runner.DEFAULT_PRD_ENV_FILE,
+        help="existing PRD application env file (default: %(default)s)",
+    )
     parser.add_argument(
         "--allow-prd",
         action="store_true",
