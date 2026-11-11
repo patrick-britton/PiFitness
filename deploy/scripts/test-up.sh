@@ -234,15 +234,36 @@ write_state() {
   mv -f "$tmp" "$STATE_FILE"
 }
 
+RECOVERED=0
+
 # recover_and_fail: log a fatal check failure, run the defined recovery path
 # (test-down.sh) to restore PRD services and clean up the test stack, then
 # exit nonzero. The durable state file is left intact for test-down to read.
 recover_and_fail() {
+  RECOVERED=1
   echo "ERROR: $1" >&2
   echo "Running recovery path (test-down.sh)..." >&2
   "$(dirname "$0")/test-down.sh" >&2 || true
   exit 1
 }
+
+# on_exit: guaranteed restore on any abnormal exit (unhandled error, signal
+# delivery, or any path that bypasses recover_and_fail). Runs test-down only
+# when the state file exists and recovery has not already run.
+on_exit() {
+  local status=$?
+  if [[ $status -ne 0 && -f "${STATE_FILE:-}" && "${RECOVERED:-0}" -eq 0 ]]; then
+    RECOVERED=1
+    echo "ERROR: abnormal exit (status=$status); running recovery path (test-down.sh)..." >&2
+    "$(dirname "$0")/test-down.sh" >&2 || true
+  fi
+  exit "$status"
+}
+
+# Crash/Ctrl+C safety: persist the current phase so test-down can decide what
+# was already done and what still needs restoring.
+trap 'write_state' INT TERM
+trap on_exit EXIT
 
 # Crash/Ctrl+C safety: persist the current phase so test-down can decide what
 # was already done and what still needs restoring.
@@ -485,4 +506,5 @@ fi
 
 current_phase="complete"
 write_state
+trap - EXIT
 echo "test-up complete."
