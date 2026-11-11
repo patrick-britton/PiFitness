@@ -61,3 +61,12 @@ TEST database and checkout unchanged, and this fix preserves that property.
 The isolated build workspace did not have `psycopg2` installed, so a minimal
 import stub was used while running mocked database tests. This is not a live
 PostgreSQL or Pi integration test. The Pi retry remains the next runtime gate.
+
+
+## Database recovery handoff
+
+The inspector's `create_from_prd` and `refresh_from_prd` decisions are handled
+by `tools/db/restore_test_db.py`. The direct restore, automatic TEST marker and
+permissions provisioning, backup validation, failure cleanup, baseline journal,
+and migration-aware retry behavior are documented in
+[`TEST_DATABASE_RECOVERY.md`](TEST_DATABASE_RECOVERY.md).

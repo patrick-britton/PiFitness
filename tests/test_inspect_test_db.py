@@ -1,5 +1,7 @@
 """Unit tests for read-only TEST database inspection and policy handoff."""
 
+import json
+
 import pytest
 
 from tools.db import inspect_test_db
@@ -23,6 +25,10 @@ class FakeCursor:
             raise AssertionError("Expected identity query, got: %s" % query)
         if expected_kind == "catalog" and "FROM pg_database" not in query:
             raise AssertionError("Expected pg_database query, got: %s" % query)
+        if expected_kind == "permissions_meta" and "FROM pg_database" not in query:
+            raise AssertionError("Expected TEST ownership query, got: %s" % query)
+        if expected_kind == "privileges" and "has_database_privilege" not in query:
+            raise AssertionError("Expected TEST role privilege query, got: %s" % query)
         self.current = response
 
     def fetchone(self):
@@ -75,6 +81,10 @@ def _install_connections(
     test_connect_error=None,
     prd_marker=None,
     prd_address="127.0.0.1",
+    test_permissions=(True, True, True, True),
+    database_owner="test_migrator",
+    schema_owner="test_migrator",
+    catalog_oid=12345,
 ):
     prd_cursor = FakeCursor(
         [
@@ -82,7 +92,7 @@ def _install_connections(
             (
                 "catalog",
                 (
-                    ("personal_fitness_test", catalog_allow_connections, catalog_is_template)
+                    ("personal_fitness_test", catalog_allow_connections, catalog_is_template, database_owner, catalog_oid)
                     if test_exists
                     else None
                 ),
@@ -91,26 +101,49 @@ def _install_connections(
     )
     prd_connection = FakeConnection(prd_cursor)
 
-    test_cursor = FakeCursor(
+    test_admin_identity_cursor = FakeCursor(
         [("identity", _identity("personal_fitness_test", marker, test_address, test_port))]
     )
-    test_connection = FakeConnection(test_cursor)
+    test_admin_identity_connection = FakeConnection(test_admin_identity_cursor)
+
+    permission_cursor = FakeCursor(
+        [
+            ("identity", _identity("personal_fitness_test", marker, test_address, test_port)),
+            ("permissions_meta", (database_owner, schema_owner)),
+            ("privileges", test_permissions),
+        ]
+    )
+    permission_connection = FakeConnection(permission_cursor)
+
+    test_app_cursor = FakeCursor(
+        [("identity", _identity("personal_fitness_test", marker, test_address, test_port))]
+    )
+    test_app_connection = FakeConnection(test_app_cursor)
+    admin_test_connections = [test_admin_identity_connection, permission_connection]
 
     def connect(dbname, params):
         if dbname == "personal_fitness":
             return prd_connection
         if dbname == "personal_fitness_test":
-            if test_connect_error:
-                raise test_connect_error
-            return test_connection
+            if params.get("user") == "test_migrator":
+                if test_connect_error:
+                    raise test_connect_error
+                return test_app_connection
+            if not admin_test_connections:
+                raise AssertionError("Unexpected extra admin TEST connection")
+            return admin_test_connections.pop(0)
         raise AssertionError("Unexpected database connection: %s" % dbname)
 
     monkeypatch.setattr(inspect_test_db.migration_runner, "_connect", connect)
     return {
         "prd_cursor": prd_cursor,
         "prd_connection": prd_connection,
-        "test_cursor": test_cursor,
-        "test_connection": test_connection,
+        "test_admin_identity_cursor": test_admin_identity_cursor,
+        "test_admin_identity_connection": test_admin_identity_connection,
+        "permission_cursor": permission_cursor,
+        "permission_connection": permission_connection,
+        "test_cursor": test_app_cursor,
+        "test_connection": test_app_connection,
     }
 
 
@@ -133,15 +166,13 @@ def test_missing_test_database_selects_create_from_prd_without_comparison(monkey
     assert report["test"]["exists"] is False
     assert report["schema_comparison"] is None
     assert report["decision"]["action"] == "create_from_prd"
-    assert report["decision"]["requires_rollback_snapshot"] is False
     assert compare_calls == []
     assert handles["prd_connection"].closed
-    assert not handles["test_connection"].closed
     assert handles["prd_connection"].readonly is True
 
 
 @pytest.mark.parametrize("marker", [None, "", "dev", "prod", "unexpected"])
-def test_missing_or_wrong_test_marker_selects_preserved_refresh_without_comparison(
+def test_missing_or_wrong_test_marker_selects_refresh_without_comparison(
     monkeypatch, marker
 ):
     _install_connections(monkeypatch, marker=marker)
@@ -156,7 +187,6 @@ def test_missing_or_wrong_test_marker_selects_preserved_refresh_without_comparis
     assert report["test"]["marker"] == (marker or None)
     assert report["schema_comparison"] is None
     assert report["decision"]["action"] == "refresh_from_prd"
-    assert report["decision"]["requires_rollback_snapshot"] is True
     assert compare_calls == []
 
 
@@ -173,12 +203,25 @@ def test_identical_schema_reuses_test_and_offers_refresh(monkeypatch):
     assert report["ok"] is True
     assert report["decision"]["action"] == "reuse_test"
     assert report["decision"]["offer_refresh"] is True
-    assert report["decision"]["requires_rollback_snapshot"] is True
     assert report["schema_comparison"]["status"] == "identical"
     assert handles["prd_connection"].readonly is True
+    assert handles["permission_connection"].readonly is True
     assert handles["test_connection"].readonly is True
     assert len(compare_calls) == 1
 
+
+
+def test_bad_test_permissions_select_refresh_without_schema_comparison(monkeypatch):
+    handles = _install_connections(monkeypatch, test_permissions=(True, True, True, False))
+    compare_calls = []
+    report = inspect_test_db.inspect_test_database(
+        *_configs(), compare_fn=lambda *a, **k: compare_calls.append((a, k))
+    )
+    assert report["ok"] is True
+    assert report["test"]["permissions"]["ok"] is False
+    assert report["decision"]["action"] == "refresh_from_prd"
+    assert compare_calls == []
+    assert not handles["test_connection"].closed
 
 def test_different_schema_selects_refresh(monkeypatch):
     _install_connections(monkeypatch)
@@ -189,7 +232,6 @@ def test_different_schema_selects_refresh(monkeypatch):
     )
 
     assert report["decision"]["action"] == "refresh_from_prd"
-    assert report["decision"]["requires_rollback_snapshot"] is True
     assert report["schema_comparison"]["statement_count"] == 2
 
 
@@ -397,3 +439,114 @@ def test_cli_requires_explicit_prd_authorization(capsys):
     captured = capsys.readouterr()
     assert '"action":"abort"' in captured.out
     assert "explicit authorization" in captured.err
+
+
+def test_verified_baseline_with_checksum_valid_migrations_is_reused_without_schema_compare(monkeypatch, tmp_path):
+    _install_connections(monkeypatch, catalog_oid=777)
+    state = {
+        "status": "baseline_ready",
+        "test_database": "personal_fitness_test",
+        "prd_database": "personal_fitness",
+        "new_test_database_oid": 777,
+        "backup_path": "/home/god/Documents/DB_Backups/pifitness_prd_20261111_090000.dump",
+        "backup_timestamp_utc": "2026-11-11T17:00:00+00:00",
+        "backup_sha256": "a" * 64,
+    }
+    (tmp_path / "test-db-recovery-baseline.json").write_text(json.dumps(state))
+    compare_calls = []
+    status_calls = []
+
+    def status(config, **kwargs):
+        status_calls.append((config, kwargs))
+        return {"ok": True, "safe_to_apply": True, "environment": "test", "database": "personal_fitness_test", "applied": 2, "pending": 1, "total": 3}
+
+    monkeypatch.setattr(inspect_test_db.migration_runner, "cmd_status", status)
+    report = inspect_test_db.inspect_test_database(
+        *_configs(),
+        compare_fn=lambda *a, **k: compare_calls.append((a, k)),
+        baseline_state_dir=str(tmp_path),
+    )
+    assert report["ok"] is True
+    assert report["decision"]["action"] == "reuse_test"
+    assert report["decision"]["offer_refresh"] is False
+    assert report["schema_comparison"]["status"] == "migration_managed"
+    assert report["baseline_provenance"]["database_oid"] == 777
+    assert status_calls
+    assert compare_calls == []
+
+
+def test_baseline_journal_oid_mismatch_does_not_bypass_schema_comparison(monkeypatch, tmp_path):
+    _install_connections(monkeypatch, catalog_oid=777)
+    (tmp_path / "test-db-recovery-stale.json").write_text(json.dumps({
+        "status": "baseline_ready",
+        "test_database": "personal_fitness_test",
+        "prd_database": "personal_fitness",
+        "new_test_database_oid": 776,
+    }))
+    compare_calls = []
+    report = inspect_test_db.inspect_test_database(
+        *_configs(),
+        compare_fn=lambda *a, **k: compare_calls.append((a, k)) or {
+            "ok": True, "status": "different", "statement_count": 1,
+        },
+        baseline_state_dir=str(tmp_path),
+    )
+    assert report["decision"]["action"] == "refresh_from_prd"
+    assert len(compare_calls) == 1
+
+
+def test_corrupt_migration_ledger_fails_closed_instead_of_recloning(monkeypatch, tmp_path):
+    _install_connections(monkeypatch, catalog_oid=777)
+    (tmp_path / "test-db-recovery-baseline.json").write_text(json.dumps({
+        "status": "baseline_ready",
+        "test_database": "personal_fitness_test",
+        "prd_database": "personal_fitness",
+        "new_test_database_oid": 777,
+        "backup_path": "/home/god/Documents/DB_Backups/pifitness_prd_20261111_090000.dump",
+        "backup_timestamp_utc": "2026-11-11T17:00:00+00:00",
+        "backup_sha256": "a" * 64,
+    }))
+    compare_calls = []
+
+    def bad_status(*args, **kwargs):
+        raise RuntimeError("applied migration checksum mismatch")
+
+    monkeypatch.setattr(inspect_test_db.migration_runner, "cmd_status", bad_status)
+    report = inspect_test_db.inspect_test_database(
+        *_configs(),
+        compare_fn=lambda *a, **k: compare_calls.append((a, k)),
+        baseline_state_dir=str(tmp_path),
+    )
+    assert report["ok"] is False
+    assert report["decision"]["action"] == "abort"
+    assert "checksum mismatch" in report["error"]
+    assert compare_calls == []
+
+
+def test_verified_baseline_with_no_applied_migrations_is_reused_without_schema_compare(monkeypatch, tmp_path):
+    _install_connections(monkeypatch, catalog_oid=777)
+    (tmp_path / "test-db-recovery-baseline.json").write_text(json.dumps({
+        "status": "baseline_ready",
+        "test_database": "personal_fitness_test",
+        "prd_database": "personal_fitness",
+        "new_test_database_oid": 777,
+        "backup_path": "/home/god/Documents/DB_Backups/pifitness_prd_20261111_090000.dump",
+        "backup_timestamp_utc": "2026-11-11T17:00:00+00:00",
+        "backup_sha256": "a" * 64,
+    }))
+    monkeypatch.setattr(
+        inspect_test_db.migration_runner,
+        "cmd_status",
+        lambda *a, **k: {"ok": True, "safe_to_apply": True, "environment": "test", "database": "personal_fitness_test", "applied": 0, "pending": 2, "total": 2},
+    )
+    compare_calls = []
+    report = inspect_test_db.inspect_test_database(
+        *_configs(),
+        compare_fn=lambda *a, **k: compare_calls.append((a, k)) or {
+            "ok": True, "status": "identical", "statement_count": 0,
+        },
+        baseline_state_dir=str(tmp_path),
+    )
+    assert report["decision"]["action"] == "reuse_test"
+    assert report["schema_comparison"]["status"] == "restored_baseline"
+    assert len(compare_calls) == 0

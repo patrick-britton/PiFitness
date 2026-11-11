@@ -8,19 +8,23 @@ This module performs no DDL and never refreshes, renames, drops, or modifies a
 - checks whether the configured TEST database exists in the same cluster;
 - if it exists, connects without applying the TEST marker guard so a missing or
   wrong marker can be reported as a policy observation (not an inspection error);
-- invokes the MigraDiff adapter only when TEST exists and has marker `test`;
-- passes the observation to the pure TEST database policy.
+- verifies TEST's application role, database ownership, and required grants;
+- invokes MigraDiff only when identity and permissions are valid;
+- passes observations to the pure TEST database policy.
 
-The deployment orchestrator is responsible for preserving TEST before any
-refresh and for performing database provisioning/rollback. This inspector is
-strictly read-only; both PostgreSQL sessions are marked read-only.
+The deployment orchestrator is responsible for replacing TEST from the latest
+validated PRD backup when policy requests it. This inspector is strictly
+read-only; all PostgreSQL sessions are marked read-only.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import sys
+from pathlib import Path
 from typing import Any, Callable
 
 if __package__:
@@ -130,14 +134,14 @@ def _read_identity(cur: Any, *, expected_database: str, expected_port: int) -> d
 def _read_test_database_catalog(prd_cur: Any, test_db: str) -> dict[str, Any] | None:
     """Read TEST existence from the already validated PRD connection."""
     prd_cur.execute(
-        "SELECT datname, datallowconn, datistemplate "
+        "SELECT datname, datallowconn, datistemplate, pg_get_userbyid(datdba), oid "
         "FROM pg_database WHERE datname = %s",
         (test_db,),
     )
     row = prd_cur.fetchone()
     if row is None:
         return None
-    database, allow_connections, is_template = row
+    database, allow_connections, is_template, owner, database_oid = row
     if database != test_db:
         raise TestDatabaseInspectionError(
             "PostgreSQL catalog returned unexpected database %r; expected %r."
@@ -147,7 +151,136 @@ def _read_test_database_catalog(prd_cur: Any, test_db: str) -> dict[str, Any] | 
         "database": database,
         "allow_connections": bool(allow_connections),
         "is_template": bool(is_template),
+        "owner": str(owner),
+        "oid": int(database_oid),
     }
+
+
+def _find_matching_baseline_journal(
+    state_dir: str | Path | None, *, test_db: str, prd_db: str, database_oid: int,
+) -> tuple[Path, dict[str, Any]] | None:
+    """Find a completed PRD restore journal for this exact current DB OID."""
+    if not state_dir:
+        return None
+    supplied_directory = Path(state_dir).expanduser()
+    if supplied_directory.is_symlink():
+        raise TestDatabaseInspectionError(
+            "TEST recovery journal directory must not be a symlink: %s" % supplied_directory
+        )
+    directory = supplied_directory.resolve()
+    if not directory.is_dir():
+        return None
+    for path in sorted(directory.glob("test-db-recovery-*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+        if path.is_symlink() or not path.is_file():
+            continue
+        try:
+            with path.open(encoding="utf-8") as stream:
+                state = json.load(stream)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise TestDatabaseInspectionError(
+                "Could not read TEST recovery provenance journal %s: %s" % (path, exc)
+            ) from exc
+        if not isinstance(state, dict):
+            raise TestDatabaseInspectionError(
+                "TEST recovery provenance journal is not a JSON object: %s" % path
+            )
+        backup_path = state.get("backup_path")
+        backup_sha256 = state.get("backup_sha256")
+        backup_timestamp = state.get("backup_timestamp_utc")
+        checksum_valid = (
+            isinstance(backup_sha256, str)
+            and len(backup_sha256) == 64
+            and all(char in "0123456789abcdef" for char in backup_sha256.lower())
+        )
+        if (
+            state.get("status") == "baseline_ready"
+            and state.get("test_database") == test_db
+            and state.get("prd_database") == prd_db
+            and state.get("new_test_database_oid") == database_oid
+            and isinstance(backup_path, str) and bool(backup_path)
+            and checksum_valid
+            and isinstance(backup_timestamp, str) and bool(backup_timestamp)
+        ):
+            return path, state
+    return None
+
+
+def _read_migration_ledger_status(test_config: dict[str, str]) -> dict[str, Any]:
+    """Run the migration runner's read-only status/integrity check silently."""
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        summary = migration_runner.cmd_status(
+            test_config, allow_prd=False,
+            output_format=migration_runner.OUTPUT_JSONL,
+        )
+    if not isinstance(summary, dict):
+        raise TestDatabaseInspectionError("Migration runner returned no structured status summary.")
+    if (
+        summary.get("environment") != test_config.get("APP_ENV")
+        or summary.get("database") != test_config.get("PG_DB")
+    ):
+        raise TestDatabaseInspectionError(
+            "Migration status was returned for an unexpected environment/database: %r" % summary
+        )
+    if summary.get("ok") is not True or summary.get("safe_to_apply") is not True:
+        raise TestDatabaseInspectionError(
+            "TEST has a baseline recovery journal but its migration ledger is not safe to resume: %r"
+            % summary
+        )
+    return summary
+
+
+def _read_test_permissions(
+    prd_config: dict[str, str],
+    *,
+    test_db: str,
+    test_role: str,
+    expected_port: int,
+    prd_identity: dict[str, Any],
+) -> dict[str, Any]:
+    """Inspect TEST grants as the PRD administrator without modifying TEST."""
+    admin_test_config = dict(prd_config)
+    admin_test_config["PG_DB"] = test_db
+    conn, cur, params = _open_read_only_connection(admin_test_config, allow_prd=True)
+    try:
+        identity = _read_identity(cur, expected_database=test_db, expected_port=expected_port)
+        _verify_same_server(identity, prd_identity, label="TEST admin permission inspection")
+        cur.execute(
+            "SELECT pg_get_userbyid(datdba), "
+            "(SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = 'public') "
+            "FROM pg_database WHERE datname = current_database()"
+        )
+        ownership = cur.fetchone()
+        if not ownership:
+            raise TestDatabaseInspectionError("Could not inspect TEST database/schema ownership.")
+        database_owner, schema_owner = ownership
+        cur.execute(
+            "SELECT has_database_privilege(%s, current_database(), 'CONNECT'), "
+            "has_database_privilege(%s, current_database(), 'TEMPORARY'), "
+            "has_schema_privilege(%s, 'public', 'USAGE'), "
+            "has_schema_privilege(%s, 'public', 'CREATE')",
+            (test_role, test_role, test_role, test_role),
+        )
+        privileges = cur.fetchone()
+        if not privileges:
+            raise TestDatabaseInspectionError("Could not inspect TEST application-role privileges.")
+        owner_ok = database_owner == test_role and schema_owner == test_role
+        grants_ok = all(bool(value) for value in privileges)
+        return {
+            "ok": bool(owner_ok and grants_ok),
+            "expected_role": test_role,
+            "database_owner": str(database_owner),
+            "public_schema_owner": str(schema_owner) if schema_owner is not None else None,
+            "privileges": {
+                "connect": bool(privileges[0]),
+                "temporary": bool(privileges[1]),
+                "schema_usage": bool(privileges[2]),
+                "schema_create": bool(privileges[3]),
+            },
+        }
+    finally:
+        cur.close()
+        conn.close()
 
 
 def _verify_same_server(
@@ -190,6 +323,7 @@ def inspect_test_database(
     refresh_from_prd: bool = False,
     compare_fn: Callable[..., dict[str, Any]] | None = None,
     diff_file: str | None = None,
+    baseline_state_dir: str | None = None,
 ) -> dict[str, Any]:
     """Inspect TEST and return a policy decision without changing either DB."""
     compare = compare_fn or compare_schema.compare_databases
@@ -243,21 +377,25 @@ def inspect_test_database(
                     "TEST database exists but disallows connections; marker cannot be verified safely."
                 )
 
-            stage = "Connect to TEST and verify its database identity and marker"
-            # Intentionally bypass only the TEST marker guard here. This
-            # read-only connection is necessary to observe a missing or wrong
-            # marker so policy can request a preserved refresh.
-            test_conn, test_cur, test_params = _open_read_only_connection(
-                test_config, allow_prd=False
+            stage = "Connect to TEST as the local database administrator and verify its identity/marker"
+            # Inspect as the validated PRD administrator first. That allows
+            # policy to detect missing TEST-role CONNECT/USAGE/CREATE grants
+            # instead of turning a repairable permission problem into a generic
+            # connection failure.
+            admin_test_config = dict(prd_config)
+            admin_test_config["PG_DB"] = test_db
+            test_admin_conn, test_admin_cur, test_admin_params = _open_read_only_connection(
+                admin_test_config, allow_prd=True
             )
             try:
                 test_identity = _read_identity(
-                    test_cur, expected_database=test_db, expected_port=test_params["port"]
+                    test_admin_cur, expected_database=test_db,
+                    expected_port=test_admin_params["port"],
                 )
                 _verify_same_server(test_identity, report["prd"], label="TEST")
             finally:
-                test_cur.close()
-                test_conn.close()
+                test_admin_cur.close()
+                test_admin_conn.close()
 
             report["test"].update(
                 {
@@ -265,6 +403,7 @@ def inspect_test_database(
                     "marker": test_identity["marker"],
                     "server_address": test_identity["server_address"],
                     "server_port": test_identity["server_port"],
+                    "database_oid": catalog["oid"],
                 }
             )
 
@@ -273,54 +412,137 @@ def inspect_test_database(
                     exists=True, marker=test_identity["marker"]
                 )
             else:
-                stage = "Compare TEST and PRD schemas using MigraDiff"
-                try:
-                    comparison = compare(
-                        test_config,
-                        prd_config,
-                        diff_file=diff_file,
-                    )
-                except Exception as exc:
-                    error = _redact_error(str(exc), configs)
-                    report["error"] = error
-                    report["failure"] = _failure_diagnostic(exc, stage, error)
-                    report["schema_comparison"] = {
-                        "ok": False,
-                        "status": "error",
-                        "error": error,
-                    }
+                stage = "Inspect TEST database ownership and application-role permissions"
+                permissions = _read_test_permissions(
+                    prd_config,
+                    test_db=test_db,
+                    test_role=test_params["user"],
+                    expected_port=int(prd_params["port"]),
+                    prd_identity=report["prd"],
+                )
+                report["test"]["permissions"] = permissions
+                if not permissions["ok"]:
                     observation = test_db_policy.DatabaseObservation(
-                        exists=True,
-                        marker="test",
-                        schema_status="error",
-                        inspection_error=error,
+                        exists=True, marker="test", permissions_ok=False
                     )
                 else:
-                    status = comparison.get("status")
-                    if status not in {"identical", "different"} or comparison.get("ok") is not True:
-                        error = "Schema comparator returned an invalid or unsuccessful report."
-                        report["error"] = error
-                        report["failure"] = _failure_diagnostic(
-                            compare_schema.SchemaComparisonError(error), stage, error
+                    stage = "Connect to TEST using its configured application role"
+                    test_conn, test_cur, test_params = _open_read_only_connection(
+                        test_config, allow_prd=False
+                    )
+                    try:
+                        test_identity = _read_identity(
+                            test_cur, expected_database=test_db, expected_port=test_params["port"]
                         )
-                        report["schema_comparison"] = {
-                            "ok": False,
-                            "status": "error",
-                            "error": error,
-                        }
-                        observation = test_db_policy.DatabaseObservation(
-                            exists=True,
-                            marker="test",
-                            schema_status="error",
-                            inspection_error=error,
-                        )
-                    else:
-                        report["schema_comparison"] = comparison
-                        observation = test_db_policy.DatabaseObservation(
-                            exists=True,
-                            marker="test",
-                            schema_status=status,
-                        )
+                        _verify_same_server(test_identity, report["prd"], label="TEST")
+                    finally:
+                        test_cur.close()
+                        test_conn.close()
+
+                    stage = "Check completed PRD restore provenance and migration ledger"
+                    baseline = _find_matching_baseline_journal(
+                        baseline_state_dir,
+                        test_db=test_db,
+                        prd_db=prd_db,
+                        database_oid=catalog["oid"],
+                    )
+                    if baseline is not None:
+                        baseline_path, baseline_state = baseline
+                        try:
+                            migration_status = _read_migration_ledger_status(test_config)
+                        except Exception as exc:
+                            error = _redact_error(str(exc), configs)
+                            report["error"] = error
+                            report["failure"] = _failure_diagnostic(exc, stage, error)
+                            report["schema_comparison"] = {
+                                "ok": False,
+                                "status": "error",
+                                "error": error,
+                            }
+                            observation = test_db_policy.DatabaseObservation(
+                                exists=True,
+                                marker="test",
+                                permissions_ok=True,
+                                schema_status="error",
+                                inspection_error=error,
+                            )
+                        else:
+                            applied_count = int(migration_status.get("applied", 0))
+                            report["baseline_provenance"] = {
+                                    "journal": str(baseline_path),
+                                    "database_oid": catalog["oid"],
+                                    "backup_path": baseline_state.get("backup_path"),
+                                    "backup_timestamp_utc": baseline_state.get("backup_timestamp_utc"),
+                                    "migration_status": migration_status,
+                                }
+                            report["schema_comparison"] = {
+                                "ok": True,
+                                "status": "migration_managed" if applied_count > 0 else "restored_baseline",
+                                "statement_count": None,
+                                "message": (
+                                    "TEST matches a completed, verified PRD backup restore. "
+                                    "Its migration ledger is safe for the current package; "
+                                    "do not re-clone this database on retry."
+                                ),
+                            }
+                            observation = test_db_policy.DatabaseObservation(
+                                exists=True,
+                                marker="test",
+                                permissions_ok=True,
+                                baseline_provenance_valid=True,
+                            )
+                    if baseline is None:
+                        stage = "Compare TEST and PRD schemas using MigraDiff"
+                        try:
+                            comparison = compare(
+                                test_config,
+                                prd_config,
+                                diff_file=diff_file,
+                            )
+                        except Exception as exc:
+                            error = _redact_error(str(exc), configs)
+                            report["error"] = error
+                            report["failure"] = _failure_diagnostic(exc, stage, error)
+                            report["schema_comparison"] = {
+                                "ok": False,
+                                "status": "error",
+                                "error": error,
+                            }
+                            observation = test_db_policy.DatabaseObservation(
+                                exists=True,
+                                marker="test",
+                                permissions_ok=True,
+                                schema_status="error",
+                                inspection_error=error,
+                            )
+                        else:
+                            status = comparison.get("status")
+                            if status not in {"identical", "different"} or comparison.get("ok") is not True:
+                                error = "Schema comparator returned an invalid or unsuccessful report."
+                                report["error"] = error
+                                report["failure"] = _failure_diagnostic(
+                                    compare_schema.SchemaComparisonError(error), stage, error
+                                )
+                                report["schema_comparison"] = {
+                                    "ok": False,
+                                    "status": "error",
+                                    "error": error,
+                                }
+                                observation = test_db_policy.DatabaseObservation(
+                                    exists=True,
+                                    marker="test",
+                                    permissions_ok=True,
+                                    schema_status="error",
+                                    inspection_error=error,
+                                )
+                            else:
+                                report["schema_comparison"] = comparison
+                                observation = test_db_policy.DatabaseObservation(
+                                    exists=True,
+                                    marker="test",
+                                    permissions_ok=True,
+                                    schema_status=status,
+                                )
 
         stage = "Evaluate the TEST reuse/refresh policy"
         decision = test_db_policy.decide_test_database(
@@ -381,6 +603,13 @@ def _failure_diagnostic(exc: Exception, stage: str, detail: str) -> dict[str, st
         next_action = (
             "Confirm APP_ENV=test and the TEST database marker is 'test'; PRD must remain unmarked. "
             "Do not drop or refresh a database solely to bypass this diagnostic."
+        )
+    elif "permission" in lower or "ownership" in lower or "privilege" in lower:
+        code = "test_database_permissions_invalid"
+        summary = "The TEST application role does not have the required database ownership or privileges."
+        next_action = (
+            "The bootstrap policy will rebuild TEST from the latest validated PRD backup and "
+            "provision ownership and grants for the configured TEST role."
         )
     elif "migradiff" in lower or "schema comparator" in lower or "schema comparison" in lower:
         code = "schema_comparison_failed"
@@ -454,6 +683,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--diff-file",
         help="optional private JSON artifact for the full MigraDiff report",
     )
+    parser.add_argument(
+        "--baseline-state-dir",
+        help="private evidence directory containing completed TEST restore journals",
+    )
     return parser
 
 
@@ -484,6 +717,7 @@ def main(argv: list[str] | None = None) -> int:
             prd_config,
             refresh_from_prd=args.refresh_from_prd,
             diff_file=args.diff_file,
+            baseline_state_dir=args.baseline_state_dir,
         )
     except Exception as exc:
         error = str(exc)

@@ -63,6 +63,12 @@ PYTHON_BIN="/usr/bin/python3"
 NODE_BIN="/usr/bin/node"
 NPM_BIN="/usr/bin/npm"
 EVIDENCE_DIR="/home/god/Documents/PiFitness_Test_Evidence"
+# Historical PiFitness backup location/name. Override these two values if the
+# nightly backup job uses a different directory or custom-archive filename.
+PRD_BACKUP_DIR="${PIFITNESS_PRD_BACKUP_DIR:-$HOME/Documents/DB_Backups}"
+PRD_BACKUP_GLOB="${PIFITNESS_PRD_BACKUP_GLOB:-pifitness_prd_*.dump}"
+DB_RECOVERY_STATE_FILE=""
+DB_RECOVERY_SCRIPT=""
 
 if [[ ! "$COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
     fail "A full 40-character commit SHA is required."
@@ -113,6 +119,33 @@ if [[ -e "$STAGE_DIR" || -L "$STAGE_DIR" ]]; then
 fi
 
 cleanup() {
+    local exit_status=$?
+    trap - EXIT
+
+    # Once the PRD-derived TEST database has passed restore, ownership,
+    # marker, permission, and schema verification, it is the new baseline.
+    # A later checkout/build/migration failure must NOT restore the known-bad
+    # previous TEST database. Keep the clean baseline for the next attempt.
+    if [[ "$exit_status" -ne 0 && -n "$DB_RECOVERY_STATE_FILE" \
+          && -f "$DB_RECOVERY_STATE_FILE" ]]; then
+        recovery_status=$("$VENV_DIR/bin/python" - "$DB_RECOVERY_STATE_FILE" <<'PY_RECOVERY_STATUS' 2>/dev/null || true
+import json
+import sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as stream:
+        print(json.load(stream).get("status", "unknown"))
+except Exception:
+    print("unknown")
+PY_RECOVERY_STATUS
+)
+        if [[ "$recovery_status" == "baseline_ready" ]]; then
+            echo "Bootstrap stopped after TEST database recovery. The verified PRD-derived TEST baseline is retained for the next attempt." >&2
+        else
+            echo "Bootstrap stopped during TEST database recovery (journal status: ${recovery_status:-unknown}). No verified baseline is being claimed." >&2
+        fi
+        echo "Recovery journal: $DB_RECOVERY_STATE_FILE" >&2
+    fi
+
     # A failed preflight must never promote a partially prepared checkout.
     # Promotion happens only in the explicit success path below.
     if git -C "$SOURCE_REPO" worktree list --porcelain |
@@ -120,6 +153,7 @@ cleanup() {
         git -C "$SOURCE_REPO" worktree remove --force "$STAGE_DIR" ||
             echo "WARNING: failed to remove staging worktree $STAGE_DIR" >&2
     fi
+    exit "$exit_status"
 }
 trap cleanup EXIT
 
@@ -220,9 +254,38 @@ echo
 echo "Frontend dependencies installed and production build verified."
 
 echo
-echo "Inspecting TEST database against PRD (read-only)..."
+echo "Reconciling any interrupted TEST database recovery..."
 mkdir -p "$EVIDENCE_DIR"
 chmod 0700 "$EVIDENCE_DIR"
+DB_RECOVERY_SCRIPT="$STAGE_DIR/tools/db/restore_test_db.py"
+[[ -f "$DB_RECOVERY_SCRIPT" ]] || fail "TEST database recovery helper is missing: $DB_RECOVERY_SCRIPT"
+PENDING_RECOVERY_REPORT="$EVIDENCE_DIR/test-db-recovery-reconcile-$(date +%Y%m%d_%H%M%S)_$$.json"
+PENDING_RECOVERY_ERROR="${PENDING_RECOVERY_REPORT%.json}.stderr"
+if ! (
+    umask 077
+    "$VENV_DIR/bin/python" "$DB_RECOVERY_SCRIPT" \
+        --test-env-file "$ENV_FILE" --prd-env-file "$PRD_ENV_FILE" \
+        recover-pending --state-dir "$EVIDENCE_DIR"
+) >"$PENDING_RECOVERY_REPORT" 2>"$PENDING_RECOVERY_ERROR"; then
+    [[ ! -s "$PENDING_RECOVERY_ERROR" ]] || cat "$PENDING_RECOVERY_ERROR" >&2
+    echo "Recovery reconciliation report: $PENDING_RECOVERY_REPORT" >&2
+    fail "An interrupted TEST database recovery could not be reconciled. Manual database inspection is required."
+fi
+chmod 0600 "$PENDING_RECOVERY_REPORT"
+[[ ! -s "$PENDING_RECOVERY_ERROR" ]] || chmod 0600 "$PENDING_RECOVERY_ERROR"
+"$VENV_DIR/bin/python" - "$PENDING_RECOVERY_REPORT" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+for path in report.get("cleaned", []):
+    print("  Removed an incomplete TEST restore so the next attempt can start cleanly: %s" % path)
+for path in report.get("baseline_ready", []):
+    print("  Retained verified PRD-derived TEST baseline (no re-restore needed): %s" % path)
+PY
+
+ echo
+echo "Inspecting TEST database against PRD (read-only)..."
 RUN_ID="$(date +%Y%m%d_%H%M%S)_${COMMIT:0:12}_$$"
 INSPECTION_REPORT="$EVIDENCE_DIR/test-db-inspection-${RUN_ID}.json"
 INSPECTION_ERROR="$EVIDENCE_DIR/test-db-inspection-${RUN_ID}.stderr"
@@ -238,6 +301,7 @@ if ! (
         --prd-env-file "$PRD_ENV_FILE" \
         --allow-prd \
         --diff-file "$SCHEMA_DIFF_FILE" \
+        --baseline-state-dir "$EVIDENCE_DIR" \
         >"$INSPECTION_REPORT" 2>"$INSPECTION_ERROR"
 ); then
     [[ ! -s "$INSPECTION_ERROR" ]] || cat "$INSPECTION_ERROR" >&2
@@ -271,9 +335,17 @@ if test.get("database"):
     elif test.get("exists") is True:
         print("  TEST: %s (marker %s)" % (test["database"], repr(test.get("marker"))))
 if comparison:
-    print("  Schema comparison: %s (%s structural differences)" % (
-        comparison.get("status", "unknown"), comparison.get("statement_count", "unknown")
-    ))
+    if comparison.get("status") == "migration_managed":
+        provenance = report.get("baseline_provenance") or {}
+        migration_status = provenance.get("migration_status") or {}
+        print("  Schema state: migration-managed (%s applied, %s pending; checksums verified)" % (
+            migration_status.get("applied", "unknown"),
+            migration_status.get("pending", "unknown"),
+        ))
+    else:
+        print("  Schema comparison: %s (%s structural differences)" % (
+            comparison.get("status", "unknown"), comparison.get("statement_count", "unknown")
+        ))
 print("  Database decision: %s" % decision.get("action", "unknown"))
 if decision.get("reason"):
     print("  Reason: %s" % decision["reason"])
@@ -294,6 +366,7 @@ PY
 )
 IFS='|' read -r DB_ACTION DB_OFFER_REFRESH <<< "$DB_DECISION_FIELDS"
 
+NEEDS_DB_RECOVERY=0
 case "$DB_ACTION" in
     reuse_test)
         if [[ "$DB_OFFER_REFRESH" == "true" ]]; then
@@ -301,32 +374,127 @@ case "$DB_ACTION" in
             echo
             read -r -p "TEST schema is compatible with PRD. Refresh TEST from the latest PRD nightly backup for freshness? [y/N]: " refresh_choice
             case "${refresh_choice,,}" in
-                y|yes)
-                    fail "PRD refresh was requested, but backup restore and rollback are the next integration step. No database or existing checkout was modified."
-                    ;;
-                n|no|"")
-                    echo "Keeping the existing TEST database."
-                    ;;
-                *)
-                    fail "Please answer yes or no. No database or existing checkout was modified."
-                    ;;
+                y|yes) NEEDS_DB_RECOVERY=1 ;;
+                n|no|"") echo "Keeping the existing TEST database." ;;
+                *) fail "Please answer yes or no. No database or existing checkout was modified." ;;
             esac
         fi
         ;;
     create_from_prd|refresh_from_prd)
-        fail "Database policy requires '$DB_ACTION'. Restoring the latest PRD nightly backup and preserving the previous TEST database are the next integration step. No database or existing checkout was modified."
+        NEEDS_DB_RECOVERY=1
         ;;
     abort)
-        fail "Database policy returned abort. See the inspection report above."
+        fail "Database inspector returned abort. See the inspection report above."
         ;;
     *)
         fail "Database inspector returned unknown decision '$DB_ACTION'."
         ;;
 esac
 
+if [[ "$NEEDS_DB_RECOVERY" == "1" ]]; then
+    echo
+    echo "Restoring TEST database from the latest PRD nightly backup..."
+    DB_RECOVERY_SCRIPT="$STAGE_DIR/tools/db/restore_test_db.py"
+    [[ -f "$DB_RECOVERY_SCRIPT" ]] || fail "TEST database recovery helper is missing: $DB_RECOVERY_SCRIPT"
+    DB_RECOVERY_STATE_FILE="$EVIDENCE_DIR/test-db-recovery-${RUN_ID}.json"
+    RECOVERY_REPORT="$EVIDENCE_DIR/test-db-recovery-report-${RUN_ID}.json"
+    RECOVERY_ERROR="$EVIDENCE_DIR/test-db-recovery-${RUN_ID}.stderr"
+
+    if ! (
+        umask 077
+        "$VENV_DIR/bin/python" "$DB_RECOVERY_SCRIPT" \
+            --test-env-file "$ENV_FILE" --prd-env-file "$PRD_ENV_FILE" \
+            restore \
+            --backup-dir "$PRD_BACKUP_DIR" \
+            --backup-glob "$PRD_BACKUP_GLOB" \
+            --max-backup-age-hours 24 \
+            --state-file "$DB_RECOVERY_STATE_FILE" \
+            --diff-file "$SCHEMA_DIFF_FILE"
+    ) >"$RECOVERY_REPORT" 2>"$RECOVERY_ERROR"; then
+        [[ ! -s "$RECOVERY_ERROR" ]] || cat "$RECOVERY_ERROR" >&2
+        echo "Database recovery evidence: $RECOVERY_REPORT" >&2
+        [[ ! -f "$DB_RECOVERY_STATE_FILE" ]] || echo "Database recovery journal: $DB_RECOVERY_STATE_FILE" >&2
+        fail "TEST database recovery failed. Any incomplete replacement was removed; inspect the recovery journal before retrying."
+    fi
+    chmod 0600 "$RECOVERY_REPORT" "$DB_RECOVERY_STATE_FILE"
+    [[ ! -s "$RECOVERY_ERROR" ]] || chmod 0600 "$RECOVERY_ERROR"
+    echo "Database recovery report: $RECOVERY_REPORT"
+    echo "Database recovery journal: $DB_RECOVERY_STATE_FILE"
+
+    "$VENV_DIR/bin/python" - "$RECOVERY_REPORT" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+if not report.get("ok"):
+    raise SystemExit("Recovery report did not confirm success.")
+print("  Restored TEST database: %s" % report.get("test_database"))
+print("  Source PRD backup: %s" % report.get("backup_path"))
+print("  Marker: %s" % report.get("marker"))
+print("  Previous TEST database discarded: %s" % report.get("previous_test_database_discarded"))
+comparison = report.get("schema_comparison") or {}
+print("  Live PRD comparison (diagnostic only): %s" % comparison.get("status", "unavailable"))
+if comparison.get("status") == "different":
+    print("  Note: the nightly archive may predate later live-PRD schema changes; the restored baseline is retained.")
+PY
+
+    # Reinspect from a new process/connection. Verify the TEST marker,
+    # permissions, restore provenance, and migration-ledger safety. A valid
+    # nightly archive may predate subsequent live-PRD schema changes.
+    POST_INSPECTION_REPORT="$EVIDENCE_DIR/test-db-inspection-after-recovery-${RUN_ID}.json"
+    POST_INSPECTION_ERROR="$EVIDENCE_DIR/test-db-inspection-after-recovery-${RUN_ID}.stderr"
+    echo
+    echo "Verifying restored TEST database identity, permissions, and baseline provenance..."
+    if ! (
+        umask 077
+        "$VENV_DIR/bin/python" "$STAGE_DIR/tools/db/inspect_test_db.py" \
+            --test-env-file "$ENV_FILE" \
+            --prd-env-file "$PRD_ENV_FILE" \
+            --allow-prd \
+            --diff-file "$SCHEMA_DIFF_FILE" \
+            --baseline-state-dir "$EVIDENCE_DIR"
+    ) >"$POST_INSPECTION_REPORT" 2>"$POST_INSPECTION_ERROR"; then
+        [[ ! -s "$POST_INSPECTION_ERROR" ]] || cat "$POST_INSPECTION_ERROR" >&2
+        echo "Post-recovery inspection report: $POST_INSPECTION_REPORT" >&2
+        fail "Restored TEST database did not pass the independent post-restore inspection. The verified baseline is retained for diagnosis; no previous TEST database will be restored."
+    fi
+    chmod 0600 "$POST_INSPECTION_REPORT"
+    [[ ! -s "$POST_INSPECTION_ERROR" ]] || chmod 0600 "$POST_INSPECTION_ERROR"
+    "$VENV_DIR/bin/python" - "$POST_INSPECTION_REPORT" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+test = report.get("test") or {}
+comparison = report.get("schema_comparison") or {}
+decision = report.get("decision") or {}
+if not report.get("ok"):
+    raise SystemExit("Post-recovery inspection did not succeed.")
+if test.get("marker") != "test":
+    raise SystemExit("Post-recovery TEST marker is not exactly 'test'.")
+if comparison.get("status") not in {"identical", "restored_baseline", "migration_managed"}:
+    raise SystemExit("Restored TEST baseline was not accepted by the inspector: %r" % comparison.get("status"))
+if decision.get("action") != "reuse_test":
+    raise SystemExit("Unexpected post-recovery database decision: %r" % decision.get("action"))
+print("  TEST database: %s (marker test)" % test.get("database"))
+print("  TEST baseline state: %s" % comparison.get("status"))
+provenance = report.get("baseline_provenance") or {}
+migration_status = provenance.get("migration_status") or {}
+if migration_status:
+    print("  Migration ledger: %s applied, %s pending; safe to resume" % (
+        migration_status.get("applied", 0), migration_status.get("pending", 0)
+    ))
+PY
+    INSPECTION_REPORT="$POST_INSPECTION_REPORT"
+    echo "Post-recovery inspection report: $INSPECTION_REPORT"
+fi
+
 echo
 echo "All checkout, build, and read-only database preflight checks passed."
 echo "TEST database decision: $DB_ACTION"
+if [[ -n "$DB_RECOVERY_STATE_FILE" ]]; then
+    echo "TEST database recovery journal (verified baseline provenance): $DB_RECOVERY_STATE_FILE"
+fi
 
 PREVIOUS_DIR="${APP_DIR}.previous.$$"
 if [[ -e "$APP_DIR" || -L "$APP_DIR" ]]; then
@@ -373,6 +541,13 @@ ls -l "$APP_DIR/backend/.env"
 echo
 echo "Dependencies synchronized from committed uv.lock."
 echo "MigraDiff 1.7.2 verified."
-echo "TEST/PRD schema inspection completed read-only."
-echo "No database refresh or migrations applied in this integration step."
+echo "TEST/PRD schema inspection completed."
+if [[ -n "$DB_RECOVERY_STATE_FILE" ]]; then
+    echo "TEST database restored from the latest validated PRD backup and marked test."
+    echo "Previous TEST database discarded after successful replacement verification."
+    echo "The PRD-derived TEST baseline remains in place if a later bootstrap step fails."
+else
+    echo "Existing TEST database reused; no database refresh was applied."
+fi
+echo "No migrations applied in this integration step."
 echo "No services changed."

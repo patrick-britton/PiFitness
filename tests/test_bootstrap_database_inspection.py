@@ -80,7 +80,7 @@ def test_database_inspection_precedes_transactional_checkout_promotion():
     assert 'manual recovery is required' in text
 
 
-def test_policy_actions_are_all_handled_and_fail_closed_until_refresh_exists():
+def test_policy_actions_are_all_handled_and_route_refreshes_to_recovery():
     text = read_script()
     decision_block = text[text.index('case "$DB_ACTION" in'):]
 
@@ -89,7 +89,9 @@ def test_policy_actions_are_all_handled_and_fail_closed_until_refresh_exists():
 
     assert "unknown decision" in decision_block
     assert "latest PRD nightly backup" in decision_block
-    assert "backup restore and rollback are the next integration step" in decision_block
+    assert 'restore_test_db.py' in decision_block
+    assert 'rollback --state-file "$DB_RECOVERY_STATE_FILE"' not in text
+    assert 'verified PRD-derived TEST baseline is retained' in text
 
 
 def test_compatible_database_prompts_for_optional_freshness_refresh():
