@@ -1,0 +1,3 @@
+# Exact version pinned for reproducible deployment schema comparison.
+# This distribution also provides the optional psycopg2-binary driver used by MigraDiff.
+migradiff[pg]==1.7.2

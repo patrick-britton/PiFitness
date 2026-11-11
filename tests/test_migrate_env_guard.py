@@ -6,6 +6,8 @@ requires explicit --allow-prd authorization. Target checks must precede DDL,
 and status must never write to the database.
 """
 
+import hashlib
+import json
 import os
 import sys
 
@@ -147,6 +149,8 @@ class FakeCursor:
         table_exists=False,
         applied=(),
         baseline_exists=False,
+        metadata_columns=(),
+        ledger_rows=None,
     ):
         self.dbname = dbname
         self.marker = marker
@@ -155,6 +159,10 @@ class FakeCursor:
         self.table_exists = table_exists
         self.applied = list(applied)
         self.baseline_exists = baseline_exists
+        self.metadata_columns = set(metadata_columns)
+        self.ledger = dict(ledger_rows or {})
+        for version in self.applied:
+            self.ledger.setdefault(version, (None, None))
         self.executed = []
         self._one = None
         self._all = []
@@ -166,12 +174,29 @@ class FakeCursor:
         self._one = None
         self._all = []
 
-        if "current_database()" in normalized:
+        if normalized.startswith("CREATE TABLE IF NOT EXISTS schema_migrations"):
+            self.table_exists = True
+            self.metadata_columns.update({"filename", "checksum"})
+        elif normalized.startswith("ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS"):
+            self.table_exists = True
+            if " filename " in " " + normalized + " ":
+                self.metadata_columns.add("filename")
+            if " checksum " in " " + normalized + " ":
+                self.metadata_columns.add("checksum")
+        elif "current_database()" in normalized:
             self._one = (self.dbname, self.server_addr, self.port)
         elif "current_setting('pifitness.env', true)" in normalized:
             self._one = (self.marker,)
         elif "to_regclass('schema_migrations')" in normalized:
             self._one = ("schema_migrations",) if self.table_exists else (None,)
+        elif "FROM information_schema.columns" in normalized and "schema_migrations" in normalized:
+            self._all = [(name,) for name in sorted(self.metadata_columns)]
+        elif normalized.startswith("SELECT version, filename, checksum FROM schema_migrations"):
+            self._all = [
+                (version, self.ledger.get(version, (None, None))[0],
+                 self.ledger.get(version, (None, None))[1])
+                for version in sorted(self.applied)
+            ]
         elif normalized.startswith("SELECT version FROM schema_migrations"):
             self._all = [(version,) for version in self.applied]
         elif normalized.startswith("SELECT 1 FROM schema_migrations"):
@@ -181,8 +206,15 @@ class FakeCursor:
                 self.baseline_exists = True
             else:
                 self.applied.append(params[0])
+                if len(params) >= 3:
+                    self.ledger[params[0]] = (params[1], params[2])
+        elif normalized.startswith("UPDATE schema_migrations SET filename") and params:
+            filename, checksum, version = params
+            if version in self.applied:
+                self.ledger[version] = (filename, checksum)
         elif normalized.startswith("DELETE FROM schema_migrations") and params:
             self.applied = [value for value in self.applied if value != params[0]]
+            self.ledger.pop(params[0], None)
 
     def fetchone(self):
         return self._one
@@ -225,6 +257,8 @@ def _install_fake_connection(
     table_exists=False,
     applied=(),
     baseline_exists=False,
+    metadata_columns=(),
+    ledger_rows=None,
 ):
     cursor = FakeCursor(
         dbname=actual_dbname or config["PG_DB"],
@@ -234,6 +268,8 @@ def _install_fake_connection(
         table_exists=table_exists,
         applied=applied,
         baseline_exists=baseline_exists,
+        metadata_columns=metadata_columns,
+        ledger_rows=ledger_rows,
     )
     conn = FakeConnection(cursor)
     connect_calls = []
@@ -557,9 +593,10 @@ def test_cli_loads_selected_env_file_and_passes_prd_authorization(
     )
     observed = {}
 
-    def fake_status(config, allow_prd=False):
+    def fake_status(config, allow_prd=False, output_format="text"):
         observed["config"] = config
         observed["allow_prd"] = allow_prd
+        observed["output_format"] = output_format
 
     monkeypatch.setattr(migrate, "cmd_status", fake_status)
 
@@ -571,6 +608,7 @@ def test_cli_loads_selected_env_file_and_passes_prd_authorization(
     assert observed["config"]["APP_ENV"] == "prod"
     assert observed["config"]["PG_DB"] == "personal_fitness"
     assert observed["allow_prd"] is True
+    assert observed["output_format"] == "text"
 
 
 @pytest.mark.regression
@@ -601,3 +639,245 @@ def test_cli_refuses_allow_prd_for_test(tmp_path, capsys):
 
     assert result == 1
     assert "only with APP_ENV=prod" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# Structured output, per-file failure attribution, and checksum integrity
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.regression
+def test_jsonl_status_emits_one_machine_readable_record_per_migration(
+    monkeypatch, tmp_path, capsys
+):
+    config = _config("test", "fitness_test")
+    _, cursor, _ = _install_fake_connection(monkeypatch, config, "test")
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    (tmp_path / "001__first.sql").write_text("-- migrate:up\nSELECT 1;\n")
+    (tmp_path / "002__second.sql").write_text("-- migrate:up\nSELECT 2;\n")
+
+    migrate.cmd_status(config, output_format="jsonl")
+
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert [event["event"] for event in events] == [
+        "migration_status", "migration_status", "migration_summary"
+    ]
+    assert events[0]["file"] == "001__first.sql"
+    assert events[0]["status"] == "pending"
+    assert events[1]["file"] == "002__second.sql"
+    assert events[1]["status"] == "pending"
+    assert events[-1]["pending"] == 2
+    assert events[-1]["ok"] is True
+    assert not any("CREATE TABLE" in sql.upper() for sql, _ in cursor.executed)
+
+
+
+
+@pytest.mark.regression
+def test_checksum_is_stable_across_lf_and_crlf_files(tmp_path):
+    lf_path = tmp_path / "lf.sql"
+    crlf_path = tmp_path / "crlf.sql"
+    content = "-- migrate:up\nSELECT 1;\n"
+    lf_path.write_bytes(content.encode("utf-8"))
+    crlf_path.write_bytes(content.replace("\n", "\r\n").encode("utf-8"))
+
+    assert migrate._sha256_file(str(lf_path)) == migrate._sha256_file(str(crlf_path))
+    assert migrate._sha256_file(str(lf_path)) == hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+@pytest.mark.regression
+def test_status_detects_applied_file_checksum_mismatch(
+    monkeypatch, tmp_path, capsys
+):
+    config = _config("test", "fitness_test")
+    content = "-- migrate:up\nSELECT 1;\n"
+    current_checksum = hashlib.sha256(content.encode()).hexdigest()
+    _, _, _ = _install_fake_connection(
+        monkeypatch,
+        config,
+        "test",
+        table_exists=True,
+        applied=(1,),
+        metadata_columns=("filename", "checksum"),
+        ledger_rows={1: ("001__first.sql", "0" * 64)},
+    )
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    (tmp_path / "001__first.sql").write_text(content)
+
+    with pytest.raises(migrate.MigrationIntegrityError, match="integrity check failed"):
+        migrate.cmd_status(config, output_format="jsonl")
+
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert events[0]["file"] == "001__first.sql"
+    assert events[0]["integrity"] == "checksum_mismatch"
+    assert events[-1]["integrity_errors"] == [
+        {"version": 1, "file": "001__first.sql"}
+    ]
+    assert events[-1]["ok"] is False
+    assert len(current_checksum) == 64
+
+
+@pytest.mark.regression
+def test_up_emits_started_and_succeeded_events_and_persists_checksum(
+    monkeypatch, tmp_path, capsys
+):
+    config = _config("test", "fitness_test")
+    conn, cursor, _ = _install_fake_connection(monkeypatch, config, "test")
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    content = "-- migrate:up\nSELECT 1;\n"
+    filepath = tmp_path / "001__first.sql"
+    filepath.write_text(content)
+    # Path.write_text() uses the platform newline convention. The runner
+    # normalizes CRLF/CR to LF before hashing so Windows and Linux agree.
+    checksum = hashlib.sha256(content.replace("\r\n", "\n").replace("\r", "\n").encode()).hexdigest()
+
+    migrate.cmd_up(config, output_format="jsonl")
+
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert [event["event"] for event in events] == [
+        "migration_started", "migration_succeeded", "migration_summary"
+    ]
+    assert events[0]["file"] == "001__first.sql"
+    assert events[1]["checksum"] == checksum
+    assert cursor.ledger[1] == ("001__first.sql", checksum)
+    assert conn.committed >= 2
+
+
+@pytest.mark.regression
+def test_up_failure_reports_exact_file_version_and_sqlstate(
+    monkeypatch, tmp_path, capsys
+):
+    config = _config("test", "fitness_test")
+    conn, cursor, _ = _install_fake_connection(monkeypatch, config, "test")
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    filepath = tmp_path / "007__failing.sql"
+    filepath.write_text("-- migrate:up\nSELECT cause_failure;\n")
+    original_execute = cursor.execute
+
+    class SimulatedPostgresError(Exception):
+        pgcode = "42P01"
+
+    def failing_execute(sql, params=None):
+        if "SELECT cause_failure" in " ".join(sql.split()):
+            cursor.executed.append(("SIMULATED MIGRATION SQL", params))
+            raise SimulatedPostgresError("relation does not exist")
+        return original_execute(sql, params)
+
+    monkeypatch.setattr(cursor, "execute", failing_execute)
+
+    with pytest.raises(migrate.MigrationExecutionError) as exc_info:
+        migrate.cmd_up(config, output_format="jsonl")
+
+    assert exc_info.value.version == 7
+    assert exc_info.value.filename == "007__failing.sql"
+    assert exc_info.value.sqlstate == "42P01"
+    assert conn.rolled_back == 1
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    failed = next(event for event in events if event["event"] == "migration_failed")
+    assert failed["version"] == 7
+    assert failed["file"] == "007__failing.sql"
+    assert failed["sqlstate"] == "42P01"
+    assert events[-1]["failed_file"] == "007__failing.sql"
+    assert events[-1]["ok"] is False
+
+
+@pytest.mark.regression
+def test_up_rejects_missing_up_section_instead_of_silently_skipping(
+    monkeypatch, tmp_path, capsys
+):
+    config = _config("test", "fitness_test")
+    _, _, _ = _install_fake_connection(monkeypatch, config, "test")
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    (tmp_path / "008__missing_up.sql").write_text("-- migrate:down\nSELECT 1;\n")
+
+    with pytest.raises(migrate.MigrationExecutionError, match="missing or empty"):
+        migrate.cmd_up(config, output_format="jsonl")
+
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    failed = next(event for event in events if event["event"] == "migration_failed")
+    assert failed["file"] == "008__missing_up.sql"
+
+
+@pytest.mark.regression
+def test_up_requires_explicit_adoption_for_legacy_applied_rows(
+    monkeypatch, tmp_path
+):
+    config = _config("test", "fitness_test")
+    _, _, _ = _install_fake_connection(
+        monkeypatch,
+        config,
+        "test",
+        table_exists=True,
+        applied=(1,),
+    )
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    (tmp_path / "001__first.sql").write_text("-- migrate:up\nSELECT 1;\n")
+
+    with pytest.raises(migrate.MigrationIntegrityError, match="--adopt-legacy-checksums"):
+        migrate.cmd_up(config)
+
+
+@pytest.mark.regression
+def test_up_can_explicitly_adopt_legacy_checksums(
+    monkeypatch, tmp_path, capsys
+):
+    config = _config("test", "fitness_test")
+    _, cursor, _ = _install_fake_connection(
+        monkeypatch,
+        config,
+        "test",
+        table_exists=True,
+        applied=(1,),
+    )
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    content = "-- migrate:up\nSELECT 1;\n"
+    (tmp_path / "001__first.sql").write_text(content)
+
+    migrate.cmd_up(config, adopt_legacy_checksums=True, output_format="jsonl")
+
+    expected = hashlib.sha256(content.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")).hexdigest()
+    assert cursor.ledger[1] == ("001__first.sql", expected)
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert any(event["event"] == "migration_legacy_checksum_adopted" for event in events)
+
+
+@pytest.mark.regression
+def test_duplicate_migration_versions_are_rejected(monkeypatch, tmp_path):
+    config = _config("test", "fitness_test")
+    _, _, _ = _install_fake_connection(monkeypatch, config, "test")
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    (tmp_path / "001__first.sql").write_text("-- migrate:up\nSELECT 1;\n")
+    (tmp_path / "001__second.sql").write_text("-- migrate:up\nSELECT 2;\n")
+
+    with pytest.raises(RuntimeError, match="Duplicate migration version 1"):
+        migrate.cmd_status(config)
+
+
+@pytest.mark.regression
+def test_up_emits_structured_integrity_error_and_runs_no_migrations(
+    monkeypatch, tmp_path, capsys
+):
+    config = _config("test", "fitness_test")
+    _, cursor, _ = _install_fake_connection(
+        monkeypatch,
+        config,
+        "test",
+        table_exists=True,
+        applied=(1,),
+        metadata_columns=("filename", "checksum"),
+        ledger_rows={1: ("001__first.sql", "0" * 64)},
+    )
+    monkeypatch.setattr(migrate, "MIGRATIONS_DIR", str(tmp_path))
+    (tmp_path / "001__first.sql").write_text("-- migrate:up\nSELECT 1;\n")
+    (tmp_path / "002__second.sql").write_text("-- migrate:up\nSELECT 2;\n")
+
+    with pytest.raises(migrate.MigrationIntegrityError):
+        migrate.cmd_up(config, output_format="jsonl")
+
+    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    issue = next(event for event in events if event["event"] == "migration_integrity_error")
+    assert issue["version"] == 1
+    assert issue["file"] == "001__first.sql"
+    assert events[-1]["ok"] is False
+    assert not any("SELECT 2" in sql for sql, _ in cursor.executed)
+    assert 2 not in cursor.applied
