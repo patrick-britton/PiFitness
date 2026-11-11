@@ -63,10 +63,11 @@ PYTHON_BIN="/usr/bin/python3"
 NODE_BIN="/usr/bin/node"
 NPM_BIN="/usr/bin/npm"
 EVIDENCE_DIR="/home/god/Documents/PiFitness_Test_Evidence"
+JOURNAL_DIR="$EVIDENCE_DIR/journals"
 # Historical PiFitness backup location/name. Override these two values if the
 # nightly backup job uses a different directory or custom-archive filename.
 PRD_BACKUP_DIR="${PIFITNESS_PRD_BACKUP_DIR:-$HOME/Documents/DB_Backups}"
-PRD_BACKUP_GLOB="${PIFITNESS_PRD_BACKUP_GLOB:-pifitness_prd_*.dump}"
+PRD_BACKUP_GLOB="${PIFITNESS_PRD_BACKUP_GLOB:-personal_fitness_[0-9]*.dump}"
 DB_RECOVERY_STATE_FILE=""
 DB_RECOVERY_SCRIPT=""
 
@@ -257,6 +258,8 @@ echo
 echo "Reconciling any interrupted TEST database recovery..."
 mkdir -p "$EVIDENCE_DIR"
 chmod 0700 "$EVIDENCE_DIR"
+mkdir -p "$JOURNAL_DIR"
+chmod 0700 "$JOURNAL_DIR"
 DB_RECOVERY_SCRIPT="$STAGE_DIR/tools/db/restore_test_db.py"
 [[ -f "$DB_RECOVERY_SCRIPT" ]] || fail "TEST database recovery helper is missing: $DB_RECOVERY_SCRIPT"
 PENDING_RECOVERY_REPORT="$EVIDENCE_DIR/test-db-recovery-reconcile-$(date +%Y%m%d_%H%M%S)_$$.json"
@@ -265,7 +268,7 @@ if ! (
     umask 077
     "$VENV_DIR/bin/python" "$DB_RECOVERY_SCRIPT" \
         --test-env-file "$ENV_FILE" --prd-env-file "$PRD_ENV_FILE" \
-        recover-pending --state-dir "$EVIDENCE_DIR"
+        recover-pending --state-dir "$JOURNAL_DIR"
 ) >"$PENDING_RECOVERY_REPORT" 2>"$PENDING_RECOVERY_ERROR"; then
     [[ ! -s "$PENDING_RECOVERY_ERROR" ]] || cat "$PENDING_RECOVERY_ERROR" >&2
     echo "Recovery reconciliation report: $PENDING_RECOVERY_REPORT" >&2
@@ -301,7 +304,7 @@ if ! (
         --prd-env-file "$PRD_ENV_FILE" \
         --allow-prd \
         --diff-file "$SCHEMA_DIFF_FILE" \
-        --baseline-state-dir "$EVIDENCE_DIR" \
+        --baseline-state-dir "$JOURNAL_DIR" \
         >"$INSPECTION_REPORT" 2>"$INSPECTION_ERROR"
 ); then
     [[ ! -s "$INSPECTION_ERROR" ]] || cat "$INSPECTION_ERROR" >&2
@@ -396,7 +399,7 @@ if [[ "$NEEDS_DB_RECOVERY" == "1" ]]; then
     echo "Restoring TEST database from the latest PRD nightly backup..."
     DB_RECOVERY_SCRIPT="$STAGE_DIR/tools/db/restore_test_db.py"
     [[ -f "$DB_RECOVERY_SCRIPT" ]] || fail "TEST database recovery helper is missing: $DB_RECOVERY_SCRIPT"
-    DB_RECOVERY_STATE_FILE="$EVIDENCE_DIR/test-db-recovery-${RUN_ID}.json"
+    DB_RECOVERY_STATE_FILE="$JOURNAL_DIR/test-db-recovery-${RUN_ID}.json"
     RECOVERY_REPORT="$EVIDENCE_DIR/test-db-recovery-report-${RUN_ID}.json"
     RECOVERY_ERROR="$EVIDENCE_DIR/test-db-recovery-${RUN_ID}.stderr"
 
@@ -452,7 +455,7 @@ PY
             --prd-env-file "$PRD_ENV_FILE" \
             --allow-prd \
             --diff-file "$SCHEMA_DIFF_FILE" \
-            --baseline-state-dir "$EVIDENCE_DIR"
+            --baseline-state-dir "$JOURNAL_DIR"
     ) >"$POST_INSPECTION_REPORT" 2>"$POST_INSPECTION_ERROR"; then
         [[ ! -s "$POST_INSPECTION_ERROR" ]] || cat "$POST_INSPECTION_ERROR" >&2
         echo "Post-recovery inspection report: $POST_INSPECTION_REPORT" >&2

@@ -42,7 +42,7 @@ DEFAULT_BACKUP_GLOB = "pifitness_prd_*.dump"
 DEFAULT_MAX_BACKUP_AGE_HOURS = 24
 DB_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
 ARCHIVE_DB_RE = re.compile(r"^;\s*dbname:\s*(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
-BACKUP_NAME_TIME_RE = re.compile(r"pifitness_prd_(\d{8}_\d{6})", re.IGNORECASE)
+BACKUP_NAME_TIME_RE = re.compile(r"_(\d{8}_\d{6})\.dump$", re.IGNORECASE)
 
 
 class RecoveryError(RuntimeError):
