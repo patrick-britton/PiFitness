@@ -53,6 +53,11 @@ VENV_DIR="$PROJECT_DIR/venv"
 FRONTEND_DIR="$PROJECT_DIR/frontend/pifitness"
 REQUIREMENTS_FILE="library_requirements.txt"
 NPM_REQUIREMENTS_FILE="npm_requirements.txt"
+# Systemd unit directory: repo-driven source of unit files.
+# No unit name is hardcoded in this script — everything is discovered from
+# the files in this directory. Units whose filename contains "-test" belong
+# to the TEST environment; all other pifitness-* units belong to PRD.
+SYSTEMD_DIR="$PROJECT_DIR/deploy/systemd"
 
 # ======================================================================
 # NUCLEAR MODE: Full wipe and re-clone
@@ -77,8 +82,14 @@ if [[ "$NUCLEAR" == "true" ]]; then
     done
 
     info "Stopping any running services before wipe..."
-    sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
-    sudo systemctl stop pifitness_agent.timer     2>/dev/null || true
+    if [[ -d "$SYSTEMD_DIR" ]]; then
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        [[ "$install_name" == *-test.* ]] && continue
+        sudo systemctl stop "$install_name" 2>/dev/null || true
+      done
+    fi
     pm2 delete pifitness-next 2>/dev/null || true
     rm -f ~/.pm2/dump.pm2
     for port in 8000 3000; do
@@ -125,34 +136,47 @@ if [[ "$NUCLEAR" == "true" ]]; then
     info "Building Next.js application..."
     npm run build
 
-    info "Installing FastAPI service file..."
-    sudo cp "$PROJECT_DIR/deploy/systemd/pifitness-fastapi.service" /etc/systemd/system/
-    sudo systemctl daemon-reload
+    info "Installing systemd units from systemd directory..."
+    if [[ -d "$SYSTEMD_DIR" ]]; then
+      # Install all unit files from the repo's systemd directory
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        info "  installing $install_name..."
+        sudo cp "$unit_file" /etc/systemd/system/"$install_name"
+      done
+      sudo systemctl daemon-reload
 
-    # [AUX] Install auxiliary systemd units (health helper + background task runner)
-    SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+      # Enable and start PRD units (filename does not contain "-test")
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        [[ "$install_name" == *-test.* ]] && continue
+        sudo systemctl enable "$install_name" 2>/dev/null || true
+        sudo systemctl start "$install_name" 2>/dev/null || true
+      done
 
-    HEALTH_SRC="$SELF_DIR/health"
-    if [[ -d "$HEALTH_SRC" ]]; then
-        info "Installing hardware health helper and timer..."
-        sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
-        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
-        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
+      # Build list of expected unit names for stale cleanup
+      expected_units=""
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        expected_units="${expected_units} $(basename "$unit_file") "
+      done
+
+      # Remove installed pifitness-* units not in the systemd directory (stale cleanup)
+      while read -r installed_unit _rest; do
+        [[ "$installed_unit" == \#* || -z "$installed_unit" ]] && continue
+        [[ "$installed_unit" == pifitness-* ]] || continue
+        case " $expected_units " in
+          *" $installed_unit "*) continue ;;
+        esac
+        info "  removing stale unit $installed_unit..."
+        sudo systemctl disable "$installed_unit" 2>/dev/null || true
+        sudo systemctl stop "$installed_unit" 2>/dev/null || true
+        sudo rm -f /etc/systemd/system/"$installed_unit"
+      done < <(systemctl list-unit-files --type=service,timer --no-pager --no-legend 2>/dev/null)
+      sudo systemctl daemon-reload
     fi
-
-    AGENT_SRC="$SELF_DIR/agent"
-    if [[ -d "$AGENT_SRC" ]]; then
-        info "Installing background task runner service and timer..."
-        sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
-        sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
-    fi
-
-    sudo systemctl daemon-reload
-    sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
-    sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
-
-    sudo systemctl enable pifitness-fastapi.service
-    sudo systemctl start  pifitness-fastapi.service
 
     if ! command -v pm2 &> /dev/null; then
         sudo npm install -g pm2
@@ -198,7 +222,15 @@ if [[ "$FAST" == "true" ]]; then
         fi
     fi
 
-    sudo systemctl enable pifitness-fastapi.service 2>/dev/null || true
+    # Enable PRD units from systemd directory (no hardcoded unit names)
+    if [[ -d "$SYSTEMD_DIR" ]]; then
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        [[ "$install_name" == *-test.* ]] && continue
+        sudo systemctl enable "$install_name" 2>/dev/null || true
+      done
+    fi
 
     cd "$PROJECT_DIR"
 
@@ -216,8 +248,15 @@ if [[ "$FAST" == "true" ]]; then
         cp /home/god/Documents/.env "$PROJECT_DIR/backend/.env" 2>/dev/null || true
         cp /home/god/Documents/.env "$PROJECT_DIR/.env"        2>/dev/null || true
 
-        sudo systemctl stop  pifitness-fastapi.service 2>/dev/null || true
-        sudo systemctl start pifitness-fastapi.service
+        # Stop PRD units from systemd directory (no hardcoded unit names)
+        if [[ -d "$SYSTEMD_DIR" ]]; then
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            install_name="$(basename "$unit_file")"
+            [[ "$install_name" == *-test.* ]] && continue
+            sudo systemctl stop "$install_name" 2>/dev/null || true
+          done
+        fi
 
         pm2 delete pifitness-next 2>/dev/null || true
         rm -f ~/.pm2/dump.pm2
@@ -239,27 +278,47 @@ if [[ "$FAST" == "true" ]]; then
             sudo systemctl reload nginx || error_exit "Failed to reload nginx."
         fi
 
-        # [AUX] Install auxiliary systemd units (health helper + background task runner)
-        SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        # Install systemd units from systemd directory (no hardcoded unit names)
+        if [[ -d "$SYSTEMD_DIR" ]]; then
+          # Install all unit files from the repo's systemd directory
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            install_name="$(basename "$unit_file")"
+            info "  installing $install_name..."
+            sudo cp "$unit_file" /etc/systemd/system/"$install_name"
+          done
+          sudo systemctl daemon-reload
 
-        HEALTH_SRC="$SELF_DIR/health"
-        if [[ -d "$HEALTH_SRC" ]]; then
-            info "Installing hardware health helper and timer..."
-            sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
+          # Enable and start PRD units (filename does not contain "-test")
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            install_name="$(basename "$unit_file")"
+            [[ "$install_name" == *-test.* ]] && continue
+            sudo systemctl enable "$install_name" 2>/dev/null || true
+            sudo systemctl start "$install_name" 2>/dev/null || true
+          done
+
+          # Build list of expected unit names for stale cleanup
+          expected_units=""
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            expected_units="${expected_units} $(basename "$unit_file") "
+          done
+
+          # Remove installed pifitness-* units not in the systemd directory (stale cleanup)
+          while read -r installed_unit _rest; do
+            [[ "$installed_unit" == \#* || -z "$installed_unit" ]] && continue
+            [[ "$installed_unit" == pifitness-* ]] || continue
+            case " $expected_units " in
+              *" $installed_unit "*) continue ;;
+            esac
+            info "  removing stale unit $installed_unit..."
+            sudo systemctl disable "$installed_unit" 2>/dev/null || true
+            sudo systemctl stop "$installed_unit" 2>/dev/null || true
+            sudo rm -f /etc/systemd/system/"$installed_unit"
+          done < <(systemctl list-unit-files --type=service,timer --no-pager --no-legend 2>/dev/null)
+          sudo systemctl daemon-reload
         fi
-
-        AGENT_SRC="$SELF_DIR/agent"
-        if [[ -d "$AGENT_SRC" ]]; then
-            info "Installing background task runner service and timer..."
-            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
-            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
-        fi
-
-        sudo systemctl daemon-reload
-        sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
-        sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
         info "Services and nginx realigned for react-ui."
         exit 0
@@ -270,9 +329,18 @@ if [[ "$FAST" == "true" ]]; then
     if [[ -z "$CHANGED_FILES" ]]; then
         info "No code changes detected. Verifying services are running..."
 
-        FASTAPI_ACTIVE=false
-        if sudo systemctl is-active --quiet pifitness-fastapi.service; then
-            FASTAPI_ACTIVE=true
+        # Check if any PRD service from systemd directory is active (no hardcoded names)
+        PRD_ANY_ACTIVE=false
+        if [[ -d "$SYSTEMD_DIR" ]]; then
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            install_name="$(basename "$unit_file")"
+            [[ "$install_name" == *-test.* ]] && continue
+            if sudo systemctl is-active --quiet "$install_name" 2>/dev/null; then
+              PRD_ANY_ACTIVE=true
+              break
+            fi
+          done
         fi
 
         PM2_ACTIVE=false
@@ -280,8 +348,8 @@ if [[ "$FAST" == "true" ]]; then
             PM2_ACTIVE=true
         fi
 
-        if [[ "$FASTAPI_ACTIVE" == "true" && "$PM2_ACTIVE" == "true" ]]; then
-            info "FastAPI and Next.js services already running."
+        if [[ "$PRD_ANY_ACTIVE" == "true" && "$PM2_ACTIVE" == "true" ]]; then
+            info "PRD services and Next.js already running."
             NGINX_SITE="/etc/nginx/sites-available/pifitness"
             if [[ -f "$NGINX_SITE" ]] && ! grep -q ":8000;" "$NGINX_SITE"; then
                 info "Correcting Nginx routing to port 8000..."
@@ -293,9 +361,16 @@ if [[ "$FAST" == "true" ]]; then
                 sudo systemctl reload nginx || error_exit "Failed to reload nginx."
             fi
         else
-            if [[ "$FASTAPI_ACTIVE" == "false" ]]; then
-                info "FastAPI service not running. Starting it..."
-                sudo systemctl start pifitness-fastapi.service
+            if [[ "$PRD_ANY_ACTIVE" == "false" ]]; then
+                info "PRD services not running. Starting them from systemd directory..."
+                if [[ -d "$SYSTEMD_DIR" ]]; then
+                  for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+                    [[ -f "$unit_file" ]] || continue
+                    install_name="$(basename "$unit_file")"
+                    [[ "$install_name" == *-test.* ]] && continue
+                    sudo systemctl start "$install_name" 2>/dev/null || true
+                  done
+                fi
             fi
             if [[ "$PM2_ACTIVE" == "false" ]]; then
                 info "Next.js not running. Starting it..."
@@ -316,27 +391,47 @@ if [[ "$FAST" == "true" ]]; then
             info "Services verified and started."
         fi
 
-        # [AUX] Install auxiliary systemd units (health helper + background task runner)
-        SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        # Install systemd units from systemd directory (no hardcoded unit names)
+        if [[ -d "$SYSTEMD_DIR" ]]; then
+          # Install all unit files from the repo's systemd directory
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            install_name="$(basename "$unit_file")"
+            info "  installing $install_name..."
+            sudo cp "$unit_file" /etc/systemd/system/"$install_name"
+          done
+          sudo systemctl daemon-reload
 
-        HEALTH_SRC="$SELF_DIR/health"
-        if [[ -d "$HEALTH_SRC" ]]; then
-            info "Installing hardware health helper and timer..."
-            sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
+          # Enable and start PRD units (filename does not contain "-test")
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            install_name="$(basename "$unit_file")"
+            [[ "$install_name" == *-test.* ]] && continue
+            sudo systemctl enable "$install_name" 2>/dev/null || true
+            sudo systemctl start "$install_name" 2>/dev/null || true
+          done
+
+          # Build list of expected unit names for stale cleanup
+          expected_units=""
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            expected_units="${expected_units} $(basename "$unit_file") "
+          done
+
+          # Remove installed pifitness-* units not in the systemd directory (stale cleanup)
+          while read -r installed_unit _rest; do
+            [[ "$installed_unit" == \#* || -z "$installed_unit" ]] && continue
+            [[ "$installed_unit" == pifitness-* ]] || continue
+            case " $expected_units " in
+              *" $installed_unit "*) continue ;;
+            esac
+            info "  removing stale unit $installed_unit..."
+            sudo systemctl disable "$installed_unit" 2>/dev/null || true
+            sudo systemctl stop "$installed_unit" 2>/dev/null || true
+            sudo rm -f /etc/systemd/system/"$installed_unit"
+          done < <(systemctl list-unit-files --type=service,timer --no-pager --no-legend 2>/dev/null)
+          sudo systemctl daemon-reload
         fi
-
-        AGENT_SRC="$SELF_DIR/agent"
-        if [[ -d "$AGENT_SRC" ]]; then
-            info "Installing background task runner service and timer..."
-            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
-            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
-        fi
-
-        sudo systemctl daemon-reload
-        sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
-        sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
         exit 0
     fi
@@ -373,27 +468,47 @@ if [[ "$FAST" == "true" ]]; then
     if [[ "$ONLY_CONFIG" == "true" ]]; then
         info "Only config/docs changed. No service restart needed."
 
-        # [AUX] Install auxiliary systemd units (health helper + background task runner)
-        SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        # Install systemd units from systemd directory (no hardcoded unit names)
+        if [[ -d "$SYSTEMD_DIR" ]]; then
+          # Install all unit files from the repo's systemd directory
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            install_name="$(basename "$unit_file")"
+            info "  installing $install_name..."
+            sudo cp "$unit_file" /etc/systemd/system/"$install_name"
+          done
+          sudo systemctl daemon-reload
 
-        HEALTH_SRC="$SELF_DIR/health"
-        if [[ -d "$HEALTH_SRC" ]]; then
-            info "Installing hardware health helper and timer..."
-            sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
-            sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
+          # Enable and start PRD units (filename does not contain "-test")
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            install_name="$(basename "$unit_file")"
+            [[ "$install_name" == *-test.* ]] && continue
+            sudo systemctl enable "$install_name" 2>/dev/null || true
+            sudo systemctl start "$install_name" 2>/dev/null || true
+          done
+
+          # Build list of expected unit names for stale cleanup
+          expected_units=""
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            expected_units="${expected_units} $(basename "$unit_file") "
+          done
+
+          # Remove installed pifitness-* units not in the systemd directory (stale cleanup)
+          while read -r installed_unit _rest; do
+            [[ "$installed_unit" == \#* || -z "$installed_unit" ]] && continue
+            [[ "$installed_unit" == pifitness-* ]] || continue
+            case " $expected_units " in
+              *" $installed_unit "*) continue ;;
+            esac
+            info "  removing stale unit $installed_unit..."
+            sudo systemctl disable "$installed_unit" 2>/dev/null || true
+            sudo systemctl stop "$installed_unit" 2>/dev/null || true
+            sudo rm -f /etc/systemd/system/"$installed_unit"
+          done < <(systemctl list-unit-files --type=service,timer --no-pager --no-legend 2>/dev/null)
+          sudo systemctl daemon-reload
         fi
-
-        AGENT_SRC="$SELF_DIR/agent"
-        if [[ -d "$AGENT_SRC" ]]; then
-            info "Installing background task runner service and timer..."
-            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
-            sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
-        fi
-
-        sudo systemctl daemon-reload
-        sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
-        sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
         exit 0
     fi
@@ -404,9 +519,16 @@ if [[ "$FAST" == "true" ]]; then
     export NEXT_PUBLIC_APP_ENV=production
 
     if [[ "$BACKEND_CHANGED" == "true" && "$FRONTEND_CHANGED" == "false" ]]; then
-        info "Backend-only changes detected. Restarting FastAPI only..."
-        sudo systemctl restart pifitness-fastapi.service
-        info "FastAPI restarted."
+        info "Backend-only changes detected. Restarting PRD services from systemd directory..."
+        if [[ -d "$SYSTEMD_DIR" ]]; then
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            install_name="$(basename "$unit_file")"
+            [[ "$install_name" == *-test.* ]] && continue
+            sudo systemctl restart "$install_name" 2>/dev/null || true
+          done
+        fi
+        info "PRD services restarted."
 
     elif [[ "$FRONTEND_CHANGED" == "true" && "$BACKEND_CHANGED" == "false" ]]; then
         info "Frontend-only changes detected. Rebuilding and restarting Next.js..."
@@ -422,7 +544,14 @@ if [[ "$FAST" == "true" ]]; then
 
     elif [[ "$BACKEND_CHANGED" == "true" && "$FRONTEND_CHANGED" == "true" ]]; then
         info "Both backend and frontend changed. Full restart..."
-        sudo systemctl restart pifitness-fastapi.service
+        if [[ -d "$SYSTEMD_DIR" ]]; then
+          for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+            [[ -f "$unit_file" ]] || continue
+            install_name="$(basename "$unit_file")"
+            [[ "$install_name" == *-test.* ]] && continue
+            sudo systemctl restart "$install_name" 2>/dev/null || true
+          done
+        fi
         cd "$FRONTEND_DIR"
         rm -rf .next
         npm run build
@@ -436,27 +565,47 @@ if [[ "$FAST" == "true" ]]; then
 
     sudo nginx -t 2>/dev/null && sudo systemctl reload nginx 2>/dev/null || true
 
-    # [AUX] Install auxiliary systemd units (health helper + background task runner)
-    SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # Install systemd units from systemd directory (no hardcoded unit names)
+    if [[ -d "$SYSTEMD_DIR" ]]; then
+      # Install all unit files from the repo's systemd directory
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        info "  installing $install_name..."
+        sudo cp "$unit_file" /etc/systemd/system/"$install_name"
+      done
+      sudo systemctl daemon-reload
 
-    HEALTH_SRC="$SELF_DIR/health"
-    if [[ -d "$HEALTH_SRC" ]]; then
-        info "Installing hardware health helper and timer..."
-        sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
-        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
-        sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
+      # Enable and start PRD units (filename does not contain "-test")
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        [[ "$install_name" == *-test.* ]] && continue
+        sudo systemctl enable "$install_name" 2>/dev/null || true
+        sudo systemctl start "$install_name" 2>/dev/null || true
+      done
+
+      # Build list of expected unit names for stale cleanup
+      expected_units=""
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        expected_units="${expected_units} $(basename "$unit_file") "
+      done
+
+      # Remove installed pifitness-* units not in the systemd directory (stale cleanup)
+      while read -r installed_unit _rest; do
+        [[ "$installed_unit" == \#* || -z "$installed_unit" ]] && continue
+        [[ "$installed_unit" == pifitness-* ]] || continue
+        case " $expected_units " in
+          *" $installed_unit "*) continue ;;
+        esac
+        info "  removing stale unit $installed_unit..."
+        sudo systemctl disable "$installed_unit" 2>/dev/null || true
+        sudo systemctl stop "$installed_unit" 2>/dev/null || true
+        sudo rm -f /etc/systemd/system/"$installed_unit"
+      done < <(systemctl list-unit-files --type=service,timer --no-pager --no-legend 2>/dev/null)
+      sudo systemctl daemon-reload
     fi
-
-    AGENT_SRC="$SELF_DIR/agent"
-    if [[ -d "$AGENT_SRC" ]]; then
-        info "Installing background task runner service and timer..."
-        sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
-        sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
-    fi
-
-    sudo systemctl daemon-reload
-    sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
-    sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
     info "Fast deployment of react-ui completed."
     exit 0
@@ -470,9 +619,15 @@ info "=== FULL DEPLOY MODE ==="
 info "Stopping any running services..."
 rm -f /tmp/*.sock /tmp/*.pid 2>/dev/null || true
 
-sudo systemctl stop pifitness_agent.service 2>/dev/null || true
-sudo systemctl stop pifitness_agent.timer   2>/dev/null || true
-sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
+# Stop PRD units from systemd directory (no hardcoded unit names)
+if [[ -d "$SYSTEMD_DIR" ]]; then
+  for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+    [[ -f "$unit_file" ]] || continue
+    install_name="$(basename "$unit_file")"
+    [[ "$install_name" == *-test.* ]] && continue
+    sudo systemctl stop "$install_name" 2>/dev/null || true
+  done
+fi
 pm2 delete pifitness-next 2>/dev/null || true
 rm -f ~/.pm2/dump.pm2
 sleep 2
@@ -541,32 +696,47 @@ fi
 
 info "Skipping automated tests (D13)."
 
-info "Installing FastAPI service file..."
-sudo cp "$PROJECT_DIR/deploy/systemd/pifitness-fastapi.service" /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable pifitness-fastapi.service
+# Install systemd units from systemd directory (no hardcoded unit names)
+if [[ -d "$SYSTEMD_DIR" ]]; then
+  # Install all unit files from the repo's systemd directory
+  for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+    [[ -f "$unit_file" ]] || continue
+    install_name="$(basename "$unit_file")"
+    info "  installing $install_name..."
+    sudo cp "$unit_file" /etc/systemd/system/"$install_name"
+  done
+  sudo systemctl daemon-reload
 
-# [AUX] Install auxiliary systemd units (health helper + background task runner)
-SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  # Enable and start PRD units (filename does not contain "-test")
+  for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+    [[ -f "$unit_file" ]] || continue
+    install_name="$(basename "$unit_file")"
+    [[ "$install_name" == *-test.* ]] && continue
+    sudo systemctl enable "$install_name" 2>/dev/null || true
+    sudo systemctl start "$install_name" 2>/dev/null || true
+  done
 
-HEALTH_SRC="$SELF_DIR/health"
-if [[ -d "$HEALTH_SRC" ]]; then
-    info "Installing hardware health helper and timer..."
-    sudo install -m 755 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.py"      /usr/local/bin/pifitness-hardware-health.py
-    sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.service" /etc/systemd/system/
-    sudo install -m 644 -o root -g root "$HEALTH_SRC/pifitness-hardware-health.timer"   /etc/systemd/system/
+  # Build list of expected unit names for stale cleanup
+  expected_units=""
+  for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+    [[ -f "$unit_file" ]] || continue
+    expected_units="${expected_units} $(basename "$unit_file") "
+  done
+
+  # Remove installed pifitness-* units not in the systemd directory (stale cleanup)
+  while read -r installed_unit _rest; do
+    [[ "$installed_unit" == \#* || -z "$installed_unit" ]] && continue
+    [[ "$installed_unit" == pifitness-* ]] || continue
+    case " $expected_units " in
+      *" $installed_unit "*) continue ;;
+    esac
+    info "  removing stale unit $installed_unit..."
+    sudo systemctl disable "$installed_unit" 2>/dev/null || true
+    sudo systemctl stop "$installed_unit" 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/"$installed_unit"
+  done < <(systemctl list-unit-files --type=service,timer --no-pager --no-legend 2>/dev/null)
+  sudo systemctl daemon-reload
 fi
-
-AGENT_SRC="$SELF_DIR/agent"
-if [[ -d "$AGENT_SRC" ]]; then
-    info "Installing background task runner service and timer..."
-    sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.service" /etc/systemd/system/
-    sudo install -m 644 -o root -g root "$AGENT_SRC/pifitness_agent.timer"   /etc/systemd/system/
-fi
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now pifitness-hardware-health.timer 2>/dev/null || true
-sudo systemctl enable --now pifitness_agent.timer     2>/dev/null || true
 
 info "Setting up Next.js server..."
 cd "$FRONTEND_DIR"
@@ -602,8 +772,15 @@ fi
 
 cd "$PROJECT_DIR"
 
-info "Starting FastAPI service..."
-sudo systemctl start pifitness-fastapi.service
+# Start PRD units from systemd directory (no hardcoded unit names)
+if [[ -d "$SYSTEMD_DIR" ]]; then
+  for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+    [[ -f "$unit_file" ]] || continue
+    install_name="$(basename "$unit_file")"
+    [[ "$install_name" == *-test.* ]] && continue
+    sudo systemctl start "$install_name" 2>/dev/null || true
+  done
+fi
 TARGET_PORT=8000
 
 info "Updating nginx configuration..."

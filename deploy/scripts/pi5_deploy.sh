@@ -10,6 +10,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Systemd unit directory: repo-driven source of unit files.
+# No unit name is hardcoded in this script — everything is discovered from
+# the files in this directory. Units whose filename contains "-test" belong
+# to the TEST environment; all other pifitness-* units belong to PRD.
+SYSTEMD_DIR="/home/god/PiFitness/deploy/systemd"
+
 # --- Helper functions ---
 error_exit() {
     echo -e "${RED}ERROR: $1${NC}" >&2
@@ -31,66 +37,70 @@ cleanup_processes() {
 }
 
 manage_agent_service() {
-    info "Managing agent service..."
-    if sudo systemctl is-active --quiet pifitness_agent.service; then
-        info "Stopping agent service..."
-        sudo systemctl stop pifitness_agent.service
-    else
-        info "Agent service not running"
-    fi
-
-    if sudo systemctl is-active --quiet pifitness_agent.timer; then
-        info "Stopping agent timer..."
-        sudo systemctl stop pifitness_agent.timer
-    else
-        info "Agent timer not running"
+    info "Managing PRD services from systemd directory..."
+    if [[ -d "$SYSTEMD_DIR" ]]; then
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        [[ "$install_name" == *-test.* ]] && continue
+        if sudo systemctl is-active --quiet "$install_name" 2>/dev/null; then
+          info "Stopping $install_name..."
+          sudo systemctl stop "$install_name" 2>/dev/null || true
+        else
+          info "$install_name not running"
+        fi
+      done
     fi
 }
 
 restart_agent_service() {
-    info "Restarting agent service..."
+    info "Restarting PRD services from systemd directory..."
     sudo systemctl daemon-reload
-    sudo systemctl start pifitness_agent.timer
+    if [[ -d "$SYSTEMD_DIR" ]]; then
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        [[ "$install_name" == *-test.* ]] && continue
+        sudo systemctl start "$install_name" 2>/dev/null || true
+      done
+    fi
 
-    if sudo systemctl is-active --quiet pifitness_agent.timer; then
-        info "Agent timer started successfully"
-    else
-        warn "Failed to start agent timer - check logs"
-        sudo systemctl status pifitness_agent.timer --no-pager || true
+    if [[ -d "$SYSTEMD_DIR" ]]; then
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        [[ "$install_name" == *-test.* ]] && continue
+        if sudo systemctl is-active --quiet "$install_name" 2>/dev/null; then
+          info "$install_name started successfully"
+        else
+          warn "Failed to start $install_name - check logs"
+          sudo systemctl status "$install_name" --no-pager || true
+        fi
+      done
     fi
 }
 
 detect_and_kill_processes() {
     info "Detecting running processes..."
 
-    if pgrep -f "uvicorn" > /dev/null; then
-        info "Found running FastAPI processes - stopping gracefully..."
-        sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
-        sleep 2
-
-        if pgrep -f "uvicorn" > /dev/null; then
-            warn "FastAPI processes still running - force killing..."
-            sudo pkill -9 -f "uvicorn" || warn "Failed to kill FastAPI processes"
-        else
-            info "FastAPI processes stopped successfully"
+    # Stop PRD units from systemd directory (no hardcoded unit names)
+    if [[ -d "$SYSTEMD_DIR" ]]; then
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        [[ "$install_name" == *-test.* ]] && continue
+        if sudo systemctl is-active --quiet "$install_name" 2>/dev/null; then
+          info "Found running $install_name - stopping gracefully..."
+          sudo systemctl stop "$install_name" 2>/dev/null || true
+          sleep 2
+          if sudo systemctl is-active --quiet "$install_name" 2>/dev/null; then
+            warn "$install_name still running - force stopping..."
+            sudo systemctl stop "$install_name" 2>/dev/null || true
+          else
+            info "$install_name stopped successfully"
+          fi
         fi
-    else
-        info "No FastAPI processes found"
-    fi
-
-    if pgrep -f "streamlit run" > /dev/null; then
-        info "Found running Streamlit processes - stopping gracefully..."
-        sudo systemctl stop pifitness-streamlit.service 2>/dev/null || true
-        sleep 2
-
-        if pgrep -f "streamlit run" > /dev/null; then
-            warn "Streamlit processes still running - force killing..."
-            sudo pkill -9 -f "streamlit run" || warn "Failed to kill Streamlit processes"
-        else
-            info "Streamlit processes stopped successfully"
-        fi
-    else
-        info "No Streamlit processes found"
+      done
     fi
 
     info "Checking for processes using deployment ports..."
@@ -194,10 +204,16 @@ if [[ "$BRANCH" == "react-ui" && "$package_choice" == "1" ]]; then
     cd /home/god/PiFitness || error_exit "Failed to return to project root after npm install"
 fi
 
-# Install/update systemd service files
-sudo cp /home/god/PiFitness/deploy/systemd/pifitness-hardware-health.service /etc/systemd/system/
-sudo cp /home/god/PiFitness/deploy/systemd/pifitness-fastapi.service /etc/systemd/system/
-sudo systemctl daemon-reload
+# Install/update systemd service files from systemd directory (no hardcoded unit names)
+if [[ -d "$SYSTEMD_DIR" ]]; then
+  for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+    [[ -f "$unit_file" ]] || continue
+    install_name="$(basename "$unit_file")"
+    info "Installing $install_name..."
+    sudo cp "$unit_file" /etc/systemd/system/"$install_name"
+  done
+  sudo systemctl daemon-reload
+fi
 
 # --- 6. Branch-specific actions ---
 if [[ "$BRANCH" == "react-ui" ]]; then
@@ -234,12 +250,26 @@ fi
 
 # --- 7. Start the appropriate service ---
 if [[ "$BRANCH" == "streamlit-prd" ]]; then
-    info "Starting Streamlit service..."
-    sudo systemctl start pifitness-streamlit.service
+    info "Starting PRD services from systemd directory..."
+    if [[ -d "$SYSTEMD_DIR" ]]; then
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        [[ "$install_name" == *-test.* ]] && continue
+        sudo systemctl start "$install_name" 2>/dev/null || true
+      done
+    fi
     TARGET_PORT=8501
 else
-    info "Starting FastAPI service..."
-    sudo systemctl start pifitness-fastapi.service
+    info "Starting PRD services from systemd directory..."
+    if [[ -d "$SYSTEMD_DIR" ]]; then
+      for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+        [[ -f "$unit_file" ]] || continue
+        install_name="$(basename "$unit_file")"
+        [[ "$install_name" == *-test.* ]] && continue
+        sudo systemctl start "$install_name" 2>/dev/null || true
+      done
+    fi
     TARGET_PORT=8000
 fi
 

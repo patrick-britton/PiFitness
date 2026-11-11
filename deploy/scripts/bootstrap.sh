@@ -83,10 +83,17 @@ fi
 [[ -x "$NPM_BIN" ]] || fail "npm not found: $NPM_BIN"
 
 # Do not reconcile the persistent TEST environment while its API is running.
-# Full PRD service/timer inventory and suspension are a later, separately
-# tested workflow stage; this check is only the existing venv-safety guard.
-if systemctl is-active --quiet pifitness-fastapi-test.service; then
-    fail "TEST FastAPI service is active. Stop it before reconciling its shared Python environment."
+# Check all TEST units from the systemd directory — no unit name is hardcoded.
+# Test units are those whose filename contains "-test".
+TEST_SYSTEMD_DIR="${APP_DIR}/deploy/systemd"
+if [[ -d "$TEST_SYSTEMD_DIR" ]]; then
+  for unit_file in "$TEST_SYSTEMD_DIR"/pifitness-*-test.service "$TEST_SYSTEMD_DIR"/pifitness-*-test.timer; do
+    [[ -f "$unit_file" ]] || continue
+    install_name="$(basename "$unit_file")"
+    if systemctl is-active --quiet "$install_name" 2>/dev/null; then
+      fail "TEST unit $install_name is active. Stop it before reconciling its shared Python environment."
+    fi
+  done
 fi
 
 if [[ -L "$VENV_DIR" ]]; then

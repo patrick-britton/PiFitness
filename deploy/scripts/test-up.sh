@@ -11,6 +11,11 @@ DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-15432}"
 HTTPS_HOSTNAME="${HTTPS_HOSTNAME:-https://pifitness.duckdns.org}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/Documents/DB_Backups}"
+# Systemd unit directory: repo-driven source of unit files.
+# No unit name is hardcoded in this script — everything is discovered from
+# the files in this directory. Units whose filename contains "-test" belong
+# to the TEST environment; all other pifitness-* units belong to PRD.
+SYSTEMD_DIR="${PRD_DIR}/deploy/systemd"
 
 # Canonicalize and validate a directory path before any destructive use.
 # Refuses: empty paths, "/", and symlinks. Returns the canonical absolute path.
@@ -223,9 +228,7 @@ write_state() {
     printf 'DUMP_PATH=%s\n' "${dump_path:-}" >> "$tmp"
     printf 'PRD_DIR=%s\n' "$PRD_DIR" >> "$tmp"
     printf 'TEST_DIR=%s\n' "$TEST_DIR" >> "$tmp"
-    printf 'FASTAPI_ACTIVE=%s\n' "${fastapi_active:-unknown}" >> "$tmp"
-    printf 'AGENT_TIMER_ACTIVE=%s\n' "${agent_timer_active:-unknown}" >> "$tmp"
-    printf 'HARDWARE_HEALTH_TIMER_ACTIVE=%s\n' "${hardware_health_timer_active:-unknown}" >> "$tmp"
+    printf 'UNIT_STATES=%s\n' "${unit_states_str:-}" >> "$tmp"
     printf 'PM2_NEXTPROD_ACTIVE=%s\n' "${pm2_nextprod_active:-unknown}" >> "$tmp"
   )
   mv -f "$tmp" "$STATE_FILE"
@@ -245,11 +248,24 @@ recover_and_fail() {
 # was already done and what still needs restoring.
 trap 'write_state' INT TERM
 
-# Capture the initial active state of PRD services, timers, and PM2 BEFORE
-# anything is stopped, then persist it durably (atomic write, mode 0600).
-fastapi_active="$(systemctl is-active pifitness-fastapi.service 2>/dev/null || echo unknown)"
-agent_timer_active="$(systemctl is-active pifitness_agent.timer 2>/dev/null || echo unknown)"
-hardware_health_timer_active="$(systemctl is-active pifitness-hardware-health.timer 2>/dev/null || echo unknown)"
+# --- Discover PRD units from the systemd directory (no hardcoded names) ---
+# PRD units (filename does not contain "-test") that are installed on this
+# host are stopped and their active state recorded so test-down can restore
+# them later. Test units (filename contains "-test") are skipped here.
+prd_unit_names=()
+unit_states_str=""
+if [[ -d "$SYSTEMD_DIR" ]]; then
+  for unit_file in "$SYSTEMD_DIR"/pifitness-*.service "$SYSTEMD_DIR"/pifitness-*.timer; do
+    [[ -f "$unit_file" ]] || continue
+    install_name="$(basename "$unit_file")"
+    [[ "$install_name" == *-test.* ]] && continue
+    if systemctl list-unit-files --no-pager --no-legend 2>/dev/null | grep -qx "$install_name"; then
+      prd_unit_names+=("$install_name")
+      state="$(systemctl is-active "$install_name" 2>/dev/null || echo unknown)"
+      unit_states_str="${unit_states_str}${install_name}=${state} "
+    fi
+  done
+fi
 # pm2 describe exits 0 for a registered process even when it is stopped, so
 # probe the status text itself: pifitness-next is "online" only when running.
 pm2_nextprod_active="unknown"
@@ -262,25 +278,36 @@ write_state
 echo "  test state durable: $STATE_FILE (phase=$current_phase)"
 
 echo "Step 3: stop PRD services and timers"
-sudo systemctl stop pifitness-fastapi.service 2>/dev/null || true
-sudo systemctl stop pifitness_agent.timer 2>/dev/null || true
-sudo systemctl stop pifitness-hardware-health.timer 2>/dev/null || true
+for unit in "${prd_unit_names[@]:-}"; do
+  [[ -z "$unit" ]] && continue
+  sudo systemctl stop "$unit" 2>/dev/null || true
+done
 pm2 stop pifitness-next 2>/dev/null || true
 
 echo "  verify PRD writers are quiesced before cloning the database"
-fastapi_state="$(systemctl is-active pifitness-fastapi.service 2>/dev/null || echo unknown)"
-agent_timer_state="$(systemctl is-active pifitness_agent.timer 2>/dev/null || echo unknown)"
-hardware_health_timer_state="$(systemctl is-active pifitness-hardware-health.timer 2>/dev/null || echo unknown)"
 pm2_next_state="stopped"
 if pm2 describe pifitness-next >/dev/null 2>&1 && pm2 describe pifitness-next 2>/dev/null | grep -qi 'online'; then
   pm2_next_state="online"
 fi
-if [[ "$fastapi_state" == "active" || "$agent_timer_state" == "active" \
-      || "$hardware_health_timer_state" == "active" || "$pm2_next_state" == "online" ]]; then
-  echo "ERROR: PRD writers still active after stop (fastapi=$fastapi_state agent.timer=$agent_timer_state hardware-health.timer=$hardware_health_timer_state pm2-next=$pm2_next_state)" >&2
+all_quiesced=1
+quiesced_details=""
+for unit in "${prd_unit_names[@]:-}"; do
+  [[ -z "$unit" ]] && continue
+  state="$(systemctl is-active "$unit" 2>/dev/null || echo unknown)"
+  quiesced_details="${quiesced_details}${unit}=${state} "
+  if [[ "$state" == "active" ]]; then
+    echo "ERROR: PRD unit still active after stop: $unit (state=$state)" >&2
+    all_quiesced=0
+  fi
+done
+if [[ "$pm2_next_state" == "online" ]]; then
+  echo "ERROR: PM2 pifitness-next still online after stop" >&2
+  all_quiesced=0
+fi
+if [[ $all_quiesced -eq 0 ]]; then
   exit 1
 fi
-echo "  PRD quiesced: fastapi=$fastapi_state agent.timer=$agent_timer_state hardware-health.timer=$hardware_health_timer_state pm2-next=$pm2_next_state"
+echo "  PRD quiesced: ${quiesced_details}pm2-next=$pm2_next_state"
 current_phase="prd-stopped"
 write_state
 
@@ -396,9 +423,16 @@ write_state
 failpoint "pre_start" "simulate failure before starting test units"
 
 echo "Step 8: start test units"
-# Start the test FastAPI unit. A start failure is fatal and runs recovery.
-if ! sudo systemctl start pifitness-fastapi-test.service 2>/dev/null; then
-  recover_and_fail "failed to start test FastAPI unit pifitness-fastapi-test.service"
+# Start test units from the systemd directory (filename contains "-test").
+# No unit name is hardcoded — everything comes from the unit files.
+if [[ -d "$SYSTEMD_DIR" ]]; then
+  for unit_file in "$SYSTEMD_DIR"/pifitness-*-test.service "$SYSTEMD_DIR"/pifitness-*-test.timer; do
+    [[ -f "$unit_file" ]] || continue
+    install_name="$(basename "$unit_file")"
+    if ! sudo systemctl start "$install_name" 2>/dev/null; then
+      recover_and_fail "failed to start test unit $install_name"
+    fi
+  done
 fi
 # Start the test Next.js frontend under PM2. A start failure is fatal and runs recovery.
 if ! pm2 start "$TEST_DIR/deploy/scripts/ecosystem.config.js" 2>/dev/null; then
@@ -408,10 +442,17 @@ current_phase="test-units-started"
 write_state
 
 echo "Step 9: verify the complete test stack"
-# systemd must report the test FastAPI unit active.
-fastapi_active="$(systemctl is-active pifitness-fastapi-test.service 2>/dev/null || echo unknown)"
-if [[ "$fastapi_active" != "active" ]]; then
-  recover_and_fail "test FastAPI unit is not active (state=$fastapi_active)"
+# systemd must report all test units active.
+# No unit name is hardcoded — everything comes from the unit files.
+if [[ -d "$SYSTEMD_DIR" ]]; then
+  for unit_file in "$SYSTEMD_DIR"/pifitness-*-test.service "$SYSTEMD_DIR"/pifitness-*-test.timer; do
+    [[ -f "$unit_file" ]] || continue
+    install_name="$(basename "$unit_file")"
+    state="$(systemctl is-active "$install_name" 2>/dev/null || echo unknown)"
+    if [[ "$state" != "active" ]]; then
+      recover_and_fail "test unit $install_name is not active (state=$state)"
+    fi
+  done
 fi
 # PM2 must report the named test process online.
 if ! pm2 describe pifitness-next-test 2>/dev/null | grep -qi 'online'; then

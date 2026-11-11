@@ -11,6 +11,11 @@ DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-15432}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1/api/health}"
 HTTPS_HOSTNAME="${HTTPS_HOSTNAME:-https://pifitness.duckdns.org}"
+# Systemd unit directory: repo-driven source of unit files.
+# No unit name is hardcoded in this script — everything is discovered from
+# the files in this directory. Units whose filename contains "-test" belong
+# to the TEST environment; all other pifitness-* units belong to PRD.
+SYSTEMD_DIR="${PRD_DIR}/deploy/systemd"
 
 # Canonicalize and validate a directory path before any destructive use.
 # Refuses: empty paths, "/", and symlinks. Returns the canonical absolute path.
@@ -136,7 +141,15 @@ if [[ "${PRD_DB:-}" == "${TEST_DB:-}" ]]; then
 fi
 
 echo "Step 1: stop test units"
-sudo systemctl stop pifitness-fastapi-test.service 2>/dev/null || true
+# Stop test units from the systemd directory (filename contains "-test").
+# No unit name is hardcoded — everything comes from the unit files.
+if [[ -d "$SYSTEMD_DIR" ]]; then
+  for unit_file in "$SYSTEMD_DIR"/pifitness-*-test.service "$SYSTEMD_DIR"/pifitness-*-test.timer; do
+    [[ -f "$unit_file" ]] || continue
+    install_name="$(basename "$unit_file")"
+    sudo systemctl stop "$install_name" 2>/dev/null || true
+  done
+fi
 pm2 delete pifitness-next-test 2>/dev/null || true
 
 # Failpoint for the human recovery drill: inject a failure during PRD
@@ -145,29 +158,22 @@ pm2 delete pifitness-next-test 2>/dev/null || true
 failpoint "during_restore" "simulate failure during PRD restore (recovery drill)"
 
 echo "Step 2: restore PRD services and timers from the state record"
-if [[ "${FASTAPI_ACTIVE:-unknown}" == "active" ]]; then
-  if ! sudo systemctl start pifitness-fastapi.service; then
-    echo "ERROR: failed to restart pifitness-fastapi.service (was active before test-up)" >&2
-    exit 1
-  fi
-else
-  echo "  pifitness-fastapi.service was not active before test-up; leaving stopped"
-fi
-if [[ "${AGENT_TIMER_ACTIVE:-unknown}" == "active" ]]; then
-  if ! sudo systemctl start pifitness_agent.timer; then
-    echo "ERROR: failed to restart pifitness_agent.timer (was active before test-up)" >&2
-    exit 1
-  fi
-else
-  echo "  pifitness_agent.timer was not active before test-up; leaving stopped"
-fi
-if [[ "${HARDWARE_HEALTH_TIMER_ACTIVE:-unknown}" == "active" ]]; then
-  if ! sudo systemctl start pifitness-hardware-health.timer; then
-    echo "ERROR: failed to restart pifitness-hardware-health.timer (was active before test-up)" >&2
-    exit 1
-  fi
-else
-  echo "  pifitness-hardware-health.timer was not active before test-up; leaving stopped"
+# UNIT_STATES is a space-separated list of "unit=state" pairs recorded by
+# test-up. Restore each PRD unit to the state it was in before test-up.
+# No unit name is hardcoded — every unit is discovered from the state file.
+if [[ -n "${UNIT_STATES:-}" ]]; then
+  for pair in $UNIT_STATES; do
+    unit="${pair%%=*}"
+    state="${pair#*=}"
+    if [[ "$state" == "active" ]]; then
+      if ! sudo systemctl start "$unit"; then
+        echo "ERROR: failed to restart $unit (was active before test-up)" >&2
+        exit 1
+      fi
+    else
+      echo "  $unit was not active before test-up; leaving stopped"
+    fi
+  done
 fi
 if [[ "${PM2_NEXTPROD_ACTIVE:-unknown}" == "online" ]]; then
   if ! pm2 restart pifitness-next; then
