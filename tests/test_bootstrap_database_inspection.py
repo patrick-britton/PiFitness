@@ -20,17 +20,27 @@ def function_body(text: str, name: str, next_marker: str) -> str:
     return text[start:end]
 
 
-def test_schema_comparison_dependency_is_installed_after_uv_sync_before_inspection():
+def test_schema_comparison_dependency_is_in_the_locked_deployment_group():
     text = read_script()
     uv_sync = text.index('"$UV_BIN" sync')
-    requirements_install = text.index('"$UV_BIN" pip install')
-    inspector = text.index('inspect_test_db.py')
     version_check = text.index('[[ "$MIGRADIFF_VERSION" == "1.7.2" ]]')
+    inspector = text.index('inspect_test_db.py')
+    sync_end = text.index('\n)', uv_sync)
+    sync_command = text[uv_sync:sync_end]
 
-    assert uv_sync < requirements_install < version_check < inspector
-    assert 'SCHEMA_COMPARE_REQUIREMENTS="$STAGE_DIR/tools/db/requirements-schema-compare.txt"' in text
-    assert '--requirement "$SCHEMA_COMPARE_REQUIREMENTS"' in text
+    assert uv_sync < version_check < inspector
+    assert "--locked" in sync_command
+    assert "--no-dev" in sync_command
+    assert "--group deployment" in sync_command
+    assert "--no-editable" in sync_command
+    assert '"$UV_BIN" pip install' not in text
+    assert "requirements-schema-compare.txt" not in text
     assert 'version("migradiff")' in text
+
+    pyproject = (REPO_ROOT / "backend" / "pyproject.toml").read_text(encoding="utf-8")
+    assert "[dependency-groups]" in pyproject
+    assert "deployment = [" in pyproject
+    assert '"migradiff[pg]==1.7.2"' in pyproject
 
 
 def test_bootstrap_uses_the_two_existing_environment_files():

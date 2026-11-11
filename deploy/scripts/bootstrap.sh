@@ -153,22 +153,14 @@ echo "Synchronizing TEST Python dependencies..."
         "$UV_BIN" sync \
             --locked \
             --no-dev \
+            --group deployment \
             --no-editable \
             --python "$PYTHON_BIN"
 )
 
-# MigraDiff is a pinned deployment-inspection dependency, deliberately kept
-# separate from the application's backend dependency group. Install it into
-# the same persistent TEST venv after uv sync so each checkout gets the exact
-# comparison engine required by compare_schema.py.
-SCHEMA_COMPARE_REQUIREMENTS="$STAGE_DIR/tools/db/requirements-schema-compare.txt"
-[[ -f "$SCHEMA_COMPARE_REQUIREMENTS" ]] ||
-    fail "Pinned schema-comparison requirements file is missing: $SCHEMA_COMPARE_REQUIREMENTS"
-
-"$UV_BIN" pip install \
-    --python "$VENV_DIR/bin/python" \
-    --requirement "$SCHEMA_COMPARE_REQUIREMENTS"
-
+# The deployment dependency group is part of backend/pyproject.toml and
+# backend/uv.lock. Keeping MigraDiff inside this sync prevents uv from
+# removing it on the next run and avoids a second package-install operation.
 # Confirm the exact comparator version before any database inspection.
 MIGRADIFF_VERSION=$("$VENV_DIR/bin/python" -c \
     'import importlib.metadata; print(importlib.metadata.version("migradiff"))')
