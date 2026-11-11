@@ -2,7 +2,7 @@
 """Read-only TEST/PRD PostgreSQL schema comparison using MigraDiff.
 
 This wrapper owns only PiFitness-specific safety and policy boundaries:
-- the existing TEST and PRD application environment files;
+- explicit TEST/PRD migration env files;
 - local endpoint, database identity, and marker verification;
 - temporary, private libpq password file (passwords never appear in argv);
 - structured MigraDiff JSON parsing;
@@ -96,7 +96,7 @@ def _connection_identity(config: dict[str, str], *, allow_prd: bool) -> dict[str
         return {
             "environment": config["APP_ENV"],
             "database": database,
-            "server_address": str(server_address),
+            "server_address": str(migration_runner._normalize_server_address(server_address)),
             "server_port": int(server_port),
             "marker": marker or None,
         }
@@ -137,12 +137,29 @@ def _validate_pair(
 
     test_identity = _connection_identity(test_config, allow_prd=False)
     prd_identity = _connection_identity(prd_config, allow_prd=True)
+    test_server_address = migration_runner._normalize_server_address(
+        test_identity["server_address"]
+    )
+    prd_server_address = migration_runner._normalize_server_address(
+        prd_identity["server_address"]
+    )
+    # Keep the returned identity evidence canonical as well as comparing it
+    # canonically, so callers never see both ::1 and ::1/128 for one endpoint.
+    test_identity["server_address"] = str(test_server_address)
+    prd_identity["server_address"] = str(prd_server_address)
     if (
-        test_identity["server_address"] != prd_identity["server_address"]
+        test_server_address != prd_server_address
         or test_identity["server_port"] != prd_identity["server_port"]
     ):
         raise SchemaComparisonError(
-            "TEST and PRD connections resolved to different PostgreSQL server endpoints."
+            "TEST and PRD connections resolved to different PostgreSQL server endpoints "
+            "(TEST=%s:%s, PRD=%s:%s)."
+            % (
+                test_server_address,
+                test_identity["server_port"],
+                prd_server_address,
+                prd_identity["server_port"],
+            )
         )
     if test_identity["marker"] != "test":
         raise SchemaComparisonError("TEST database marker is not exactly 'test'.")
@@ -454,16 +471,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Read-only TEST/PRD PostgreSQL schema comparison using MigraDiff."
     )
-    parser.add_argument(
-        "--test-env-file",
-        default=migration_runner.DEFAULT_TEST_ENV_FILE,
-        help="existing TEST application env file (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--prd-env-file",
-        default=migration_runner.DEFAULT_PRD_ENV_FILE,
-        help="existing PRD application env file (default: %(default)s)",
-    )
+    parser.add_argument("--test-env-file", required=True, help="TEST migration env file")
+    parser.add_argument("--prd-env-file", required=True, help="PRD migration env file")
     parser.add_argument(
         "--allow-prd",
         action="store_true",

@@ -248,16 +248,44 @@ if ! (
         --diff-file "$SCHEMA_DIFF_FILE" \
         >"$INSPECTION_REPORT" 2>"$INSPECTION_ERROR"
 ); then
-    [[ ! -f "$INSPECTION_REPORT" ]] || cat "$INSPECTION_REPORT" >&2
     [[ ! -s "$INSPECTION_ERROR" ]] || cat "$INSPECTION_ERROR" >&2
-    fail "Read-only TEST/PRD database inspection failed. Existing TEST database and checkout were not modified."
+    echo "Structured inspection report: $INSPECTION_REPORT" >&2
+    echo "No database or existing checkout was modified by this inspection." >&2
+    exit 1
 fi
 
 chmod 0600 "$INSPECTION_REPORT"
 [[ ! -s "$INSPECTION_ERROR" ]] || chmod 0600 "$INSPECTION_ERROR"
 echo "Database inspection report: $INSPECTION_REPORT"
 [[ ! -f "$SCHEMA_DIFF_FILE" ]] || echo "Schema comparison artifact: $SCHEMA_DIFF_FILE"
-cat "$INSPECTION_REPORT"
+"$VENV_DIR/bin/python" - "$INSPECTION_REPORT" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    report = json.load(stream)
+
+test = report.get("test") or {}
+prd = report.get("prd") or {}
+comparison = report.get("schema_comparison") or {}
+decision = report.get("decision") or {}
+
+if prd.get("database"):
+    marker = "unmarked" if not prd.get("marker") else repr(prd["marker"])
+    print("  PRD: %s (marker %s)" % (prd["database"], marker))
+if test.get("database"):
+    if test.get("exists") is False:
+        print("  TEST: %s (does not exist)" % test["database"])
+    elif test.get("exists") is True:
+        print("  TEST: %s (marker %s)" % (test["database"], repr(test.get("marker"))))
+if comparison:
+    print("  Schema comparison: %s (%s structural differences)" % (
+        comparison.get("status", "unknown"), comparison.get("statement_count", "unknown")
+    ))
+print("  Database decision: %s" % decision.get("action", "unknown"))
+if decision.get("reason"):
+    print("  Reason: %s" % decision["reason"])
+PY
 
 DB_DECISION_FIELDS=$("$VENV_DIR/bin/python" - "$INSPECTION_REPORT" <<'PY'
 import json

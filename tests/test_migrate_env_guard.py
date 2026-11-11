@@ -403,6 +403,21 @@ def test_connection_identity_accepts_matching_loopback_database_and_port():
 
 
 @pytest.mark.regression
+@pytest.mark.parametrize("server_addr", ["::1", "::1/128", "127.0.0.1/32"])
+def test_connection_identity_accepts_postgresql_inet_loopback_prefix(server_addr):
+    cursor = FakeCursor(
+        dbname="fitness_test",
+        marker="test",
+        port=5432,
+        server_addr=server_addr,
+    )
+    cursor.execute = lambda sql: setattr(
+        cursor, "_one", ("fitness_test", server_addr, 5432)
+    )
+    migrate._validate_connection_identity(cursor, "fitness_test", {"port": 5432})
+
+
+@pytest.mark.regression
 @pytest.mark.parametrize(
     "dbname,server_addr,port,match",
     [

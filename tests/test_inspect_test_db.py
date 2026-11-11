@@ -74,10 +74,11 @@ def _install_connections(
     catalog_is_template=False,
     test_connect_error=None,
     prd_marker=None,
+    prd_address="127.0.0.1",
 ):
     prd_cursor = FakeCursor(
         [
-            ("identity", _identity("personal_fitness", prd_marker)),
+            ("identity", _identity("personal_fitness", prd_marker, prd_address)),
             (
                 "catalog",
                 (
@@ -244,6 +245,42 @@ def test_test_database_on_different_server_fails_closed(monkeypatch):
     assert compare_calls == []
 
 
+
+
+def test_ipv6_loopback_inet_prefix_is_accepted_and_normalized(monkeypatch):
+    _install_connections(
+        monkeypatch,
+        test_address="::1/128",
+        prd_address="::1",
+    )
+
+    report = inspect_test_db.inspect_test_database(
+        *_configs(),
+        compare_fn=lambda *a, **k: {"ok": True, "status": "identical", "statement_count": 0},
+    )
+
+    assert report["ok"] is True
+    assert report["test"]["server_address"] == "::1"
+    assert report["prd"]["server_address"] == "::1"
+    assert report["decision"]["action"] == "reuse_test"
+
+
+def test_failure_report_includes_stage_code_and_actionable_next_step(monkeypatch):
+    _install_connections(monkeypatch, test_address="192.168.1.20")
+
+    report = inspect_test_db.inspect_test_database(*_configs())
+    failure = report["failure"]
+    human = inspect_test_db.format_failure_report(report)
+
+    assert report["ok"] is False
+    assert failure["code"] == "postgres_server_not_loopback"
+    assert "Connect to TEST" in failure["stage"]
+    assert "not loopback" in failure["detail"]
+    assert "PG_HOST" in failure["next_action"]
+    assert "Problem:" in human
+    assert "Next action:" in human
+    assert "No database was modified" in human
+
 def test_test_database_port_mismatch_fails_closed(monkeypatch):
     _install_connections(monkeypatch, test_port=5433)
 
@@ -348,14 +385,6 @@ def test_diff_file_is_forwarded_to_comparator(monkeypatch, tmp_path):
     assert seen["diff_file"] == path
 
 
-@pytest.mark.unit
-def test_cli_defaults_to_existing_application_env_files():
-    args = inspect_test_db._build_parser().parse_args(["--allow-prd"])
-
-    assert args.test_env_file == inspect_test_db.migration_runner.DEFAULT_TEST_ENV_FILE
-    assert args.prd_env_file == inspect_test_db.migration_runner.DEFAULT_PRD_ENV_FILE
-
-
 def test_cli_requires_explicit_prd_authorization(capsys):
     code = inspect_test_db.main(
         [
@@ -365,4 +394,6 @@ def test_cli_requires_explicit_prd_authorization(capsys):
     )
 
     assert code == 1
-    assert '"action":"abort"' in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert '"action":"abort"' in captured.out
+    assert "explicit authorization" in captured.err

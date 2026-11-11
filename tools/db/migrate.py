@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Safely inspect and apply PiFitness SQL migrations.
 
-Examples (the paths are the existing application environment files):
-    python tools/db/migrate.py status --env-file /home/god/.config/pifitness/test.env --format jsonl
-    python tools/db/migrate.py up --env-file /home/god/.config/pifitness/test.env --format jsonl
-    python tools/db/migrate.py status --env-file /home/god/PiFitness/backend/.env --allow-prd --format jsonl
+Examples:
+    python tools/db/migrate.py status --env-file PATH --format jsonl
+    python tools/db/migrate.py up --env-file PATH --format jsonl
+    python tools/db/migrate.py up --env-file PATH --adopt-legacy-checksums
+    python tools/db/migrate.py down --env-file PATH
+    python tools/db/migrate.py baseline --env-file PATH
 
-PRD commands additionally require --allow-prd. The selected existing
-application environment file is this tool's sole source of connection
-settings; inherited shell environment variables are not loaded. No separate
-migration-specific environment files are required.
+PRD commands additionally require --allow-prd. The selected environment file is
+this tool's sole source of connection settings; backend/.env and inherited shell
+environment variables are not loaded.
 
 JSON Lines output is intended for deployment orchestration. Every migration
 start/result is a separate JSON object on stdout; human diagnostics go to
@@ -47,13 +48,6 @@ SCHEMA_MIGRATIONS_UPGRADE_SQL = (
 APP_ENV_DEV = "dev"
 APP_ENV_TEST = "test"
 APP_ENV_PROD = "prod"
-
-# Canonical Pi runtime/application configuration files. These are also the
-# connection sources for migrations and read-only schema inspection; no
-# migration-specific duplicate .env files are used.
-DEFAULT_TEST_ENV_FILE = "/home/god/.config/pifitness/test.env"
-DEFAULT_PRD_ENV_FILE = "/home/god/PiFitness/backend/.env"
-
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 OUTPUT_TEXT = "text"
 OUTPUT_JSONL = "jsonl"
@@ -119,7 +113,7 @@ def _load_env_file(path):
     """Load and validate migration settings exclusively from the selected file."""
     env_path = os.path.abspath(os.path.expanduser(path))
     if not os.path.isfile(env_path):
-        raise RuntimeError("Environment file does not exist: %s" % env_path)
+        raise RuntimeError("Migration environment file does not exist: %s" % env_path)
 
     # Do not interpolate from inherited shell variables.
     values = dotenv_values(env_path, interpolate=False)
@@ -179,7 +173,7 @@ def _resolve_db_name(config):
         )
     dbname = config["PG_DB"].strip()
     if not dbname:
-        raise RuntimeError("PG_DB is missing from the selected environment file.")
+        raise RuntimeError("PG_DB is missing from the selected migration environment file.")
     return dbname
 
 
@@ -205,6 +199,25 @@ def _connect(dbname, params):
     return psycopg2.connect(**connection_params)
 
 
+def _normalize_server_address(server_addr):
+    """Return the canonical IP address from PostgreSQL's inet text output.
+
+    PostgreSQL may render inet_server_addr() as an address with a prefix,
+    e.g. ``::1/128`` or ``127.0.0.1/32``. ip_address() rejects those strings;
+    ip_interface() correctly parses both forms and exposes the host address.
+    """
+    raw = str(server_addr).strip()
+    if not raw:
+        raise ValueError("empty PostgreSQL server address")
+    try:
+        return ipaddress.ip_address(raw)
+    except ValueError:
+        try:
+            return ipaddress.ip_interface(raw).ip
+        except ValueError as exc:
+            raise ValueError("invalid PostgreSQL server address %r" % raw) from exc
+
+
 def _validate_connection_identity(cur, expected_dbname, params):
     """Verify the connected database, server address, and TCP port."""
     cur.execute("SELECT current_database(), inet_server_addr(), inet_server_port()")
@@ -221,13 +234,13 @@ def _validate_connection_identity(cur, expected_dbname, params):
     if server_addr is None:
         raise RuntimeError("PostgreSQL did not report a TCP server address; refusing to migrate.")
     try:
-        is_loopback = ipaddress.ip_address(str(server_addr)).is_loopback
-    except ValueError:
-        is_loopback = False
-    if not is_loopback:
+        normalized_address = _normalize_server_address(server_addr)
+    except ValueError as exc:
+        raise RuntimeError("%s; refusing to migrate." % exc) from exc
+    if not normalized_address.is_loopback:
         raise RuntimeError(
             "Connected PostgreSQL server address %r is not loopback; refusing to migrate."
-            % str(server_addr)
+            % str(normalized_address)
         )
     if actual_port != expected_port:
         raise RuntimeError(
@@ -751,7 +764,7 @@ def _build_parser():
     parser.add_argument(
         "--env-file",
         required=True,
-        help="existing environment configuration file for the target database",
+        help="explicit environment file containing migration connection settings",
     )
     parser.add_argument(
         "--allow-prd",

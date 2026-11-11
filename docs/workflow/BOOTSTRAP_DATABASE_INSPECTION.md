@@ -1,77 +1,63 @@
-# TEST bootstrap: read-only database inspection integration
+# Bootstrap TEST/PRD inspection: IPv6 endpoint and diagnostic improvement
 
-## Scope of this increment
+## Root cause of the Pi failure
 
-This increment wires the existing read-only TEST/PRD database inspector and
-pure database policy into `deploy/scripts/bootstrap.sh`. It does not yet
-restore a database, apply migrations, run the regression suite, suspend or
-restart services/timers, or implement the GO/NO-GO acceptance window. Those
-remain later workflow stages and must preserve the operator-approved order.
+PostgreSQL returned `inet_server_addr()` as `::1/128`. That is IPv6 loopback in
+PostgreSQL's `inet` representation. The previous safety check passed the full
+string to Python's `ipaddress.ip_address()`, which accepts bare addresses but
+not CIDR/prefix notation. It therefore rejected a legitimate local endpoint.
 
-## Configuration
+## Fix
 
-The script uses only the two existing environment files:
+`tools/db/migrate.py` now provides `_normalize_server_address()`. It accepts
+both bare IP addresses and PostgreSQL `inet` values with a prefix, using
+`ip_address()` first and `ip_interface().ip` as the prefix-aware fallback.
+The resulting canonical address is then checked for loopback.
 
-- TEST: `/home/god/.config/pifitness/test.env`
-- PRD: `/home/god/PiFitness/backend/.env`
+The inspector and MigraDiff adapter use the same normalization and compare
+canonical addresses, so `::1`, `::1/128`, and equivalent representations are
+not mistaken for different servers.
 
-No migration-specific `.env` files or PostgreSQL roles are created.
+## Clearer inspection failures
 
-## Execution added
+The inspector's JSON report now includes a `failure` object when inspection
+fails:
 
-After the candidate worktree is built and MigraDiff 1.7.2 is installed into
-the persistent TEST venv from the pinned
-`tools/db/requirements-schema-compare.txt`, bootstrap runs:
+- `code`: stable machine-readable failure category;
+- `stage`: the inspection stage where it stopped;
+- `summary`: concise problem statement;
+- `detail`: the original redacted diagnostic;
+- `next_action`: actionable operator guidance.
 
-```bash
-"$VENV_DIR/bin/python" "$STAGE_DIR/tools/db/inspect_test_db.py" \
-    --test-env-file "$ENV_FILE" \
-    --prd-env-file "$PRD_ENV_FILE" \
-    --allow-prd \
-    --diff-file "$SCHEMA_DIFF_FILE"
-```
+The inspector always writes machine-readable JSON to stdout. On failure it
+also writes a concise human-readable explanation to stderr. Bootstrap stores
+the JSON report and stderr separately under the private evidence directory.
+On failure it displays the human-readable explanation and the report path; it
+does not dump raw JSON into the terminal. On success it prints a short
+summary of PRD identity, TEST identity/marker, schema result, and policy action.
 
-The inspector verifies both database identities and environment markers,
-then compares TEST to PRD using MigraDiff in read-only mode. The JSON report
-and full schema diff are retained under:
+## Safety
 
-```text
-/home/god/Documents/PiFitness_Test_Evidence
-```
+This is a read-only inspection fix. It does not change database selection
+policy, perform database DDL, clone/restore/drop/rename a database, apply
+migrations, or start/stop any service. The failing inspection left the current
+TEST database and checkout unchanged, and this fix preserves that property.
 
-with private file/directory permissions.
+## Files in this update
 
-## Decision handling in this increment
+- `tools/db/migrate.py`
+- `tools/db/compare_schema.py`
+- `tools/db/inspect_test_db.py`
+- `deploy/scripts/bootstrap.sh`
+- focused tests for the migration runner, comparator, inspector, and bootstrap
+  integration contract.
 
-- `reuse_test`: prompt for optional freshness refresh. A `no` response allows
-  the checkout-preparation step to continue. A `yes` response exits safely
-  because backup restore and rollback are not implemented in this increment.
-- `create_from_prd`: exits safely; the missing-TEST restore workflow is a
-  subsequent increment.
-- `refresh_from_prd`: exits safely; the latest-nightly-backup restore and
-  rollback workflow is a subsequent increment.
-- `abort`, malformed output, failed connection, or comparison error: exits
-  nonzero and leaves the existing TEST database and checkout untouched.
+## Local verification performed in the isolated build workspace
 
-No database DDL, database rename/drop, migration execution, or service action
-is performed by this database-inspection stage.
+- Python compilation passed for the changed Python modules and tests.
+- `bash -n deploy/scripts/bootstrap.sh` passed.
+- 121 focused tests passed.
 
-## Checkout failure handling
-
-The EXIT cleanup trap removes only the staging worktree. It never promotes a
-partially prepared staging checkout after a failure. Promotion of the staging
-worktree into the TEST path occurs only after all checks and the database
-inspection decision have passed.
-
-## Validation
-
-Run locally:
-
-```powershell
-& .\.venv\Scripts\python.exe -m pytest tests\test_bootstrap_database_inspection.py -q
-```
-
-On the Pi, the first integration check should use the current expected state
-(TEST and PRD schemas compatible), choose **no** to the optional refresh, and
-verify that the JSON report says `reuse_test` and no database/service state
-was modified by the inspector.
+The isolated build workspace did not have `psycopg2` installed, so a minimal
+import stub was used while running mocked database tests. This is not a live
+PostgreSQL or Pi integration test. The Pi retry remains the next runtime gate.

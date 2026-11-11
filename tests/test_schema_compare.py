@@ -167,6 +167,22 @@ def test_validate_pair_requires_same_configured_and_actual_endpoint(monkeypatch)
 
 
 @pytest.mark.unit
+
+
+def test_validate_pair_treats_ipv6_inet_prefix_and_bare_address_as_same_endpoint(monkeypatch):
+    test = _config("test", "fitness_test")
+    prd = _config("prod", "fitness_prd")
+    _install_identity_stubs(monkeypatch)
+    identities = iter([
+        {"environment": "test", "database": "fitness_test", "server_address": "::1/128", "server_port": 5432, "marker": "test"},
+        {"environment": "prod", "database": "fitness_prd", "server_address": "::1", "server_port": 5432, "marker": None},
+    ])
+    monkeypatch.setattr(compare_schema, "_connection_identity", lambda *a, **k: next(identities))
+
+    test_identity, prd_identity = compare_schema._validate_pair(test, prd)
+    assert test_identity["server_address"] == "::1"
+    assert prd_identity["server_address"] == "::1"
+
 def test_validate_pair_rejects_non_loopback_hosts():
     test = _config("test", "fitness_test", host="db.example.com")
     prd = _config("prod", "fitness_prd", host="db.example.com")
@@ -351,15 +367,6 @@ def test_missing_migradiff_fails_closed(monkeypatch):
     monkeypatch.setattr(compare_schema, "_resolve_migradiff_executable", lambda _path=None: (_ for _ in ()).throw(compare_schema.SchemaComparisonError("MigraDiff command not found")))
     with pytest.raises(compare_schema.SchemaComparisonError, match="not found"):
         compare_schema.compare_databases(_config("test", "fitness_test"), _config("prod", "fitness_prd"))
-
-
-@pytest.mark.unit
-def test_cli_defaults_to_existing_application_env_files():
-    args = compare_schema._build_parser().parse_args(["--allow-prd"])
-
-    assert args.test_env_file == compare_schema.migration_runner.DEFAULT_TEST_ENV_FILE
-    assert args.prd_env_file == compare_schema.migration_runner.DEFAULT_PRD_ENV_FILE
-
 
 
 @pytest.mark.unit

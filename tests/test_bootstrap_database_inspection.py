@@ -123,3 +123,21 @@ def test_pg_dump_is_not_a_preflight_executable_requirement():
     text = read_script()
     assert 'command -v pg_dump' not in text
     assert 'Required PostgreSQL executable pg_dump is missing' not in text
+
+
+def test_bootstrap_renders_inspector_failure_as_human_diagnostic_and_keeps_json_evidence():
+    text = read_script()
+    failure = text[text.index('if ! (', text.index('INSPECTION_REPORT=')):text.index('chmod 0600 "$INSPECTION_REPORT"')]
+    assert 'cat "$INSPECTION_REPORT"' not in failure
+    assert 'cat "$INSPECTION_ERROR"' in failure
+    assert 'Structured inspection report:' in failure
+    assert 'No database or existing checkout was modified' in failure
+
+
+def test_bootstrap_prints_inspection_summary_instead_of_raw_json():
+    text = read_script()
+    assert 'PRD: %s (marker %s)' in text
+    assert 'TEST: %s (marker %s)' in text
+    assert 'Schema comparison:' in text
+    assert 'Database decision:' in text
+    assert 'cat "$INSPECTION_REPORT"' not in text
