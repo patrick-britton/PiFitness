@@ -11,8 +11,6 @@
 --
 -- migrate:up
 
-BEGIN;
-
 -- Pre-check: _migration must contain exactly the two token tables.
 DO $$
 DECLARE
@@ -82,8 +80,7 @@ DROP SCHEMA _migration;
 -- 5. Confirm _migration gone. Expected: 0.
 SELECT count(*) AS _migration_present FROM information_schema.schemata WHERE schema_name = '_migration';
 
-COMMIT;
-
 -- migrate:down
 -- NO ROLLBACK: destructive schema retirement. Reverse via prod-latest.dump
 -- restore per deploy/README.md section "destructive changes."
+DO $$ BEGIN RAISE EXCEPTION 'NO ROLLBACK: 20261108000000 destructive migration; restore from prod-latest.dump'; END $$;

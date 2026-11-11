@@ -22,8 +22,6 @@
 --
 -- migrate:up
 
-BEGIN;
-
 -- json_extractors (per INT-38 original -- rows existed when this migration was designed)
 UPDATE tasks.task_config
 SET python_function = REPLACE(python_function, 'backend_functions.json_extractors', 'pifitness.worker.json_extractors')
@@ -39,8 +37,6 @@ UPDATE tasks.task_config
 SET python_function = 'pifitness.worker.backend_tasks.nightly_maintenance'
 WHERE python_function = 'backend_functions.backend_tasks.nightly_maintenance';
 
-COMMIT;
-
 -- migrate:down
 -- INT-38 rollback: revert the python_function repointing in tasks.task_config.
 -- Restores pifitness.worker.json_extractors -> backend_functions.json_extractors.
@@ -49,8 +45,6 @@ COMMIT;
 -- After rollback, backend_functions.json_extractors.* module no longer exists
 -- in current code (moved to pifitness.worker); this rollback exists for
 -- paired-forward/rollback discipline only.
-
-BEGIN;
 
 UPDATE tasks.task_config
 SET python_function = 'backend_functions.json_extractors'
@@ -63,5 +57,3 @@ WHERE python_function = 'pifitness.worker.backend_tasks.backup_database';
 UPDATE tasks.task_config
 SET python_function = 'backend_functions.backend_tasks.nightly_maintenance'
 WHERE python_function = 'pifitness.worker.backend_tasks.nightly_maintenance';
-
-COMMIT;

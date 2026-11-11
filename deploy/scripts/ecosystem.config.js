@@ -1,13 +1,16 @@
+const testDir = process.env.TEST_DIR || '/home/god/PiFitness-test';
+const port = process.env.PORT || '3000';
+
 module.exports = {
   apps: [
     {
       name: 'pifitness-next-test',
-      cwd: '/home/god/PiFitness-test/frontend/pifitness',
+      cwd: testDir + '/frontend/pifitness',
       script: 'node_modules/.bin/next',
-      args: 'start -p 3000 -H 127.0.0.1',
+      args: 'start -p ' + port + ' -H 127.0.0.1',
       env: {
         NODE_ENV: 'production',
-        PORT: '3000',
+        PORT: port,
         NEXT_PUBLIC_APP_ENV: 'test',
       },
       autorestart: true,
