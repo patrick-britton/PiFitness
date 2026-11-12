@@ -9,18 +9,20 @@ BOOTSTRAP = (REPO_ROOT / "deploy" / "scripts" / "bootstrap.sh").read_text(encodi
 
 
 def test_recovery_helper_is_invoked_for_create_refresh_and_opt_in_freshness():
-    assert 'create_from_prd|refresh_from_prd)' in BOOTSTRAP
+    assert 'DB_RECOVERY_SOURCE' in BOOTSTRAP
+    assert 'Choose an option' in BOOTSTRAP
+    assert 'Fresh dump of live PRD' in BOOTSTRAP
     assert 'NEEDS_DB_RECOVERY=1' in BOOTSTRAP
     assert 'restore_test_db.py' in BOOTSTRAP
-    assert 'restore \\\n            --backup-dir "$PRD_BACKUP_DIR"' in BOOTSTRAP
     assert '--backup-glob "$PRD_BACKUP_GLOB"' in BOOTSTRAP
-    assert 'n|no|"")' in BOOTSTRAP
+    assert '--backup-dir "$PRD_BACKUP_DIR"' in BOOTSTRAP
+    assert '--backup-file "$FRESH_DUMP"' in BOOTSTRAP
 
 
 def test_recovery_uses_historical_backup_default_with_explicit_overrides():
     assert 'PIFITNESS_PRD_BACKUP_DIR:-$HOME/Documents/DB_Backups' in BOOTSTRAP
     assert 'PIFITNESS_PRD_BACKUP_GLOB:-personal_fitness_[0-9]*.dump' in BOOTSTRAP
-    assert 'pg_dump' not in BOOTSTRAP
+    assert 'pg_dump' in BOOTSTRAP
 
 
 def test_post_recovery_inspection_requires_test_marker_and_valid_baseline_provenance():

@@ -138,6 +138,31 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _validate_backup_archive(
+    path: Path, expected_prd_db: str, *,
+    runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> None:
+    """Validate a specific PRD backup archive: readable, custom format, correct source database."""
+    restore_bin = shutil.which("pg_restore")
+    if not restore_bin:
+        raise RecoveryError("pg_restore is not installed; cannot validate the PRD backup archive.")
+    listed = _safe_run([restore_bin, "--list", str(path)], runner=runner)
+    archive_listing = listed.stdout or ""
+    db_match = ARCHIVE_DB_RE.search(archive_listing)
+    if db_match is None:
+        raise RecoveryError(
+            "Backup does not identify its source database in the pg_restore archive header: %s" % path
+        )
+    archive_db = db_match.group(1)
+    if archive_db != expected_prd_db:
+        raise RecoveryError(
+            "Backup is for database %r, not configured PRD database %r: %s"
+            % (archive_db, expected_prd_db, path)
+        )
+    if not re.search(r"^;\s*Format:\s*CUSTOM\s*$", archive_listing, re.MULTILINE | re.IGNORECASE):
+        raise RecoveryError("Expected a PostgreSQL custom-format backup (.dump): %s" % path)
+
+
 def _latest_backup(
     backup_dir: str | Path,
     backup_glob: str,
@@ -762,6 +787,7 @@ def restore_test_database(
     *,
     backup_dir: str,
     backup_glob: str,
+    backup_file: str | None = None,
     state_file: str,
     schema_diff_file: str | None = None,
     max_backup_age_hours: float = DEFAULT_MAX_BACKUP_AGE_HOURS,
@@ -771,10 +797,30 @@ def restore_test_database(
     test_db, prd_db, test_params, prd_params = _validate_restore_config(test_config, prd_config)
 
     # Do every filesystem/archive check before the destructive DROP DATABASE.
-    backup, backup_time, backup_sha256 = _latest_backup(
-        backup_dir, backup_glob, prd_db,
-        max_age_hours=max_backup_age_hours, runner=runner,
-    )
+    if backup_file is not None:
+        backup = Path(os.path.abspath(os.path.expanduser(backup_file)))
+        if backup.is_symlink() or not backup.is_file():
+            raise RecoveryError(
+                "Specified backup file is missing, not a file, or a symlink: %s" % backup
+            )
+        stat = backup.stat()
+        if stat.st_size <= 0:
+            raise RecoveryError("Specified PRD backup is empty: %s" % backup)
+        backup_time = _backup_time(backup)
+        now_utc = dt.datetime.now(dt.timezone.utc)
+        age = now_utc - backup_time
+        if age.total_seconds() > max_age_hours * 3600:
+            raise RecoveryError(
+                "Specified PRD backup is %.1f hours old; the maximum permitted age is %.1f hours: %s"
+                % (age.total_seconds() / 3600, max_age_hours, backup)
+            )
+        backup_sha256 = _sha256_file(backup)
+        _validate_backup_archive(backup, prd_db, runner=runner)
+    else:
+        backup, backup_time, backup_sha256 = _latest_backup(
+            backup_dir, backup_glob, prd_db,
+            max_age_hours=max_backup_age_hours, runner=runner,
+        )
     state_path = Path(os.path.abspath(os.path.expanduser(state_file)))
     state_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(state_path.parent, 0o700)
@@ -1061,9 +1107,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--prd-env-file", required=True)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    restore = sub.add_parser("restore", help="replace TEST from the latest PRD nightly backup")
+    restore = sub.add_parser("restore", help="replace TEST from a validated PRD backup")
     restore.add_argument("--backup-dir", default=DEFAULT_BACKUP_DIR)
     restore.add_argument("--backup-glob", default=DEFAULT_BACKUP_GLOB)
+    restore.add_argument("--backup-file", default=None, help="restore a specific dump file instead of the latest nightly")
     restore.add_argument("--max-backup-age-hours", type=float, default=DEFAULT_MAX_BACKUP_AGE_HOURS)
     restore.add_argument("--state-file", required=True)
     restore.add_argument("--diff-file")
@@ -1079,6 +1126,7 @@ def main(argv: list[str] | None = None) -> int:
             result = restore_test_database(
                 test_config, prd_config,
                 backup_dir=args.backup_dir, backup_glob=args.backup_glob,
+                backup_file=args.backup_file,
                 state_file=args.state_file, max_backup_age_hours=args.max_backup_age_hours,
                 schema_diff_file=args.diff_file,
             )
