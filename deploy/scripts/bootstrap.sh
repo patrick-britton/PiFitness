@@ -376,110 +376,47 @@ PY
 )
 IFS='|' read -r DB_ACTION DB_OFFER_REFRESH <<< "$DB_DECISION_FIELDS"
 
-# Enumerate PRD nightly backups and compute the latest one's age for the menu.
-shopt -s nullglob
-BACKUP_FILES=("$PRD_BACKUP_DIR"/$PRD_BACKUP_GLOB)
-shopt -u nullglob
-BACKUP_COUNT=${#BACKUP_FILES[@]}
-LATEST_BACKUP=""
-LATEST_BACKUP_AGE_DISPLAY="unknown"
-if (( BACKUP_COUNT > 0 )); then
-    LATEST_BACKUP="$(printf '%s\n' "${BACKUP_FILES[@]}" | sort -r | head -n 1)"
-    if [[ "$LATEST_BACKUP" =~ _([0-9]{8}_[0-9]{6})\.dump$ ]]; then
-        BACKUP_TS="${BASH_REMATCH[1]}"
-        BACKUP_EPOCH="$(date -d "$BACKUP_TS" +%s 2>/dev/null || true)"
-        NOW_EPOCH="$(date +%s)"
-        if [[ -n "$BACKUP_EPOCH" ]]; then
-            AGE_SECONDS=$(( NOW_EPOCH - BACKUP_EPOCH ))
-            LATEST_BACKUP_AGE_HOURS=$(( AGE_SECONDS / 3600 ))
-            LATEST_BACKUP_AGE_DISPLAY="${LATEST_BACKUP_AGE_HOURS} hour(s)"
-        fi
-    fi
-fi
-
-# Three-option TEST database menu:
-#   1. Keep existing — only when TEST/PRD structure is identical (reuse_test).
-#   2. Latest nightly — restore the newest validated PRD backup (shows its age).
-#   3. Fresh dump — pg_dump live PRD, then restore that dump to TEST.
 NEEDS_DB_RECOVERY=0
-DB_RECOVERY_SOURCE=""
-echo
-if [[ "$DB_ACTION" == "reuse_test" ]]; then
-    echo "TEST database structure is identical to PRD."
-    echo "  1. Keep the existing TEST database (no restore)"
-    echo "  2. Restore from the latest PRD nightly backup (age: $LATEST_BACKUP_AGE_DISPLAY)"
-    echo "  3. Fresh dump of live PRD (pg_dump live PRD, then restore to TEST)"
-else
-    echo "TEST database requires replacement ($DB_ACTION)."
-    echo "  2. Restore from the latest PRD nightly backup (age: $LATEST_BACKUP_AGE_DISPLAY)"
-    echo "  3. Fresh dump of live PRD (pg_dump live PRD, then restore to TEST)"
-fi
-read -r -p "Choose an option: " db_choice
-
-case "$db_choice" in
-    1)
-        if [[ "$DB_ACTION" != "reuse_test" ]]; then
-            fail "Option 1 is not available; TEST database must be replaced."
+case "$DB_ACTION" in
+    reuse_test)
+        if [[ "$DB_OFFER_REFRESH" == "true" ]]; then
+            [[ -t 0 ]] || fail "TEST and PRD are compatible, but the optional PRD freshness choice requires an interactive terminal."
+            echo
+            read -r -p "TEST schema is compatible with PRD. Refresh TEST from the latest PRD nightly backup for freshness? [y/N]: " refresh_choice
+            case "${refresh_choice,,}" in
+                y|yes) NEEDS_DB_RECOVERY=1 ;;
+                n|no|"") echo "Keeping the existing TEST database." ;;
+                *) fail "Please answer yes or no. No database or existing checkout was modified." ;;
+            esac
         fi
-        NEEDS_DB_RECOVERY=0
-        DB_RECOVERY_SOURCE=""
-        echo "Keeping the existing TEST database."
         ;;
-    2)
-        if (( BACKUP_COUNT == 0 )); then
-            fail "No PRD nightly backup found in $PRD_BACKUP_DIR matching $PRD_BACKUP_GLOB."
-        fi
+    create_from_prd|refresh_from_prd)
         NEEDS_DB_RECOVERY=1
-        DB_RECOVERY_SOURCE="nightly"
         ;;
-    3)
-        NEEDS_DB_RECOVERY=1
-        DB_RECOVERY_SOURCE="fresh_dump"
+    abort)
+        fail "Database inspector returned abort. See the inspection report above."
         ;;
     *)
-        fail "Invalid choice. No database or existing checkout was modified."
+        fail "Database inspector returned unknown decision '$DB_ACTION'."
         ;;
 esac
 
 if [[ "$NEEDS_DB_RECOVERY" == "1" ]]; then
     echo
-    if [[ "$DB_RECOVERY_SOURCE" == "fresh_dump" ]]; then
-        echo "Creating a fresh dump of live PRD..."
-        set -a
-        . "$PRD_ENV_FILE"
-        set +a
-        export PGHOST="${PG_HOST}"
-        export PGPORT="${PG_PORT}"
-        export PGUSER="${PG_USER}"
-        export PGPASSWORD="${PG_PASSWORD}"
-        export PGDATABASE="${PG_DB}"
-        FRESH_DUMP="$PRD_BACKUP_DIR/personal_fitness_$(date +%Y%m%d_%H%M%S).dump"
-        if ! pg_dump -F c -f "$FRESH_DUMP"; then
-            fail "Fresh PRD dump failed. No database was changed."
-        fi
-        echo "Fresh PRD dump created: $FRESH_DUMP"
-    else
-        echo "Restoring TEST database from the latest PRD nightly backup..."
-    fi
+    echo "Restoring TEST database from the latest PRD nightly backup..."
     DB_RECOVERY_SCRIPT="$STAGE_DIR/tools/db/restore_test_db.py"
     [[ -f "$DB_RECOVERY_SCRIPT" ]] || fail "TEST database recovery helper is missing: $DB_RECOVERY_SCRIPT"
     DB_RECOVERY_STATE_FILE="$JOURNAL_DIR/test-db-recovery-${RUN_ID}.json"
     RECOVERY_REPORT="$EVIDENCE_DIR/test-db-recovery-report-${RUN_ID}.json"
     RECOVERY_ERROR="$EVIDENCE_DIR/test-db-recovery-${RUN_ID}.stderr"
 
-    # Build the restore arguments: --backup-glob for the nightly path,
-    # --backup-file for the fresh-dump path (backup_file takes precedence in the helper).
-    DB_RECOVERY_ARGS=(--backup-dir "$PRD_BACKUP_DIR" --backup-glob "$PRD_BACKUP_GLOB")
-    if [[ "$DB_RECOVERY_SOURCE" == "fresh_dump" ]]; then
-        DB_RECOVERY_ARGS+=(--backup-file "$FRESH_DUMP")
-    fi
-
     if ! (
         umask 077
         "$VENV_DIR/bin/python" "$DB_RECOVERY_SCRIPT" \
             --test-env-file "$ENV_FILE" --prd-env-file "$PRD_ENV_FILE" \
             restore \
-            "${DB_RECOVERY_ARGS[@]}" \
+            --backup-dir "$PRD_BACKUP_DIR" \
+            --backup-glob "$PRD_BACKUP_GLOB" \
             --max-backup-age-hours 24 \
             --state-file "$DB_RECOVERY_STATE_FILE" \
             --diff-file "$SCHEMA_DIFF_FILE"
