@@ -62,6 +62,7 @@ UV_BIN="/home/god/.local/bin/uv"
 PYTHON_BIN="/usr/bin/python3"
 NODE_BIN="/usr/bin/node"
 NPM_BIN="/usr/bin/npm"
+DBMATE_BIN="/usr/local/bin/dbmate"
 EVIDENCE_DIR="/home/god/Documents/PiFitness_Test_Evidence"
 JOURNAL_DIR="$EVIDENCE_DIR/journals"
 # Historical PiFitness backup location/name. Override these two values if the
@@ -81,6 +82,10 @@ fi
 [[ -x "$PYTHON_BIN" ]] || fail "Python not found: $PYTHON_BIN"
 [[ -x "$NODE_BIN" ]] || fail "Node.js not found: $NODE_BIN"
 [[ -x "$NPM_BIN" ]] || fail "npm not found: $NPM_BIN"
+
+# dbmate must be available before any migration step runs. It is installed
+# below (idempotent); verify here that the install actually succeeded.
+[[ -x "$DBMATE_BIN" ]] || fail "dbmate not found or not executable: $DBMATE_BIN"
 
 # Do not reconcile the persistent TEST environment while its API is running.
 # Check all TEST units from the systemd directory — no unit name is hardcoded.
@@ -208,6 +213,23 @@ MIGRADIFF_VERSION=$("$VENV_DIR/bin/python" -c \
     'import importlib.metadata; print(importlib.metadata.version("migradiff"))')
 [[ "$MIGRADIFF_VERSION" == "1.7.2" ]] ||
     fail "Expected MigraDiff 1.7.2, found $MIGRADIFF_VERSION."
+
+echo
+echo "Installing dbmate migration tool..."
+DBMATE_VERSION="2.36.0"
+DBMATE_URL="https://github.com/amacneil/dbmate/releases/download/v${DBMATE_VERSION}/dbmate-linux-arm64"
+if [[ ! -x "$DBMATE_BIN" ]]; then
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$DBMATE_URL" -o "$DBMATE_BIN"
+    else
+        fail "curl is required to download dbmate"
+    fi
+    chmod +x "$DBMATE_BIN"
+fi
+INSTALLED_DBMATE_VERSION=$("$DBMATE_BIN" --version | awk '{print $NF}')
+[[ "$INSTALLED_DBMATE_VERSION" == "$DBMATE_VERSION" ]] ||
+    fail "dbmate version mismatch: expected $DBMATE_VERSION, got $INSTALLED_DBMATE_VERSION"
+echo "dbmate $INSTALLED_DBMATE_VERSION verified."
 
 echo
 echo "Reconciling any interrupted TEST database recovery..."

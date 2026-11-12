@@ -53,6 +53,7 @@ VENV_DIR="$PROJECT_DIR/venv"
 FRONTEND_DIR="$PROJECT_DIR/frontend/pifitness"
 REQUIREMENTS_FILE="library_requirements.txt"
 NPM_REQUIREMENTS_FILE="npm_requirements.txt"
+DBMATE_BIN="/usr/local/bin/dbmate"
 # Systemd unit directory: repo-driven source of unit files.
 # No unit name is hardcoded in this script — everything is discovered from
 # the files in this directory. Units whose filename contains "-test" belong
@@ -121,6 +122,22 @@ if [[ "$NUCLEAR" == "true" ]]; then
 
     info "Installing Python dependencies..."
     pip install -r "$PROJECT_DIR/deploy/scripts/$REQUIREMENTS_FILE"
+
+    info "Installing dbmate migration tool..."
+    DBMATE_VERSION="2.36.0"
+    DBMATE_URL="https://github.com/amacneil/dbmate/releases/download/v${DBMATE_VERSION}/dbmate-linux-arm64"
+    if [[ ! -x "$DBMATE_BIN" ]]; then
+        if command -v curl >/dev/null 2>&1; then
+            curl -fsSL "$DBMATE_URL" -o "$DBMATE_BIN"
+        else
+            error_exit "curl is required to download dbmate"
+        fi
+        chmod +x "$DBMATE_BIN"
+    fi
+    INSTALLED_DBMATE_VERSION=$("$DBMATE_BIN" --version | awk '{print $NF}')
+    [[ "$INSTALLED_DBMATE_VERSION" == "$DBMATE_VERSION" ]] ||
+        error_exit "dbmate version mismatch: expected $DBMATE_VERSION, got $INSTALLED_DBMATE_VERSION"
+    info "dbmate $INSTALLED_DBMATE_VERSION verified."
 
     info "Installing npm packages..."
     cd "$FRONTEND_DIR"
