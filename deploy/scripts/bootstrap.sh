@@ -266,13 +266,18 @@ echo "Preparing clean TEST checkout..."
 git -C "$SOURCE_REPO" worktree add --detach "$STAGE_DIR" "$COMMIT"
 
 STAGE_ENV_LINK="$STAGE_DIR/backend/.env"
-ln -s "$ENV_FILE" "$STAGE_ENV_LINK"
+STAGE_VENV_LINK="$STAGE_DIR/venv"
 
-# The virtual environment lives outside the replaceable Git checkout.
-# Its symlink is recreated in every new checkout.
-ln -s "$VENV_DIR" "$STAGE_DIR/venv"
+# Both destinations must be absent in a clean staging checkout.
+[[ ! -e "$STAGE_ENV_LINK" && ! -L "$STAGE_ENV_LINK" ]] ||
+    fail "Environment link destination already exists: $STAGE_ENV_LINK"
 
-ACTUAL_COMMIT=$(git -C "$STAGE_DIR" rev-parse HEAD)
+[[ ! -e "$STAGE_VENV_LINK" && ! -L "$STAGE_VENV_LINK" ]] ||
+    fail "Virtual environment link destination already exists: $STAGE_VENV_LINK"
+
+# Link persistent resources into the staged checkout.
+ln -sT -- "$ENV_FILE" "$STAGE_ENV_LINK"
+ln -sT -- "$VENV_DIR" "$STAGE_VENV_LINK"
 
 [[ "$ACTUAL_COMMIT" == "$COMMIT" ]] ||
     fail "Staged commit verification failed."
