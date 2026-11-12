@@ -64,8 +64,19 @@ def _install_identity_stubs(monkeypatch, *, test_marker="test", prd_marker=None)
         opened.append(conn)
         return conn, conn.cursor()
 
+    def fake_open_identity(config, *, allow_prd=False):
+        assert allow_prd is (config["APP_ENV"] == "prod")
+        identity = identities[config["PG_DB"]]
+        return {
+            "environment": config["APP_ENV"],
+            "database": identity[0],
+            "server_address": identity[1],
+            "server_port": identity[2],
+            "marker": identity[3],
+        }
+
     monkeypatch.setattr(
-        compare_schema.migration_runner, "_open_validated_connection", fake_open
+        compare_schema, "_connection_identity", fake_open_identity
     )
     return opened
 
@@ -183,6 +194,7 @@ def test_validate_pair_treats_ipv6_inet_prefix_and_bare_address_as_same_endpoint
     assert test_identity["server_address"] == "::1"
     assert prd_identity["server_address"] == "::1"
 
+@pytest.mark.unit
 def test_validate_pair_rejects_non_loopback_hosts():
     test = _config("test", "fitness_test", host="db.example.com")
     prd = _config("prod", "fitness_prd", host="db.example.com")
@@ -379,7 +391,7 @@ def test_cli_requires_explicit_prd_authorization():
 
 @pytest.mark.unit
 def test_cli_error_output_is_machine_readable(monkeypatch, capsys):
-    monkeypatch.setattr(compare_schema.migration_runner, "_load_env_file", lambda _path: _config("test", "fitness_test"))
+    monkeypatch.setattr(compare_schema._env, "load_env_file", lambda _path: _config("test", "fitness_test"))
     monkeypatch.setattr(compare_schema, "compare_databases", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("test-failure")))
     code = compare_schema.main([
         "--test-env-file", "unused-test.env",

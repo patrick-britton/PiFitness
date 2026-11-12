@@ -1,5 +1,6 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -Eeuo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd /
 
 usage() {
@@ -88,7 +89,7 @@ fi
 [[ -x "$DBMATE_BIN" ]] || fail "dbmate not found or not executable: $DBMATE_BIN"
 
 # Do not reconcile the persistent TEST environment while its API is running.
-# Check all TEST units from the systemd directory — no unit name is hardcoded.
+# Check all TEST units from the systemd directory â€” no unit name is hardcoded.
 # Test units are those whose filename contains "-test".
 TEST_SYSTEMD_DIR="${APP_DIR}/deploy/systemd"
 if [[ -d "$TEST_SYSTEMD_DIR" ]]; then
@@ -215,23 +216,12 @@ MIGRADIFF_VERSION=$("$VENV_DIR/bin/python" -c \
     fail "Expected MigraDiff 1.7.2, found $MIGRADIFF_VERSION."
 
 echo
-echo "Installing dbmate migration tool..."
-DBMATE_VERSION="2.36.0"
-DBMATE_URL="https://github.com/amacneil/dbmate/releases/download/v${DBMATE_VERSION}/dbmate-linux-arm64"
-if [[ ! -x "$DBMATE_BIN" ]]; then
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "$DBMATE_URL" -o "$DBMATE_BIN"
-    else
-        fail "curl is required to download dbmate"
-    fi
-    chmod +x "$DBMATE_BIN"
-fi
-INSTALLED_DBMATE_VERSION=$("$DBMATE_BIN" --version | awk '{print $NF}')
-[[ "$INSTALLED_DBMATE_VERSION" == "$DBMATE_VERSION" ]] ||
-    fail "dbmate version mismatch: expected $DBMATE_VERSION, got $INSTALLED_DBMATE_VERSION"
-echo "dbmate $INSTALLED_DBMATE_VERSION verified."
+source "$SCRIPT_DIR/lib/ensure_binary.sh"
+ensure_binary "$DBMATE_BIN" "2.36.0" \
+    "https://github.com/amacneil/dbmate/releases/download/v2.36.0/dbmate-linux-arm64" "dbmate"
 
 echo
+
 echo "Reconciling any interrupted TEST database recovery..."
 mkdir -p "$EVIDENCE_DIR"
 chmod 0700 "$EVIDENCE_DIR"

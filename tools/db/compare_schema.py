@@ -34,9 +34,9 @@ from typing import Any, Iterator
 from urllib.parse import quote, urlencode
 
 if __package__:
-    from . import migrate as migration_runner
+    from . import _env
 else:
-    import migrate as migration_runner
+    import _env
 
 
 MIGRADIFF_DISTRIBUTION = "migradiff"
@@ -67,12 +67,38 @@ _LEDGER_IDENTIFIER = re.compile(
 )
 
 
+def _validate_target(config: dict[str, str], params: dict[str, Any], *, allow_prd: bool) -> None:
+    """Validate that config targets a local database with matching APP_ENV marker.
+
+    Replaces migrate.py's _validate_target. Checks:
+    - host is loopback (localhost-only safety gate)
+    - --allow-prd required for APP_ENV=prod
+    - --allow-prd invalid for non-prod
+    """
+    app_env = str(config.get("APP_ENV", ""))
+    host = str(params.get("host", ""))
+    if not _env.is_loopback(_env.normalize_server_address(host)):
+        raise SchemaComparisonError(
+            f"Refusing to connect to non-loopback host {host!r}."
+        )
+    if app_env == _env.APP_ENV_PROD and not allow_prd:
+        raise SchemaComparisonError(
+            "PRD access requires explicit --allow-prd authorization."
+        )
+    if app_env != _env.APP_ENV_PROD and allow_prd:
+        raise SchemaComparisonError(
+            "--allow-prd is valid only with APP_ENV=prod."
+        )
+
+
 def _connection_identity(config: dict[str, str], *, allow_prd: bool) -> dict[str, Any]:
     """Open a guarded connection and return the actual PostgreSQL identity."""
-    conn, cur = migration_runner._open_validated_connection(
-        config, allow_prd=allow_prd
-    )
+    app_env = str(config.get("APP_ENV", ""))
+    params = _env.conn_params(config)
+    _validate_target(config, params, allow_prd=allow_prd)
+    conn = psycopg2.connect(dbname=_env.resolve_db_name(config), **params)
     try:
+        cur = conn.cursor()
         cur.execute(
             "SELECT current_database(), inet_server_addr()::text, inet_server_port(), "
             "current_setting('pifitness.env', true)"
@@ -83,7 +109,7 @@ def _connection_identity(config: dict[str, str], *, allow_prd: bool) -> dict[str
                 "PostgreSQL returned no database identity row."
             )
         database, server_address, server_port, marker = row
-        expected_database = migration_runner._resolve_db_name(config)
+        expected_database = _env.resolve_db_name(config)
         if database != expected_database:
             raise SchemaComparisonError(
                 "Connected to database %r, expected %r."
@@ -93,10 +119,12 @@ def _connection_identity(config: dict[str, str], *, allow_prd: bool) -> dict[str
             raise SchemaComparisonError(
                 "PostgreSQL did not report a TCP server address and port."
             )
+        # Validate marker against APP_ENV (replaces migrate.py's _guard).
+        _env.guard_marker(app_env, marker)
         return {
             "environment": config["APP_ENV"],
             "database": database,
-            "server_address": str(migration_runner._normalize_server_address(server_address)),
+            "server_address": str(_env.normalize_server_address(server_address)),
             "server_port": int(server_port),
             "marker": marker or None,
         }
@@ -109,23 +137,23 @@ def _validate_pair(
     test_config: dict[str, str], prd_config: dict[str, str]
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Validate distinct TEST/PRD databases on the same local PostgreSQL server."""
-    if test_config.get("APP_ENV") != migration_runner.APP_ENV_TEST:
+    if test_config.get("APP_ENV") != _env.APP_ENV_TEST:
         raise SchemaComparisonError("TEST env file must specify APP_ENV=test.")
-    if prd_config.get("APP_ENV") != migration_runner.APP_ENV_PROD:
+    if prd_config.get("APP_ENV") != _env.APP_ENV_PROD:
         raise SchemaComparisonError("PRD env file must specify APP_ENV=prod.")
 
-    test_db = migration_runner._resolve_db_name(test_config)
-    prd_db = migration_runner._resolve_db_name(prd_config)
+    test_db = _env.resolve_db_name(test_config)
+    prd_db = _env.resolve_db_name(prd_config)
     if test_db == prd_db:
         raise SchemaComparisonError(
             "TEST and PRD env files resolve to the same database %r; refusing comparison."
             % test_db
         )
 
-    test_params = migration_runner._conn_params(test_config)
-    prd_params = migration_runner._conn_params(prd_config)
-    migration_runner._validate_target(test_config, test_params, allow_prd=False)
-    migration_runner._validate_target(prd_config, prd_params, allow_prd=True)
+    test_params = _env.conn_params(test_config)
+    prd_params = _env.conn_params(prd_config)
+    _validate_target(test_config, test_params, allow_prd=False)
+    _validate_target(prd_config, prd_params, allow_prd=True)
 
     if (
         test_params["host"] != prd_params["host"]
@@ -137,10 +165,10 @@ def _validate_pair(
 
     test_identity = _connection_identity(test_config, allow_prd=False)
     prd_identity = _connection_identity(prd_config, allow_prd=True)
-    test_server_address = migration_runner._normalize_server_address(
+    test_server_address = _env.normalize_server_address(
         test_identity["server_address"]
     )
-    prd_server_address = migration_runner._normalize_server_address(
+    prd_server_address = _env.normalize_server_address(
         prd_identity["server_address"]
     )
     # Keep the returned identity evidence canonical as well as comparing it
@@ -219,11 +247,11 @@ def _pgpass_escape(value: str) -> str:
 
 
 def _pgpass_entry(config: dict[str, str]) -> str:
-    params = migration_runner._conn_params(config)
+    params = _env.conn_params(config)
     fields = (
         params["host"],
         str(params["port"]),
-        migration_runner._resolve_db_name(config),
+        _env.resolve_db_name(config),
         params["user"],
         config["PG_PASSWORD"],
     )
@@ -236,12 +264,12 @@ def _pgpass_entry(config: dict[str, str]) -> str:
 
 def _database_url(config: dict[str, str]) -> str:
     """Build a password-free SQLAlchemy/libpq URL for MigraDiff's argv."""
-    params = migration_runner._conn_params(config)
+    params = _env.conn_params(config)
     host = str(params["host"])
     if ":" in host and not host.startswith("["):
         host = "[%s]" % host
     username = quote(str(params["user"]), safe="")
-    database = quote(migration_runner._resolve_db_name(config), safe="")
+    database = quote(_env.resolve_db_name(config), safe="")
     query = urlencode({"sslmode": str(params["sslmode"])})
     return "postgresql://%s@%s:%s/%s?%s" % (
         username,
@@ -498,8 +526,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     try:
-        test_config = migration_runner._load_env_file(args.test_env_file)
-        prd_config = migration_runner._load_env_file(args.prd_env_file)
+        test_config = _env.load_env_file(args.test_env_file)
+        prd_config = _env.load_env_file(args.prd_env_file)
         report = compare_databases(
             test_config,
             prd_config,

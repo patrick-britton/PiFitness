@@ -23,15 +23,20 @@ import argparse
 import contextlib
 import io
 import json
+import os
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
+import psycopg2
+
 if __package__:
-    from . import compare_schema, migrate as migration_runner, test_db_policy
+    from . import compare_schema, _env, test_db_policy
 else:
     import compare_schema
-    import migrate as migration_runner
+    import _env
     import test_db_policy
 
 
@@ -39,27 +44,45 @@ class TestDatabaseInspectionError(RuntimeError):
     """The TEST/PRD database state could not be established safely."""
 
 
+def _validate_target(config: dict[str, str], params: dict[str, Any], *, allow_prd: bool) -> None:
+    """Validate that config targets a local database with matching APP_ENV marker."""
+    app_env = str(config.get("APP_ENV", ""))
+    host = str(params.get("host", ""))
+    if not _env.is_loopback(_env.normalize_server_address(host)):
+        raise TestDatabaseInspectionError(
+            "remote host %r; migrations run only against localhost." % host
+        )
+    if app_env == _env.APP_ENV_PROD and not allow_prd:
+        raise TestDatabaseInspectionError(
+            "PRD access requires explicit --allow-prd authorization."
+        )
+    if app_env != _env.APP_ENV_PROD and allow_prd:
+        raise TestDatabaseInspectionError(
+            "--allow-prd is valid only with APP_ENV=prod."
+        )
+
+
 def _check_config_pair(
     test_config: dict[str, str], prd_config: dict[str, str]
 ) -> tuple[str, str, dict[str, Any], dict[str, Any]]:
     """Validate the intended local TEST/PRD configuration pair."""
-    if test_config.get("APP_ENV") != migration_runner.APP_ENV_TEST:
+    if test_config.get("APP_ENV") != _env.APP_ENV_TEST:
         raise TestDatabaseInspectionError("TEST env file must specify APP_ENV=test.")
-    if prd_config.get("APP_ENV") != migration_runner.APP_ENV_PROD:
+    if prd_config.get("APP_ENV") != _env.APP_ENV_PROD:
         raise TestDatabaseInspectionError("PRD env file must specify APP_ENV=prod.")
 
-    test_db = migration_runner._resolve_db_name(test_config)
-    prd_db = migration_runner._resolve_db_name(prd_config)
+    test_db = _env.resolve_db_name(test_config)
+    prd_db = _env.resolve_db_name(prd_config)
     if test_db == prd_db:
         raise TestDatabaseInspectionError(
             "TEST and PRD env files resolve to the same database %r; refusing inspection."
             % test_db
         )
 
-    test_params = migration_runner._conn_params(test_config)
-    prd_params = migration_runner._conn_params(prd_config)
-    migration_runner._validate_target(test_config, test_params, allow_prd=False)
-    migration_runner._validate_target(prd_config, prd_params, allow_prd=True)
+    test_params = _env.conn_params(test_config)
+    prd_params = _env.conn_params(prd_config)
+    _validate_target(test_config, test_params, allow_prd=False)
+    _validate_target(prd_config, prd_params, allow_prd=True)
 
     if (
         test_params["host"] != prd_params["host"]
@@ -75,10 +98,10 @@ def _open_read_only_connection(
     config: dict[str, str], *, allow_prd: bool
 ) -> tuple[Any, Any, dict[str, Any]]:
     """Connect to the configured local database in a read-only session."""
-    dbname = migration_runner._resolve_db_name(config)
-    params = migration_runner._conn_params(config)
-    migration_runner._validate_target(config, params, allow_prd=allow_prd)
-    conn = migration_runner._connect(dbname, params)
+    dbname = _env.resolve_db_name(config)
+    params = _env.conn_params(config)
+    _validate_target(config, params, allow_prd=allow_prd)
+    conn = psycopg2.connect(dbname=dbname, **params)
     try:
         # Enforce read-only at the PostgreSQL transaction/session boundary.
         conn.set_session(readonly=True)
@@ -109,10 +132,10 @@ def _read_identity(cur: Any, *, expected_database: str, expected_port: int) -> d
             "PostgreSQL did not report a complete TCP database identity."
         )
     try:
-        normalized_address = migration_runner._normalize_server_address(server_address)
+        normalized_address = _env.normalize_server_address(server_address)
     except ValueError as exc:
         raise TestDatabaseInspectionError(str(exc)) from exc
-    if not normalized_address.is_loopback:
+    if not _env.is_loopback(normalized_address):
         raise TestDatabaseInspectionError(
             "PostgreSQL server address %r is not loopback; expected localhost, 127.0.0.1, or ::1."
             % str(normalized_address)
@@ -205,27 +228,71 @@ def _find_matching_baseline_journal(
     return None
 
 
+def _write_temp_env_file(config: dict[str, str]) -> str:
+    """Write a temporary dotenv file from a loaded config dict.
+
+    Returns the path. The caller is responsible for removing it.
+    """
+    lines = [
+        f"APP_ENV={config.get('APP_ENV', 'dev')}",
+        f"PG_HOST={config.get('PG_HOST', 'localhost')}",
+        f"PG_DB={config.get('PG_DB', 'pifitness')}",
+        f"PG_USER={config.get('PG_USER', '')}",
+        f"PG_PASSWORD={config.get('PG_PASSWORD', '')}",
+        f"PG_PORT={config.get('PG_PORT', '5432')}",
+        f"PGSSLMODE={config.get('PGSSLMODE', 'disable')}",
+    ]
+    fd, path = tempfile.mkstemp(prefix="pifitness-inspect-env-", suffix=".env")
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        stream.write("\n".join(lines) + "\n")
+    os.chmod(path, 0o600)
+    return path
+
+
 def _read_migration_ledger_status(test_config: dict[str, str]) -> dict[str, Any]:
-    """Run the migration runner's read-only status/integrity check silently."""
-    output = io.StringIO()
-    with contextlib.redirect_stdout(output):
-        summary = migration_runner.cmd_status(
-            test_config, allow_prd=False,
-            output_format=migration_runner.OUTPUT_JSONL,
+    """Run dbmate's read-only status check silently via the guard wrapper.
+
+    Returns a dict compatible with migrate.py's cmd_status JSONL output:
+    ok, safe_to_apply, applied, environment, database.
+    """
+    guard = os.path.join(os.path.dirname(__file__), "dbmate_guard.sh")
+    env_file = _write_temp_env_file(test_config)
+    try:
+        result = subprocess.run(
+            ["bash", guard, "status", "--env-file", env_file],
+            capture_output=True,
+            text=True,
+            check=False,
         )
-    if not isinstance(summary, dict):
-        raise TestDatabaseInspectionError("Migration runner returned no structured status summary.")
-    if (
-        summary.get("environment") != test_config.get("APP_ENV")
-        or summary.get("database") != test_config.get("PG_DB")
-    ):
-        raise TestDatabaseInspectionError(
-            "Migration status was returned for an unexpected environment/database: %r" % summary
-        )
-    if summary.get("ok") is not True or summary.get("safe_to_apply") is not True:
-        raise TestDatabaseInspectionError(
-            "TEST has a baseline recovery journal but its migration ledger is not safe to resume: %r"
-            % summary
+    finally:
+        try:
+            os.unlink(env_file)
+        except OSError:
+            pass
+
+    # dbmate status exits 0 when all migrations are applied; non-zero means
+    # pending migrations or a dirty ledger.
+    all_applied = result.returncode == 0
+    applied_count = 0
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line or line.startswith("version") or line.startswith("----"):
+            continue
+        parts = line.split()
+        if parts and parts[0].isdigit():
+            applied_count += 1
+
+    summary = {
+        "ok": all_applied,
+        "safe_to_apply": all_applied,
+        "applied": applied_count,
+        "environment": test_config.get("APP_ENV"),
+        "database": test_config.get("PG_DB"),
+    }
+    if not all_applied:
+        summary["status"] = "pending_migrations"
+        summary["error"] = (
+            result.stderr.strip() or "dbmate status reported pending migrations."
         )
     return summary
 
@@ -287,8 +354,8 @@ def _verify_same_server(
     identity: dict[str, Any], prd_identity: dict[str, Any], *, label: str
 ) -> None:
     try:
-        test_address = migration_runner._normalize_server_address(identity["server_address"])
-        prd_address = migration_runner._normalize_server_address(prd_identity["server_address"])
+        test_address = _env.normalize_server_address(identity["server_address"])
+        prd_address = _env.normalize_server_address(prd_identity["server_address"])
     except (KeyError, ValueError) as exc:
         raise TestDatabaseInspectionError(
             "%s/PRD server endpoint could not be normalized: %s" % (label, exc)
@@ -354,9 +421,7 @@ def inspect_test_database(
             prd_identity = _read_identity(
                 prd_cur, expected_database=prd_db, expected_port=prd_params["port"]
             )
-            migration_runner._guard(
-                migration_runner.APP_ENV_PROD, prd_identity["marker"]
-            )
+            _env.guard_marker(_env.APP_ENV_PROD, prd_identity["marker"])
             report["prd"] = prd_identity
             stage = "Check whether the TEST database exists in the PRD PostgreSQL cluster"
             catalog = _read_test_database_catalog(prd_cur, test_db)
@@ -710,8 +775,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        test_config = migration_runner._load_env_file(args.test_env_file)
-        prd_config = migration_runner._load_env_file(args.prd_env_file)
+        test_config = _env.load_env_file(args.test_env_file)
+        prd_config = _env.load_env_file(args.prd_env_file)
         report = inspect_test_database(
             test_config,
             prd_config,

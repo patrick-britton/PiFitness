@@ -19,7 +19,9 @@ This is a DEV-only safety tool. It never touches PRD.
 """
 
 import os
+import subprocess
 import sys
+import tempfile
 import time
 
 # DEV-only: tools must run with APP_ENV=dev (D8). Set before config import so
@@ -34,10 +36,9 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 from pifitness.core.config import get_settings
 
-# tools/db/ is next to this file; migrate.py lives there and is import-safe
-# (its main() is guarded by __name__ == "__main__").
+# Shared env-file helpers (replaces migrate.py's non-migration-specific symbols).
 sys.path.insert(0, os.path.dirname(__file__))
-import migrate  # noqa: E402
+import _env  # noqa: E402
 
 
 ADMIN_DB = "postgres"
@@ -135,51 +136,93 @@ def main():
     elapsed = time.perf_counter() - t0
     print(f"dev_reset: complete in {elapsed:.2f}s")
 
+def _write_dev_env_file() -> str:
+    """Write a temporary dotenv file for the DEV database connection.
+
+    Returns the path to the temp file. The caller is responsible for removing
+    it after dbmate completes.
+    """
+    s = get_settings()
+    lines = [
+        f"APP_ENV=dev",
+        f"PG_HOST={s.db_host}",
+        f"PG_DB={DEV_DB}",
+        f"PG_USER={s.db_user}",
+        f"PG_PASSWORD={s.db_password}",
+        f"PG_PORT={s.db_port}",
+        f"PGSSLMODE={s.db_sslmode}",
+    ]
+    fd, path = tempfile.mkstemp(prefix="pifitness-dev-env-", suffix=".env")
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        stream.write("\n".join(lines) + "\n")
+    os.chmod(path, 0o600)
+    return path
+
+
 def _replay_pending_migrations():
     """Apply pending dbmate migrations from deploy/migrations/ onto DEV.
 
     Runs after the template clone or a PRD restore so pifitness_dev converges
-    to the current migration baseline. Each applied migration is recorded in
-    schema_migrations, exactly as migrate.py up does.
+    to the current migration baseline. All migrations run through dbmate
+    dynamically — none are hard-coded or skipped. If a migration fails (for
+    example, migration 001's _migration pre-check on post-INT19b DEV), dbmate
+    exits non-zero and this function propagates the failure so the operator
+    remediates in DEV before attempting test.
 
-    Migration 001 (INT-19c) is PRD-only: its header says "NOT executed by
-    agents" and its up pre-check requires the _migration schema, which does
-    not exist on post-INT19b DEV. It is skipped deliberately and stays pending.
+    Migration 001 (INT-19c) runs exactly like every other migration: its up
+    pre-check requires the _migration schema. On DEV after INT-19b that schema
+    is absent, so dbmate reports failure and the reset stops. The operator must
+    remediate in DEV (or roll the migration back) before proceeding.
     """
-    scripts_dir = os.path.dirname(__file__)
-    if scripts_dir not in sys.path:
-        sys.path.insert(0, scripts_dir)
-    import migrate  # noqa: E402
+    s = get_settings()
 
-    conn = migrate._dev_conn()
-    cur = conn.cursor()
-    migrate._ensure_schema_migrations(cur)
-    applied = migrate._applied_versions(cur)
-    files = migrate._list_migration_files()  # (version, fname, fpath), sorted
-
-    pending = [(v, fn, fp) for v, fn, fp in files if v not in applied]
-    if not pending:
-        print("  no pending migrations to replay")
-        conn.close()
-        return
-
-    for version, fname, fp in pending:
-        if version == 1:
-            # 001__int19b_move_tokens_to_api_services.sql is PRD-only.
-            print(f"  skipping {fname}: PRD-only migration, not executed on DEV")
-            continue
-        up_sql, _ = migrate._parse_sections(fp)
-        if not up_sql:
-            print(f"  skipping {fname}: no -- migrate:up section found.")
-            continue
-        print(f"  replaying {fname} ...")
-        cur.execute(up_sql)
+    # Ensure the schema_migrations table is dbmate-compatible (dirty column)
+    # before dbmate attempts to write to it.
+    dev_params = _conn_params()
+    dev_params["dbname"] = DEV_DB
+    admin_conn = psycopg2.connect(**dev_params)
+    admin_conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+    try:
+        cur = admin_conn.cursor()
         cur.execute(
-            "INSERT INTO schema_migrations (version) VALUES (%s)", (version,)
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version BIGINT PRIMARY KEY,
+                dirty BOOLEAN NOT NULL DEFAULT false,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                filename TEXT,
+                checksum TEXT
+            )
+            """
         )
-        conn.commit()
-        print(f"    {fname} applied.")
-    conn.close()
+        # Add dirty column if the table predates dbmate (migrate.py ledger lacked it).
+        cur.execute(
+            "ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS dirty BOOLEAN NOT NULL DEFAULT false"
+        )
+        cur.close()
+    finally:
+        admin_conn.close()
+
+    # Write the env file dbmate_guard.sh will read. This is the sole source of
+    # connection settings for dbmate; backend/.env and inherited shell env are
+    # not loaded by the guard wrapper.
+    env_file = _write_dev_env_file()
+    try:
+        guard = os.path.join(os.path.dirname(__file__), "dbmate_guard.sh")
+        result = subprocess.run(
+            ["bash", guard, "up", "--env-file", env_file],
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"dbmate up failed with exit code {result.returncode}; "
+                "stopping DEV reset. Remediate in DEV before attempting test."
+            )
+    finally:
+        try:
+            os.unlink(env_file)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":

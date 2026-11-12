@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 set -euo pipefail
 
 PRD_DIR="${PRD_DIR:-$HOME/PiFitness}"
@@ -11,8 +12,9 @@ DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-15432}"
 HTTPS_HOSTNAME="${HTTPS_HOSTNAME:-https://pifitness.duckdns.org}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/Documents/DB_Backups}"
+DBMATE_BIN="/usr/local/bin/dbmate"
 # Systemd unit directory: repo-driven source of unit files.
-# No unit name is hardcoded in this script — everything is discovered from
+# No unit name is hardcoded in this script â€” everything is discovered from
 # the files in this directory. Units whose filename contains "-test" belong
 # to the TEST environment; all other pifitness-* units belong to PRD.
 SYSTEMD_DIR="${PRD_DIR}/deploy/systemd"
@@ -124,7 +126,7 @@ steps=(
   "fetch $ref from origin and resolve to full SHA"
   "check out resolved SHA into $TEST_DIR (own venv and build)"
   "provision test checkout (venv, Python requirements, frontend build)"
-  "apply pending migrations to $TEST_DB (pinned checkout's migration runner)"
+"dbmate binary ensured on test host (migrations applied separately via dbmate)"
   "start test units"
   "write final test state"
 )
@@ -173,6 +175,11 @@ for integration in SPOTIFY_ENABLED GARMIN_ENABLED PIRATE_ENABLED; do
   fi
 done
 chmod 0600 "$TEST_ENV_FILE"
+
+# Ensure dbmate is available before any migration-dependent step.
+source "$SCRIPT_DIR/lib/ensure_binary.sh"
+ensure_binary "$DBMATE_BIN" "2.36.0" \
+    "https://github.com/amacneil/dbmate/releases/download/v2.36.0/dbmate-linux-arm64" "dbmate"
 echo "  test env file validated: $TEST_ENV_FILE"
 
 if [[ -f "$STATE_FILE" ]]; then
@@ -445,7 +452,7 @@ failpoint "pre_start" "simulate failure before starting test units"
 
 echo "Step 8: start test units"
 # Start test units from the systemd directory (filename contains "-test").
-# No unit name is hardcoded — everything comes from the unit files.
+# No unit name is hardcoded â€” everything comes from the unit files.
 if [[ -d "$SYSTEMD_DIR" ]]; then
   for unit_file in "$SYSTEMD_DIR"/pifitness-*-test.service "$SYSTEMD_DIR"/pifitness-*-test.timer; do
     [[ -f "$unit_file" ]] || continue
@@ -464,7 +471,7 @@ write_state
 
 echo "Step 9: verify the complete test stack"
 # systemd must report all test units active.
-# No unit name is hardcoded — everything comes from the unit files.
+# No unit name is hardcoded â€” everything comes from the unit files.
 if [[ -d "$SYSTEMD_DIR" ]]; then
   for unit_file in "$SYSTEMD_DIR"/pifitness-*-test.service "$SYSTEMD_DIR"/pifitness-*-test.timer; do
     [[ -f "$unit_file" ]] || continue

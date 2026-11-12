@@ -121,11 +121,12 @@ def _install_connections(
     test_app_connection = FakeConnection(test_app_cursor)
     admin_test_connections = [test_admin_identity_connection, permission_connection]
 
-    def connect(dbname, params):
+    def fake_connect(*, dbname=None, **kwargs):
         if dbname == "personal_fitness":
             return prd_connection
         if dbname == "personal_fitness_test":
-            if params.get("user") == "test_migrator":
+            user = kwargs.get("user")
+            if user == "test_migrator":
                 if test_connect_error:
                     raise test_connect_error
                 return test_app_connection
@@ -134,7 +135,7 @@ def _install_connections(
             return admin_test_connections.pop(0)
         raise AssertionError("Unexpected database connection: %s" % dbname)
 
-    monkeypatch.setattr(inspect_test_db.migration_runner, "_connect", connect)
+    monkeypatch.setattr("psycopg2.connect", fake_connect)
     return {
         "prd_cursor": prd_cursor,
         "prd_connection": prd_connection,
@@ -398,9 +399,10 @@ def test_nonlocal_host_is_rejected_before_connecting(monkeypatch):
     prd_config["PG_HOST"] = "db.example.com"
     connect_calls = []
     monkeypatch.setattr(
-        inspect_test_db.migration_runner,
-        "_open_validated_connection",
-        lambda *a, **k: connect_calls.append((a, k)),
+        inspect_test_db, "_validate_target",
+        lambda *a, **k: (_ for _ in ()).throw(
+            inspect_test_db.TestDatabaseInspectionError("remote host 'db.example.com'; migrations run only against localhost.")
+        ),
     )
 
     report = inspect_test_db.inspect_test_database(test_config, prd_config)
@@ -460,7 +462,7 @@ def test_verified_baseline_with_checksum_valid_migrations_is_reused_without_sche
         status_calls.append((config, kwargs))
         return {"ok": True, "safe_to_apply": True, "environment": "test", "database": "personal_fitness_test", "applied": 2, "pending": 1, "total": 3}
 
-    monkeypatch.setattr(inspect_test_db.migration_runner, "cmd_status", status)
+    monkeypatch.setattr(inspect_test_db, "_read_migration_ledger_status", status)
     report = inspect_test_db.inspect_test_database(
         *_configs(),
         compare_fn=lambda *a, **k: compare_calls.append((a, k)),
@@ -511,7 +513,7 @@ def test_corrupt_migration_ledger_fails_closed_instead_of_recloning(monkeypatch,
     def bad_status(*args, **kwargs):
         raise RuntimeError("applied migration checksum mismatch")
 
-    monkeypatch.setattr(inspect_test_db.migration_runner, "cmd_status", bad_status)
+    monkeypatch.setattr(inspect_test_db, "_read_migration_ledger_status", bad_status)
     report = inspect_test_db.inspect_test_database(
         *_configs(),
         compare_fn=lambda *a, **k: compare_calls.append((a, k)),
@@ -535,8 +537,8 @@ def test_verified_baseline_with_no_applied_migrations_is_reused_without_schema_c
         "backup_sha256": "a" * 64,
     }))
     monkeypatch.setattr(
-        inspect_test_db.migration_runner,
-        "cmd_status",
+        inspect_test_db,
+        "_read_migration_ledger_status",
         lambda *a, **k: {"ok": True, "safe_to_apply": True, "environment": "test", "database": "personal_fitness_test", "applied": 0, "pending": 2, "total": 2},
     )
     compare_calls = []

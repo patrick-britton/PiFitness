@@ -180,5 +180,24 @@ case "$APP_ENV" in
         ;;
 esac
 
+# --- ensure schema_migrations is dbmate-compatible ---
+# dbmate requires a 'dirty' column that migrate.py's ledger lacked. Creating
+# the table IF NOT EXISTS and adding the column IF NOT EXISTS is idempotent
+# and safe for status/up/down. Extra columns (filename/checksum) are ignored
+# by dbmate but preserved for backward compatibility.
+psql "$DATABASE_URL" -q -c "
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+        version BIGINT PRIMARY KEY,
+        dirty BOOLEAN NOT NULL DEFAULT false,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        filename TEXT,
+        checksum TEXT
+    );
+    ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS dirty BOOLEAN NOT NULL DEFAULT false;
+" 2>/dev/null || {
+    echo "ERROR: Unable to ensure schema_migrations table exists." >&2
+    exit 1
+}
+
 # --- delegate to dbmate ---
 exec "$DBMATE_BIN" --migrations-dir "$MIGRATIONS_DIR" "$command"

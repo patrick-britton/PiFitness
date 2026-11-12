@@ -23,6 +23,7 @@ import hashlib
 import json
 import os
 import re
+import psycopg2
 import shutil
 import subprocess
 import sys
@@ -31,11 +32,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 if __package__:
-    from . import compare_schema, inspect_test_db, migrate as migration_runner
+    from . import compare_schema, inspect_test_db, _env
 else:
     import compare_schema
     import inspect_test_db
-    import migrate as migration_runner
+    import _env
 
 DEFAULT_BACKUP_DIR = "~/Documents/DB_Backups"
 DEFAULT_BACKUP_GLOB = "personal_fitness_[0-9]*.dump"
@@ -251,9 +252,9 @@ def _make_pgpass(temp_dir: Path, config: dict[str, str]) -> Path:
 
 
 def _connect(config: dict[str, str], dbname: str):
-    params = migration_runner._conn_params(config)
+    params = _env.conn_params(config)
     params["dbname"] = dbname
-    return migration_runner.psycopg2.connect(**params)
+    return psycopg2.connect(**params)
 
 
 def _admin_connection(config: dict[str, str]):
@@ -277,10 +278,10 @@ def _server_identity(conn, expected_port: int) -> dict[str, Any]:
     if address is None or port is None:
         raise RecoveryError("PostgreSQL did not report a TCP server address and port.")
     try:
-        normalized = migration_runner._normalize_server_address(address)
+        normalized = _env.normalize_server_address(address)
     except ValueError as exc:
         raise RecoveryError(str(exc)) from exc
-    if not normalized.is_loopback:
+    if not _env.is_loopback(normalized):
         raise RecoveryError("Database recovery is restricted to loopback; server is %s." % normalized)
     if int(port) != int(expected_port):
         raise RecoveryError("Database administration connection used port %s, expected %s." % (port, expected_port))
@@ -333,8 +334,8 @@ def _test_role_login_preflight(
             )
         if address is None or port is None:
             raise RecoveryError("TEST-role credential preflight returned an incomplete server endpoint.")
-        normalized = migration_runner._normalize_server_address(address)
-        if not normalized.is_loopback:
+        normalized = _env.normalize_server_address(address)
+        if not _env.is_loopback(normalized):
             raise RecoveryError("TEST-role credential preflight connected to non-loopback server %s." % normalized)
         if str(normalized) != expected_server["server_address"] or int(port) != int(expected_server["server_port"]):
             raise RecoveryError("TEST-role credential preflight reached a different PostgreSQL endpoint than PRD.")
@@ -679,7 +680,17 @@ def _verify_database(
     try:
         cur = conn.cursor()
         try:
-            migration_runner._validate_connection_identity(cur, test_db, {"port": expected_port})
+            cur.execute("SELECT current_database(), inet_server_port()")
+            _db_row = cur.fetchone()
+            if not _db_row or _db_row[0] != test_db:
+                raise RecoveryError(
+                    "Connected to database %r, expected %r."
+                    % (_db_row[0] if _db_row else None, test_db)
+                )
+            if str(_db_row[1]) != str(expected_port):
+                raise RecoveryError(
+                    "Connected on port %s, expected %s." % (_db_row[1], expected_port)
+                )
             cur.execute(
                 "SELECT current_setting('pifitness.env', true), current_user, "
                 "(SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database()), "
@@ -1120,8 +1131,8 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     try:
-        test_config = migration_runner._load_env_file(args.test_env_file)
-        prd_config = migration_runner._load_env_file(args.prd_env_file)
+        test_config = _env.load_env_file(args.test_env_file)
+        prd_config = _env.load_env_file(args.prd_env_file)
         if args.command == "restore":
             result = restore_test_database(
                 test_config, prd_config,
