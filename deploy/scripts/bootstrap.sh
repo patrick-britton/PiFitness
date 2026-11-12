@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd /
@@ -79,14 +79,105 @@ fi
 
 [[ -f "$ENV_FILE" ]] || fail "Missing TEST environment file: $ENV_FILE"
 [[ -f "$PRD_ENV_FILE" ]] || fail "Missing PRD environment file: $PRD_ENV_FILE"
-[[ -x "$UV_BIN" ]] || fail "uv not found or not executable: $UV_BIN"
-[[ -x "$PYTHON_BIN" ]] || fail "Python not found: $PYTHON_BIN"
-[[ -x "$NODE_BIN" ]] || fail "Node.js not found: $NODE_BIN"
-[[ -x "$NPM_BIN" ]] || fail "npm not found: $NPM_BIN"
+# ======================================================================
+# Dependency preflight: audit all requirements, record results, then
+# install only the missing ones using each tool's best-known install
+# method. The orchestrator stays dumb; the report is the source of truth.
+# ======================================================================
+AUDIT_REPORT="$EVIDENCE_DIR/dependency-audit-$(date +%Y%m%d_%H%M%S).json"
+mkdir -p "$EVIDENCE_DIR"
+: > "$AUDIT_REPORT"
 
-# dbmate must be available before any migration step runs. It is installed
-# below (idempotent); verify here that the install actually succeeded.
-[[ -x "$DBMATE_BIN" ]] || fail "dbmate not found or not executable: $DBMATE_BIN"
+record_dep() {
+    local name="$1" path="$2" status="$3" ver="${4:-}"
+    echo "{\"tool\":\"$name\",\"path\":\"$path\",\"status\":\"$status\",\"installed_version\":\"$ver\"}" >> "$AUDIT_REPORT"
+}
+
+check_dep() {
+    local name="$1" path="$2"
+    if [[ -x "$path" ]]; then
+        local ver
+        ver="$(\"$path\" --version 2>/dev/null | awk '{print $NF}' | sed 's/^v//')" || ver=""
+        record_dep "$name" "$path" "ok" "$ver"
+        return 0
+    fi
+    record_dep "$name" "$path" "missing" ""
+    return 1
+}
+
+# --- audit all requirements ---
+declare -a MISSING_DEPS=()
+
+if ! check_dep "uv" "$UV_BIN"; then MISSING_DEPS+=("uv"); fi
+if ! check_dep "python3" "$PYTHON_BIN"; then MISSING_DEPS+=("python3"); fi
+if ! check_dep "node" "$NODE_BIN"; then MISSING_DEPS+=("node"); fi
+if ! check_dep "npm" "$NPM_BIN"; then MISSING_DEPS+=("npm"); fi
+if ! check_dep "dbmate" "$DBMATE_BIN"; then MISSING_DEPS+=("dbmate"); fi
+
+# --- selectively install only the missing ones ---
+if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
+    echo
+    echo "Some dependencies are missing. Installing only what is required..."
+    for dep in "${MISSING_DEPS[@]}"; do
+        case "$dep" in
+            dbmate)
+                echo "Installing dbmate..."
+                source "$SCRIPT_DIR/lib/ensure_binary.sh"
+                if ensure_binary "$DBMATE_BIN" "2.36.0" \\
+                    "https://github.com/amacneil/dbmate/releases/download/v2.36.0/dbmate-linux-arm64" "dbmate"; then
+                    record_dep "dbmate" "$DBMATE_BIN" "ok" "2.36.0"
+                else
+                    record_dep "dbmate" "$DBMATE_BIN" "install_failed" ""
+                    fail "Failed to install dbmate."
+                fi
+                ;;
+            uv)
+                echo "Installing uv..."
+                if curl -LsSf "https://astral.sh/uv/install.sh" -o uv-install.sh; then
+                    bash uv-install.sh -d /home/god/.local/bin >/dev/null 2>&1 || bash uv-install.sh
+                    record_dep "uv" "$UV_BIN" "ok" "$(\"$UV_BIN\" --version 2>/dev/null | awk '{print $NF}')"
+                else
+                    record_dep "uv" "$UV_BIN" "install_failed" ""
+                    fail "Failed to download uv installer."
+                fi
+                ;;
+            node)
+                echo "Installing Node.js (includes npm)..."
+                if curl -fsSL "https://nodejs.org/dist/v20.10.0/node-v20.10.0-linux-arm64.tar.xz" -o node.tar.xz; then
+                    tar -C /usr/local/bin -xJf node.tar.xz
+                    mv /usr/local/bin/node-v20.10.0-linux-arm64/node "$NODE_BIN"
+                    mv /usr/local/bin/node-v20.10.0-linux-arm64/npm "$NPM_BIN"
+                    rm -rf node.tar.xz node-v20.10.0-linux-arm64
+                    record_dep "node" "$NODE_BIN" "ok" "$("$NODE_BIN" --version | sed 's/^v//')"
+                    record_dep "npm" "$NPM_BIN" "ok" "$("$NPM_BIN" --version)"
+                else
+                    record_dep "node" "$NODE_BIN" "install_failed" ""
+                    fail "Failed to download Node.js."
+                fi
+                ;;
+            python3)
+                echo "Installing python3..."
+                if apt-get install -y python3 >/dev/null 2>&1; then
+                    record_dep "python3" "$PYTHON_BIN" "ok" "$("$PYTHON_BIN" --version 2>/dev/null | awk '{print $2}')"
+                else
+                    record_dep "python3" "$PYTHON_BIN" "install_failed" ""
+                    fail "Failed to install python3."
+                fi
+                ;;
+        esac
+    done
+fi
+
+# --- verify all requirements are present ---
+if ! check_dep "uv" "$UV_BIN"; then fail "uv is missing and could not be installed."; fi
+if ! check_dep "python3" "$PYTHON_BIN"; then fail "python3 is missing and could not be installed."; fi
+if ! check_dep "node" "$NODE_BIN"; then fail "Node.js is missing and could not be installed."; fi
+if ! check_dep "npm" "$NPM_BIN"; then fail "npm is missing and could not be installed."; fi
+if ! check_dep "dbmate" "$DBMATE_BIN"; then fail "dbmate is missing and could not be installed."; fi
+
+echo
+echo "All dependencies verified. Audit report: $AUDIT_REPORT"
+echo
 
 # Do not reconcile the persistent TEST environment while its API is running.
 # Check all TEST units from the systemd directory â€” no unit name is hardcoded.
