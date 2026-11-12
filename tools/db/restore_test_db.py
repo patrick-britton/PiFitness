@@ -38,7 +38,7 @@ else:
     import migrate as migration_runner
 
 DEFAULT_BACKUP_DIR = "~/Documents/DB_Backups"
-DEFAULT_BACKUP_GLOB = "pifitness_prd_*.dump"
+DEFAULT_BACKUP_GLOB = "personal_fitness_[0-9]*.dump"
 DEFAULT_MAX_BACKUP_AGE_HOURS = 24
 DB_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
 ARCHIVE_DB_RE = re.compile(r"^;\s*dbname:\s*(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
@@ -523,6 +523,15 @@ BEGIN
               SELECT 1 FROM pg_depend d
               WHERE d.classid = 'pg_class'::regclass
                 AND d.objid = c.oid AND d.deptype = 'e'
+          )
+          AND NOT (
+              c.relkind = 'S'
+              AND EXISTS (
+                  SELECT 1 FROM pg_depend d
+                  WHERE d.classid = 'pg_class'::regclass
+                    AND d.objid = c.oid AND d.deptype = 'a'
+                    AND d.refclassid = 'pg_class'::regclass
+              )
           )
     LOOP
         IF obj.relkind = 'S' THEN

@@ -19,7 +19,7 @@ def test_recovery_helper_is_invoked_for_create_refresh_and_opt_in_freshness():
 
 def test_recovery_uses_historical_backup_default_with_explicit_overrides():
     assert 'PIFITNESS_PRD_BACKUP_DIR:-$HOME/Documents/DB_Backups' in BOOTSTRAP
-    assert 'PIFITNESS_PRD_BACKUP_GLOB:-pifitness_prd_*.dump' in BOOTSTRAP
+    assert 'PIFITNESS_PRD_BACKUP_GLOB:-personal_fitness_[0-9]*.dump' in BOOTSTRAP
     assert 'pg_dump' not in BOOTSTRAP
 
 
@@ -64,7 +64,7 @@ def test_interrupted_db_swap_is_reconciled_before_initial_inspection():
 
 
 def test_inspector_receives_baseline_journal_directory_for_migration_retries():
-    assert '--baseline-state-dir "$EVIDENCE_DIR"' in BOOTSTRAP
+    assert '--baseline-state-dir "$JOURNAL_DIR"' in BOOTSTRAP
     assert 'migration-managed' in BOOTSTRAP
     assert 'checksums verified' in BOOTSTRAP
 
