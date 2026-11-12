@@ -84,10 +84,10 @@ def decide_test_database(
             action="reuse_test",
             reason=(
                 "TEST matches a previously verified PRD backup baseline, and its migration "
-                "ledger is safe against the current package; reuse it without re-restoring "
-                "the large PRD backup."
+                "ledger is safe against the current package; reuse it by default, or refresh "
+                "its data from the validated PRD backup on operator request."
             ),
-            offer_refresh=False,
+            offer_refresh=True,
         )
     if observation.schema_status == "error" or observation.schema_status is None:
         return TestDatabaseDecision(

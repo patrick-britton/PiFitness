@@ -78,5 +78,5 @@ def test_verified_backup_provenance_reuses_test_even_when_schema_differs_from_li
         )
     )
     assert decision.action == "reuse_test"
-    assert decision.offer_refresh is False
+    assert decision.offer_refresh is True
     assert "ledger is safe" in decision.reason

@@ -468,7 +468,7 @@ def test_verified_baseline_with_checksum_valid_migrations_is_reused_without_sche
     )
     assert report["ok"] is True
     assert report["decision"]["action"] == "reuse_test"
-    assert report["decision"]["offer_refresh"] is False
+    assert report["decision"]["offer_refresh"] is True
     assert report["schema_comparison"]["status"] == "migration_managed"
     assert report["baseline_provenance"]["database_oid"] == 777
     assert status_calls
