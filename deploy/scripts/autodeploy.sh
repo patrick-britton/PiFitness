@@ -138,7 +138,7 @@
 #  Must be idempotent and safe if some state keys are absent (step never ran).
 # =============================================================================
 
-set -Eeuo pipefail
+set -euo pipefail
 
 PYTHON="/usr/bin/python3"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -148,9 +148,6 @@ export PYTHONUNBUFFERED=1
 
 note() { printf '[autodeploy] %s\n' "$*"; }
 err()  { printf '[autodeploy] ERROR: %s\n' "$*" >&2; }
-
-# Any unexpected shell-level failure says where it happened.
-trap 'err "unexpected failure at line $LINENO: $BASH_COMMAND"' ERR
 
 # Run one helper. Explains a missing helper (with directory listings) and any
 # non-zero exit (except 10, the reserved "stop cleanly" code). Returns the
@@ -201,7 +198,7 @@ note "run directory: $RUN_DIR"
 on_exit() {
     local status=$?
     local final=0
-    trap - EXIT INT TERM ERR
+    trap - EXIT INT TERM
 
     note "shutting down (status before cleanup: $status); running cleanup..."
     run_helper cleanup.py --run-dir "$RUN_DIR" --exit-status "$status" || final=$?
