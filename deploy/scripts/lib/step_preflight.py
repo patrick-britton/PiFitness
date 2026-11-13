@@ -10,6 +10,10 @@ exception to "read-only": if any TEST unit is active it runs test-down.sh,
 because that is a remediation, not a decision (requirements 4.6 / D19).
 
 Uses only what exists before checkout: autodeploy.conf and the Pi env file.
+NO DEFAULTS: machine-specific values (paths, DB settings, backup dir/glob, ...) are read
+ONLY from the Pi env file; repo-specific values (units, tools, table/marker names,
+timeouts, ...) ONLY from autodeploy.conf. A missing file, a malformed line or a missing
+key fails the step; nothing is guessed or hard-coded here.
 
 TEST run                                   PRD run
   config + env keys                          config + env keys
@@ -47,19 +51,14 @@ import shutil
 import sys
 import time
 
-from common import (HelperError, Parser, PgError, PgTarget, ask_tty, evidence,
-                    human_age, human_size, info, is_inside, load_context,
+from common import (HelperError, Parser, PgError, PgTarget, ask_tty, check_keys,
+                    describe_gaps, evidence, human_age, human_size, info, is_inside, load_context,
                     nearest_existing_ancestor, open_tty, parse_kv_file,
                     psql_rows, read_db_marker, run_cmd, step_main, update_state,
                     warn, words, writable_dir)
 
 INTRINSIC_TOOLS = ("psql", "pg_dump", "pg_restore", "systemctl")  # this helper needs them
 ACTIVE_STATES = ("active", "activating", "reloading", "deactivating")
-DEFAULT_PRD_ENV = "/home/god/.config/pifitness/prd.env"
-DEFAULT_BACKUP_DIR = "/home/god/Documents/DB_Backups"
-DEFAULT_BACKUP_GLOB = "personal_fitness_[0-9]*.dump"
-DEFAULT_MARKER = "pifitness-test-database"
-DEFAULT_MIGRATIONS_TABLE = "schema_migrations"
 IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
 SAMPLE_LINES = 20
 
@@ -147,49 +146,73 @@ class Preflight:
     def stage_config(self):
         c = self.ctx
         per = self.per
-        non_empty = ["LOG_DIR", "PG_HOST", "PG_PORT",
-                     "PG_USER", "PG_DB", "TEST_SERVICES", "PRD_SERVICES",
-                     per + "_APP_DIR", per + "_VENV_DIR", per + "_STATE_FILE"]
-        present = ["PG_PASSWORD", "TEST_TIMERS", "PRD_TIMERS"]
-        missing = c.missing(non_empty) + c.missing_keys(present)
-        if missing:
-            raise HelperError("required configuration is missing or empty: %s" % ", ".join(missing),
-                              "%s  and  %s" % (c.conf_path, c.env_path))
 
-        self.log_dir = c.get("LOG_DIR")
-        self.backup_dir = c.get("PIFITNESS_PRD_BACKUP_DIR") or c.get("DEFAULT_BACKUP_DIR", DEFAULT_BACKUP_DIR)
-        self.backup_glob = c.get("PIFITNESS_PRD_BACKUP_GLOB", DEFAULT_BACKUP_GLOB)
-        self.app_dir = c.get(per + "_APP_DIR")
-        self.venv_dir = c.get(per + "_VENV_DIR")
-        self.state_file = c.get(per + "_STATE_FILE")
-        self.test_state_file = c.get("TEST_STATE_FILE")
-        self.test_units = c.words("TEST_TIMERS") + c.words("TEST_SERVICES")
-        self.prd_units = c.words("PRD_TIMERS") + c.words("PRD_SERVICES")
-        self.marker = c.get("TEST_DB_MARKER", DEFAULT_MARKER)
-        self.migrations_table = c.get("MIGRATIONS_TABLE", DEFAULT_MIGRATIONS_TABLE)
-        if not IDENT_RE.match(self.migrations_table):
-            raise HelperError("MIGRATIONS_TABLE is not a plain table name: %r" % self.migrations_table,
-                              c.conf_path)
+        # Pi env file ONLY (machine-specific). Nothing here has a default.
+        env_keys = ["LOG_DIR", "PG_HOST", "PG_PORT", "PG_USER", "PG_DB",
+                    "PIFITNESS_PRD_BACKUP_DIR", "TEST_STATE_FILE",
+                    per + "_APP_DIR", per + "_VENV_DIR", per + "_STATE_FILE"]
+        env_empty_ok = ["PG_PASSWORD"]
+        # autodeploy.conf ONLY (repo-specific). Nothing here has a default either.
+        conf_keys = ["TEST_SERVICES", "PRD_SERVICES", "REQUIRED_TOOLS", "SYSTEMCTL",
+                     "TEST_DOWN_SCRIPT", "TEST_DOWN_TIMEOUT"]
+        conf_empty_ok = ["TEST_TIMERS", "PRD_TIMERS", "INSTALLABLE_TOOLS", "PERSISTENT_RESOURCES"]
+        if self.is_test:        # only the TEST run restores/compares/snapshots
+            env_keys += ["PIFITNESS_PRD_BACKUP_GLOB", "PRD_ENV_FILE"]
+            conf_keys += ["MIGRATIONS_TABLE", "TEST_DB_MARKER", "BACKUP_WARN_AGE_HOURS"]
+        c.require(env=env_keys, env_may_be_empty=env_empty_ok,
+                  conf=conf_keys, conf_may_be_empty=conf_empty_ok)
+
+        # Pi env file values
+        self.log_dir = c.env_value("LOG_DIR")
+        self.backup_dir = c.env_value("PIFITNESS_PRD_BACKUP_DIR")
+        self.backup_glob = c.env_value("PIFITNESS_PRD_BACKUP_GLOB") if self.is_test else None
+        self.app_dir = c.env_value(per + "_APP_DIR")
+        self.venv_dir = c.env_value(per + "_VENV_DIR")
+        self.state_file = c.env_value(per + "_STATE_FILE")
+        self.test_state_file = c.env_value("TEST_STATE_FILE")
+
+        # autodeploy.conf values
+        self.test_units = c.conf_words("TEST_TIMERS") + c.conf_words("TEST_SERVICES")
+        self.prd_units = c.conf_words("PRD_TIMERS") + c.conf_words("PRD_SERVICES")
+        self.systemctl_cmd = c.conf_words("SYSTEMCTL")
+        self.test_down_script = c.conf_value("TEST_DOWN_SCRIPT")
+        try:
+            self.test_down_timeout = int(c.conf_value("TEST_DOWN_TIMEOUT"))
+            if self.test_down_timeout < 1:
+                raise ValueError
+        except ValueError:
+            raise HelperError("TEST_DOWN_TIMEOUT must be a whole number of seconds >= 1 (got %r)"
+                              % c.conf_value("TEST_DOWN_TIMEOUT"), c.conf_path)
 
         if self.is_test:
-            prd_env_path = c.get("PRD_ENV_FILE", DEFAULT_PRD_ENV)
-            prd_values = parse_kv_file(prd_env_path)
-            gaps = [k for k in ("PG_HOST", "PG_PORT", "PG_USER", "PG_DB") if not prd_values.get(k)]
-            if "PG_PASSWORD" not in prd_values:
-                gaps.append("PG_PASSWORD")
-            if gaps:
-                raise HelperError("PRD env file is missing: %s" % ", ".join(gaps), prd_env_path)
-            self.prd_target = PgTarget.from_values("PRD", prd_values)
-            self.test_target = PgTarget.from_values("TEST", c.merged())
+            self.marker = c.conf_value("TEST_DB_MARKER")
+            self.migrations_table = c.conf_value("MIGRATIONS_TABLE")
+            if not IDENT_RE.match(self.migrations_table):
+                raise HelperError("MIGRATIONS_TABLE is not a plain table name: %r"
+                                  % self.migrations_table, c.conf_path)
+            try:
+                self.warn_age_hours = float(c.conf_value("BACKUP_WARN_AGE_HOURS"))
+                if self.warn_age_hours <= 0:
+                    raise ValueError
+            except ValueError:
+                raise HelperError("BACKUP_WARN_AGE_HOURS must be a positive number (got %r)"
+                                  % c.conf_value("BACKUP_WARN_AGE_HOURS"), c.conf_path)
+
+            # The PRD connection comes from the PRD env file, whose path is itself an env value.
+            prd_env_path = c.env_value("PRD_ENV_FILE")
+            prd_values = parse_kv_file(prd_env_path)          # fails if absent / malformed
+            self.prd_target = PgTarget.from_values("PRD", prd_values, prd_env_path)
+            self.test_target = PgTarget.from_values("TEST", c.envvals, c.env_path)
             evidence("prd_env_file", prd_env_path)
         else:
-            self.prd_target = PgTarget.from_values("PRD", c.merged())
+            self.prd_target = PgTarget.from_values("PRD", c.envvals, c.env_path)
 
         evidence("environment", c.environment)
         evidence("commit", c.commit)
         evidence("config_file", c.conf_path)
         evidence("env_file", c.env_path)
-        evidence("required_keys_checked", "%d (all present)" % (len(non_empty) + len(present)))
+        evidence("required_keys_checked", "%d (all present)" % (
+            len(set(env_keys)) + len(env_empty_ok) + len(conf_keys) + len(conf_empty_ok)))
 
     # ----------------------------------------------------------- 2. terminal
     def stage_terminal(self):
@@ -206,12 +229,12 @@ class Preflight:
 
     # -------------------------------------------------------------- 3. tools
     def stage_tools(self):
-        installable = set(self.ctx.words("INSTALLABLE_TOOLS"))
+        installable = set(self.ctx.conf_words("INSTALLABLE_TOOLS"))
         required = list(INTRINSIC_TOOLS)
-        for tool in self.ctx.words("REQUIRED_TOOLS"):
+        for tool in self.ctx.conf_words("REQUIRED_TOOLS"):
             if tool not in required and tool not in installable:
                 required.append(tool)
-        reported_only = [t for t in self.ctx.words("INSTALLABLE_TOOLS") if t not in required]
+        reported_only = [t for t in self.ctx.conf_words("INSTALLABLE_TOOLS") if t not in required]
 
         missing = []
         for tool in required + reported_only:
@@ -268,7 +291,7 @@ class Preflight:
             raise HelperError("path check failed: %s" % "; ".join(problems),
                               "%s / %s" % (self.ctx.conf_path, self.ctx.env_path))
 
-        resources = self.ctx.words("PERSISTENT_RESOURCES")
+        resources = self.ctx.conf_words("PERSISTENT_RESOURCES")
         if not resources:
             evidence("persistent_resources", "none configured")
         for item in resources:
@@ -281,7 +304,7 @@ class Preflight:
 
     # -------------------------------------------------------------- 5. units
     def systemctl_show(self, unit):
-        argv = self.ctx.words("SYSTEMCTL", "systemctl") + [
+        argv = self.systemctl_cmd + [
             "show", "--property=LoadState,ActiveState", unit]
         result = run_cmd(argv, timeout=30)
         if not result.ok:
@@ -372,20 +395,19 @@ class Preflight:
     # ----------------------------------------------------- remediation
     def stage_remediate(self):
         active = [u for u in self.test_units if self.unit_state[u][1] in ACTIVE_STATES]
-        if self.test_state_file:
-            evidence("test_state_file", self.test_state_file)
+        evidence("test_state_file", self.test_state_file)
         if not active:
             evidence("test_units_active", "none; test-down.sh not needed")
             return
 
-        script = self.ctx.get("TEST_DOWN_SCRIPT", "test-down.sh")
+        script = self.test_down_script
         if not os.path.isabs(script):
             script = os.path.join(self.ctx.script_dir, script)
         if not os.path.isfile(script):
             raise HelperError("TEST units are active (%s) but the test-down script does not exist"
                               % ", ".join(active), script)
         info("TEST units are active; running test-down.sh to return to a known state")
-        result = run_cmd(["bash", script], timeout=int(self.ctx.get("TEST_DOWN_TIMEOUT", "180")),
+        result = run_cmd(["bash", script], timeout=self.test_down_timeout,
                          echo_prefix="    ", heartbeat=30)
         self.test_down_ran = True
         verdict = "PASS" if result.ok else "FAIL"
@@ -521,7 +543,7 @@ class Preflight:
         evidence("newest_snapshot", "%s (%s, %s old)" % (os.path.basename(newest),
                                                           human_size(size), human_age(age)))
         self.snapshot["file"] = newest
-        limit = float(self.ctx.get("BACKUP_WARN_AGE_HOURS", "36"))
+        limit = self.warn_age_hours
         if age > limit * 3600:
             warn("newest nightly snapshot is older than %g hours" % limit)
 

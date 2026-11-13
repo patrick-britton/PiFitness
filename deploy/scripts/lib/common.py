@@ -27,6 +27,8 @@ Subprocesses     run_cmd() -> CmdResult (timeouts, optional live echo),
                  print_failure()
 Step protocol    SkipStep, step_main()  (maps outcomes to exit 0/1/2/130)
 Run context      load_context(run_dir) -> RunContext (state + conf + Pi env file)
+                 STRICT: env values come ONLY from the Pi env file, conf values ONLY from
+                 autodeploy.conf; nothing has a default; a missing key fails the run.
 Terminal         open_tty(), ask_tty()
 PostgreSQL       PgTarget, PgError, psql_rows(), norm_host()
 DB state marker  read_db_marker(), update_db_marker()   (TEST/PRD state files)
@@ -159,6 +161,23 @@ def parse_kv_file(path):
     return values
 
 
+def check_keys(values, required=(), may_be_empty=()):
+    """-> (absent, empty) key lists. `required` must be present AND non-empty;
+    `may_be_empty` must be present but may have an empty value."""
+    absent = [k for k in list(required) + list(may_be_empty) if k not in values]
+    empty = [k for k in required if k in values and not values[k]]
+    return absent, empty
+
+
+def describe_gaps(absent, empty):
+    parts = []
+    if absent:
+        parts.append("missing: %s" % ", ".join(absent))
+    if empty:
+        parts.append("empty: %s" % ", ".join(empty))
+    return "; ".join(parts)
+
+
 def write_text_atomic(path, text, mode=0o600):
     tmp = "%s.tmp.%d" % (path, os.getpid())
     try:
@@ -195,7 +214,6 @@ def update_state(run_dir, updates):
 # Everything below was added for cleanup.py and the step helpers.
 # ============================================================================
 PYTHON = "/usr/bin/python3"
-DEFAULT_ENV_DIR = "/home/god/.config/pifitness"
 
 
 # ----------------------------------------------------------------------------
@@ -524,6 +542,19 @@ def step_main(body):
 # Run context: run.state + autodeploy.conf + the Pi env file
 # ----------------------------------------------------------------------------
 class RunContext:
+    """run.state + autodeploy.conf + the Pi env file, with NO defaults and NO merging.
+
+    Two sources, two meanings:
+      Pi env file     (not in git)  machine-specific values: PG_*, *_APP_DIR, *_VENV_DIR,
+                                    *_STATE_FILE, *_ENV_FILE, LOG_DIR, backup dir/glob ...
+                                    read ONLY with env_value().
+      autodeploy.conf (in git)      repo-specific values: unit lists, tools, table and
+                                    marker names, timeouts ... read ONLY with
+                                    conf_value() / conf_words().
+    A key found in the "wrong" file is NOT used. Call require() first so every
+    missing key is reported at once; the accessors never fall back to a default.
+    """
+
     def __init__(self, run_dir, state, conf, envvals, conf_path, env_path, script_dir):
         self.run_dir = run_dir
         self.state = state
@@ -532,44 +563,62 @@ class RunContext:
         self.conf_path = conf_path
         self.env_path = env_path
         self.script_dir = script_dir
-        self.environment = state.get("ENVIRONMENT", "")
-        self.commit = state.get("COMMIT", "")
+        self.environment = state["ENVIRONMENT"]
+        self.commit = state["COMMIT"]
 
-    def get(self, key, default=None):
-        """Pi env file wins over autodeploy.conf (machine-specific overrides)."""
-        if key in self.envvals:
-            return self.envvals[key]
-        if key in self.conf:
-            return self.conf[key]
-        return default
+    def require(self, env=(), conf=(), env_may_be_empty=(), conf_may_be_empty=()):
+        """Fail (listing EVERY gap) unless all keys are present in the right file.
 
-    def merged(self):
-        values = dict(self.conf)
-        values.update(self.envvals)
-        return values
+        env / conf          must be present and non-empty
+        *_may_be_empty      must be present; an empty value is fine
+        """
+        problems, where = [], []
+        for label, values, path, required, optional in (
+                ("Pi env file", self.envvals, self.env_path, env, env_may_be_empty),
+                ("autodeploy.conf", self.conf, self.conf_path, conf, conf_may_be_empty)):
+            absent, empty = check_keys(values, list(dict.fromkeys(required)),
+                                       list(dict.fromkeys(optional)))
+            if absent or empty:
+                problems.append("%s (%s)" % (label, describe_gaps(absent, empty)))
+                where.append(path)
+        if problems:
+            raise HelperError("required configuration is incomplete: %s" % "; ".join(problems),
+                              "  and  ".join(where))
 
-    def words(self, key, default=""):
-        return words(self.get(key, default))
+    def env_value(self, key):
+        """Value from the Pi env file ONLY. Missing key = failure, never a default."""
+        if key not in self.envvals:
+            raise HelperError("key %s is not in the Pi env file" % key, self.env_path)
+        return self.envvals[key]
 
-    def missing(self, keys):
-        """Keys that are absent OR empty."""
-        return [k for k in keys if not self.get(k)]
+    def conf_value(self, key):
+        """Value from autodeploy.conf ONLY. Missing key = failure, never a default."""
+        if key not in self.conf:
+            raise HelperError("key %s is not in autodeploy.conf" % key, self.conf_path)
+        return self.conf[key]
 
-    def missing_keys(self, keys):
-        """Keys that are absent (an empty value is fine)."""
-        return [k for k in keys if self.get(k) is None]
+    def conf_words(self, key):
+        return words(self.conf_value(key))
 
 
 def load_context(run_dir):
+    """Re-open the run exactly as new_run.py initialised it.
+
+    The conf/env file paths come ONLY from run.state (written by new_run.py);
+    there is no guessing and no fallback location.
+    """
     state = read_state(run_dir)
-    environment = state.get("ENVIRONMENT", "")
-    if environment not in ("test", "prd"):
-        raise HelperError("run.state has no valid ENVIRONMENT", state_path(run_dir))
-    script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    conf_path = state.get("CONFIG_FILE") or os.path.join(script_dir, "autodeploy.conf")
-    env_path = state.get("ENV_FILE") or os.path.join(DEFAULT_ENV_DIR, "%s.env" % environment)
+    missing = [k for k in ("ENVIRONMENT", "COMMIT", "CONF_FILE", "ENV_FILE", "SCRIPT_DIR")
+               if not state.get(k)]
+    if missing:
+        raise HelperError("run.state is missing key(s): %s" % ", ".join(missing),
+                          state_path(run_dir))
+    if state["ENVIRONMENT"] not in ("test", "prd"):
+        raise HelperError("run.state has an invalid ENVIRONMENT: %r" % state["ENVIRONMENT"],
+                          state_path(run_dir))
+    conf_path, env_path = state["CONF_FILE"], state["ENV_FILE"]
     return RunContext(run_dir, state, parse_kv_file(conf_path), parse_kv_file(env_path),
-                      conf_path, env_path, script_dir)
+                      conf_path, env_path, state["SCRIPT_DIR"])
 
 
 # ----------------------------------------------------------------------------
@@ -665,10 +714,16 @@ class PgTarget:
         self.dbname = dbname
 
     @classmethod
-    def from_values(cls, label, values):
-        return cls(label, values.get("PG_HOST", ""), values.get("PG_PORT", ""),
-                   values.get("PG_USER", ""), values.get("PG_PASSWORD", ""),
-                   values.get("PG_DB", ""))
+    def from_values(cls, label, values, source):
+        """Build a target from a Pi env file's values. No defaults: a missing or
+        empty PG_HOST/PG_PORT/PG_USER/PG_DB (or a missing PG_PASSWORD) fails."""
+        absent, empty = check_keys(values, ("PG_HOST", "PG_PORT", "PG_USER", "PG_DB"),
+                                   may_be_empty=("PG_PASSWORD",))
+        if absent or empty:
+            raise HelperError("%s database settings are incomplete (%s)"
+                              % (label, describe_gaps(absent, empty)), source)
+        return cls(label, values["PG_HOST"], values["PG_PORT"], values["PG_USER"],
+                   values["PG_PASSWORD"], values["PG_DB"])
 
     def env(self):
         """Connection settings for libpq tools. The password never goes on a command line."""

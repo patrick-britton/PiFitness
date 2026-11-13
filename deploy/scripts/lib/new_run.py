@@ -33,12 +33,15 @@ deploy/scripts/autodeploy.conf  (found relative to this file: ../autodeploy.conf
     Required here : <ENV>_STEPS   e.g. TEST_STEPS="preflight checkout ..."
                     (space-separated, each name [a-z][a-z0-9_]*, no duplicates;
                      each name maps to lib/step_<name>.py)
-    Optional      : REQUIRED_ENV_KEYS="PG_HOST PG_PORT ..." - keys that must be
+                    ENV_FILE_DIR  absolute directory holding <env>.env. This is the ONE
+                                  location the env file itself cannot tell us, so it
+                                  lives in autodeploy.conf; there is no default here.
+                    REQUIRED_ENV_KEYS="PG_HOST PG_PORT ..." - keys that must be
                     present and non-empty in the Pi env file. This is how the
                     "missing key fails the run immediately" rule grows with the
                     repo without changing this script.
-/home/god/.config/pifitness/<env>.env   (not in git)
-    Required here : LOG_DIR (absolute path), plus any REQUIRED_ENV_KEYS.
+<ENV_FILE_DIR>/<env>.env   (not in git)
+    Required here : LOG_DIR (absolute path), plus every REQUIRED_ENV_KEYS entry.
 
 File format for both: plain KEY=value lines, optional "export ", # comments,
 optionally quoted values. Values are NOT shell-expanded ($VAR is literal) and
@@ -63,7 +66,6 @@ from common import (HelperError, Parser, Reporter, guarded, parse_kv_file,
                     run_stages, write_state, write_text_atomic)
 
 TAG = "[new_run]"
-ENV_DIR = "/home/god/.config/pifitness"
 ENVIRONMENTS = ("test", "prd")
 
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -122,25 +124,37 @@ def stage_load_config(ctx):
 
 
 def stage_load_env_file(ctx):
-    env_file = os.path.join(ENV_DIR, "%s.env" % ctx["environment"])
+    conf = ctx["conf"]
+    missing_conf = [k for k in ("ENV_FILE_DIR", "REQUIRED_ENV_KEYS") if not conf.get(k)]
+    if missing_conf:
+        raise HelperError("autodeploy.conf is missing or has empty key(s): %s"
+                          % ", ".join(missing_conf), ctx["conf_file"])
+    env_dir = conf["ENV_FILE_DIR"]
+    if not os.path.isabs(env_dir):
+        raise HelperError("ENV_FILE_DIR must be an absolute path", ctx["conf_file"])
+
+    env_file = os.path.join(env_dir, "%s.env" % ctx["environment"])
     if not os.path.isfile(env_file):
         raise HelperError("Pi env file for %s not found" % ctx["environment"], env_file)
     env = parse_kv_file(env_file)
 
-    required = ["LOG_DIR"] + ctx["conf"].get("REQUIRED_ENV_KEYS", "").split()
-    missing = [key for key in required if not env.get(key)]
-    if missing:
-        hint = ""
-        if "LOG_DIR" in missing:
-            hint = " (e.g. add the line LOG_DIR=/home/god/pifitness-logs)"
-        raise HelperError("env file is missing required key(s): %s%s"
-                        % (", ".join(missing), hint), env_file)
+    required = list(dict.fromkeys(["LOG_DIR"] + conf["REQUIRED_ENV_KEYS"].split()))
+    missing = [key for key in required if key not in env]
+    empty = [key for key in required if key in env and not env[key]]
+    if missing or empty:
+        problems = []
+        if missing:
+            problems.append("missing: %s" % ", ".join(missing))
+        if empty:
+            problems.append("empty: %s" % ", ".join(empty))
+        raise HelperError("env file has incomplete required keys (%s)" % "; ".join(problems),
+                          env_file)
 
     ctx["env_file"] = env_file
     ctx["env"] = env
     return [("env_file", env_file),
             ("env_keys_loaded", len(env)),
-            ("required_keys_checked", "%d (all present)" % len(required)),
+            ("required_keys_checked", "%d (all present and non-empty)" % len(required)),
             ("log_dir", env["LOG_DIR"])]
 
 
