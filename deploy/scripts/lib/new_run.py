@@ -47,22 +47,20 @@ an unquoted value may not contain spaces. Secret values are never printed.
 DESIGN
 ------
 Each stage below is one small function: stage_xxx(ctx) -> [(key, value), ...]
-evidence. It raises InitError(reason, where) to fail. run_stages() prints
-"(i/N) title ... OK" plus the evidence, so progress is visible live.
-parse_kv_file / write_text_atomic / write_state are deliberately generic so
-they can be lifted into a shared lib module when a second helper needs them.
+evidence. It raises HelperError(reason, where) to fail. common.run_stages()
+prints "(i/N) title ... OK" plus the evidence, so progress is visible live.
+File parsing, state writing and error reporting live in lib/common.py.
 
 Python 3 standard library only.
 """
-import argparse
 import datetime
 import hashlib
 import os
 import re
-import shlex
 import sys
-import time
-import traceback
+
+from common import (HelperError, Parser, Reporter, guarded, parse_kv_file,
+                    run_stages, write_state, write_text_atomic)
 
 TAG = "[new_run]"
 ENV_DIR = "/home/god/.config/pifitness"
@@ -70,110 +68,27 @@ ENVIRONMENTS = ("test", "prd")
 
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 STEP_RE = re.compile(r"^[a-z][a-z0-9_]*$")
-KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-
-class InitError(Exception):
-    """A failure with a one-line reason and a pointer to where it happened."""
-
-    def __init__(self, reason, where=""):
-        super().__init__(reason)
-        self.reason = reason
-        self.where = where
-
-
-# ----------------------------------------------------------------------------
-# Progress output (stderr live, remembered so it can be written to the log)
-# ----------------------------------------------------------------------------
-PROGRESS = []
-
-
-def say(message=""):
-    line = "%s %s" % (TAG, message) if message else ""
-    PROGRESS.append(line)
-    print(line, file=sys.stderr, flush=True)
-
-
-def say_evidence(pairs):
-    for key, value in pairs:
-        say("    EVIDENCE: %s = %s" % (key, value))
-
-
-# ----------------------------------------------------------------------------
-# Generic helpers (candidates for a shared module later)
-# ----------------------------------------------------------------------------
-def parse_kv_file(path):
-    """Parse KEY=value lines into a dict. Never echoes file content in errors."""
-    try:
-        with open(path, encoding="utf-8") as handle:
-            lines = handle.read().splitlines()
-    except OSError as exc:
-        raise InitError("cannot read file: %s" % exc.strerror, path)
-
-    values = {}
-    for number, raw in enumerate(lines, 1):
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("export "):
-            line = line[len("export "):].lstrip()
-        key, sep, value = line.partition("=")
-        key = key.strip()
-        if not sep or not KEY_RE.match(key):
-            raise InitError("line is not KEY=value", "%s:%d" % (path, number))
-        try:
-            tokens = shlex.split(value)
-        except ValueError as exc:
-            raise InitError("cannot parse value for %s (%s)" % (key, exc),
-                            "%s:%d" % (path, number))
-        for index, token in enumerate(tokens):      # trailing "# comment"
-            if token.startswith("#"):
-                tokens = tokens[:index]
-                break
-        if len(tokens) > 1:
-            raise InitError("value for %s has unquoted spaces; wrap it in quotes"
-                            % key, "%s:%d" % (path, number))
-        values[key] = tokens[0] if tokens else ""
-    return values
-
-
-def write_text_atomic(path, text, mode=0o600):
-    tmp = "%s.tmp.%d" % (path, os.getpid())
-    try:
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(text)
-        os.replace(tmp, path)
-    except OSError as exc:
-        raise InitError("cannot write file: %s" % exc.strerror, path)
-
-
-def write_state(path, values):
-    text = "".join("%s=%s\n" % (k, shlex.quote(str(v))) for k, v in values.items())
-    write_text_atomic(path, text)
+# Live progress goes to stderr (stdout is reserved for the log path).
+R = Reporter(TAG, sys.stderr)
 
 
 # ----------------------------------------------------------------------------
 # Stages
 # ----------------------------------------------------------------------------
-class _Parser(argparse.ArgumentParser):
-    def error(self, message):
-        raise InitError(message, "command line: " + " ".join(sys.argv[1:]))
-
-
 def stage_parse_args(ctx):
-    parser = _Parser(prog="autodeploy.sh", allow_abbrev=False)
+    parser = Parser(prog="autodeploy.sh", allow_abbrev=False)
     parser.add_argument("--environment", required=True, choices=ENVIRONMENTS)
     parser.add_argument("--commit", required=True)
     parser.add_argument("--through", type=int, default=None)
     args = parser.parse_args(ctx["argv"])
 
     if not SHA_RE.match(args.commit):
-        raise InitError("--commit must be exactly 40 hex characters "
+        raise HelperError("--commit must be exactly 40 hex characters "
                         "(got %d characters)" % len(args.commit),
                         "--commit %s" % args.commit)
     if args.through is not None and args.through < 1:
-        raise InitError("--through must be 1 or greater", "--through %d" % args.through)
+        raise HelperError("--through must be 1 or greater", "--through %d" % args.through)
 
     ctx["environment"] = args.environment
     ctx["commit"] = args.commit.lower()
@@ -188,7 +103,7 @@ def stage_locate_config(ctx):
     script_dir = os.path.dirname(lib_dir)
     conf_file = os.path.join(script_dir, "autodeploy.conf")
     if not os.path.isfile(conf_file):
-        raise InitError("autodeploy.conf not found next to autodeploy.sh "
+        raise HelperError("autodeploy.conf not found next to autodeploy.sh "
                         "(commit it at deploy/scripts/autodeploy.conf)", conf_file)
     with open(conf_file, "rb") as handle:
         data = handle.read()
@@ -209,7 +124,7 @@ def stage_load_config(ctx):
 def stage_load_env_file(ctx):
     env_file = os.path.join(ENV_DIR, "%s.env" % ctx["environment"])
     if not os.path.isfile(env_file):
-        raise InitError("Pi env file for %s not found" % ctx["environment"], env_file)
+        raise HelperError("Pi env file for %s not found" % ctx["environment"], env_file)
     env = parse_kv_file(env_file)
 
     required = ["LOG_DIR"] + ctx["conf"].get("REQUIRED_ENV_KEYS", "").split()
@@ -218,7 +133,7 @@ def stage_load_env_file(ctx):
         hint = ""
         if "LOG_DIR" in missing:
             hint = " (e.g. add the line LOG_DIR=/home/god/pifitness-logs)"
-        raise InitError("env file is missing required key(s): %s%s"
+        raise HelperError("env file is missing required key(s): %s%s"
                         % (", ".join(missing), hint), env_file)
 
     ctx["env_file"] = env_file
@@ -233,18 +148,18 @@ def stage_resolve_steps(ctx):
     key = "%s_STEPS" % ctx["environment"].upper()
     steps = ctx["conf"].get(key, "").split()
     if not steps:
-        raise InitError("%s is missing or empty in autodeploy.conf" % key,
+        raise HelperError("%s is missing or empty in autodeploy.conf" % key,
                         ctx["conf_file"])
     for name in steps:
         if not STEP_RE.match(name):
-            raise InitError("invalid step name %r (allowed: [a-z][a-z0-9_]*)" % name,
+            raise HelperError("invalid step name %r (allowed: [a-z][a-z0-9_]*)" % name,
                             "%s in %s" % (key, ctx["conf_file"]))
     duplicates = sorted(set(n for n in steps if steps.count(n) > 1))
     if duplicates:
-        raise InitError("duplicate step name(s): %s" % ", ".join(duplicates),
+        raise HelperError("duplicate step name(s): %s" % ", ".join(duplicates),
                         "%s in %s" % (key, ctx["conf_file"]))
     if ctx["through"] is not None and ctx["through"] > len(steps):
-        raise InitError("--through %d is beyond the last step (%d steps)"
+        raise HelperError("--through %d is beyond the last step (%d steps)"
                         % (ctx["through"], len(steps)), "--through %d" % ctx["through"])
     ctx["steps"] = steps
     return [("step_list_key", key),
@@ -255,13 +170,13 @@ def stage_resolve_steps(ctx):
 def stage_create_run(ctx):
     log_dir = ctx["env"]["LOG_DIR"]
     if not os.path.isabs(log_dir):
-        raise InitError("LOG_DIR must be an absolute path", ctx["env_file"])
+        raise HelperError("LOG_DIR must be an absolute path", ctx["env_file"])
     try:
         os.makedirs(log_dir, exist_ok=True)
     except OSError as exc:
-        raise InitError("cannot create LOG_DIR: %s" % exc.strerror, log_dir)
+        raise HelperError("cannot create LOG_DIR: %s" % exc.strerror, log_dir)
     if not os.access(log_dir, os.W_OK):
-        raise InitError("LOG_DIR is not writable by this user", log_dir)
+        raise HelperError("LOG_DIR is not writable by this user", log_dir)
 
     now = datetime.datetime.now(datetime.timezone.utc)
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
@@ -271,7 +186,7 @@ def stage_create_run(ctx):
     try:
         os.mkdir(run_dir, 0o700)
     except OSError as exc:
-        raise InitError("cannot create run directory: %s" % exc.strerror, run_dir)
+        raise HelperError("cannot create run directory: %s" % exc.strerror, run_dir)
 
     write_text_atomic(os.path.join(run_dir, "steps"), "\n".join(ctx["steps"]) + "\n")
     write_state(os.path.join(run_dir, "run.state"), {
@@ -306,48 +221,27 @@ STAGES = [
 ]
 
 
-def run_stages(ctx):
-    total = len(STAGES)
-    for index, (title, function) in enumerate(STAGES, 1):
-        ctx["stage"] = "(%d/%d) %s" % (index, total, title)
-        say("%s ..." % ctx["stage"])
-        started = time.monotonic()
-        say_evidence(function(ctx))
-        say("%s ... OK (%.1fs)" % (ctx["stage"], time.monotonic() - started))
-
-
 def append_progress_to_log(log_file):
     try:
         with open(log_file, "a", encoding="utf-8") as handle:
-            handle.write("\n".join(PROGRESS) + "\n")
+            handle.write("\n".join(R.lines) + "\n")
     except OSError as exc:
-        raise InitError("cannot write log file: %s" % exc.strerror, log_file)
+        raise HelperError("cannot write log file: %s" % exc.strerror, log_file)
 
 
 def main():
     ctx = {"argv": sys.argv[1:], "stage": "(startup)"}
-    say("initialising run ...")
-    try:
-        run_stages(ctx)
-        say("run initialised; handing over to autodeploy.sh")
-        append_progress_to_log(ctx["log_file"])
-    except InitError as exc:
-        say("FAIL at stage %s" % ctx["stage"])
-        say("REASON: %s" % exc.reason)
-        if exc.where:
-            say("WHERE: %s" % exc.where)
-        say("No deployment action was taken.")
-        return 1
-    except Exception as exc:  # a bug in this helper: still be informative
-        say("FAIL at stage %s" % ctx["stage"])
-        say("REASON: unexpected %s: %s" % (type(exc).__name__, exc))
-        for line in traceback.format_exc().rstrip().splitlines():
-            say("    " + line)
-        say("No deployment action was taken.")
-        return 1
 
-    print(ctx["log_file"])
-    return 0
+    def body():
+        run_stages(R, STAGES, ctx)
+        R.say("run initialised; handing over to autodeploy.sh")
+        append_progress_to_log(ctx["log_file"])
+
+    R.say("initialising run ...")
+    status = guarded(R, ctx, body, "No deployment action was taken.")
+    if status == 0:
+        print(ctx["log_file"])
+    return status
 
 
 if __name__ == "__main__":

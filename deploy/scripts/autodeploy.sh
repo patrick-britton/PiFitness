@@ -21,6 +21,8 @@
 # GENERAL RULES FOR ALL HELPERS
 # -----------------------------------------------------------------------------
 #  * Location: deploy/scripts/lib/ (this script finds them relative to itself).
+#  * Shared code: lib/common.py (HelperError, Reporter, run_stages, guarded,
+#    parse_kv_file, read_state/update_state ...). Helpers import from it.
 #  * Language: Python 3, standard library only, run with /usr/bin/python3.
 #    (Shell out to canonical tools - git, dbmate, uv, npm, pg_dump, pg_restore,
 #    systemctl - rather than reimplementing them.)
@@ -86,9 +88,9 @@
 # -----------------------------------------------------------------------------
 # HELPER 2: lib/startup_report.py --run-dir <dir>
 # -----------------------------------------------------------------------------
-#  Prints the "startup evidence" block (runs after logging is active):
-#  log file path, config path + hash, env file path, number of keys loaded,
-#  environment, commit, --through value, step list.
+#  Read-only run banner (runs after logging is active): re-reads run.state to
+#  prove the contract holds, then prints run identity, host facts, whether a
+#  terminal is available, and which step helpers exist (built / NOT IMPLEMENTED).
 #  Exit: 0 ok, non-zero = fail the run.
 #
 # -----------------------------------------------------------------------------
@@ -145,6 +147,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB="$SCRIPT_DIR/lib"
 
 export PYTHONUNBUFFERED=1
+export PYTHONDONTWRITEBYTECODE=1
 
 note() { printf '[autodeploy] %s\n' "$*"; }
 err()  { printf '[autodeploy] ERROR: %s\n' "$*" >&2; }
@@ -159,8 +162,6 @@ run_helper() {
     if [[ ! -f "$LIB/$helper" ]]; then
         err "helper not found: $LIB/$helper"
         err "  called as: $helper $*"
-        err "  contents of $SCRIPT_DIR:"
-        { ls -la "$SCRIPT_DIR" 2>&1 | sed 's/^/[autodeploy]     /' >&2; } || true
         err "  contents of $LIB:"
         { ls -la "$LIB" 2>&1 | sed 's/^/[autodeploy]     /' >&2; } || true
         return 127
@@ -200,7 +201,7 @@ on_exit() {
     local final=0
     trap - EXIT INT TERM
 
-    note "shutting down (status before cleanup: $status); running cleanup..."
+    note "run ended with status $status; no further steps will run; entering cleanup..."
     run_helper cleanup.py --run-dir "$RUN_DIR" --exit-status "$status" || final=$?
     note "run finished: exit status $final (log: $LOG_FILE)"
 
