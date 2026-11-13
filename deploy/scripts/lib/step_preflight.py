@@ -56,6 +56,7 @@ from common import (HelperError, Parser, PgError, PgTarget, ask_tty, evidence,
 INTRINSIC_TOOLS = ("psql", "pg_dump", "pg_restore", "systemctl")  # this helper needs them
 ACTIVE_STATES = ("active", "activating", "reloading", "deactivating")
 DEFAULT_PRD_ENV = "/home/god/.config/pifitness/prd.env"
+DEFAULT_BACKUP_DIR = "/home/god/Documents/DB_Backups"
 DEFAULT_BACKUP_GLOB = "personal_fitness_[0-9]*.dump"
 DEFAULT_MARKER = "pifitness-test-database"
 DEFAULT_MIGRATIONS_TABLE = "schema_migrations"
@@ -146,7 +147,7 @@ class Preflight:
     def stage_config(self):
         c = self.ctx
         per = self.per
-        non_empty = ["LOG_DIR", "PIFITNESS_PRD_BACKUP_DIR", "PG_HOST", "PG_PORT",
+        non_empty = ["LOG_DIR", "PG_HOST", "PG_PORT",
                      "PG_USER", "PG_DB", "TEST_SERVICES", "PRD_SERVICES",
                      per + "_APP_DIR", per + "_VENV_DIR", per + "_STATE_FILE"]
         present = ["PG_PASSWORD", "TEST_TIMERS", "PRD_TIMERS"]
@@ -156,7 +157,7 @@ class Preflight:
                               "%s  and  %s" % (c.conf_path, c.env_path))
 
         self.log_dir = c.get("LOG_DIR")
-        self.backup_dir = c.get("PIFITNESS_PRD_BACKUP_DIR")
+        self.backup_dir = c.get("PIFITNESS_PRD_BACKUP_DIR") or c.get("DEFAULT_BACKUP_DIR", DEFAULT_BACKUP_DIR)
         self.backup_glob = c.get("PIFITNESS_PRD_BACKUP_GLOB", DEFAULT_BACKUP_GLOB)
         self.app_dir = c.get(per + "_APP_DIR")
         self.venv_dir = c.get(per + "_VENV_DIR")
