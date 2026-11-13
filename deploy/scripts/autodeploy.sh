@@ -106,11 +106,18 @@
 #    - On FAIL ensure REASON:, WHERE: and the tail of the tool output are shown.
 #    - After a step PASSES (or SKIPS), if --through (from run.state) equals n,
 #      exit 10.
+#  State it maintains for cleanup.py / the summary table:
+#      results   one TAB-separated line per step: number name STATUS seconds detail
+#                (STATUS = PASS|FAIL|SKIPPED|NOT_IMPLEMENTED|INTERRUPTED)
+#      run.state CURRENT_STEP, CURRENT_STEP_NUMBER, CURRENT_STEP_STATUS
+#                (RUNNING before the step starts, so a crash still shows which
+#                 step was in progress)
 #  Exit codes (this script acts on them):
 #      0   step passed or was skipped -> continue with next step
 #      10  stop cleanly (NOT IMPLEMENTED, or --through reached) -> run ends
 #          with exit status 0 after cleanup
 #      any other non-zero -> step failed -> run ends non-zero after cleanup
+#      (130 = interrupted)
 #
 #  Step helper contract (lib/step_<name>.py --run-dir <dir>):
 #      stdout lines of the form   EVIDENCE: <key> = <value>
