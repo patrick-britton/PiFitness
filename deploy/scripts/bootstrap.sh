@@ -123,8 +123,8 @@ if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
             dbmate)
                 echo "Installing dbmate..."
                 source "$SCRIPT_DIR/lib/ensure_binary.sh"
-                if ensure_binary "$DBMATE_BIN" "2.36.0" \\
-                    "https://github.com/amacneil/dbmate/releases/download/v2.36.0/dbmate-linux-arm64" "dbmate"; then
+                if ensure_binary "$DBMATE_BIN" "2.36.0" \
+                        "https://github.com/amacneil/dbmate/releases/download/v2.36.0/dbmate-linux-arm64" "dbmate"; then
                     record_dep "dbmate" "$DBMATE_BIN" "ok" "2.36.0"
                 else
                     record_dep "dbmate" "$DBMATE_BIN" "install_failed" ""
