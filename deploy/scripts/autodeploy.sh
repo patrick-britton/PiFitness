@@ -34,6 +34,10 @@
 #  * Helpers that prompt a human must read/write via /dev/tty (stdout is a pipe
 #    to tee, so isatty(stdout) is always False). "Is a terminal present?" means
 #    "can /dev/tty be opened?". Do not redirect stdin.
+#  * Exit code 10 is reserved for "stop the run cleanly" (see run_step.py).
+#    Any other non-zero exit is a failure; this script reports the helper
+#    name, its arguments and the exit status, so helpers should print their
+#    own specific cause (REASON:/WHERE: lines) to stdout or stderr first.
 #  * A helper must never assume a previous step's shell variables. Anything a
 #    later step or the cleanup helper needs is written to the run directory.
 #
@@ -142,22 +146,66 @@ LIB="$SCRIPT_DIR/lib"
 
 export PYTHONUNBUFFERED=1
 
+note() { printf '[autodeploy] %s\n' "$*"; }
+err()  { printf '[autodeploy] ERROR: %s\n' "$*" >&2; }
+
+# Any unexpected shell-level failure says where it happened.
+trap 'err "unexpected failure at line $LINENO: $BASH_COMMAND"' ERR
+
+# Run one helper. Explains a missing helper (with directory listings) and any
+# non-zero exit (except 10, the reserved "stop cleanly" code). Returns the
+# helper's exit code unchanged.
+run_helper() {
+    local helper="$1"; shift
+    local rc=0
+
+    if [[ ! -f "$LIB/$helper" ]]; then
+        err "helper not found: $LIB/$helper"
+        err "  called as: $helper $*"
+        err "  contents of $SCRIPT_DIR:"
+        { ls -la "$SCRIPT_DIR" 2>&1 | sed 's/^/[autodeploy]     /' >&2; } || true
+        err "  contents of $LIB:"
+        { ls -la "$LIB" 2>&1 | sed 's/^/[autodeploy]     /' >&2; } || true
+        return 127
+    fi
+
+    "$PYTHON" "$LIB/$helper" "$@" || rc=$?
+
+    if [[ $rc -ne 0 && $rc -ne 10 ]]; then
+        err "helper failed: $helper exited with status $rc"
+        err "  called as: $helper $*"
+    fi
+    return "$rc"
+}
+
+note "starting: $0 $*"
+note "script dir: $SCRIPT_DIR"
+
 # --- 1. Validate and initialise (nothing is touched if this fails) -----------
-LOG_FILE="$("$PYTHON" "$LIB/new_run.py" "$@")"
+rc=0
+LOG_FILE="$(run_helper new_run.py "$@")" || rc=$?
+if [[ $rc -ne 0 ]]; then
+    err "run initialisation failed (exit $rc); nothing was changed on the Pi."
+    exit "$rc"
+fi
 RUN_DIR="${LOG_FILE%.log}.d"
 
 # --- 2. Mirror all output to the log file -------------------------------------
 TEE_PID=""
 exec > >(tee -a "$LOG_FILE") 2>&1
 TEE_PID=$!
+note "log file:      $LOG_FILE"
+note "run directory: $RUN_DIR"
 
 # --- 3. Exit handler (runs on every exit; its exit code is the run's) ---------
 on_exit() {
     local status=$?
     local final=0
-    trap - EXIT INT TERM
+    trap - EXIT INT TERM ERR
 
-    "$PYTHON" "$LIB/cleanup.py" --run-dir "$RUN_DIR" --exit-status "$status" || final=$?
+    note "shutting down (status before cleanup: $status); running cleanup..."
+    run_helper cleanup.py --run-dir "$RUN_DIR" --exit-status "$status" || final=$?
+    note "run finished: exit status $final (log: $LOG_FILE)"
 
     # Close our output so tee flushes, then wait for it so no lines are lost.
     exec >&- 2>&-
@@ -169,25 +217,28 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 # --- 4. Startup evidence -------------------------------------------------------
-"$PYTHON" "$LIB/startup_report.py" --run-dir "$RUN_DIR"
+run_helper startup_report.py --run-dir "$RUN_DIR"
 
 # --- 5. Run the steps in order; first failure ends the run ---------------------
 mapfile -t STEPS < "$RUN_DIR/steps"
 TOTAL="${#STEPS[@]}"
 NUMBER=0
+note "steps to run: $TOTAL (${STEPS[*]})"
 
 for STEP in "${STEPS[@]}"; do
     NUMBER=$((NUMBER + 1))
     rc=0
-    "$PYTHON" "$LIB/run_step.py" \
+    run_helper run_step.py \
         --run-dir "$RUN_DIR" \
         --step "$STEP" \
         --number "$NUMBER" \
         --total "$TOTAL" || rc=$?
 
     if [[ $rc -eq 10 ]]; then   # clean stop: NOT IMPLEMENTED or --through reached
+        note "step sequence stopped cleanly at step $NUMBER/$TOTAL ($STEP)"
         break
     elif [[ $rc -ne 0 ]]; then  # step failed; exit handler does the rest
+        err "step $NUMBER/$TOTAL ($STEP) failed with exit status $rc"
         exit "$rc"
     fi
 done
