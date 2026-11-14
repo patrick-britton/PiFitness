@@ -61,8 +61,9 @@ from common import (ACTIVE_UNIT_STATES as ACTIVE_STATES, HelperError, Parser, Pg
                     PgTarget, ask_tty, discover_unit_files, evidence, human_age,
                     human_size, info, is_inside, list_matching_units, load_context,
                     load_prd_source, nearest_existing_ancestor, open_tty, orphan_timers,
-                    psql_rows, read_db_marker, run_cmd, standalone_services, startable_units,
-                    step_main, systemd_unit_dir, update_state, warn, writable_dir)
+                    parse_kv_file, psql_rows, read_db_marker, run_cmd, standalone_services,
+                    startable_units, step_main, systemd_unit_dir, update_state, warn,
+                    words, writable_dir)
 from unitctl import CONF_KEYS as UNIT_CONF_KEYS, CONF_MAY_BE_EMPTY as UNIT_CONF_EMPTY_OK, UnitEnv
 import fnmatch
 
@@ -71,6 +72,16 @@ IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
 PLAIN_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 TOC_TABLE_RE = re.compile(r"^\d+;\s+\d+\s+\d+\s+TABLE\s+(?!DATA\s)(\S+)\s+(\S+)\s")
 SAMPLE_LINES = 20
+TOOLS_CONF = "tools.conf"       # beside autodeploy.conf; step_dependencies.py reads the same file
+
+
+def read_installable_tools(script_dir):
+    """INSTALLABLE_TOOLS from tools.conf -> (path, [names])."""
+    path = os.path.join(script_dir, TOOLS_CONF)
+    values = parse_kv_file(path)
+    if "INSTALLABLE_TOOLS" not in values:
+        raise HelperError("key INSTALLABLE_TOOLS is not in tools.conf", path)
+    return path, words(values["INSTALLABLE_TOOLS"])
 
 
 def parse_args(argv):
@@ -178,12 +189,15 @@ class Preflight:
         env_empty_ok = ["PG_PASSWORD"]
         # autodeploy.conf ONLY (repo-specific). No defaults here either.
         conf_keys = ["REQUIRED_TOOLS", "MIGRATIONS_TABLE", "MIGRATIONS_SCHEMA"] + [k for k in UNIT_CONF_KEYS]
-        conf_empty_ok = ["INSTALLABLE_TOOLS", "PERSISTENT_RESOURCES"] + list(UNIT_CONF_EMPTY_OK)
+        conf_empty_ok = ["PERSISTENT_RESOURCES"] + list(UNIT_CONF_EMPTY_OK)
         if self.is_test:        # only the TEST run restores/compares/snapshots
             conf_keys += ["TEST_DB_MARKER", "BACKUP_WARN_AGE_HOURS",
                           "ENV_FILE_DIR", "PRD_APP_ENV"]
         c.require(env=env_keys, env_may_be_empty=env_empty_ok,
                   conf=conf_keys, conf_may_be_empty=conf_empty_ok)
+
+        # Tools the dependencies step installs (tools.conf): reported present/missing, never failed.
+        self.tools_conf_path, self.installable_tools = read_installable_tools(c.script_dir)
 
         # This run's own env file (the file IS the environment)
         self.log_dir = c.env_value("LOG_DIR")
@@ -232,6 +246,7 @@ class Preflight:
         evidence("commit", c.commit)
         evidence("config_file", c.conf_path)
         evidence("env_file", c.env_path)
+        evidence("tools_file", self.tools_conf_path)
         evidence("required_keys_checked", "%d (all present)" % (
             len(env_keys) + len(env_empty_ok) + len(conf_keys) + len(conf_empty_ok)))
 
@@ -250,12 +265,12 @@ class Preflight:
 
     # -------------------------------------------------------------- 3. tools
     def stage_tools(self):
-        installable = set(self.ctx.conf_words("INSTALLABLE_TOOLS"))
+        installable = set(self.installable_tools)
         required = list(INTRINSIC_TOOLS)
         for tool in self.ctx.conf_words("REQUIRED_TOOLS"):
             if tool not in required and tool not in installable:
                 required.append(tool)
-        reported_only = [t for t in self.ctx.conf_words("INSTALLABLE_TOOLS") if t not in required]
+        reported_only = [t for t in self.installable_tools if t not in required]
 
         missing = []
         for tool in required + reported_only:
