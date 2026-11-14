@@ -125,7 +125,10 @@ def stage_load_config(ctx):
 
 def stage_load_env_file(ctx):
     conf = ctx["conf"]
-    missing_conf = [k for k in ("ENV_FILE_DIR", "REQUIRED_ENV_KEYS") if not conf.get(k)]
+    app_env_key = "%s_APP_ENV" % ctx["environment"].upper()
+    missing_conf = [k for k in ("ENV_FILE_DIR", "REQUIRED_ENV_KEYS", app_env_key)
+                    if not conf.get(k)]
+    missing_conf += [k for k in ("REQUIRED_ENV_KEYS_MAY_BE_EMPTY",) if k not in conf]
     if missing_conf:
         raise HelperError("autodeploy.conf is missing or has empty key(s): %s"
                           % ", ".join(missing_conf), ctx["conf_file"])
@@ -138,9 +141,11 @@ def stage_load_env_file(ctx):
         raise HelperError("Pi env file for %s not found" % ctx["environment"], env_file)
     env = parse_kv_file(env_file)
 
-    required = list(dict.fromkeys(["LOG_DIR"] + conf["REQUIRED_ENV_KEYS"].split()))
-    missing = [key for key in required if key not in env]
-    empty = [key for key in required if key in env and not env[key]]
+    # test.env and prd.env have identical keys. LOG_DIR and APP_ENV are always required.
+    required = list(dict.fromkeys(["LOG_DIR", "APP_ENV"] + conf["REQUIRED_ENV_KEYS"].split()))
+    may_be_empty = conf["REQUIRED_ENV_KEYS_MAY_BE_EMPTY"].split()
+    missing = [k for k in required + may_be_empty if k not in env]
+    empty = [k for k in required if k in env and not env[k]]
     if missing or empty:
         problems = []
         if missing:
@@ -150,11 +155,21 @@ def stage_load_env_file(ctx):
         raise HelperError("env file has incomplete required keys (%s)" % "; ".join(problems),
                           env_file)
 
+    # The file must belong to the environment it was selected for (catches a copied or
+    # mislabelled file BEFORE anything is touched).
+    if env["APP_ENV"] != conf[app_env_key]:
+        raise HelperError("%s has APP_ENV=%r but this is a %s run (autodeploy.conf %s=%r)"
+                          % (os.path.basename(env_file), env["APP_ENV"], ctx["environment"],
+                             app_env_key, conf[app_env_key]), env_file)
+
     ctx["env_file"] = env_file
     ctx["env"] = env
     return [("env_file", env_file),
             ("env_keys_loaded", len(env)),
-            ("required_keys_checked", "%d (all present and non-empty)" % len(required)),
+            ("required_keys_checked", "%d (all present%s)" % (
+                len(required) + len(may_be_empty), "; empty allowed for: " + " ".join(may_be_empty)
+                if may_be_empty else "")),
+            ("app_env", "%s (matches %s)" % (env["APP_ENV"], ctx["environment"])),
             ("log_dir", env["LOG_DIR"])]
 
 

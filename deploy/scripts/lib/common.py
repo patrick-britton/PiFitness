@@ -545,13 +545,14 @@ class RunContext:
     """run.state + autodeploy.conf + the Pi env file, with NO defaults and NO merging.
 
     Two sources, two meanings:
-      Pi env file     (not in git)  machine-specific values: PG_*, *_APP_DIR, *_VENV_DIR,
-                                    *_STATE_FILE, *_ENV_FILE, LOG_DIR, backup dir/glob ...
+      Pi env file     (not in git)  machine-specific values: APP_ENV, PG_*, APP_DIR, VENV_DIR,
+                                    STATE_FILE, LOG_DIR, PG_BACKUP_LOCATION, BACKUP_GLOB ...
                                     read ONLY with env_value().
       autodeploy.conf (in git)      repo-specific values: unit lists, tools, table and
                                     marker names, timeouts ... read ONLY with
                                     conf_value() / conf_words().
-    A key found in the "wrong" file is NOT used. Call require() first so every
+    test.env and prd.env have identical keys (APP_DIR, not PRD_APP_DIR); the file chosen by
+    --environment IS the environment. A key found in the "wrong" file is NOT used. Call require() first so every
     missing key is reported at once; the accessors never fall back to a default.
     """
 
@@ -599,6 +600,55 @@ class RunContext:
 
     def conf_words(self, key):
         return words(self.conf_value(key))
+
+
+# ----------------------------------------------------------------------------
+# The PRD source (TEST runs only)
+# ----------------------------------------------------------------------------
+# test.env and prd.env have IDENTICAL keys; only the values differ. A TEST run still
+# has to READ the PRD database (migration/schema comparison, clone) and find the PRD
+# nightly dumps. That is done in exactly one place, here, by loading prd.env from the
+# same ENV_FILE_DIR the run itself came from. Nothing in test.env points at PRD, and
+# no other helper may open prd.env.
+class PrdSource:
+    """What a TEST run may know about PRD: a DB connection and where nightlies live."""
+
+    def __init__(self, env_path, target, backup_dir, backup_glob):
+        self.env_path = env_path
+        self.target = target
+        self.backup_dir = backup_dir
+        self.backup_glob = backup_glob
+
+
+def expected_app_env(conf, conf_path, environment):
+    """The APP_ENV value an env file must carry for this environment (from autodeploy.conf)."""
+    key = "%s_APP_ENV" % environment.upper()
+    if not conf.get(key):
+        raise HelperError("autodeploy.conf is missing or has an empty %s" % key, conf_path)
+    return conf[key]
+
+
+def load_prd_source(ctx):
+    if ctx.environment != "test":
+        raise HelperError("internal error: the PRD source is only for TEST runs "
+                          "(a PRD run uses its own env file)", "load_prd_source")
+    path = os.path.join(ctx.conf_value("ENV_FILE_DIR"), "prd.env")
+    if not os.path.isfile(path):
+        raise HelperError("PRD env file not found (a TEST run reads PRD, read-only, from it)", path)
+    if os.path.realpath(path) == os.path.realpath(ctx.env_path):
+        raise HelperError("prd.env and the TEST env file are the same file", path)
+    values = parse_kv_file(path)
+    absent, empty = check_keys(
+        values, ("APP_ENV", "PG_HOST", "PG_PORT", "PG_USER", "PG_DB",
+                 "PG_BACKUP_LOCATION", "BACKUP_GLOB"), may_be_empty=("PG_PASSWORD",))
+    if absent or empty:
+        raise HelperError("PRD env file is incomplete (%s)" % describe_gaps(absent, empty), path)
+    expected = expected_app_env(ctx.conf, ctx.conf_path, "prd")
+    if values["APP_ENV"] != expected:
+        raise HelperError("PRD env file has APP_ENV=%r but autodeploy.conf expects %r for PRD"
+                          % (values["APP_ENV"], expected), path)
+    return PrdSource(path, PgTarget.from_values("PRD", values, path),
+                     values["PG_BACKUP_LOCATION"], values["BACKUP_GLOB"])
 
 
 def load_context(run_dir):

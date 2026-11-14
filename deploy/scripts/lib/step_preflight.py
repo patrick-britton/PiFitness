@@ -11,7 +11,8 @@ because that is a remediation, not a decision (requirements 4.6 / D19).
 
 Uses only what exists before checkout: autodeploy.conf and the Pi env file.
 NO DEFAULTS: machine-specific values (paths, DB settings, backup dir/glob, ...) are read
-ONLY from the Pi env file; repo-specific values (units, tools, table/marker names,
+ONLY from the Pi env file (test.env and prd.env have IDENTICAL keys; a TEST run reads PRD,
+read-only, through the single load_prd_source() in common.py); repo-specific values (units, tools, table/marker names,
 timeouts, ...) ONLY from autodeploy.conf. A missing file, a malformed line or a missing
 key fails the step; nothing is guessed or hard-coded here.
 
@@ -51,11 +52,11 @@ import shutil
 import sys
 import time
 
-from common import (HelperError, Parser, PgError, PgTarget, ask_tty, check_keys,
-                    describe_gaps, evidence, human_age, human_size, info, is_inside, load_context,
-                    nearest_existing_ancestor, open_tty, parse_kv_file,
+from common import (HelperError, Parser, PgError, PgTarget, ask_tty, evidence,
+                    human_age, human_size, info, is_inside, load_context,
+                    load_prd_source, nearest_existing_ancestor, open_tty,
                     psql_rows, read_db_marker, run_cmd, step_main, update_state,
-                    warn, words, writable_dir)
+                    warn, writable_dir)
 
 INTRINSIC_TOOLS = ("psql", "pg_dump", "pg_restore", "systemctl")  # this helper needs them
 ACTIVE_STATES = ("active", "activating", "reloading", "deactivating")
@@ -145,31 +146,28 @@ class Preflight:
     # ------------------------------------------------------------- 1. config
     def stage_config(self):
         c = self.ctx
-        per = self.per
 
-        # Pi env file ONLY (machine-specific). Nothing here has a default.
-        env_keys = ["LOG_DIR", "PG_HOST", "PG_PORT", "PG_USER", "PG_DB",
-                    "PIFITNESS_PRD_BACKUP_DIR", "TEST_STATE_FILE",
-                    per + "_APP_DIR", per + "_VENV_DIR", per + "_STATE_FILE"]
+        # Pi env file ONLY. test.env and prd.env have identical keys; only values differ.
+        env_keys = ["APP_ENV", "LOG_DIR", "PG_HOST", "PG_PORT", "PG_USER", "PG_DB",
+                    "APP_DIR", "VENV_DIR", "STATE_FILE", "PG_BACKUP_LOCATION", "BACKUP_GLOB"]
         env_empty_ok = ["PG_PASSWORD"]
-        # autodeploy.conf ONLY (repo-specific). Nothing here has a default either.
+        # autodeploy.conf ONLY (repo-specific). No defaults here either.
         conf_keys = ["TEST_SERVICES", "PRD_SERVICES", "REQUIRED_TOOLS", "SYSTEMCTL",
                      "TEST_DOWN_SCRIPT", "TEST_DOWN_TIMEOUT"]
         conf_empty_ok = ["TEST_TIMERS", "PRD_TIMERS", "INSTALLABLE_TOOLS", "PERSISTENT_RESOURCES"]
         if self.is_test:        # only the TEST run restores/compares/snapshots
-            env_keys += ["PIFITNESS_PRD_BACKUP_GLOB", "PRD_ENV_FILE"]
-            conf_keys += ["MIGRATIONS_TABLE", "TEST_DB_MARKER", "BACKUP_WARN_AGE_HOURS"]
+            conf_keys += ["MIGRATIONS_TABLE", "TEST_DB_MARKER", "BACKUP_WARN_AGE_HOURS",
+                          "ENV_FILE_DIR", "PRD_APP_ENV"]
         c.require(env=env_keys, env_may_be_empty=env_empty_ok,
                   conf=conf_keys, conf_may_be_empty=conf_empty_ok)
 
-        # Pi env file values
+        # This run's own env file (the file IS the environment)
         self.log_dir = c.env_value("LOG_DIR")
-        self.backup_dir = c.env_value("PIFITNESS_PRD_BACKUP_DIR")
-        self.backup_glob = c.env_value("PIFITNESS_PRD_BACKUP_GLOB") if self.is_test else None
-        self.app_dir = c.env_value(per + "_APP_DIR")
-        self.venv_dir = c.env_value(per + "_VENV_DIR")
-        self.state_file = c.env_value(per + "_STATE_FILE")
-        self.test_state_file = c.env_value("TEST_STATE_FILE")
+        self.backup_dir = c.env_value("PG_BACKUP_LOCATION")
+        self.app_dir = c.env_value("APP_DIR")
+        self.venv_dir = c.env_value("VENV_DIR")
+        self.state_file = c.env_value("STATE_FILE")
+        self.test_state_file = self.state_file if self.is_test else None
 
         # autodeploy.conf values
         self.test_units = c.conf_words("TEST_TIMERS") + c.conf_words("TEST_SERVICES")
@@ -184,6 +182,7 @@ class Preflight:
             raise HelperError("TEST_DOWN_TIMEOUT must be a whole number of seconds >= 1 (got %r)"
                               % c.conf_value("TEST_DOWN_TIMEOUT"), c.conf_path)
 
+        self.nightly_dir = self.nightly_glob = None
         if self.is_test:
             self.marker = c.conf_value("TEST_DB_MARKER")
             self.migrations_table = c.conf_value("MIGRATIONS_TABLE")
@@ -198,21 +197,24 @@ class Preflight:
                 raise HelperError("BACKUP_WARN_AGE_HOURS must be a positive number (got %r)"
                                   % c.conf_value("BACKUP_WARN_AGE_HOURS"), c.conf_path)
 
-            # The PRD connection comes from the PRD env file, whose path is itself an env value.
-            prd_env_path = c.env_value("PRD_ENV_FILE")
-            prd_values = parse_kv_file(prd_env_path)          # fails if absent / malformed
-            self.prd_target = PgTarget.from_values("PRD", prd_values, prd_env_path)
+            # PRD is only ever READ by a TEST run, and only through this one loader.
+            source = load_prd_source(c)
+            self.prd_target = source.target
+            self.nightly_dir = source.backup_dir
+            self.nightly_glob = source.backup_glob
             self.test_target = PgTarget.from_values("TEST", c.envvals, c.env_path)
-            evidence("prd_env_file", prd_env_path)
+            evidence("prd_source_env_file", "%s (read-only use: DB connection + nightly dumps)"
+                     % source.env_path)
         else:
             self.prd_target = PgTarget.from_values("PRD", c.envvals, c.env_path)
 
         evidence("environment", c.environment)
+        evidence("app_env", c.env_value("APP_ENV"))
         evidence("commit", c.commit)
         evidence("config_file", c.conf_path)
         evidence("env_file", c.env_path)
         evidence("required_keys_checked", "%d (all present)" % (
-            len(set(env_keys)) + len(env_empty_ok) + len(conf_keys) + len(conf_empty_ok)))
+            len(env_keys) + len(env_empty_ok) + len(conf_keys) + len(conf_empty_ok)))
 
     # ----------------------------------------------------------- 2. terminal
     def stage_terminal(self):
@@ -275,6 +277,12 @@ class Preflight:
 
         need_dir("log_dir", self.log_dir)
         need_dir("backup_dir", self.backup_dir)
+        if self.is_test:        # nightlies are only READ; they may live elsewhere than baselines
+            readable = os.path.isdir(self.nightly_dir) and os.access(self.nightly_dir, os.R_OK | os.X_OK)
+            evidence("nightly_dir", "%s (%s)" % (self.nightly_dir,
+                                                  "exists, readable" if readable else "MISSING or NOT READABLE"))
+            if not readable:
+                problems.append("nightly_dir: %s" % self.nightly_dir)
         need_dir("app_dir_parent", os.path.dirname(os.path.abspath(self.app_dir)))
         evidence("app_dir", "%s (%s)" % (self.app_dir, "exists" if os.path.isdir(self.app_dir)
                                           else "does not exist yet"))
@@ -395,7 +403,8 @@ class Preflight:
     # ----------------------------------------------------- remediation
     def stage_remediate(self):
         active = [u for u in self.test_units if self.unit_state[u][1] in ACTIVE_STATES]
-        evidence("test_state_file", self.test_state_file)
+        if self.is_test:
+            evidence("test_state_file", self.test_state_file)
         if not active:
             evidence("test_units_active", "none; test-down.sh not needed")
             return
@@ -531,7 +540,7 @@ class Preflight:
 
     # ---------------------------------------------------------- snapshot
     def stage_snapshot(self):
-        pattern = os.path.join(self.backup_dir, self.backup_glob)
+        pattern = os.path.join(self.nightly_dir, self.nightly_glob)
         files = [f for f in glob.glob(pattern) if os.path.isfile(f)]
         evidence("nightly_snapshots_found", len(files))
         if not files:
@@ -612,8 +621,8 @@ class Preflight:
 
         if action != "keep" and not snap["usable"]:
             raise HelperError("database action '%s' needs a usable PRD nightly backup but there is "
-                              "none in %s" % (action, self.backup_dir),
-                              os.path.join(self.backup_dir, self.backup_glob))
+                              "none in %s" % (action, self.nightly_dir),
+                              os.path.join(self.nightly_dir, self.nightly_glob))
         evidence("decision", "database action = %s" % action)
         self.decision.update({
             "DB_CLASSIFICATION": cls, "DB_CLASSIFICATION_REASON": reason, "DB_ACTION": action,
