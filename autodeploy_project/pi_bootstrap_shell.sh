@@ -76,9 +76,18 @@ cleanup() {
 
 trap cleanup EXIT
 
-# Extract the complete deployment scripts directory from
-# the requested commit, including supporting libraries.
-git -C "$REPO" archive "$COMMIT" deploy/scripts |
+# Extract the deployment tooling from the requested commit:
+#   deploy/scripts  the scripts and their supporting libraries (required)
+#   deploy/systemd  the unit files the commit defines (autodeploy.sh reads the
+#                   unit lists from it, before any checkout exists). Optional:
+#                   a commit without that directory simply defines no units.
+# Helpers find deploy/systemd as a sibling of deploy/scripts (common.py,
+# systemd_unit_dir): the two names must agree.
+EXTRACT_PATHS=(deploy/scripts)
+if git -C "$REPO" cat-file -e "$COMMIT:deploy/systemd" 2>/dev/null; then
+    EXTRACT_PATHS+=(deploy/systemd)
+fi
+git -C "$REPO" archive "$COMMIT" "${EXTRACT_PATHS[@]}" |
     tar -xf - -C "$TMP_DIR"
 
 SCRIPT="$TMP_DIR/deploy/scripts/autodeploy.sh"

@@ -33,6 +33,8 @@ Terminal         open_tty(), ask_tty()
 PostgreSQL       PgTarget, PgError, psql_rows(), norm_host()
 DB state marker  read_db_marker(), update_db_marker()   (TEST/PRD state files)
 Filesystem       writable_dir(), nearest_existing_ancestor(), is_inside()
+systemd units    systemd_unit_dir(), discover_unit_files(), list_matching_units(),
+                 ACTIVE_UNIT_STATES  (what a commit defines vs what is running)
 Formatting       human_size(), human_age(), words()
 
 Python 3 standard library only.
@@ -870,3 +872,79 @@ def nearest_existing_ancestor(path):
 def is_inside(path, parent):
     path, parent = os.path.realpath(path), os.path.realpath(parent)
     return path == parent or path.startswith(parent.rstrip(os.sep) + os.sep)
+
+
+# ----------------------------------------------------------------------------
+# systemd units: what a commit defines vs what is running on the Pi
+#   No unit is ever named in configuration. The units a commit defines are the
+#   *.service / *.timer files in its deploy/systemd directory; what is running is
+#   read from systemd itself.
+# ----------------------------------------------------------------------------
+ACTIVE_UNIT_STATES = ("active", "activating", "reloading", "deactivating")
+
+# A plain unit file name. No leading "-" (it would be read as an option by systemctl),
+# no "@" (template units cannot be started without an instance).
+UNIT_FILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9:_.-]*\.(service|timer)$")
+
+
+def systemd_unit_dir(script_dir):
+    """The commit's deploy/systemd: a sibling of deploy/scripts.
+
+    pi_bootstrap_shell.sh extracts it next to deploy/scripts; the directory name
+    ("systemd") must agree in both places.
+    """
+    return os.path.normpath(os.path.join(script_dir, os.pardir, "systemd"))
+
+
+def discover_unit_files(unit_dir):
+    """Units a commit defines -> (services, timers, ignored, note).
+
+    services / timers  sorted names of the *.service / *.timer files in unit_dir
+    ignored            [(entry, reason)] for everything else found there
+    note               "" when something was found, else why nothing was
+    Copes with every combination: services only, timers only, both, neither, an
+    empty directory, or no directory at all (none of those is an error here).
+    """
+    services, timers, ignored = [], [], []
+    if not os.path.isdir(unit_dir):
+        return services, timers, ignored, "directory does not exist"
+    try:
+        entries = sorted(os.listdir(unit_dir))
+    except OSError as exc:
+        raise HelperError("cannot read the systemd unit directory: %s" % exc.strerror,
+                          unit_dir)
+    for entry in entries:
+        if not os.path.isfile(os.path.join(unit_dir, entry)):
+            ignored.append((entry, "not a file"))
+        elif not entry.endswith((".service", ".timer")):
+            ignored.append((entry, "not a .service or .timer file"))
+        elif entry.rsplit(".", 1)[0].endswith("@"):
+            ignored.append((entry, "template unit: cannot be started without an instance"))
+        elif not UNIT_FILE_RE.match(entry):
+            ignored.append((entry, "not a plain unit file name"))
+        elif entry.endswith(".service"):
+            services.append(entry)
+        else:
+            timers.append(entry)
+    note = "" if (services or timers) else "no .service or .timer files"
+    return services, timers, ignored, note
+
+
+def list_matching_units(systemctl_cmd, name_glob):
+    """Loaded *.service / *.timer units whose name matches name_glob (read-only).
+
+    -> [(unit, load_state, active_state)] sorted by unit name.
+    systemctl_cmd is the configured SYSTEMCTL as a word list (e.g. ["sudo", "-n", "systemctl"]).
+    """
+    argv = list(systemctl_cmd) + ["list-units", "--all", "--plain", "--no-legend",
+                                  "--no-pager", "--type=service,timer", name_glob]
+    result = run_cmd(argv, timeout=30)
+    if not result.ok:
+        raise HelperError("cannot list systemd units matching %r: %s"
+                          % (name_glob, result.first_error_line()), result.command())
+    units = set()
+    for line in result.stdout.splitlines():
+        parts = line.split(None, 4)           # UNIT LOAD ACTIVE SUB DESCRIPTION
+        if len(parts) >= 4 and parts[0].endswith((".service", ".timer")):
+            units.add((parts[0], parts[1], parts[2]))
+    return sorted(units)

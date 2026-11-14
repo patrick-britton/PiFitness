@@ -21,7 +21,7 @@ TEST run                                   PRD run
   terminal (required)                        terminal (reported only)
   tools                                      tools
   paths                                      paths
-  units exist (TEST + PRD)                   units exist (PRD)
+  units (defined + running)                  units (defined + running)
   PRD database + migrations                  PRD database (reachable/writable)
   auto test-down                             PRD state marker (stale dirty?)
   TEST database, markers, comparison         auto test-down
@@ -39,6 +39,11 @@ Decision handed to later steps (written to run.state):
     TEST_STATE_AT_START / PRD_STATE_AT_START   clean|dirty|migrated|absent|unreadable
     PRD_STALE_DIRTY     yes | no   (PRD run)
     PRD_BASELINE_DUMP   recorded baseline when PRD_STALE_DIRTY=yes
+    SERVICES_LIST       *.service files in the commit's deploy/systemd (space-separated)
+    TIMERS_LIST         *.timer files in the commit's deploy/systemd   (space-separated)
+    ACTIVE_SERVICES     PiFitness services running on the Pi when preflight ran, minus the
+    ACTIVE_TIMERS       listed ones (and the same for timers): what a later step stops and
+                        restores. Space-separated; empty when none.
     PREFLIGHT           PASS
 
 Exit: 0 pass, 1 fail (REASON:/WHERE: printed).  Never 10 (reserved).
@@ -52,14 +57,14 @@ import shutil
 import sys
 import time
 
-from common import (HelperError, Parser, PgError, PgTarget, ask_tty, evidence,
-                    human_age, human_size, info, is_inside, load_context,
-                    load_prd_source, nearest_existing_ancestor, open_tty,
-                    psql_rows, read_db_marker, run_cmd, step_main, update_state,
-                    warn, writable_dir)
+from common import (ACTIVE_UNIT_STATES as ACTIVE_STATES, HelperError, Parser, PgError,
+                    PgTarget, ask_tty, discover_unit_files, evidence, human_age,
+                    human_size, info, is_inside, list_matching_units, load_context,
+                    load_prd_source, nearest_existing_ancestor, open_tty, psql_rows,
+                    read_db_marker, run_cmd, step_main, systemd_unit_dir,
+                    update_state, warn, writable_dir)
 
 INTRINSIC_TOOLS = ("psql", "pg_dump", "pg_restore", "systemctl")  # this helper needs them
-ACTIVE_STATES = ("active", "activating", "reloading", "deactivating")
 IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
 SAMPLE_LINES = 20
 
@@ -108,7 +113,13 @@ class Preflight:
         self.is_test = ctx.environment == "test"
         self.per = "TEST" if self.is_test else "PRD"
         self.decision = {}
-        self.unit_state = {}
+        self.unit_state = {}            # unit -> (LoadState, ActiveState), for the listed units
+        self.services_list = []         # *.service the commit defines (deploy/systemd)
+        self.timers_list = []           # *.timer the commit defines
+        self.test_units = []            # timers + services of those two lists
+        self.active_services = []       # PiFitness services running at the start
+        self.active_timers = []         # PiFitness timers running at the start
+        self.active_units = []          # timers + services of those two lists
         self.test_target = None
         self.prd_target = None
         self.prd_versions = None
@@ -152,9 +163,9 @@ class Preflight:
                     "APP_DIR", "VENV_DIR", "STATE_FILE", "PG_BACKUP_LOCATION", "BACKUP_GLOB"]
         env_empty_ok = ["PG_PASSWORD"]
         # autodeploy.conf ONLY (repo-specific). No defaults here either.
-        conf_keys = ["TEST_SERVICES", "PRD_SERVICES", "REQUIRED_TOOLS", "SYSTEMCTL",
+        conf_keys = ["UNIT_NAME_GLOB", "REQUIRED_TOOLS", "SYSTEMCTL",
                      "TEST_DOWN_SCRIPT", "TEST_DOWN_TIMEOUT"]
-        conf_empty_ok = ["TEST_TIMERS", "PRD_TIMERS", "INSTALLABLE_TOOLS", "PERSISTENT_RESOURCES"]
+        conf_empty_ok = ["INSTALLABLE_TOOLS", "PERSISTENT_RESOURCES"]
         if self.is_test:        # only the TEST run restores/compares/snapshots
             conf_keys += ["MIGRATIONS_TABLE", "TEST_DB_MARKER", "BACKUP_WARN_AGE_HOURS",
                           "ENV_FILE_DIR", "PRD_APP_ENV"]
@@ -170,8 +181,6 @@ class Preflight:
         self.test_state_file = self.state_file if self.is_test else None
 
         # autodeploy.conf values
-        self.test_units = c.conf_words("TEST_TIMERS") + c.conf_words("TEST_SERVICES")
-        self.prd_units = c.conf_words("PRD_TIMERS") + c.conf_words("PRD_SERVICES")
         self.systemctl_cmd = c.conf_words("SYSTEMCTL")
         self.test_down_script = c.conf_value("TEST_DOWN_SCRIPT")
         try:
@@ -322,19 +331,73 @@ class Preflight:
         return values.get("LoadState", "unknown"), values.get("ActiveState", "unknown")
 
     def stage_units(self):
-        must_exist = self.prd_units + (self.test_units if self.is_test else [])
-        check = list(dict.fromkeys(must_exist + self.test_units))
+        """Work out the two unit sets at run time. Nothing is listed in configuration.
+
+        SERVICES_LIST / TIMERS_LIST   the *.service / *.timer files in the commit's
+                                      deploy/systemd: the units the commit defines
+                                      (the TEST units).
+        ACTIVE_SERVICES / ACTIVE_TIMERS  the PiFitness units running on the Pi right now
+                                      (UNIT_NAME_GLOB says which units are PiFitness's),
+                                      minus the listed ones: what a later step stops
+                                      and restores.
+        """
+        c = self.ctx
+        pattern = c.conf_value("UNIT_NAME_GLOB")
+        if pattern[0] in "*?[":
+            raise HelperError("UNIT_NAME_GLOB must start with literal text (got %r): a pattern "
+                              "that matches unrelated units would have them stopped" % pattern,
+                              c.conf_path)
+
+        # --- units the commit defines
+        unit_dir = systemd_unit_dir(c.script_dir)
+        services, timers, ignored, note = discover_unit_files(unit_dir)
+        self.services_list, self.timers_list = services, timers
+        self.test_units = timers + services              # timers first: they are stopped first
+        evidence("units_dir", "%s (%s)" % (unit_dir, note or "%d service(s), %d timer(s)"
+                                           % (len(services), len(timers))))
+        evidence("services_list", " ".join(services) or "none")
+        evidence("timers_list", " ".join(timers) or "none")
+        for entry, reason in ignored:
+            evidence("units_dir_ignored", "%s (%s)" % (entry, reason))
+        if note and self.is_test:
+            warn("this commit defines no systemd units (%s in %s): either the commit has no "
+                 "deploy/systemd, or the launcher did not extract it. A TEST run would have "
+                 "nothing to start." % (note, unit_dir))
+
+        # --- state of each defined unit (also the only way to see one that is not installed)
         missing = []
-        for unit in check:
+        for unit in self.test_units:
             load, active = self.unit_state[unit] = self.systemctl_show(unit)
             evidence("unit_" + unit, "%s, %s" % (load, active))
-            if unit in must_exist and load != "loaded":
+            if load != "loaded":
                 missing.append("%s (%s)" % (unit, load))
-        if missing:
-            raise HelperError("systemd unit(s) listed in config do not exist: %s" % ", ".join(missing),
-                              "TEST_SERVICES/TEST_TIMERS/PRD_SERVICES/PRD_TIMERS in %s" % self.ctx.conf_path)
-        prd_active = [u for u in self.prd_units if self.unit_state[u][1] in ACTIVE_STATES]
-        evidence("prd_units_active", ", ".join(prd_active) or "none")
+
+        # --- units running on the Pi now
+        matching = list_matching_units(self.systemctl_cmd, pattern)
+        evidence("unit_name_glob", "%s (%d loaded unit(s) match)" % (pattern, len(matching)))
+        defined = set(self.test_units)
+        for unit, load, active in matching:
+            if unit not in defined:                      # defined ones were shown above
+                evidence("unit_" + unit, "%s, %s" % (load, active))
+        running = [u for u, _load, active in matching
+                   if active in ACTIVE_STATES and u not in defined]
+        self.active_services = [u for u in running if u.endswith(".service")]
+        self.active_timers = [u for u in running if u.endswith(".timer")]
+        self.active_units = self.active_timers + self.active_services      # stop order
+        evidence("active_services", " ".join(self.active_services) or "none")
+        evidence("active_timers", " ".join(self.active_timers) or "none")
+
+        self.decision.update({
+            "SERVICES_LIST": " ".join(self.services_list),
+            "TIMERS_LIST": " ".join(self.timers_list),
+            "ACTIVE_SERVICES": " ".join(self.active_services),
+            "ACTIVE_TIMERS": " ".join(self.active_timers)})
+
+        # A TEST run must start every defined unit, so each one has to be installed.
+        # (A PRD run only needs to know whether any of them is running: see remediation.)
+        if missing and self.is_test:
+            raise HelperError("unit file(s) in deploy/systemd are not installed on the Pi, "
+                              "so TEST could not start them: %s" % ", ".join(missing), unit_dir)
 
     # ----------------------------------------------------------- 6. PRD DB
     def stage_prd_database(self):
@@ -633,7 +696,7 @@ class Preflight:
 
     # --------------------------------------------------------------- plan
     def stage_plan(self):
-        prd_active = [u for u in self.prd_units if self.unit_state[u][1] in ACTIVE_STATES]
+        prd_active = self.active_units
         if self.is_test:
             action = self.decision["DB_ACTION"]
             text = {"keep": "keep the current TEST database",
