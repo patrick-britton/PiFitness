@@ -18,6 +18,7 @@ OBJECTIVE
 STAGES
     (1/8) Configuration             keys, paths, safety guards (read-only)
     (2/8) Fetch the exact commit    registers the undo, builds <APP_DIR>.stage-<run id>
+                                    from the launcher's local repo (see SOURCE)
     (3/8) Verify the checkout       HEAD == requested SHA, clean tree, expected paths
     (4/8) Persistent resources      copied from the previous checkout (it is not modified)
     (5/8) Environment file          symlink (TEST) or copy (PRD) at CHECKOUT_ENV_FILE_PATH
@@ -25,8 +26,18 @@ STAGES
     (7/8) Swap in                   one atomic exchange
     (8/8) Previous checkout         TEST: deleted. PRD: retained for the exit handler.
 
+SOURCE OF THE COMMIT (nothing to configure: no URL, no branch)
+    The launcher has already fetched the exact commit (its SHA is --commit) into the repo at
+    the PRD app dir before autodeploy.sh starts. This step fetches that one SHA from there:
+        PRD run : the repo is this run's own APP_DIR (read before the swap replaces it)
+        TEST run: the repo is APP_DIR from prd.env (read via common.load_prd_source)
+    Stage 1 proves, read-only, that the path is a git checkout that contains the commit and
+    has an 'origin' remote. The new checkout is given the SAME 'origin' URL, so after a swap
+    the launcher's next "git fetch origin ..." still works in the new directory.
+
 KEYS (no defaults anywhere; a missing key fails the step before anything is touched)
-    Pi env file     APP_DIR  VENV_DIR  STATE_FILE  LOG_DIR  GIT_REMOTE
+    Pi env file     APP_DIR  VENV_DIR  STATE_FILE  LOG_DIR
+                    (TEST run also: APP_DIR in prd.env, which load_prd_source requires)
     autodeploy.conf CHECKOUT_EXPECTED_PATHS  CHECKOUT_ENV_FILE_PATH  PERSISTENT_RESOURCES (may be empty)
 
 STATE WRITTEN (run.state), all BEFORE anything is changed, so undo_checkout.py can act
@@ -44,8 +55,9 @@ import shutil
 import sys
 import time
 
-from common import (HelperError, Parser, evidence, info, is_inside, load_context, register_undo,
-                    run_cmd, step_main, update_state, warn, words, writable_dir)
+from common import (HelperError, Parser, evidence, info, is_inside, load_context,
+                    load_prd_source, register_undo, run_cmd, step_main, update_state, warn,
+                    words, writable_dir)
 import checkoutlib as cl
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -136,7 +148,7 @@ class Checkout:
     # --------------------------------------------------------------- 1. config
     def stage_config(self):
         c = self.ctx
-        c.require(env=["APP_DIR", "VENV_DIR", "STATE_FILE", "LOG_DIR", "GIT_REMOTE"],
+        c.require(env=["APP_DIR", "VENV_DIR", "STATE_FILE", "LOG_DIR"],
                   conf=["CHECKOUT_EXPECTED_PATHS", "CHECKOUT_ENV_FILE_PATH"],
                   conf_may_be_empty=["PERSISTENT_RESOURCES"])
 
@@ -180,6 +192,8 @@ class Checkout:
         if not git.ok:
             raise HelperError("git is not usable: %s" % git.first_error_line(), git.command())
 
+        self.resolve_source_repo()
+
         self.expected_paths = [clean_relative(p, "CHECKOUT_EXPECTED_PATHS entry", c.conf_path)
                                for p in c.conf_words("CHECKOUT_EXPECTED_PATHS")]
         self.env_rel = clean_relative(c.conf_value("CHECKOUT_ENV_FILE_PATH"),
@@ -220,13 +234,45 @@ class Checkout:
         evidence("requested_sha", self.sha)
         evidence("app_dir", "%s (%s)" % (self.app_dir, "previous checkout present"
                                          if self.previous_exists else "does not exist yet"))
-        evidence("git_remote", mask_url(c.env_value("GIT_REMOTE")))
+        evidence("source_repo", "%s (contains the commit)" % self.source_repo)
+        evidence("origin_remote", "%s (copied onto the new checkout)" % mask_url(self.origin_url))
         evidence("staging_dir", self.stage)
         evidence("env_file_wiring", "%s backend file %s -> %s" % (
             "symlink" if self.test_run else "copy", self.env_rel, self.env_source))
         evidence("previous_checkout_policy", "deleted right after the swap" if self.test_run
                  else "retained until the exit handler decides (success: deleted; else: swapped back)")
         evidence("leftover_stage_dirs", str(len(stale)))
+
+    def resolve_source_repo(self):
+        """Find the repo the launcher fetched the commit into; read-only.
+
+        Sets self.source_repo and self.origin_url. Nothing is configured: a PRD run uses its
+        own APP_DIR, a TEST run uses APP_DIR from prd.env.
+        """
+        c = self.ctx
+        if self.test_run:
+            prd = load_prd_source(c)
+            path, whose, where = prd.app_dir, "APP_DIR in prd.env", prd.env_path
+        else:
+            path, whose, where = self.app_dir, "APP_DIR", c.env_path
+        if not os.path.isabs(path):
+            raise HelperError("%s must be an absolute path: %r" % (whose, path), where)
+        path = os.path.normpath(path.rstrip(os.sep) or os.sep)
+        if not os.path.isdir(os.path.join(path, ".git")):
+            raise HelperError("%s (%s) is not a git checkout; the launcher fetches the commit "
+                              "into it, so it must be one" % (whose, path), where)
+        have = self.git(["cat-file", "-e", "%s^{commit}" % self.sha], cwd=path, timeout=60)
+        if not have.ok:
+            raise HelperError("commit %s is not in %s (%s): %s; the launcher fetches the "
+                              "commit into the repo it was started with, so this is not that "
+                              "repo" % (self.sha, path, whose, have.first_error_line()), where)
+        origin = self.git(["config", "--get", "remote.origin.url"], cwd=path, timeout=60)
+        url = origin.stdout.strip() if origin.ok else ""
+        if not url:
+            raise HelperError("the repo at %s has no 'origin' remote. The launcher's "
+                              "'git fetch origin' needs one, and the new checkout could not "
+                              "be given one" % path, where)
+        self.source_repo, self.origin_url = path, url
 
     # ---------------------------------------------------------------- git helpers
     def git(self, args, cwd=None, timeout=300, echo=False, extra_env=None):
@@ -259,7 +305,7 @@ class Checkout:
     # ---------------------------------------------------------- 2. fetch commit
     def stage_fetch(self):
         c = self.ctx
-        remote = c.env_value("GIT_REMOTE")
+        source = self.source_repo
 
         # Everything the undo needs is recorded BEFORE the first thing is created.
         register_undo(c.run_dir, UNDO_NAME)
@@ -288,23 +334,22 @@ class Checkout:
         if not init.ok:
             self.git_fail("git init failed", init)
 
-        # Preferred: fetch only the one commit. Some servers refuse a fetch by SHA; then
-        # fetch all branch heads and require the commit to be among them.
-        method = "shallow fetch of the exact SHA"
-        shallow = self.git(["fetch", "--no-tags", "--depth", "1", remote, self.sha],
+        # Fetch only the one commit, from the launcher's local repo. If a shallow fetch is
+        # refused, retry the same SHA without --depth (still one commit's worth, locally).
+        method = "shallow fetch of the exact SHA from the local repo"
+        shallow = self.git(["fetch", "--no-tags", "--depth", "1", source, self.sha],
                            timeout=900, echo=True)
         if not shallow.ok:
-            warn("fetch by SHA failed (%s); falling back to fetching all branches"
+            warn("shallow fetch failed (%s); retrying without --depth"
                  % mask_url(shallow.first_error_line()))
-            full = self.git(["fetch", "--no-tags", remote, "+refs/heads/*:refs/remotes/origin/*"],
-                            timeout=1800, echo=True)
+            full = self.git(["fetch", "--no-tags", source, self.sha], timeout=900, echo=True)
             if not full.ok:
-                self.git_fail("cannot fetch from GIT_REMOTE", full)
-            method = "full fetch of all branches"
+                self.git_fail("cannot fetch the commit from the local repo %s" % source, full)
+            method = "fetch of the exact SHA from the local repo (no --depth)"
         have = self.git(["cat-file", "-e", "%s^{commit}" % self.sha], timeout=60)
         if not have.ok:
-            raise HelperError("commit %s is not available from GIT_REMOTE (was it pushed?)"
-                              % self.sha, mask_url(remote))
+            raise HelperError("commit %s is not available after fetching from %s"
+                              % (self.sha, source), mask_url(source))
         checkout = self.git(["-c", "advice.detachedHead=false", "checkout", "-q", "--detach",
                              "--force", self.sha], timeout=600)
         if not checkout.ok:
@@ -312,7 +357,13 @@ class Checkout:
         if os.path.exists(os.path.join(self.stage, ".gitmodules")):
             raise HelperError("the commit uses git submodules, which this step does not fetch; "
                               "a silent partial checkout is refused", self.stage)
+        # Give the new checkout the same 'origin' as the repo it replaces, so the launcher's
+        # next "git fetch origin ..." (run inside this directory) keeps working after a swap.
+        remote = self.git(["remote", "add", "origin", self.origin_url], timeout=60)
+        if not remote.ok:
+            self.git_fail("cannot set the origin remote on the new checkout", remote)
         evidence("fetch_method", method)
+        evidence("origin_remote_set", mask_url(self.origin_url))
 
     # ------------------------------------------------------------- 3. verify
     def stage_verify(self):

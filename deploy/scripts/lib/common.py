@@ -615,13 +615,15 @@ class RunContext:
 # same ENV_FILE_DIR the run itself came from. Nothing in test.env points at PRD, and
 # no other helper may open prd.env.
 class PrdSource:
-    """What a TEST run may know about PRD: a DB connection and where nightlies live."""
+    """What a TEST run may know about PRD: a DB connection, where nightlies live, and the
+    PRD app dir (the repo the launcher fetches the commit into; step_checkout reads it)."""
 
-    def __init__(self, env_path, target, backup_dir, backup_glob):
+    def __init__(self, env_path, target, backup_dir, backup_glob, app_dir=""):
         self.env_path = env_path
         self.target = target
         self.backup_dir = backup_dir
         self.backup_glob = backup_glob
+        self.app_dir = app_dir
 
 
 def expected_app_env(conf, conf_path, environment):
@@ -644,7 +646,8 @@ def load_prd_source(ctx):
     values = parse_kv_file(path)
     absent, empty = check_keys(
         values, ("APP_ENV", "PG_HOST", "PG_PORT", "PG_USER", "PG_DB",
-                 "PG_BACKUP_LOCATION", "BACKUP_GLOB"), may_be_empty=("PG_PASSWORD",))
+                 "PG_BACKUP_LOCATION", "BACKUP_GLOB", "APP_DIR"),
+        may_be_empty=("PG_PASSWORD",))
     if absent or empty:
         raise HelperError("PRD env file is incomplete (%s)" % describe_gaps(absent, empty), path)
     expected = expected_app_env(ctx.conf, ctx.conf_path, "prd")
@@ -652,7 +655,7 @@ def load_prd_source(ctx):
         raise HelperError("PRD env file has APP_ENV=%r but autodeploy.conf expects %r for PRD"
                           % (values["APP_ENV"], expected), path)
     return PrdSource(path, PgTarget.from_values("PRD", values, path),
-                     values["PG_BACKUP_LOCATION"], values["BACKUP_GLOB"])
+                     values["PG_BACKUP_LOCATION"], values["BACKUP_GLOB"], values["APP_DIR"])
 
 
 def load_context(run_dir):
