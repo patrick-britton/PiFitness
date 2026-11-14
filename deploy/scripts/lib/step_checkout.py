@@ -21,7 +21,7 @@ STAGES
                                     from the launcher's local repo (see SOURCE)
     (3/8) Verify the checkout       HEAD == requested SHA, clean tree, expected paths
     (4/8) Persistent resources      copied from the previous checkout (it is not modified)
-    (5/8) Environment file          symlink (TEST) or copy (PRD) at CHECKOUT_ENV_FILE_PATH
+    (5/8) Environment file          symlink (TEST) or copy (PRD) at ENV_FILE_IN_CHECKOUT
     (6/8) Final checks              untracked files must be 0 apart from the two above
     (7/8) Swap in                   one atomic exchange
     (8/8) Previous checkout         TEST: deleted. PRD: retained for the exit handler.
@@ -38,7 +38,9 @@ SOURCE OF THE COMMIT (nothing to configure: no URL, no branch)
 KEYS (no defaults anywhere; a missing key fails the step before anything is touched)
     Pi env file     APP_DIR  VENV_DIR  STATE_FILE  LOG_DIR
                     (TEST run also: APP_DIR in prd.env, which load_prd_source requires)
-    autodeploy.conf CHECKOUT_EXPECTED_PATHS  CHECKOUT_ENV_FILE_PATH  PERSISTENT_RESOURCES (may be empty)
+    autodeploy.conf PERSISTENT_RESOURCES (may be empty)
+    (Where the env file goes inside the checkout is the constant ENV_FILE_IN_CHECKOUT
+     below: the application reads it from there, and it never varies per environment.)
 
 STATE WRITTEN (run.state), all BEFORE anything is changed, so undo_checkout.py can act
 even if this process is killed:
@@ -62,6 +64,9 @@ import checkoutlib as cl
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 UNDO_NAME = "checkout"
+# Where the application reads its env file inside a checkout (objectives D17). Fixed by
+# the application, identical for TEST and PRD, so it is a constant, not configuration.
+ENV_FILE_IN_CHECKOUT = "backend/.env"
 SAMPLE = 20
 TOTAL_STAGES = 8
 
@@ -149,7 +154,6 @@ class Checkout:
     def stage_config(self):
         c = self.ctx
         c.require(env=["APP_DIR", "VENV_DIR", "STATE_FILE", "LOG_DIR"],
-                  conf=["CHECKOUT_EXPECTED_PATHS", "CHECKOUT_ENV_FILE_PATH"],
                   conf_may_be_empty=["PERSISTENT_RESOURCES"])
 
         self.sha = c.commit.strip().lower()
@@ -194,10 +198,10 @@ class Checkout:
 
         self.resolve_source_repo()
 
-        self.expected_paths = [clean_relative(p, "CHECKOUT_EXPECTED_PATHS entry", c.conf_path)
-                               for p in c.conf_words("CHECKOUT_EXPECTED_PATHS")]
-        self.env_rel = clean_relative(c.conf_value("CHECKOUT_ENV_FILE_PATH"),
-                                      "CHECKOUT_ENV_FILE_PATH", c.conf_path)
+        # Nothing to configure: the commit must hold what this deploy itself depends on, the
+        # directory the env file goes into and the deploy/scripts the launcher extracted.
+        self.env_rel = ENV_FILE_IN_CHECKOUT
+        self.expected_paths = [os.path.dirname(self.env_rel), os.path.join("deploy", "scripts")]
         self.env_source = os.path.abspath(c.env_path)
 
         # Persistent resources: relative to APP_DIR (or absolute). Only those INSIDE the app
@@ -379,7 +383,7 @@ class Checkout:
                    if not os.path.exists(os.path.join(self.stage, p))]
         if missing:
             raise HelperError("expected top-level path(s) missing from the commit: %s"
-                              % ", ".join(missing), "CHECKOUT_EXPECTED_PATHS in " + self.ctx.conf_path)
+                              % ", ".join(missing), "step_checkout.py (ENV_FILE_IN_CHECKOUT)")
         tracked = self.git(["ls-files"], timeout=120)
         tracked_count = len(tracked.stdout.splitlines()) if tracked.ok else -1
 
@@ -454,7 +458,7 @@ class Checkout:
         parent = os.path.dirname(link)
         if not os.path.isdir(parent):
             raise HelperError("directory for the env file does not exist in the commit: %s"
-                              % os.path.relpath(parent, self.stage), "CHECKOUT_ENV_FILE_PATH")
+                              % os.path.relpath(parent, self.stage), "step_checkout.py (ENV_FILE_IN_CHECKOUT)")
         if os.path.lexists(link):
             raise HelperError("%s already exists in the commit; refusing to overwrite it"
                               % self.env_rel, self.stage)
