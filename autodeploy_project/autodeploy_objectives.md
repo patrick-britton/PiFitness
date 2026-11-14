@@ -337,7 +337,7 @@ The exit handler rolls back PRD to the **specific** baseline dump recorded in th
 2. Verify the public URL is served by TEST, not PRD (version/commit/environment endpoint or header).
 3. Fail if TEST is not healthy within the timeout.
 4. Before installing anything, register the `halt_units` undo (section 4.2, "Undo order") so the exit handler stops the new units before any other undo runs.
-
+5. Run `npm build`
 **Required evidence:** unit states, health check result and response time, URL and what it reported (environment = TEST, SHA), confirmation PRD units are inactive.
 
 ---
