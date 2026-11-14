@@ -9,7 +9,7 @@ Makes the machine's dependencies match what the checked-out commit declares:
     1. dbmate            pinned in tools.conf; installed (or replaced) only when the version differs
     2. Python venv       `uv sync --locked` from uv.lock into VENV_DIR, then a second sync that must
                          change nothing, `uv pip check`, and a check that nothing extra is installed
-    3. Node packages     `npm ci` in FRONTEND_DIR from package-lock.json
+    3. Node packages     `npm ci` next to package-lock.json
     4. Playwright        the browsers named in tools.conf, installed with the venv's own Playwright,
                          then launched once to prove they work
 
@@ -18,10 +18,13 @@ TEST and PRD run exactly this code. Everything that differs comes from the Pi en
 
 Reads
     Pi env file         APP_DIR, VENV_DIR
-    autodeploy.conf     FRONTEND_DIR, DEPENDENCY_GROUPS (may be empty), PRIVILEGE_CMD (may be empty)
+    autodeploy.conf     DEPENDENCY_GROUPS (may be empty), PRIVILEGE_CMD (may be empty)
     tools.conf          INSTALLABLE_TOOLS, PLAYWRIGHT_BROWSERS (both may be empty), DBMATE_VERSION,
                         DBMATE_SHA256_ARM64 (needed when dbmate is listed)
-    The checkout        pyproject.toml, uv.lock, <FRONTEND_DIR>/package-lock.json
+    The checkout        uv.lock (+ pyproject.toml beside it) and package-lock.json (+ package.json
+                        beside it). Their directories are found by searching the checkout; there
+                        must be exactly one of each lockfile, otherwise the step fails and lists
+                        what it found. Nothing about the repo layout is configured.
 
 Writes
     Nothing to run.state and no undo action: the venv, node_modules and the tools are not rolled
@@ -58,6 +61,7 @@ DBMATE_URL = "https://github.com/amacneil/dbmate/releases/download/v%s/dbmate-li
 DBMATE_MACHINES = ("aarch64", "arm64")
 KNOWN_INSTALLABLE = ("dbmate",)                # names INSTALLABLE_TOOLS may contain
 BROWSERS = ("chromium", "firefox", "webkit")   # names PLAYWRIGHT_BROWSERS may contain
+SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".next"}
 LONG_TIMEOUT = 1800                            # uv sync / npm ci / browser download, seconds
 DOWNLOAD_TIMEOUT = 120
 SAMPLE = 20
@@ -149,7 +153,7 @@ class Dependencies:
     # ------------------------------------------------------ 1. config, paths
     def stage_config(self):
         c = self.ctx
-        c.require(env=["APP_DIR", "VENV_DIR"], conf=["FRONTEND_DIR"],
+        c.require(env=["APP_DIR", "VENV_DIR"],
                   conf_may_be_empty=["DEPENDENCY_GROUPS", "PRIVILEGE_CMD"])
         self.app_dir = os.path.abspath(c.env_value("APP_DIR"))
         self.venv_dir = os.path.abspath(c.env_value("VENV_DIR"))
@@ -165,25 +169,33 @@ class Dependencies:
             raise HelperError("VENV_DIR is inside APP_DIR and would be destroyed by the "
                               "checkout swap", "VENV_DIR=%s APP_DIR=%s" % (self.venv_dir, self.app_dir))
 
-        relative = c.conf_value("FRONTEND_DIR")
-        if os.path.isabs(relative) or ".." in relative.split("/"):
-            raise HelperError("FRONTEND_DIR must be a path below the app dir (got %r)" % relative,
-                              c.conf_path)
-        self.frontend_dir = os.path.join(self.app_dir, relative)
-        self.pyproject = os.path.join(self.app_dir, "pyproject.toml")
-        self.uv_lock = os.path.join(self.app_dir, "uv.lock")
+        self.project_dir = self.find_one("uv.lock", "pyproject.toml")
+        self.frontend_dir = self.find_one("package-lock.json", "package.json")
+        self.pyproject = os.path.join(self.project_dir, "pyproject.toml")
+        self.uv_lock = os.path.join(self.project_dir, "uv.lock")
         self.npm_lock = os.path.join(self.frontend_dir, "package-lock.json")
-        for path in (self.pyproject, self.uv_lock, os.path.join(self.frontend_dir, "package.json"),
-                     self.npm_lock):
-            if not os.path.isfile(path):
-                raise HelperError("file expected in the checkout is missing", path)
 
         self.load_tools()
         evidence("app_dir", self.app_dir)
         evidence("venv_dir", "%s (outside the app dir: yes)" % self.venv_dir)
+        evidence("python_project_dir", self.project_dir)
         evidence("frontend_dir", self.frontend_dir)
         evidence("tools_file", os.path.join(c.script_dir, TOOLS_CONF))
         evidence("uv_sync_command", "uv " + " ".join(self.sync_args))
+
+    def find_one(self, lockfile, companion):
+        """The one directory of the checkout that holds `lockfile` (with `companion` beside it)."""
+        found = []
+        for dirpath, dirnames, filenames in os.walk(self.app_dir):
+            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+            if lockfile in filenames:
+                found.append(dirpath)
+        if len(found) != 1:
+            raise HelperError("expected exactly one %s in the checkout, found %s"
+                              % (lockfile, ", ".join(found) if found else "none"), self.app_dir)
+        if not os.path.isfile(os.path.join(found[0], companion)):
+            raise HelperError("%s has no %s beside it" % (lockfile, companion), found[0])
+        return found[0]
 
     def load_tools(self):
         path = os.path.join(self.ctx.script_dir, TOOLS_CONF)
@@ -278,7 +290,7 @@ class Dependencies:
 
     # ----------------------------------------------------- 3. python venv
     def uv(self, args, **kwargs):
-        return run_cmd([self.uv_path] + args, cwd=self.app_dir,
+        return run_cmd([self.uv_path] + args, cwd=self.project_dir,
                        extra_env={"UV_PROJECT_ENVIRONMENT": self.venv_dir}, **kwargs)
 
     def list_packages(self, tolerant=False):
