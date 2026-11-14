@@ -197,7 +197,9 @@ RUN_DIR="${LOG_FILE%.log}.d"
 
 # --- 2. Mirror all output to the log file -------------------------------------
 TEE_PID=""
-exec > >(tee -a "$LOG_FILE") 2>&1
+# tee must outlive Ctrl-C / hangup: they reach the whole process group, and a dead tee
+# breaks the pipe (SIGPIPE) before the exit handler can even print or run cleanup.
+exec > >(trap '' INT HUP; exec tee -a "$LOG_FILE") 2>&1
 TEE_PID=$!
 note "log file:      $LOG_FILE"
 note "run directory: $RUN_DIR"
@@ -206,7 +208,8 @@ note "run directory: $RUN_DIR"
 on_exit() {
     local status=$?
     local final=0
-    trap - EXIT INT TERM
+    trap - EXIT
+    trap '' INT TERM HUP    # cleanup must not be cut short by a second signal
 
     note "run ended with status $status; no further steps will run; entering cleanup..."
     run_helper cleanup.py --run-dir "$RUN_DIR" --exit-status "$status" || final=$?
@@ -220,6 +223,7 @@ on_exit() {
 trap on_exit EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+trap 'exit 129' HUP      # SSH drop / closed terminal
 
 # --- 4. Startup evidence -------------------------------------------------------
 run_helper startup_report.py --run-dir "$RUN_DIR"

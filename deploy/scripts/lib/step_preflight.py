@@ -68,6 +68,8 @@ import fnmatch
 
 INTRINSIC_TOOLS = ("psql", "pg_dump", "pg_restore", "systemctl")  # this helper needs them
 IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
+PLAIN_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+TOC_TABLE_RE = re.compile(r"^\d+;\s+\d+\s+\d+\s+TABLE\s+(?!DATA\s)(\S+)\s+(\S+)\s")
 SAMPLE_LINES = 20
 
 
@@ -94,13 +96,26 @@ def normalize_schema(text):
     return lines
 
 
-def parse_migration_versions(dump_text, table):
-    """Versions from the COPY block of the migrations table in a pg_restore text dump."""
+def toc_has_table(toc_text, schema, table):
+    """True if a pg_restore --list TOC defines TABLE <schema>.<table> (exact schema)."""
+    for line in toc_text.splitlines():
+        match = TOC_TABLE_RE.match(line)
+        if match and match.group(1) == schema and match.group(2) == table:
+            return True
+    return False
+
+
+def parse_migration_versions(dump_text, schema, table):
+    """Versions from the COPY block of <schema>.<table> in a pg_restore text dump.
+
+    Matches the exact schema-qualified name, so a same-named table in another schema
+    (e.g. the legacy _migrations schema) can never be picked up.
+    """
     versions, inside = [], False
-    short = table.split(".")[-1]
+    prefix = "COPY %s.%s " % (schema, table)
     for line in dump_text.splitlines():
         if not inside:
-            if line.startswith("COPY ") and (" %s " % short in line or "." + short + " " in line):
+            if line.startswith(prefix):
                 inside = True
             continue
         if line == "\\.":
@@ -162,10 +177,10 @@ class Preflight:
                     "APP_DIR", "VENV_DIR", "STATE_FILE", "PG_BACKUP_LOCATION", "BACKUP_GLOB"]
         env_empty_ok = ["PG_PASSWORD"]
         # autodeploy.conf ONLY (repo-specific). No defaults here either.
-        conf_keys = ["REQUIRED_TOOLS"] + [k for k in UNIT_CONF_KEYS]
+        conf_keys = ["REQUIRED_TOOLS", "MIGRATIONS_TABLE", "MIGRATIONS_SCHEMA"] + [k for k in UNIT_CONF_KEYS]
         conf_empty_ok = ["INSTALLABLE_TOOLS", "PERSISTENT_RESOURCES"] + list(UNIT_CONF_EMPTY_OK)
         if self.is_test:        # only the TEST run restores/compares/snapshots
-            conf_keys += ["MIGRATIONS_TABLE", "TEST_DB_MARKER", "BACKUP_WARN_AGE_HOURS",
+            conf_keys += ["TEST_DB_MARKER", "BACKUP_WARN_AGE_HOURS",
                           "ENV_FILE_DIR", "PRD_APP_ENV"]
         c.require(env=env_keys, env_may_be_empty=env_empty_ok,
                   conf=conf_keys, conf_may_be_empty=conf_empty_ok)
@@ -181,13 +196,18 @@ class Preflight:
         # autodeploy.conf values
         self.systemctl_cmd = c.conf_words("SYSTEMCTL")
 
+        self.migrations_table = c.conf_value("MIGRATIONS_TABLE")
+        self.migrations_schema = c.conf_value("MIGRATIONS_SCHEMA")
+        for key, value in (("MIGRATIONS_TABLE", self.migrations_table),
+                           ("MIGRATIONS_SCHEMA", self.migrations_schema)):
+            if not PLAIN_IDENT_RE.match(value):
+                raise HelperError("%s must be a plain, unqualified name: %r" % (key, value),
+                                  c.conf_path)
+        self.migrations_fqn = "%s.%s" % (self.migrations_schema, self.migrations_table)
+
         self.nightly_dir = self.nightly_glob = None
         if self.is_test:
             self.marker = c.conf_value("TEST_DB_MARKER")
-            self.migrations_table = c.conf_value("MIGRATIONS_TABLE")
-            if not IDENT_RE.match(self.migrations_table):
-                raise HelperError("MIGRATIONS_TABLE is not a plain table name: %r"
-                                  % self.migrations_table, c.conf_path)
             try:
                 self.warn_age_hours = float(c.conf_value("BACKUP_WARN_AGE_HOURS"))
                 if self.warn_age_hours <= 0:
@@ -435,6 +455,41 @@ class Preflight:
         evidence("unit_files_to_move_aside", " ".join(e["name"] for e in displaced) or "none")
         self.decision["UNITS_TO_DISPLACE"] = " ".join(e["name"] for e in displaced)
 
+    # ------------------------------------------------- applied migrations
+    def read_applied_versions(self, target, label):
+        """Versions dbmate has applied in <target>; [] when the table does not exist yet.
+
+        A missing table is the normal state before the FIRST dbmate run: dbmate creates it
+        itself and applies every migration in the repo. Nothing is created here.
+
+        Only <MIGRATIONS_SCHEMA>.<MIGRATIONS_TABLE> is ever consulted, always schema-qualified,
+        so a same-named table in another schema (the legacy _migrations schema) is ignored.
+        dbmate puts its table in the connection's current_schema(); if that is not
+        MIGRATIONS_SCHEMA, dbmate would create/read the table somewhere else, so fail now.
+        Connection or permission errors still fail the step: only "table absent"
+        (decided by to_regclass, not by matching error text) means "nothing applied".
+        """
+        try:
+            current = psql_rows(target, "SELECT current_schema()")[0][0]
+            if current != self.migrations_schema:
+                raise HelperError(
+                    "%s connects with current_schema() = %s but MIGRATIONS_SCHEMA is %s; dbmate "
+                    "would keep its table in %s" % (label, current or "(none)",
+                                                    self.migrations_schema, current or "(none)"),
+                    "role search_path of %s" % target.describe())
+            exists = psql_rows(target, "SELECT to_regclass('%s') IS NOT NULL"
+                               % self.migrations_fqn)[0][0] == "t"
+            if not exists:
+                evidence("%s_migrations_table" % label.lower(),
+                         "%s absent (treated as 0 applied: first dbmate run)" % self.migrations_fqn)
+                return []
+            rows = psql_rows(target, "SELECT version FROM %s ORDER BY version" % self.migrations_fqn)
+        except PgError as exc:
+            raise HelperError("cannot read %s migrations table %s: %s"
+                              % (label, self.migrations_fqn, exc.reason), exc.where)
+        evidence("%s_migrations_table" % label.lower(), "%s present" % self.migrations_fqn)
+        return [r[0] for r in rows]
+
     # ----------------------------------------------------------- 6. PRD DB
     def stage_prd_database(self):
         prd = self.prd_target
@@ -457,6 +512,11 @@ class Preflight:
             raise HelperError("the PRD database carries the TEST marker; refusing to continue",
                               prd.describe())
 
+        # PRD may be un-migrated (no table yet): that is "0 applied", never a failure.
+        self.prd_versions = self.read_applied_versions(prd, "PRD")
+        evidence("prd_migrations", "latest %s, count %d" % (
+            self.prd_versions[-1] if self.prd_versions else "(none)", len(self.prd_versions)))
+
         if self.is_test:
             test = self.test_target
             if test.same_database_as(prd):
@@ -465,14 +525,6 @@ class Preflight:
                                   "PG_HOST/PG_PORT/PG_DB in %s and the PRD env file" % self.ctx.env_path)
             evidence("test_target", test.describe())
             evidence("test_target_is_prd", "no")
-            try:
-                rows = psql_rows(prd, "SELECT version FROM %s ORDER BY version" % self.migrations_table)
-            except PgError as exc:
-                raise HelperError("cannot read PRD migrations table %s: %s"
-                                  % (self.migrations_table, exc.reason), exc.where)
-            self.prd_versions = [r[0] for r in rows]
-            evidence("prd_migrations", "latest %s, count %d" % (
-                self.prd_versions[-1] if self.prd_versions else "(none)", len(self.prd_versions)))
 
     # ------------------------------------------------------ PRD marker (PRD)
     def stage_prd_marker(self):
@@ -554,11 +606,11 @@ class Preflight:
         evidence("test_marker", "present" if comment == self.marker else "MISSING")
 
         try:
-            rows = psql_rows(test, "SELECT version FROM %s ORDER BY version" % self.migrations_table)
-        except PgError as exc:
-            unusable.append("TEST migrations table unreadable: %s" % exc.reason)
+            self.test_versions = self.read_applied_versions(test, "TEST")
+        except HelperError as exc:
+            unusable.append("TEST migrations unreadable: %s" % exc.reason)
+            self.test_versions = None
             return
-        self.test_versions = [r[0] for r in rows]
 
         prd_schema = self.dump_schema(self.prd_target, fatal=True)
         test_schema = self.dump_schema(test, fatal=False)
@@ -619,13 +671,15 @@ class Preflight:
         if age > limit * 3600:
             warn("newest nightly snapshot is older than %g hours" % limit)
 
-        problem = None
+        problem, toc_text = None, ""
         if size == 0:
             problem = "file is empty"
         else:
             toc = run_cmd(["pg_restore", "--list", newest], timeout=120)
             if not toc.ok:
                 problem = "pg_restore cannot read it: %s" % toc.first_error_line()
+            else:
+                toc_text = toc.stdout
         if problem:
             evidence("snapshot_usable", "no (%s)" % problem)
             warn("newest nightly snapshot is not usable: %s" % problem)
@@ -633,9 +687,14 @@ class Preflight:
         self.snapshot["usable"] = True
         evidence("snapshot_usable", "yes")
 
-        data = run_cmd(["pg_restore", "--data-only", "--table=" + self.migrations_table.split(".")[-1],
-                        "--file=-", newest], timeout=300)
-        versions = parse_migration_versions(data.stdout, self.migrations_table) if data.ok else None
+        if not toc_has_table(toc_text, self.migrations_schema, self.migrations_table):
+            versions = []       # snapshot predates dbmate: 0 applied
+            evidence("snapshot_migrations_table", "%s absent (treated as 0 applied)" % self.migrations_fqn)
+        else:
+            data = run_cmd(["pg_restore", "--data-only", "--schema=" + self.migrations_schema,
+                            "--table=" + self.migrations_table, "--file=-", newest], timeout=300)
+            versions = (parse_migration_versions(data.stdout, self.migrations_schema,
+                                                 self.migrations_table) if data.ok else None)
         self.snapshot["versions"] = versions
         if versions is None:
             evidence("snapshot_migrations", "could not be read")

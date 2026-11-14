@@ -13,7 +13,7 @@ Exit code = THE FINAL EXIT CODE OF THE WHOLE RUN (autodeploy.sh exits with it):
     --exit-status != 0  -> that same status is returned (a failure stays a failure)
     --exit-status == 0  -> 0, unless an undo action failed -> 1
 Never raises: if cleanup itself breaks it says so and still returns a non-zero code.
-Ignores SIGINT/SIGTERM while it runs, so a rollback cannot be cut short by a
+Ignores SIGINT/SIGTERM/SIGHUP while it runs, so a rollback cannot be cut short by a
 second Ctrl-C (child undo helpers inherit this).
 
 OUTCOME handed to undo helpers
@@ -230,7 +230,7 @@ def print_summary(ctx):
 
 # ----------------------------------------------------------------------------
 def main():
-    for sig in (signal.SIGINT, signal.SIGTERM):
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, signal.SIG_IGN)
 
     ctx = {"stage": "(startup)", "undo_results": []}
