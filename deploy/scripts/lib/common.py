@@ -34,7 +34,9 @@ PostgreSQL       PgTarget, PgError, psql_rows(), norm_host()
 DB state marker  read_db_marker(), update_db_marker()   (TEST/PRD state files)
 Filesystem       writable_dir(), nearest_existing_ancestor(), is_inside()
 systemd units    systemd_unit_dir(), discover_unit_files(), list_matching_units(),
-                 ACTIVE_UNIT_STATES  (what a commit defines vs what is running)
+                 unit_stem(), orphan_timers(), standalone_services(), startable_units()
+                 (timer/service pairing), ACTIVE_UNIT_STATES
+                 (what a commit defines vs what is running)
 Formatting       human_size(), human_age(), words()
 
 Python 3 standard library only.
@@ -948,3 +950,34 @@ def list_matching_units(systemctl_cmd, name_glob):
         if len(parts) >= 4 and parts[0].endswith((".service", ".timer")):
             units.add((parts[0], parts[1], parts[2]))
     return sorted(units)
+
+
+# ----------------------------------------------------------------------------
+# Timer/service pairing
+#   A timer is always paired with a service of the exact same name
+#   (X.timer drives X.service). A service may exist without a timer.
+#   Stop:           timers first, then services.
+#   Start/restore:  timers plus STANDALONE services only. A service that has a
+#                   same-named timer is never started directly: starting it runs
+#                   the job immediately instead of on the timer's schedule.
+# ----------------------------------------------------------------------------
+def unit_stem(unit):
+    """'pifitness_agent.timer' -> 'pifitness_agent'."""
+    return unit.rsplit(".", 1)[0]
+
+
+def orphan_timers(services, timers):
+    """Timers with no same-named service among `services`."""
+    stems = {unit_stem(s) for s in services}
+    return [t for t in timers if unit_stem(t) not in stems]
+
+
+def standalone_services(services, timers):
+    """Services with no same-named timer among `timers` (order preserved)."""
+    stems = {unit_stem(t) for t in timers}
+    return [s for s in services if unit_stem(s) not in stems]
+
+
+def startable_units(services, timers):
+    """What to start, in start order: standalone services first, then timers."""
+    return standalone_services(services, timers) + list(timers)

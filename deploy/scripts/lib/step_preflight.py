@@ -5,9 +5,7 @@ deploy/scripts/lib/step_preflight.py  --  Step 1 of the TEST and PRD runs.
     step_preflight.py --run-dir <dir>
 
 Proves, WITHOUT changing anything, that the run can succeed, and (TEST only)
-collects the one decision the developer may have to make.  The single
-exception to "read-only": if any TEST unit is active it runs test-down.sh,
-because that is a remediation, not a decision (requirements 4.6 / D19).
+collects the one decision the developer may have to make.  Strictly read-only.
 
 Uses only what exists before checkout: autodeploy.conf and the Pi env file.
 NO DEFAULTS: machine-specific values (paths, DB settings, backup dir/glob, ...) are read
@@ -21,10 +19,9 @@ TEST run                                   PRD run
   terminal (required)                        terminal (reported only)
   tools                                      tools
   paths                                      paths
-  units (defined + running)                  units (defined + running)
+  units (defined + running + pairing)        units (defined + running + pairing)
   PRD database + migrations                  PRD database (reachable/writable)
-  auto test-down                             PRD state marker (stale dirty?)
-  TEST database, markers, comparison         auto test-down
+  TEST database, markers, comparison         PRD state marker (stale dirty?)
   newest nightly snapshot                    plan
   classify -> decide (prompt if compatible)
   plan
@@ -41,9 +38,12 @@ Decision handed to later steps (written to run.state):
     PRD_BASELINE_DUMP   recorded baseline when PRD_STALE_DIRTY=yes
     SERVICES_LIST       *.service files in the commit's deploy/systemd (space-separated)
     TIMERS_LIST         *.timer files in the commit's deploy/systemd   (space-separated)
-    ACTIVE_SERVICES     PiFitness services running on the Pi when preflight ran, minus the
-    ACTIVE_TIMERS       listed ones (and the same for timers): what a later step stops and
-                        restores. Space-separated; empty when none.
+    ACTIVE_SERVICES     every PiFitness service / timer running on the Pi when preflight ran
+    ACTIVE_TIMERS       (UNIT_NAME_GLOB), including units named like the listed ones: what a
+                        later step stops and restores. Space-separated; empty when none.
+                        Stop timers first, then services. Start and restore use timers plus
+                        services with no same-named timer; a timer-paired service is never
+                        started directly (see common.startable_units).
     PREFLIGHT           PASS
 
 Exit: 0 pass, 1 fail (REASON:/WHERE: printed).  Never 10 (reserved).
@@ -60,9 +60,11 @@ import time
 from common import (ACTIVE_UNIT_STATES as ACTIVE_STATES, HelperError, Parser, PgError,
                     PgTarget, ask_tty, discover_unit_files, evidence, human_age,
                     human_size, info, is_inside, list_matching_units, load_context,
-                    load_prd_source, nearest_existing_ancestor, open_tty, psql_rows,
-                    read_db_marker, run_cmd, step_main, systemd_unit_dir,
-                    update_state, warn, writable_dir)
+                    load_prd_source, nearest_existing_ancestor, open_tty, orphan_timers,
+                    psql_rows, read_db_marker, run_cmd, standalone_services, startable_units,
+                    step_main, systemd_unit_dir, update_state, warn, writable_dir)
+from unitctl import CONF_KEYS as UNIT_CONF_KEYS, CONF_MAY_BE_EMPTY as UNIT_CONF_EMPTY_OK, UnitEnv
+import fnmatch
 
 INTRINSIC_TOOLS = ("psql", "pg_dump", "pg_restore", "systemctl")  # this helper needs them
 IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
@@ -116,10 +118,12 @@ class Preflight:
         self.unit_state = {}            # unit -> (LoadState, ActiveState), for the listed units
         self.services_list = []         # *.service the commit defines (deploy/systemd)
         self.timers_list = []           # *.timer the commit defines
-        self.test_units = []            # timers + services of those two lists
+        self.defined_units = []         # timers + services of those two lists
+        self.start_units = []           # what a deploy starts: standalone services, then timers
+        self.restore_units = []         # what a restore starts (same rule, from the active set)
         self.active_services = []       # PiFitness services running at the start
         self.active_timers = []         # PiFitness timers running at the start
-        self.active_units = []          # timers + services of those two lists
+        self.active_units = []          # timers + services, in stop order
         self.test_target = None
         self.prd_target = None
         self.prd_versions = None
@@ -134,13 +138,11 @@ class Preflight:
                   ("systemd units", self.stage_units),
                   ("PRD database", self.stage_prd_database)]
         if self.is_test:
-            stages += [("Remediation: TEST units", self.stage_remediate),
-                       ("TEST database", self.stage_test_database),
+            stages += [("TEST database", self.stage_test_database),
                        ("Newest nightly snapshot", self.stage_snapshot),
                        ("Decision", self.stage_decide)]
         else:
-            stages += [("PRD state marker", self.stage_prd_marker),
-                       ("Remediation: TEST units", self.stage_remediate)]
+            stages += [("PRD state marker", self.stage_prd_marker)]
         stages.append(("Plan", self.stage_plan))
 
         total = len(stages)
@@ -149,10 +151,7 @@ class Preflight:
             function()
         self.decision["PREFLIGHT"] = "PASS"
         update_state(self.ctx.run_dir, self.decision)
-        evidence("preflight", "ready: nothing was changed%s" % (
-            " except TEST units stopped by test-down.sh" if self.test_down_ran else ""))
-
-    test_down_ran = False
+        evidence("preflight", "ready: nothing was changed")
 
     # ------------------------------------------------------------- 1. config
     def stage_config(self):
@@ -163,9 +162,8 @@ class Preflight:
                     "APP_DIR", "VENV_DIR", "STATE_FILE", "PG_BACKUP_LOCATION", "BACKUP_GLOB"]
         env_empty_ok = ["PG_PASSWORD"]
         # autodeploy.conf ONLY (repo-specific). No defaults here either.
-        conf_keys = ["UNIT_NAME_GLOB", "REQUIRED_TOOLS", "SYSTEMCTL",
-                     "TEST_DOWN_SCRIPT", "TEST_DOWN_TIMEOUT"]
-        conf_empty_ok = ["INSTALLABLE_TOOLS", "PERSISTENT_RESOURCES"]
+        conf_keys = ["REQUIRED_TOOLS"] + [k for k in UNIT_CONF_KEYS]
+        conf_empty_ok = ["INSTALLABLE_TOOLS", "PERSISTENT_RESOURCES"] + list(UNIT_CONF_EMPTY_OK)
         if self.is_test:        # only the TEST run restores/compares/snapshots
             conf_keys += ["MIGRATIONS_TABLE", "TEST_DB_MARKER", "BACKUP_WARN_AGE_HOURS",
                           "ENV_FILE_DIR", "PRD_APP_ENV"]
@@ -182,14 +180,6 @@ class Preflight:
 
         # autodeploy.conf values
         self.systemctl_cmd = c.conf_words("SYSTEMCTL")
-        self.test_down_script = c.conf_value("TEST_DOWN_SCRIPT")
-        try:
-            self.test_down_timeout = int(c.conf_value("TEST_DOWN_TIMEOUT"))
-            if self.test_down_timeout < 1:
-                raise ValueError
-        except ValueError:
-            raise HelperError("TEST_DOWN_TIMEOUT must be a whole number of seconds >= 1 (got %r)"
-                              % c.conf_value("TEST_DOWN_TIMEOUT"), c.conf_path)
 
         self.nightly_dir = self.nightly_glob = None
         if self.is_test:
@@ -335,11 +325,16 @@ class Preflight:
 
         SERVICES_LIST / TIMERS_LIST   the *.service / *.timer files in the commit's
                                       deploy/systemd: the units the commit defines
-                                      (the TEST units).
-        ACTIVE_SERVICES / ACTIVE_TIMERS  the PiFitness units running on the Pi right now
+                                      (what a deploy starts).
+        ACTIVE_SERVICES / ACTIVE_TIMERS  every PiFitness unit running on the Pi right now
                                       (UNIT_NAME_GLOB says which units are PiFitness's),
-                                      minus the listed ones: what a later step stops
-                                      and restores.
+                                      including units named like the listed ones: what a
+                                      later step stops and restores.
+
+        Timer/service pairing: X.timer is paired with X.service. An orphan timer fails
+        the step. Stop order is timers then services; start and restore use timers plus
+        services that have no same-named timer (a paired service is never started
+        directly).
         """
         c = self.ctx
         pattern = c.conf_value("UNIT_NAME_GLOB")
@@ -352,7 +347,7 @@ class Preflight:
         unit_dir = systemd_unit_dir(c.script_dir)
         services, timers, ignored, note = discover_unit_files(unit_dir)
         self.services_list, self.timers_list = services, timers
-        self.test_units = timers + services              # timers first: they are stopped first
+        self.defined_units = timers + services
         evidence("units_dir", "%s (%s)" % (unit_dir, note or "%d service(s), %d timer(s)"
                                            % (len(services), len(timers))))
         evidence("services_list", " ".join(services) or "none")
@@ -364,28 +359,45 @@ class Preflight:
                  "deploy/systemd, or the launcher did not extract it. A TEST run would have "
                  "nothing to start." % (note, unit_dir))
 
-        # --- state of each defined unit (also the only way to see one that is not installed)
-        missing = []
-        for unit in self.test_units:
+        # --- pairing: every timer needs a same-named service
+        orphans = orphan_timers(services, timers)
+        if orphans:
+            raise HelperError("timer(s) in deploy/systemd have no same-named .service: %s"
+                              % ", ".join(orphans), unit_dir)
+        self.start_units = startable_units(services, timers)
+        evidence("start_units", " ".join(self.start_units) or "none")
+        evidence("paired_services_not_started_directly", " ".join(
+            s for s in services if s not in self.start_units) or "none")
+
+        # --- state of each defined unit. Units are INSTALLED by the start step, so
+        #     "not found" is normal here and is only reported.
+        for unit in self.defined_units:
             load, active = self.unit_state[unit] = self.systemctl_show(unit)
             evidence("unit_" + unit, "%s, %s" % (load, active))
-            if load != "loaded":
-                missing.append("%s (%s)" % (unit, load))
 
         # --- units running on the Pi now
         matching = list_matching_units(self.systemctl_cmd, pattern)
         evidence("unit_name_glob", "%s (%d loaded unit(s) match)" % (pattern, len(matching)))
-        defined = set(self.test_units)
+        defined = set(self.defined_units)
         for unit, load, active in matching:
             if unit not in defined:                      # defined ones were shown above
                 evidence("unit_" + unit, "%s, %s" % (load, active))
-        running = [u for u, _load, active in matching
-                   if active in ACTIVE_STATES and u not in defined]
+        # Everything active is recorded, including units named like the commit's own:
+        # they are what is serving now, and they are what gets stopped and restored.
+        running = [u for u, _load, active in matching if active in ACTIVE_STATES]
         self.active_services = [u for u in running if u.endswith(".service")]
         self.active_timers = [u for u in running if u.endswith(".timer")]
         self.active_units = self.active_timers + self.active_services      # stop order
         evidence("active_services", " ".join(self.active_services) or "none")
         evidence("active_timers", " ".join(self.active_timers) or "none")
+
+        # Restore set: active timers plus active services with no same-named timer. A
+        # timer counts whether or not it was active (a service whose timer was stopped
+        # by hand is still timer-paired and is not started directly).
+        known_timers = set(timers) | {u for u, _l, _a in matching if u.endswith(".timer")}
+        self.restore_units = (standalone_services(self.active_services, known_timers)
+                              + self.active_timers)
+        evidence("restore_units", " ".join(self.restore_units) or "none")
 
         self.decision.update({
             "SERVICES_LIST": " ".join(self.services_list),
@@ -393,11 +405,35 @@ class Preflight:
             "ACTIVE_SERVICES": " ".join(self.active_services),
             "ACTIVE_TIMERS": " ".join(self.active_timers)})
 
-        # A TEST run must start every defined unit, so each one has to be installed.
-        # (A PRD run only needs to know whether any of them is running: see remediation.)
-        if missing and self.is_test:
-            raise HelperError("unit file(s) in deploy/systemd are not installed on the Pi, "
-                              "so TEST could not start them: %s" % ", ".join(missing), unit_dir)
+        self.check_unit_handling(pattern, unit_dir)
+
+    def check_unit_handling(self, pattern, unit_dir):
+        """Read-only proof that stop -> move aside -> install -> start can succeed."""
+        c = self.ctx
+        ue = UnitEnv(c)
+        evidence("unit_install_dir", ue.install_dir)
+        evidence("privilege_cmd", " ".join(ue.priv) or "(none: running as the unit owner)")
+        ue.check_privilege()
+        evidence("unit_dir_writable_with_privilege", "yes")
+
+        # every unit the commit defines must be findable (and so displaceable) next time
+        strays = [u for u in self.defined_units if not fnmatch.fnmatchcase(u, pattern)]
+        if strays:
+            raise HelperError("unit(s) in deploy/systemd do not match UNIT_NAME_GLOB %r, so a "
+                              "later run could not find and replace them: %s"
+                              % (pattern, ", ".join(strays)), unit_dir)
+
+        # the commit's units must render completely for THIS environment
+        if self.defined_units:
+            ue.render(self.defined_units)
+            evidence("units_render", "ok (placeholders: %s)" % (" ".join(ue.placeholders) or "none"))
+        else:
+            warn("this commit defines no units: the start step will refuse to run")
+
+        # every existing PiFitness unit file must be one the stop step can move aside
+        displaced = ue.plan_displaced()
+        evidence("unit_files_to_move_aside", " ".join(e["name"] for e in displaced) or "none")
+        self.decision["UNITS_TO_DISPLACE"] = " ".join(e["name"] for e in displaced)
 
     # ----------------------------------------------------------- 6. PRD DB
     def stage_prd_database(self):
@@ -462,42 +498,6 @@ class Preflight:
             self.decision["PRD_BASELINE_DUMP"] = baseline
         else:
             evidence("prd_stale_dirty", "no")
-
-    # ----------------------------------------------------- remediation
-    def stage_remediate(self):
-        active = [u for u in self.test_units if self.unit_state[u][1] in ACTIVE_STATES]
-        if self.is_test:
-            evidence("test_state_file", self.test_state_file)
-        if not active:
-            evidence("test_units_active", "none; test-down.sh not needed")
-            return
-
-        script = self.test_down_script
-        if not os.path.isabs(script):
-            script = os.path.join(self.ctx.script_dir, script)
-        if not os.path.isfile(script):
-            raise HelperError("TEST units are active (%s) but the test-down script does not exist"
-                              % ", ".join(active), script)
-        info("TEST units are active; running test-down.sh to return to a known state")
-        result = run_cmd(["bash", script], timeout=self.test_down_timeout,
-                         echo_prefix="    ", heartbeat=30)
-        self.test_down_ran = True
-        verdict = "PASS" if result.ok else "FAIL"
-        evidence("test_units_active", "%s; ran test-down.sh: %s (%.1fs)" % (
-            ", ".join(active), verdict, result.seconds))
-        if not result.ok:
-            raise HelperError("test-down.sh failed: %s" % result.first_error_line(), result.command())
-
-        deadline = time.monotonic() + 30
-        while True:
-            still = [u for u in self.test_units if self.systemctl_show(u)[1] in ACTIVE_STATES]
-            if not still or time.monotonic() > deadline:
-                break
-            time.sleep(1)
-        if still:
-            raise HelperError("TEST units still active after test-down.sh: %s" % ", ".join(still),
-                              "systemctl show " + " ".join(still))
-        evidence("test_units_after", "all inactive")
 
     # --------------------------------------------------------- TEST database
     def stage_test_database(self):
@@ -704,9 +704,16 @@ class Preflight:
                     "fresh_clone": "take a fresh clone of PRD into TEST"}[action]
             evidence("plan_database", text)
             evidence("plan_prd_units_stopped_at_step_7", ", ".join(prd_active) or "none active")
+            evidence("plan_unit_files_moved_aside_at_step_7", self.decision.get("UNITS_TO_DISPLACE") or "none")
+            evidence("plan_units_installed_and_started_at_step_8", ", ".join(self.start_units) or "none")
+            evidence("plan_units_restored_on_exit", ", ".join(self.restore_units) or "none (restore set is re-polled at step 7)")
             evidence("plan_input", "no further input is needed until step 10 (GO / NO-GO)")
         else:
             evidence("plan_prd_units_stopped_at_step_2", ", ".join(prd_active) or "none active")
+            evidence("plan_unit_files_moved_aside_at_step_2", self.decision.get("UNITS_TO_DISPLACE") or "none")
+            evidence("plan_units_installed_and_started_at_step_7", ", ".join(self.start_units) or "none")
+            evidence("plan_on_success", "old units stay stopped and their files are deleted")
+            evidence("plan_on_failure", "old units restored (files, enabled state, running set)")
             evidence("plan_baseline", "decided in step 5 (only if migrations are pending)")
             evidence("plan_input", "none: PRD runs prompt nobody; any failure rolls back automatically")
 

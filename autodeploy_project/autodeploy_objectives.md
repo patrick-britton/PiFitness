@@ -94,7 +94,7 @@ Deploy changes developed on a Windows PC to a Raspberry Pi, first to **TEST**, t
 9. **Keep PRD up as long as possible.** PRD is stopped only when TEST actually needs the shared URL and ports (TEST Step 7). A PRD run takes it down as a necessity of the deploy.
 10. **PRD rollback is complete or it is a failure.** The exit handler restores code, units and database to their pre-run state; a partial rollback is itself a failure and is reported as one.
 11. **Never trust "most recent" at restore time.** Rollback restores the **specific** dump recorded in the state file, not whatever the newest file happens to be.
-12. **Restore state automatically; never ask the user to run restore commands.** If a prior TEST run left units active, `test-down.sh` is invoked automatically.
+12. **Restore state automatically; never ask the user to run restore commands.** Every unit active at the start of a run is recorded, stopped and restored by the scripts; units left running by an interrupted run are simply found active and stopped like any other.
 13. **The Pi is unattended.** No manual workflows run on the Pi. The launcher is the only entry point, and the only file system it writes outside the app dirs, log dir, state files and backup dir is what `autodeploy.sh` explicitly manages.
 
 ---
@@ -136,7 +136,7 @@ Deploy changes developed on a Windows PC to a Raspberry Pi, first to **TEST**, t
 On **any** exit (success, failure, Ctrl-C, timeout), for either environment:
 
 1. **Stop TEST services.** No-op if already down.
-2. **TEST run** — restore exactly the PRD units that were active when TEST Step 7 recorded them. If Step 7 has not run, PRD was never touched, and this is reported as "PRD was never stopped."
+2. **TEST run** — restore exactly the PRD units that were active when TEST Step 7 recorded them (timers, plus services that have no same-named timer; see "Timer/service pairing" in section 8). If Step 7 has not run, PRD was never touched, and this is reported as "PRD was never stopped."
 3. **TEST run** — roll back the TEST database to the clean baseline only when the state marker is `dirty` and the outcome is not GO. Leave it as-is on GO.
 4. **PRD run** — restore PRD services to the state recorded in PRD Step 2 (no-op if Step 2 did not complete).
 5. **PRD run** — if the outcome is not success **and** the PRD state marker is `dirty`, restore the PRD database from the specific baseline dump recorded in the state file (`baseline_dump=<path>`). If the restore cannot be performed, the exit handler itself reports FAIL and the overall exit code is non-zero.
@@ -187,7 +187,7 @@ The exit handler rolls back PRD to the **specific** baseline dump recorded in th
 
 - **TEST run:** exactly one prompt is guaranteed — GO / NO-GO in TEST Step 10. One additional prompt may appear in TEST Step 1 (database choice, only when TEST is compatible with PRD). Both require a terminal; TEST Step 1 checks for one.
 - **PRD run:** **no** prompts. Success = all tests pass; failure = automatic rollback. PRD runs do not require an interactive terminal (they just log to the log dir).
-- **Restore is never a prompt.** If a prior run left TEST units active, `test-down.sh` is invoked automatically by Step 1 — the user is never asked to know which command restores state.
+- **Restore is never a prompt.** Units are stopped and restored automatically from the recorded active set; the user is never asked to know which command restores state.
 
 ---
 
@@ -201,13 +201,13 @@ The exit handler rolls back PRD to the **specific** baseline dump recorded in th
 **Objective:** Prove, without changing anything, that the run can succeed, and collect every answer the developer must give.
 
 **Required behavior:**
-1. **Read-only**, with one exception: **if any TEST unit is active, run `test-down.sh` automatically** to return to a known state. This is a remediation, not a decision — see 4.6.
+1. **Strictly read-only.** Pre-flight changes nothing. Units left running by a previous run are discovered like any other active unit and are stopped by Step 7.
 2. **Uses only what exists before checkout:** `autodeploy.conf` (from the launcher's temp folder) and the Pi env file.
 3. **Readiness checks**, each failing early with a clear message:
    - An interactive terminal is present.
    - Required system tools are present (`git`, `psql`, `pg_dump`, `pg_restore`, `systemctl`, `dbmate`, `uv`, `node`, `npm`). Tools that Step 3 installs are reported present/missing, not failed.
    - The TEST and PRD databases are reachable, and the TEST connection target is verified as **not** PRD.
-   - Every unit the commit defines (`SERVICES_LIST` / `TIMERS_LIST`, read from `deploy/systemd`) is installed on the Pi. The units running on the Pi (`ACTIVE_SERVICES` / `ACTIVE_TIMERS`) are discovered, not checked.
+   - Every unit the commit defines (`SERVICES_LIST` / `TIMERS_LIST`, read from `deploy/systemd`) is installed on the Pi. Every `.timer` in `deploy/systemd` has a `.service` of the exact same name in `deploy/systemd`; an orphan timer fails the check. The units running on the Pi (`ACTIVE_SERVICES` / `ACTIVE_TIMERS`) are discovered, not checked.
    - The log directory and persistent-resource paths exist and are writable.
    - The backup directory (`$PIFITNESS_PRD_BACKUP_DIR`) exists and is writable.
 4. **Database comparison** using dbmate's applied-migrations table and a schema-only dump comparison. Migrations table read directly with SQL (the migrations directory is not checked out yet).
@@ -219,8 +219,6 @@ The exit handler rolls back PRD to the **specific** baseline dump recorded in th
 7. Store the decision for Step 4 and print a **plan**: the database action, the PRD units that will be stopped, and the statement that no further input is needed until Step 10.
 
 **Required evidence:** terminal check, tool presence list, units defined by the commit and units running (`SERVICES_LIST`, `TIMERS_LIST`, `ACTIVE_SERVICES`, `ACTIVE_TIMERS`), PRD migration versions (latest + count), TEST migration versions (latest + count), versions in TEST but not PRD, versions in PRD but not TEST, schema diff line count, classification, newest nightly snapshot filename and age, WARNING if the snapshot's migration versions differ from live PRD, decision taken, plan.
-
-**Required evidence (auto test-down):** "TEST units found active: <list>; ran test-down.sh: PASS/FAIL", and the resulting state file path.
 
 ---
 
@@ -308,11 +306,11 @@ The exit handler rolls back PRD to the **specific** baseline dump recorded in th
 **Objective:** Free the shared URL and ports safely, remembering exactly how to put PRD back. PRD downtime begins here.
 
 **Required behavior:**
-1. Read the PRD units to stop from `ACTIVE_SERVICES` / `ACTIVE_TIMERS` (the units running on the Pi when the run began, recorded by Step 1).
+1. Read the PRD units to stop from `ACTIVE_SERVICES` / `ACTIVE_TIMERS` (every PiFitness unit running on the Pi when the run began, recorded by Step 1; this includes units with the same names as those in the commit's `deploy/systemd`).
 2. **Record** which units are active **before** stopping, and persist the record (on disk, outside the app dir) so the exit handler can restore it even after a crash.
-3. Stop them gracefully (timers first, then services), wait with a timeout.
+3. Stop them gracefully: timers first (so no new runs start), then services; wait with a timeout.
 4. Register restoration with the exit handler **before** stopping.
-5. Units that were not active are not started on restore.
+5. Units that were not active are not started on restore. Restore follows the pairing rule (section 8): timers, plus services that have no same-named timer. A service paired with a timer is never started directly.
 6. Confirm the ports TEST needs are free.
 
 **Required evidence:** table of unit name / state before / state after; path of the saved record; TEST ports and that they are free.
@@ -325,7 +323,7 @@ The exit handler rolls back PRD to the **specific** baseline dump recorded in th
 **Objective:** TEST runs and is served at `https://pifitness.duckdns.org`, intentionally replacing PRD there.
 
 **Required behavior:**
-1. Start the TEST units (`SERVICES_LIST` / `TIMERS_LIST`, from the commit's `deploy/systemd`); wait until healthy (URL and/or `systemctl is-active` + HTTP).
+1. Start the units the commit defines (`SERVICES_LIST` / `TIMERS_LIST`, from `deploy/systemd`) following the pairing rule (section 8): every timer, plus every service that has no same-named timer. A service paired with a timer is not started directly; its timer triggers it. Wait until healthy (URL and/or `systemctl is-active` + HTTP).
 2. Verify the public URL is served by TEST, not PRD (version/commit/environment endpoint or header).
 3. Fail if TEST is not healthy within the timeout.
 
@@ -372,18 +370,19 @@ PRD runs share most mechanics with TEST but differ in checkout source, env wirin
 **Objective:** Prove, without changing anything, that the PRD run can succeed. **No prompt.**
 
 **Required behavior:**
-1. **Read-only**, with one exception: **if any TEST unit is active, run `test-down.sh` automatically** (same as TEST Step 1; see 4.6).
+1. **Strictly read-only.** Units found running are recorded here and stopped in Step 2.
 2. **Readiness checks**, each failing early:
    - Required system tools (`git`, `psql`, `pg_dump`, `pg_restore`, `systemctl`, `dbmate`, `uv`, `node`, `npm`).
    - PRD database reachable and writable.
    - The units running on the Pi are discovered and recorded (`ACTIVE_SERVICES` / `ACTIVE_TIMERS`); there is nothing to check because nothing is listed.
+   - Every `.timer` in `deploy/systemd` has a `.service` of the exact same name in `deploy/systemd`; an orphan timer fails the check.
    - The log directory, app dir parent, and backup directory exist and are writable.
    - Any stale `dirty` marker in `PRD_STATE_FILE` is noted (recovery will restore from the recorded baseline in Step 5).
 3. **No interactive terminal is required** (PRD runs prompt nobody).
 4. **No DB schema comparison** is performed in Step 1 — the migrations directory is not checked out yet. That decision is made in Step 5 after checkout.
 5. Print a **plan**: units that will be stopped, whether a baseline will be taken (decided in Step 5), and the statement that no input is needed.
 
-**Required evidence:** tool presence list, PRD DB reachability, units defined by the commit and units running, writable paths, plan; if `test-down` ran: "TEST units found active: <list>; ran test-down.sh: PASS/FAIL", resulting state file path.
+**Required evidence:** tool presence list, PRD DB reachability, units defined by the commit and units running, writable paths, plan.
 
 ---
 
@@ -457,7 +456,7 @@ PRD runs share most mechanics with TEST but differ in checkout source, env wirin
 **Objective:** PRD runs and is served at `https://pifitness.duckdns.org`.
 
 **Required behavior:** Same mechanics as TEST Step 8, but:
-- Re-applies the recorded **PRD** active set (`ACTIVE_SERVICES` / `ACTIVE_TIMERS`): the units that were running when the run began.
+- Re-applies the recorded **PRD** active set (`ACTIVE_SERVICES` / `ACTIVE_TIMERS`): the units that were running when the run began, following the pairing rule (section 8): timers, plus services that have no same-named timer.
 - Verifies the public URL is served by **PRD** (environment = PRD, deployed SHA = the `main` SHA).
 - Fails if PRD is not healthy within the timeout. On failure, the exit handler rolls back code, units and DB.
 
@@ -559,8 +558,20 @@ No systemd unit is named in configuration. Step 1 derives two sets and records t
 
 | Set | Source | Meaning |
 |---|---|---|
-| `SERVICES_LIST`, `TIMERS_LIST` | The `*.service` / `*.timer` files in the commit's `deploy/systemd` | The units the commit defines (the TEST units). Any mix, including none, is valid. |
-| `ACTIVE_SERVICES`, `ACTIVE_TIMERS` | `systemctl` at the start of the run: loaded units matching `UNIT_NAME_GLOB` that are active, minus the units in the lists above | What is running on the Pi when the deployment begins; what is stopped and later restored. |
+| `SERVICES_LIST`, `TIMERS_LIST` | The `*.service` / `*.timer` files in the commit's `deploy/systemd` | The units the commit defines; what a deployment starts. Any mix, including none, is valid, subject to the pairing rule below. |
+| `ACTIVE_SERVICES`, `ACTIVE_TIMERS` | `systemctl` at the start of the run: every loaded unit matching `UNIT_NAME_GLOB` that is active. Units that share a name with a file in `deploy/systemd` are included. | What is running on the Pi when the deployment begins; what is stopped and later restored. |
+
+### Timer/service pairing
+
+A timer is always paired with a service of the exact same name (`pifitness_agent.timer` drives `pifitness_agent.service`). A service may exist without a timer. This is validated in Step 1 and applied everywhere units are stopped or started:
+
+| Operation | Units acted on | Order |
+|---|---|---|
+| Stop (cutover) | Every active unit in `ACTIVE_TIMERS` and `ACTIVE_SERVICES` | Timers first, then services |
+| Start (deploy) | Every timer in `TIMERS_LIST`, plus every service in `SERVICES_LIST` with no same-named timer | Standalone services first, then timers |
+| Restore (exit handler) | Every timer in `ACTIVE_TIMERS`, plus every service in `ACTIVE_SERVICES` with no same-named timer | Standalone services first, then timers |
+
+A service that has a same-named timer is never started directly, because starting it runs the job immediately instead of on the timer's schedule. If such a service is active when the Pi is polled (a run in flight), it is stopped with the rest but is not started again on restore; its timer brings it back.
 
 The launcher extracts `deploy/systemd` beside `deploy/scripts` (optional: a commit without it defines no units) because the lists are needed in Step 1, before any checkout exists.
 
@@ -623,10 +634,11 @@ The `$APP_DIR` and `$LOG_DIR` values are injected by `autodeploy.sh` before eval
 | D16 | Test commands | `deploy/tests.conf` (created) for regression + smoke; `autodeploy.conf` for units/ports/paths/tools/prefixes |
 | D17 | Env file wiring | TEST env **symlinked** into checkout; PRD env **copied** into checkout |
 | D18 | Disk-space checks | None (removed per user) |
-| D19 | Auto `test-down` | Both Step 1s auto-invoke `test-down.sh` if any TEST unit is unexpectedly active |
+| D19 | No auto `test-down` | Removed. TEST and PRD share unit names, so a running unit cannot be told apart as "TEST". Every active unit is recorded, stopped and restored per the pairing rule (section 8); the exit handler stops TEST on every exit. |
 | D20 | PRD success definition | All tests pass; no GO/NO-GO prompt; any failure = automatic rollback |
 | D21 | `/home/god/PiFitness` role | PRD application directory only. No manual workflows run on the Pi; the launcher is the sole entry point and calls only the specified files from the repo. `/home/god/PiFitness` is atomically swapped on every PRD run. |
 | D22 | PRD test writes | Accepted for now (single-user personal app). If any backend test writes meaningfully to the PRD database, revisit and apply mitigation (b) from PRD Step 8 before the first PRD run. |
+| D23 | Timer/service pairing | A timer is paired with the same-named service. Stop: timers then services. Start and restore: timers plus standalone services only; a timer-paired service is never started directly. An orphan timer fails Step 1. |
 
 ---
 
