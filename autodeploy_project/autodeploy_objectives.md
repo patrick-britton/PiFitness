@@ -92,7 +92,7 @@ Deploy changes developed on a Windows PC to a Raspberry Pi, first to **TEST**, t
 7. **Fail fast, cheapest first.** Read-only validation precedes any change. No slow or destructive operation starts until every question has been asked and every foreseeable failure has been checked.
 8. **Ask once, up front.** All input is gathered in TEST Step 1. After Step 1 the run needs no one until the GO / NO-GO in Step 10. PRD runs prompt **nobody**.
 9. **Keep PRD up as long as possible.** PRD is stopped only when TEST actually needs the shared URL and ports (TEST Step 7). A PRD run takes it down as a necessity of the deploy.
-10. **PRD rollback is complete or it is a failure.** The exit handler restores code, units and database to their pre-run state; a partial rollback is itself a failure and is reported as one.
+10. **PRD rollback is complete or it is a failure.** The exit handler restores code, units and database to their pre-run state; a partial rollback is itself a failure and is reported as one. It never restores the database or swaps the checkout underneath a unit of the new deploy: the new units are halted first (section 4.2, "Undo order").
 11. **Never trust "most recent" at restore time.** Rollback restores the **specific** dump recorded in the state file, not whatever the newest file happens to be.
 12. **Restore state automatically; never ask the user to run restore commands.** Every unit active at the start of a run is recorded, stopped and restored by the scripts; units left running by an interrupted run are simply found active and stopped like any other.
 13. **The Pi is unattended.** No manual workflows run on the Pi. The launcher is the only entry point, and the only file system it writes outside the app dirs, log dir, state files and backup dir is what `autodeploy.sh` explicitly manages.
@@ -144,6 +144,16 @@ On **any** exit (success, failure, Ctrl-C, timeout), for either environment:
 7. Print the cleanup result as part of the final summary.
 
 The handler is built **before** the steps that need it. Each new step registers what it needs the handler to undo.
+
+**Undo order.** Undo actions run last-registered-first. The step order cannot be changed to suit rollback (PRD must stop units before the checkout swap and start them after migrations, and the tests need them running), so the unit undo is split in two, registered at opposite ends of the run:
+
+| Registered by | Undo | Runs | Does |
+|---|---|---|---|
+| Start-services step (TEST Step 8 / PRD Step 7), before it installs anything | `halt_units` | **First** | Stops every unit this run installed (timers first, then services), including a timer-paired service a timer fired during testing. Skipped on a PRD success. |
+| Database / checkout steps | their own undo actions | Between | Restore the pinned database baseline; swap the previous checkout back. |
+| Stop-services step (TEST Step 7 / PRD Step 2), before it stops anything | `units` | **Last** | Removes the new unit files, puts the originals back, re-enables and starts the recorded restore set. On a PRD success, keeps the new units and deletes the old files. |
+
+A PRD rollback therefore always reads: halt new units, restore database, swap code back, restore old units. Nothing is restored while a unit of the new deploy is still running against the database or executing from the app directory. A TEST run is unaffected in effect (its unit steps are already the last ones registered), but registers the same actions so both environments behave identically.
 
 ### 4.3 Development convenience
 `--through <n>` stops cleanly after step *n* (running cleanup). For PRD, `--through 5` is a useful way to verify baseline capture without applying migrations.
@@ -326,6 +336,7 @@ The exit handler rolls back PRD to the **specific** baseline dump recorded in th
 1. Start the units the commit defines (`SERVICES_LIST` / `TIMERS_LIST`, from `deploy/systemd`) following the pairing rule (section 8): every timer, plus every service that has no same-named timer. A service paired with a timer is not started directly; its timer triggers it. Wait until healthy (URL and/or `systemctl is-active` + HTTP).
 2. Verify the public URL is served by TEST, not PRD (version/commit/environment endpoint or header).
 3. Fail if TEST is not healthy within the timeout.
+4. Before installing anything, register the `halt_units` undo (section 4.2, "Undo order") so the exit handler stops the new units before any other undo runs.
 
 **Required evidence:** unit states, health check result and response time, URL and what it reported (environment = TEST, SHA), confirmation PRD units are inactive.
 
@@ -458,6 +469,7 @@ PRD runs share most mechanics with TEST but differ in checkout source, env wirin
 **Required behavior:** Same mechanics as TEST Step 8, but:
 - Re-applies the recorded **PRD** active set (`ACTIVE_SERVICES` / `ACTIVE_TIMERS`): the units that were running when the run began, following the pairing rule (section 8): timers, plus services that have no same-named timer.
 - Verifies the public URL is served by **PRD** (environment = PRD, deployed SHA = the `main` SHA).
+- Before installing anything, registers the `halt_units` undo (section 4.2, "Undo order"). It is registered after the checkout and database steps registered theirs, so on a failure it runs first: the new units are stopped before the database is restored or the previous checkout is swapped back. It is skipped on success.
 - Fails if PRD is not healthy within the timeout. On failure, the exit handler rolls back code, units and DB.
 
 **Required evidence:** unit states, health check result and response time, URL response (environment = PRD, SHA), confirmation TEST units are inactive.
@@ -639,6 +651,7 @@ The `$APP_DIR` and `$LOG_DIR` values are injected by `autodeploy.sh` before eval
 | D21 | `/home/god/PiFitness` role | PRD application directory only. No manual workflows run on the Pi; the launcher is the sole entry point and calls only the specified files from the repo. `/home/god/PiFitness` is atomically swapped on every PRD run. |
 | D22 | PRD test writes | Accepted for now (single-user personal app). If any backend test writes meaningfully to the PRD database, revisit and apply mitigation (b) from PRD Step 8 before the first PRD run. |
 | D23 | Timer/service pairing | A timer is paired with the same-named service. Stop: timers then services. Start and restore: timers plus standalone services only; a timer-paired service is never started directly. An orphan timer fails Step 1. |
+| D24 | Rollback order vs. running units | The unit undo is split: `halt_units` (registered by the start-services step, runs first) and `units` (registered by the stop-services step, runs last). Step order is not changed. Nothing is restored while a new unit is running (section 4.2, "Undo order"). |
 
 ---
 

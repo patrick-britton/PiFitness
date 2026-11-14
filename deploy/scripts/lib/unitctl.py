@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 deploy/scripts/lib/unitctl.py  --  systemd unit handling shared by
-step_preflight, step_stop_services, step_start_services and undo_units.
+step_preflight, step_stop_services, step_start_services, undo_halt_units and
+undo_units.
 
 Not executable on its own.  Nothing here is specific to an environment or to a
 particular unit: every name, path and command comes from autodeploy.conf, the Pi env
@@ -15,15 +16,22 @@ THE PROCESS (identical for TEST and PRD)
                    4. disable the ones that were enabled, move their files (and any
                       <unit>.d drop-in directory) into <run-dir>/units_backup
                    5. daemon-reload
-  start_services   6. render the commit's deploy/systemd files (@KEY@ placeholders are
-                      filled from the Pi env file) and install them into UNIT_INSTALL_DIR
+  start_services   6. register the halt_units undo (see below), render the commit's
+                      deploy/systemd files (@KEY@ placeholders are filled from the Pi env
+                      file) and install them into UNIT_INSTALL_DIR
                    7. daemon-reload, enable the startable units, start them, check health
-  undo_units       8. TEST (any outcome) and PRD (failure / incomplete):
+  undo (exit handler, last registered runs first) -- TWO undo actions, at opposite ends
+  of the rollback, so that nothing is restored while a unit of the new deploy still runs:
+  undo_halt_units  8. registered by start_services, so it runs FIRST: stop every unit this
+                      run installed (timers first), before the database is restored or the
+                      previous checkout is swapped back.  Skipped on a PRD success.
+  undo_units       9. registered by stop_services, so it runs LAST: TEST (any outcome) and
+                      PRD (failure / incomplete):
                          stop what this run started, disable it, delete the installed
                          files, move the backed-up originals back, daemon-reload,
                          re-enable what was enabled, start the recorded restore set
                       PRD (success): keep the new units, delete the backed-up old files.
-  The ONLY environment difference is the outcome condition in step 8.
+  The ONLY environment difference is the outcome condition in steps 8 and 9.
 
 units.json (in the run dir) is the single record the undo works from.  It is written
 BEFORE each phase changes anything, so a crash mid-phase can still be undone.
@@ -37,7 +45,7 @@ import re
 import time
 
 from common import (ACTIVE_UNIT_STATES, UNIT_FILE_RE, HelperError, Parser,
-                    list_matching_units, run_cmd, systemd_unit_dir,
+                    list_matching_units, run_cmd, systemd_unit_dir, warn,
                     write_text_atomic)
 
 CONF_KEYS = ("UNIT_NAME_GLOB", "SYSTEMCTL", "UNIT_INSTALL_DIR",
@@ -264,6 +272,21 @@ def manifest_load(ue):
 
 def manifest_save(ue, data):
     write_text_atomic(ue.manifest_path, json.dumps(data, indent=2, sort_keys=True) + "\n")
+
+
+class Failures:
+    """Attempt every sub-step of an undo even if an earlier one failed; report them all."""
+
+    def __init__(self):
+        self.items = []
+
+    def attempt(self, label, func):
+        try:
+            return func()
+        except HelperError as exc:
+            warn("%s: %s" % (label, exc.reason))
+            self.items.append("%s (%s)" % (label, exc.reason))
+        return None
 
 
 # ----------------------------------------------------------------------------

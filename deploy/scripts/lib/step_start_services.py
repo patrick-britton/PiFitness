@@ -10,9 +10,14 @@ Identical for TEST and PRD.  Installs the commit's units and brings them up.
      units aside).
   2. Render the commit's deploy/systemd files: @KEY@ placeholders (UNIT_PLACEHOLDERS)
      are filled from this environment's Pi env file.  An unresolved placeholder fails.
-  3. Record what is about to be installed / enabled / started in units.json, then
-     install into UNIT_INSTALL_DIR and daemon-reload.  Prove each unit loaded from
-     the file just written.
+  3. Register the halt_units undo, record what is about to be installed / enabled /
+     started in units.json, then install into UNIT_INSTALL_DIR and daemon-reload.
+     Prove each unit loaded from the file just written.
+     halt_units is registered HERE (after the checkout / database steps registered
+     theirs) so that in the exit handler's last-registered-first order it runs FIRST:
+     the new units are stopped before the database is restored or the previous
+     checkout is swapped back.  undo_units (registered by stop_services) still runs
+     last and puts the old units back.
   4. enable the startable units (standalone services + timers), prove they are enabled.
   5. start them: standalone services first, then timers (a timer-paired service is
      never started directly).  Wait until each is healthy.
@@ -23,8 +28,8 @@ Exit: 0 pass, 1 fail.  Python 3 standard library only.
 import os
 import sys
 
-from common import (HelperError, evidence, info, load_context, startable_units,
-                    step_main, words)
+from common import (HelperError, evidence, info, load_context, register_undo,
+                    startable_units, step_main, words)
 from unitctl import (UnitEnv, manifest_load, manifest_save, parse_args, start_and_wait)
 
 
@@ -54,10 +59,11 @@ def main():
     evidence("placeholders", " ".join("@%s@=%s" % (k, ctx.env_value(k))
                                       for k in ue.placeholders) or "none")
 
-    # ---- 3. record, then install
+    # ---- 3. register the halt, record, then install
     for name in defined:
         ue.check_name(name)
     dests = [ue.unit_path(n) for n in defined]
+    register_undo(ctx.run_dir, "halt_units")
     record["installed"] = dests
     record["enabled_new"] = list(to_start)
     record["started"] = list(to_start)

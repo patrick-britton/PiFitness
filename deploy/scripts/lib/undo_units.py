@@ -4,8 +4,13 @@ deploy/scripts/lib/undo_units.py  --  exit-handler undo for the unit steps.
 
     undo_units.py --run-dir <dir> --outcome success|incomplete|failure --exit-status <n>
 
-Registered by step_stop_services BEFORE it changes anything.  Works only from
-<run-dir>/units.json and run.state; idempotent; safe if the change never happened.
+Registered by step_stop_services BEFORE it changes anything, so it is the FIRST
+registered unit undo and therefore runs LAST in the exit handler.  The new units are
+already stopped by then: step_start_services registers undo_halt_units, which runs
+first (before the database restore and the checkout swap-back).  Step 1 below is a
+harmless repeat of that, and the only stop when this helper is run by hand.
+Works only from <run-dir>/units.json and run.state; idempotent; safe if the change
+never happened.
 
   TEST run (every outcome, including GO)  and  PRD run (failure / incomplete):
       REVERT  1. stop what this run started (timers first)
@@ -25,22 +30,9 @@ Exit: 0 done, 1 failed, 2 nothing to do.  Python 3 standard library only.
 import os
 import sys
 
-from common import (HelperError, SkipStep, evidence, info, load_context, step_main, warn)
-from unitctl import (UnitEnv, manifest_load, manifest_save, parse_args, start_and_wait,
-                     stop_order, stop_unit)
-
-
-class Failures:
-    def __init__(self):
-        self.items = []
-
-    def attempt(self, label, func):
-        try:
-            return func()
-        except HelperError as exc:
-            warn("%s: %s" % (label, exc.reason))
-            self.items.append("%s (%s)" % (label, exc.reason))
-        return None
+from common import (HelperError, SkipStep, evidence, info, load_context, step_main)
+from unitctl import (Failures, UnitEnv, manifest_load, manifest_save, parse_args,
+                     start_and_wait, stop_order, stop_unit)
 
 
 def keep_new_units(ue, record):
