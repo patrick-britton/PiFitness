@@ -37,6 +37,7 @@ beforeEach(() => {
 });
 
 describe('IsrcDupeHomeBanner', () => {
+  // REVIEWED: shows the pending pair count when duplicates exist — banner shows count when > 0 (FR-7/FR-9)
   it('shows the pending pair count when duplicates exist', async () => {
     getIsrcDupeCount.mockResolvedValue({ count: 3 });
 
@@ -47,6 +48,7 @@ describe('IsrcDupeHomeBanner', () => {
     ).toBeInTheDocument();
   });
 
+  // REVIEWED: renders nothing when the queue is empty — empty DOM when count is 0
   it('renders nothing when the queue is empty', async () => {
     getIsrcDupeCount.mockResolvedValue({ count: 0 });
 
@@ -56,6 +58,7 @@ describe('IsrcDupeHomeBanner', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  // REVIEWED: renders nothing while the count is still loading — no flash while pending promise
   it('renders nothing while the count is still loading', () => {
     // Never resolves — the banner must not flash a count it does not have.
     getIsrcDupeCount.mockImplementation(() => new Promise(() => {}));

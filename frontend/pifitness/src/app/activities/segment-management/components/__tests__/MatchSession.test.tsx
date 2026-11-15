@@ -261,6 +261,7 @@ beforeEach(() => {
 });
 
 describe('MatchSession auto-reject (T32)', () => {
+  // REVIEWED: rejects >200 rows on load, reloads, shows message — real AC-20 auto-reject behaviour, mocked API, no network
   it('rejects >200 rows on load, reloads, shows message', async () => {
     const dirty = [candidate(11, 50), candidate(13, 250)];
     const clean = [candidate(11, 50)];
@@ -278,6 +279,7 @@ describe('MatchSession auto-reject (T32)', () => {
     expect(await screen.findByText('Auto-rejected 1 candidate with confidence > 200.')).toBeInTheDocument();
   });
 
+  // REVIEWED: makes no write call when the set is clean — auto-reject skips bulkReject on clean set, mocked API
   it('makes no write call when the set is clean', async () => {
     getCandidates.mockResolvedValue(candidatesResponse([candidate(11, 50), candidate(12, 200)]));
 
@@ -288,6 +290,7 @@ describe('MatchSession auto-reject (T32)', () => {
     expect(screen.queryByText(/Auto-rejected/)).not.toBeInTheDocument();
   });
 
+  // REVIEWED: clears the message when the segment changes — auto-reject message clears on segment switch
   it('clears the message when the segment changes', async () => {
     const dirty = [candidate(11, 50), candidate(13, 250)];
     const clean = [candidate(11, 50)];
@@ -310,6 +313,7 @@ describe('MatchSession auto-reject (T32)', () => {
 });
 
 describe('MatchSession reject-all (T33)', () => {
+  // REVIEWED: fires bulkReject only after dialog confirm, then reloads — reject-all requires confirm before write
   it('fires bulkReject only after dialog confirm, then reloads', async () => {
     const rows = [candidate(11, 50), candidate(12, 60)];
     getCandidates
@@ -337,6 +341,7 @@ describe('MatchSession reject-all (T33)', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  // REVIEWED: refreshes both counts and clears the selected candidate after confirm — reject-all updates UI post-confirm
   it('refreshes both counts and clears the selected candidate after confirm', async () => {
     const rows = [candidate(11, 50), candidate(12, 60)];
     const withReference: SegmentListRow = {
@@ -382,6 +387,7 @@ describe('MatchSession reject-all (T33)', () => {
     expect(screen.queryByText(/orange = candidate/)).not.toBeInTheDocument();
   });
 
+  // REVIEWED: stays disabled with an empty candidate set — reject-all disabled when nothing to reject
   it('stays disabled with an empty candidate set', async () => {
     getCandidates.mockResolvedValue(candidatesResponse([]));
 
@@ -410,6 +416,7 @@ describe('MatchSession comparison elevation (T34/T35)', () => {
     },
   };
 
+  // REVIEWED: feeds the selected candidate in as the comparison series of the one profile — comparison elevation wiring
   it('feeds the selected candidate in as the comparison series of the one profile', async () => {
     getRoute.mockResolvedValueOnce(segmentRoute).mockResolvedValue(candidateRoute);
     getCandidates.mockResolvedValue(candidatesResponse([candidate(11, 50)]));
@@ -441,6 +448,7 @@ describe('MatchSession comparison elevation (T34/T35)', () => {
     );
   });
 
+  // REVIEWED: drops the comparison series when the candidate route fails — comparison dropped on route failure
   it('drops the comparison series when the candidate route fails', async () => {
     getRoute
       .mockResolvedValueOnce(segmentRoute)
@@ -463,6 +471,7 @@ describe('MatchSession comparison elevation (T34/T35)', () => {
     );
   });
 
+  // REVIEWED: drops the comparison series when the segment changes — comparison dropped on segment switch
   it('drops the comparison series when the segment changes', async () => {
     getRoute.mockResolvedValueOnce(segmentRoute).mockResolvedValue(candidateRoute);
     getCandidates.mockResolvedValue(candidatesResponse([candidate(11, 50)]));
@@ -501,6 +510,7 @@ async function renderSession() {
 }
 
 describe('map elevation coupling deleted (009-010 T01)', () => {
+  // REVIEWED: exposes no map-pick control — map → elevation coupling deleted (T01)
   it('exposes no map-pick control', async () => {
     const withReference: SegmentListRow = {
       ...SEGMENT,
@@ -585,6 +595,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     bulkReject.mockResolvedValue({ rejected: 1 });
   });
 
+  // REVIEWED: marks both series at the same fraction of their own lengths and names the fraction — plot pick marks both activities (T05)
   it('marks both series at the same fraction of their own lengths and names the fraction', async () => {
     // Click at 200 m of the 334 m plotted span ≈ 60%: each series marks its
     // own 60% — snapped to the nearest plotted point of its 3-point fixture
@@ -608,6 +619,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     expect(screen.queryByText(/Picked point:/)).toBeNull();
   });
 
+  // REVIEWED: at the span end the shorter series is beyond its extent, so only the longer marks (AC-4 boundary rule)
   it('at the span end the shorter series is beyond its extent, so only the longer marks (AC-4 boundary)', async () => {
     // 334 m IS the span (the candidate's extent): the route's 222 m extent is
     // absolutely beyond it, so only the candidate marks — at its own 100%.
@@ -621,6 +633,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     );
   });
 
+  // REVIEWED: marks only the series that reaches the distance and names the missing side — AC-4 span-end marking
   it('marks only the series that reaches the distance and names the missing side', async () => {
     // 300 m is past the segment route's 222 m extent but inside the candidate's 334 m.
     await pickOnPlot(300);
@@ -633,6 +646,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     );
   });
 
+  // REVIEWED: names an unselected comparison instead of drawing a second marker — unselected comparison naming fallback
   it('names an unselected comparison instead of drawing a second marker', async () => {
     // No candidate selected: the span is the route's own 222 m, so 111 m is
     // 50% of it — the route marks its own 50% and the legend says so.
@@ -649,6 +663,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     );
   });
 
+  // REVIEWED: clears the markers with the explicit clear control — pick markers cleared on demand
   it('clears the markers with the explicit clear control', async () => {
     const { user } = await pickOnPlot(200);
     expect(markers()).toHaveLength(2);
@@ -662,6 +677,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     expect(screen.getByTestId('elevation')).toHaveAttribute('data-pick-distance', '');
   });
 
+  // REVIEWED: clears the markers when the segment changes — markers cleared on segment switch
   it('clears the markers when the segment changes', async () => {
     const { view } = await pickOnPlot(200);
     expect(markers()).toHaveLength(2);
@@ -679,6 +695,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     expect(screen.queryByText(/on the elevation plot/)).toBeNull();
   });
 
+  // REVIEWED: clears the markers when the comparison is deselected (reject-all) — markers cleared on deselect
   it('clears the markers when the comparison is deselected (reject-all)', async () => {
     const { user } = await pickOnPlot(200);
     expect(markers()).toHaveLength(2);
@@ -740,6 +757,7 @@ describe('candidate-table render scope (T42, Bug 009-003-41-1)', () => {
     findMatchesStep.mockResolvedValue({ message: 'ok' });
   });
 
+  // REVIEWED: is untouched by a pick but re-rendered by a selection change — candidate-table render scope (T42)
   it('is untouched by a pick but re-rendered by a selection change', async () => {
     const userEvent = (await import('@testing-library/user-event')).default;
     const user = userEvent.setup();
@@ -776,6 +794,7 @@ describe('candidate-table render scope (T42, Bug 009-003-41-1)', () => {
     expect(tableProps.last?.onReject).toBe(stable?.onReject);
   });
 
+  // REVIEWED: re-renders when the candidate set is refreshed — candidate-table refreshes on candidate change
   it('re-renders when the candidate set is refreshed', async () => {
     // The mount read returns one candidate and the post-find re-read returns
     // two, so the rows prop genuinely changes identity here.
@@ -803,6 +822,7 @@ describe('candidate-table render scope (T42, Bug 009-003-41-1)', () => {
    * so removing `memo` from `CandidateTable` fails here instead of leaving the
    * render-scope test passing on a stub that is memoised by itself.
    */
+  // REVIEWED: keeps the real CandidateTable memo-wrapped — table stays memoized, not re-created per render
   it('keeps the real CandidateTable memo-wrapped', async () => {
     const actual = await vi.importActual<{
       default: { $$typeof?: symbol; type?: unknown };
@@ -863,6 +883,7 @@ describe('directional arrows (009-010 T04, FR-3)', () => {
     bulkReject.mockResolvedValue({ rejected: 1 });
   });
 
+  // REVIEWED: samples each route at the nominal spacing, in that series' own direction — directional arrows T04 sampling
   it('samples each route at the nominal spacing, in that series’ own direction', async () => {
     const userEvent = (await import('@testing-library/user-event')).default;
     const user = userEvent.setup();
@@ -892,6 +913,7 @@ describe('directional arrows (009-010 T04, FR-3)', () => {
     expect(arrows().filter((a) => a.series === 'route')).toEqual(routeOnly);
   });
 
+  // REVIEWED: names the arrows and both series in the map legend and the aria text — arrow legend and a11y text
   it('names the arrows and both series in the map legend and the aria text', async () => {
     const userEvent = (await import('@testing-library/user-event')).default;
     const user = userEvent.setup();
@@ -916,6 +938,7 @@ describe('directional arrows (009-010 T04, FR-3)', () => {
     expect(ariaAfter).toContain('open chevron arrows on the candidate effort');
   });
 
+  // REVIEWED: runs one pass per route and none for state the routes do not carry — directionArrows call count (T04)
   it('runs one pass per route and none for state the routes do not carry', async () => {
     const userEvent = (await import('@testing-library/user-event')).default;
     const user = userEvent.setup();
@@ -935,6 +958,7 @@ describe('directional arrows (009-010 T04, FR-3)', () => {
     expect(vi.mocked(directionArrows)).toHaveBeenCalledTimes(2);
   });
 
+  // REVIEWED: collapses cross-series glyphs that land within ~4 m, one per series — dedupeArrows cross-series collapse (AC-6b)
   it('collapses cross-series glyphs that land within ~4 m, one per series', async () => {
     // A candidate that covered the very same track: every overlay glyph collides
     // with a route glyph of the same path distance, so the route's glyphs (listed
@@ -956,6 +980,7 @@ describe('directional arrows (009-010 T04, FR-3)', () => {
     expect(overlayGlyphs[0].lngLat).toEqual(routeGlyphs[0].lngLat);
   });
 
+  // REVIEWED: says in the legend that both lines are solid and collided glyphs are dropped — legend naming (OQ-5 retired dash convention)
   it('says in the legend that both lines are solid and collided glyphs are dropped', async () => {
     const userEvent = (await import('@testing-library/user-event')).default;
     const user = userEvent.setup();

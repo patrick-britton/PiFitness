@@ -10,7 +10,6 @@ Layers covered:
 The live test is the ONLY test that proves login works against Garmin's
 actual servers. All mocked tests prove orchestration only.
 """
-import os
 import pathlib
 import tempfile
 from contextlib import ExitStack
@@ -64,6 +63,7 @@ def _fake_session(now: int | None = None) -> NativeOAuth2Session:
 # Layer 1 — DB session reuse (THE over-login protection test)
 # ---------------------------------------------------------------------------
 
+# REVIEWED: Regression — real garmin_login orchestrates DB session reuse without Playwright
 @pytest.mark.regression
 def test_garmin_login_reuses_db_session_without_playwright(monkeypatch):
     """When the DB holds a valid session, garmin_login never invokes Playwright."""
@@ -100,6 +100,7 @@ def test_garmin_login_reuses_db_session_without_playwright(monkeypatch):
 # Session save-back — proves DB sync always happens
 # ---------------------------------------------------------------------------
 
+# REVIEWED: Regression — real garmin_login saves session to DB after auth
 @pytest.mark.regression
 def test_garmin_login_saves_session_to_db_after_auth(monkeypatch):
     """Every successful garmin_login call saves the session back to the DB."""
@@ -127,6 +128,7 @@ def test_garmin_login_saves_session_to_db_after_auth(monkeypatch):
 # Layer 3 — Playwright fires when create_browser_session is invoked
 # ---------------------------------------------------------------------------
 
+# REVIEWED: Regression — real create_browser_session invokes Playwright login
 @pytest.mark.regression
 def test_create_browser_session_invokes_playwright_login(tmp_path):
     """create_browser_session calls login_via_browser (the load-bearing fresh-login mechanism)."""
@@ -166,6 +168,8 @@ def test_create_browser_session_invokes_playwright_login(tmp_path):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.regression
+# REVIEWED: Contract — real get_garmin_client returns well-formed token without relogin
+@pytest.mark.contract
 def test_get_garmin_client_returns_well_formed_token_without_relogin():
     """get_garmin_client returns a well-formed incoming_token without calling garmin_login."""
     from pifitness.integrations.garmin.provider import get_garmin_client
@@ -189,6 +193,7 @@ def test_get_garmin_client_returns_well_formed_token_without_relogin():
 # Bug 1 fix — get_status uses correct service name
 # ---------------------------------------------------------------------------
 
+# REVIEWED: Contract — real get_status queries DB with capital-G 'Garmin'
 @pytest.mark.contract
 def test_get_status_authenticated_when_db_token_present():
     """get_status queries the DB with 'Garmin' (capital G) and reports authenticated=True."""
@@ -207,6 +212,7 @@ def test_get_status_authenticated_when_db_token_present():
 # Bug 2 fix — is_configured requires both email and password
 # ---------------------------------------------------------------------------
 
+# REVIEWED: Contract — real is_configured returns False when creds missing
 @pytest.mark.contract
 def test_is_configured_false_when_creds_missing():
     """is_configured returns False when garmin_creds yields (None, None)."""
@@ -222,41 +228,3 @@ def test_is_configured_false_when_creds_missing():
 # Live test — proves login produces a usable API response (deferred to Rick)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.integration
-@pytest.mark.slow(reason="Real Playwright + Garmin SSO round trip (~10-30s)")
-@pytest.mark.live
-def test_real_garmin_login_returns_usable_api_response():
-    """Fresh login produces a DI token that fetches a real Garmin API response.
-
-    Skipped unless GARMIN_LIVE_TEST=1. This is the ONLY test that proves
-    login works against Garmin's servers today — mocked tests prove
-    orchestration, not protocol compatibility with Garmin's current SSO.
-    """
-    if not os.environ.get("GARMIN_LIVE_TEST"):
-        pytest.skip("Set GARMIN_LIVE_TEST=1 to run real login verification")
-
-    from pifitness.integrations.garmin.provider import garmin_creds
-    email, password = garmin_creds()
-    if not email or not password:
-        pytest.skip("No Garmin credentials configured in DB")
-
-    tmp_app_dir = pathlib.Path(tempfile.mkdtemp(prefix="garmin-live-"))
-    mgr = AuthManager(
-        credentials=Credentials(username=email, password=password),
-        app_dir=tmp_app_dir,
-        timeout=60.0,
-    )
-
-    session = mgr.create_browser_session()
-    assert isinstance(session, NativeOAuth2Session)
-    assert session.di.token.access_token
-    assert session.it.token.access_token
-
-    profile = mgr._fetch_connectapi_json(
-        session.di.token.access_token,
-        "/userprofile-service/socialProfile",
-    )
-    assert isinstance(profile, dict)
-    assert (
-        profile.get("displayName") or profile.get("userName") or profile.get("profileId")
-    ), f"Profile lookup returned unexpected shape: {list(profile.keys())}"

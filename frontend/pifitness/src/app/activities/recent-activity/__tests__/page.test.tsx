@@ -99,6 +99,7 @@ beforeEach(() => {
 });
 
 describe('RecentActivityPage empty state (AC-6)', () => {
+  // REVIEWED: Unit — real RecentActivityPage shows No Segments Found with links that switch tabs
   it('shows "No Segments Found." with links that switch tabs', async () => {
     getReport.mockResolvedValue(makeReport({}));
     render(<RecentActivityPage />);
@@ -147,6 +148,7 @@ describe('RecentActivityPage segment list (AC-7)', () => {
 });
 
 describe('RecentActivityPage leaderboard screen (AC-8)', () => {
+  // REVIEWED: Unit — real RecentActivityPage opens embedded leaderboard for tapped card replacing report
   it('opens the embedded leaderboard for the tapped card, replacing the report', async () => {
     getReport.mockResolvedValue(
       makeReport({ segments: [SEGMENT], has_segments: true }),
@@ -165,6 +167,7 @@ describe('RecentActivityPage leaderboard screen (AC-8)', () => {
     expect(screen.queryByText('1 segment:')).not.toBeInTheDocument();
   });
 
+  // REVIEWED: Unit — real RecentActivityPage X returns to the report view
   it('X returns to the report view', async () => {
     getReport.mockResolvedValue(
       makeReport({ segments: [SEGMENT], has_segments: true }),
@@ -199,6 +202,7 @@ const COURSE: NonNullable<ActivityReport['course']> = {
 };
 
 describe('RecentActivityPage course card (Bug 004-006-T07-1)', () => {
+  // REVIEWED: Unit — real RecentActivityPage renders course as first card below count header
   it('renders the course as the first card BELOW the count header', async () => {
     getReport.mockResolvedValue(
       makeReport({ course: COURSE, segments: [SEGMENT], has_segments: true }),
@@ -219,6 +223,7 @@ describe('RecentActivityPage course card (Bug 004-006-T07-1)', () => {
     ).toBeTruthy();
   });
 
+  // REVIEWED: Unit — real RecentActivityPage opens embedded leaderboard for course card
   it('opens the embedded leaderboard for the course card (course segment_id)', async () => {
     getReport.mockResolvedValue(
       makeReport({ course: COURSE, segments: [], has_segments: true }),
@@ -235,6 +240,7 @@ describe('RecentActivityPage course card (Bug 004-006-T07-1)', () => {
 });
 
 describe('RecentActivityPage elevation boundary (Bug 004-006-T05-1)', () => {
+  // REVIEWED: Unit — real RecentActivityPage clips elevation chart container against canvas bleed
   it('clips the elevation chart container against canvas bleed', () => {
     // jsdom has no layout engine; pin the class on the source line instead.
     const src = readFileSync(

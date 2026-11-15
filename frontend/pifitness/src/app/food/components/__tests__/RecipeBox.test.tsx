@@ -31,7 +31,8 @@ beforeEach(() => {
   useViewportStore.setState({ layoutVariant: 'desktop' });
 });
 describe('RecipeBox', () => {
-  it('renders in all three layouts', async () => {
+  // REVIEWED: renders in all three layouts — RecipeBox renders in desktop/portrait/landscape
+it('renders in all three layouts', async () => {
     recipes.mockResolvedValue([]);
     for (const v of ['desktop', 'portrait', 'landscape'] as const) {
       useViewportStore.setState({ layoutVariant: v });
@@ -40,17 +41,20 @@ describe('RecipeBox', () => {
       unmount();
     }
   });
-  it('shows loading state', async () => {
+  // REVIEWED: shows loading state — loading testid shown while recipes fetch
+it('shows loading state', async () => {
     recipes.mockReturnValue(new Promise(() => {}));
     render(<RecipeBox />);
     expect(screen.getByTestId('recipe-loading')).toBeInTheDocument();
   });
-  it('shows empty state when the box has no recipes', async () => {
+  // REVIEWED: shows empty state when the box has no recipes — empty state text shown
+it('shows empty state when the box has no recipes', async () => {
     recipes.mockResolvedValue([]);
     render(<RecipeBox />);
     expect(await screen.findByText(/No recipes yet/i)).toBeInTheDocument();
   });
-  it('shows error state with a retry that reloads', async () => {
+  // REVIEWED: shows error state with a retry that reloads — alert shown, retry reloads
+it('shows error state with a retry that reloads', async () => {
     const user = userEvent.setup();
     recipes.mockRejectedValueOnce(new Error('down'));
     recipes.mockResolvedValueOnce([]);

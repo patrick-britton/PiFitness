@@ -5,6 +5,7 @@ import pytest
 from pifitness.integrations.spotify import oauth_flow
 
 
+# REVIEWED: Regression — real force_refresh call with mocked cache/token asserts cache cleared and token returned
 @pytest.mark.regression
 def test_force_refresh_clears_cache_and_returns_token(monkeypatch):
     """force_refresh clears the Spotify token cache and returns a freshly obtained token
@@ -34,6 +35,7 @@ def test_force_refresh_clears_cache_and_returns_token(monkeypatch):
     assert result is sentinel_token
 
 
+# REVIEWED: Regression — real exchange_code call with mocked auth manager asserts token dict returned
 @pytest.mark.regression
 def test_exchange_code_returns_token_dict(monkeypatch):
     """exchange_code returns the token dict from the auth manager's get_access_token."""
@@ -53,6 +55,7 @@ def test_exchange_code_returns_token_dict(monkeypatch):
     assert result.get('access_token') == 'tok'
 
 
+# REVIEWED: Regression — real build_authorize_url call with mocked auth manager asserts URL and show_dialog=True
 @pytest.mark.regression
 def test_build_authorize_url_calls_show_dialog(monkeypatch):
     """build_authorize_url requests the consent dialog and returns the authorize URL."""

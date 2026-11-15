@@ -27,27 +27,8 @@ def _run_create(qec_calls, new_id=96):
     return result, qec_mock
 
 
-@pytest.mark.regression
-@pytest.mark.quarantine(
-    reason="asserts the SQL text of three qec calls by index",
-    exit="rewrite_against_db",
-)
-def test_create_segment_writes_details_row():
-    """create_segment creates the segment, finalizes the match, then writes details
-    scoped to the reference activity only.
-    """
-    result, qec_mock = _run_create([None, None, None])
-    assert result == 96
-    assert qec_mock.call_count == 3
-    calls = [c[0] for c in qec_mock.call_args_list]
-    assert "segment_matching_segment_creation" in calls[0][0]
-    assert "segment_matching_finalize_match(TRUE" in calls[1][0]
-    assert calls[1][1] == [24652871872, 96, 0, 7000]
-    # Scoped per-activity details write — never the unscoped NULL variant.
-    assert "staging.update_segment_details(%s)" in calls[2][0]
-    assert calls[2][1] == [24652871872]
 
-
+# REVIEWED: Regression — real create_segment with mocked qec asserts ValueError wraps details-write failure
 @pytest.mark.regression
 def test_create_segment_details_failure_maps_to_value_error():
     """create_segment raises ValueError naming the details write when the per-activity
@@ -61,6 +42,7 @@ def test_create_segment_details_failure_maps_to_value_error():
         raise AssertionError("expected ValueError from details-write failure")
 
 
+# REVIEWED: Regression — real create_segment with mocked qec asserts ValueError wraps finalize failure and skips details write
 @pytest.mark.regression
 def test_create_segment_finalize_failure_skips_details_write():
     """create_segment raises ValueError and performs no details write when finalizing

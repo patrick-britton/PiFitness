@@ -6,6 +6,7 @@ import pytest
 import backend_functions.music_functions as mf
 
 
+# REVIEWED: Regression — real auto_shuffle_playlists call with mocked DB/Spotify asserts ordered track upload and parameterized SQL
 @pytest.mark.regression
 def test_auto_shuffle_parity_target_id_and_ordered_track_list(monkeypatch):
     """auto_shuffle_playlists uploads the view's tracks in row order to the first row's

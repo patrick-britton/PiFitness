@@ -53,6 +53,7 @@ const base = (over: Partial<ProcessStepResult> = {}): ProcessStepResult => ({
 describe('failure finalization (AC-3)', () => {
   beforeEach(() => processActivity.mockReset());
 
+  // REVIEWED: Unit — real ActivityProcessingPage early failure: 0 pending, first step red, banner shown
   it('early failure (non-OK response): 0 pending, first step red, banner shown', async () => {
     // Guard: vitest's teardown probes the mock with zero args — only reject
     // the real (2-arg) call so the probe's promise never rejects unhandled.
@@ -77,6 +78,7 @@ describe('failure finalization (AC-3)', () => {
     ).toBeNull();
   });
 
+  // REVIEWED: Unit — real ActivityProcessingPage stream cut mid-step: interrupted step red with message, rest skipped
   it('stream cut mid-step: interrupted step red with message, rest skipped', async () => {
     processActivity.mockImplementation(async (...args: unknown[]) => {
       // Guard: vitest teardown probes the mock with zero args.
@@ -338,6 +340,7 @@ describe('estimate-driven status bars (004-007 T05 / AC-5)', () => {
     ).not.toBeNull();
   });
 
+  // REVIEWED: Unit — real ActivityProcessingPage completion banner reads Complete in n seconds with report link
   it('completion banner reads "Complete in {n}s" with a report link (AC-9)', async () => {
     processActivity.mockResolvedValue({
       complete: true,
@@ -369,6 +372,7 @@ describe('playlist rows hidden when music is not in the flow (Bug 004-007-7-4)',
     await screen.findAllByTestId('step-row');
   }
 
+  // REVIEWED: Unit — real ActivityProcessingPage last_run + no_music: all six playlist rows are absent
   it('last_run + no_music: all six playlist rows are absent', async () => {
     await startLastRun('No Music');
     for (const row of playlistRowIds()) expect(row).toBeNull();
@@ -377,12 +381,14 @@ describe('playlist rows hidden when music is not in the flow (Bug 004-007-7-4)',
     );
   });
 
+  // REVIEWED: Unit — real ActivityProcessingPage last_run + music: all six playlist rows are present
   it('last_run + music: all six playlist rows are present', async () => {
     await startLastRun('Running');
     for (const row of playlistRowIds()) expect(row).not.toBeNull();
     expect(screen.getAllByTestId('step-row')).toHaveLength(STEP_ORDER.length);
   });
 
+  // REVIEWED: Unit — real ActivityProcessingPage last_walk: playlist rows stay hidden after failure finalization
   it('last_walk (page-level): playlist rows stay hidden after failure finalization', async () => {
     processActivity.mockImplementation(async (...args: unknown[]) => {
       // Guard: vitest teardown probes the mock with zero args.

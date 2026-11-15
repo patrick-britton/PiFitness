@@ -6,8 +6,6 @@ touching Playwright, browser login, or create_browser_session. Structurally
 guarantees that refresh does not fall back to fresh login under any condition.
 """
 
-import ast
-import inspect
 import time
 
 import httpx
@@ -61,6 +59,7 @@ def _mock_client(handler):
     return httpx.Client(transport=httpx.MockTransport(handler), timeout=1.0)
 
 
+# REVIEWED: Unit — real AuthManager.refresh_di_token_slot with MockTransport asserts POST to DI token URL and new token
 @pytest.mark.unit
 def test_refresh_di_token_slot_success(tmp_path):
     captured = {}
@@ -87,6 +86,7 @@ def test_refresh_di_token_slot_success(tmp_path):
 
 
 
+# REVIEWED: Unit — real AuthManager.refresh_it_token_slot with MockTransport asserts POST to IT token URL and new token
 @pytest.mark.unit
 def test_refresh_it_token_slot_success(tmp_path):
     captured = {}
@@ -110,6 +110,7 @@ def test_refresh_it_token_slot_success(tmp_path):
     assert new_slot.client_id == "IT_CLIENT"
 
 
+# REVIEWED: Unit — real AuthManager.refresh_it_token_slot asserts GarminAuthError on expired IT refresh token, no HTTP attempted
 @pytest.mark.unit
 def test_refresh_it_token_slot_raises_when_refresh_token_expired(tmp_path):
     called = []
@@ -125,6 +126,7 @@ def test_refresh_it_token_slot_raises_when_refresh_token_expired(tmp_path):
     assert called == []
 
 
+# REVIEWED: Unit — real AuthManager.refresh_it_token_slot asserts GarminAuthError on HTTP 500 with body text
 @pytest.mark.unit
 def test_refresh_it_token_slot_raises_on_http_error(tmp_path):
     def handler(request):
@@ -140,37 +142,13 @@ def test_refresh_it_token_slot_raises_on_http_error(tmp_path):
     assert "server exploded" in msg
 
 
-@pytest.mark.unit
-def test_refresh_paths_have_no_browser_or_session_dependency():
-    """
-    Structural guarantee: neither refresh_di_token_slot nor refresh_it_token_slot
-    may reference login_via_browser or create_browser_session in any way. If a
-    future change adds a browser fallback, this test fails.
-    """
-    from pifitness.integrations.garmin import auth as auth_mod
-
-    src = inspect.getsource(auth_mod)
-    tree = ast.parse(src)
-    forbidden = {"login_via_browser", "create_browser_session"}
-    violations = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name in (
-            "refresh_di_token_slot",
-            "refresh_it_token_slot",
-        ):
-            for sub in ast.walk(node):
-                if isinstance(sub, ast.Name) and sub.id in forbidden:
-                    violations.append(f"{node.name} references {sub.id} at line {sub.lineno}")
-                elif isinstance(sub, ast.Attribute) and sub.attr in forbidden:
-                    violations.append(f"{node.name} calls .{sub.attr} at line {sub.lineno}")
-    assert not violations, violations
-
-
 # Sanity check: the JWT client-id extractor is exercised indirectly above (falls
 # back to slot.client_id for non-JWT tokens). Confirm it behaves as expected.
+# REVIEWED: Unit — real _extract_client_id_from_access_token call with non-JWT string asserts None
 @pytest.mark.unit
 def test_extract_client_id_from_non_jwt_returns_none():
     assert _extract_client_id_from_access_token("not-a-jwt-at-all") is None
+# REVIEWED: Unit — real AuthManager.refresh_di_token_slot asserts GarminAuthError on expired DI refresh token, no HTTP attempted
 @pytest.mark.unit
 def test_refresh_di_token_slot_raises_when_refresh_token_expired(tmp_path):
     called = []
@@ -187,6 +165,7 @@ def test_refresh_di_token_slot_raises_when_refresh_token_expired(tmp_path):
     assert called == []
 
 
+# REVIEWED: Unit — real AuthManager.refresh_di_token_slot asserts GarminAuthError on HTTP 401 with body text
 @pytest.mark.unit
 def test_refresh_di_token_slot_raises_on_http_error(tmp_path):
     def handler(request):

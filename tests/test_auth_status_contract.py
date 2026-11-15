@@ -19,6 +19,7 @@ def _mock_db_returns(monkeypatch, sql_results):
     )
 
 
+# REVIEWED: Contract — real get_auth_status call asserts exact services structure fields
 @pytest.mark.contract
 def test_returns_expected_structure(monkeypatch):
     """get_auth_status returns a services mapping whose Spotify and Garmin entries carry
@@ -43,6 +44,7 @@ def test_returns_expected_structure(monkeypatch):
     }
 
 
+# REVIEWED: Contract — real get_auth_status call asserts missing_credentials for both services
 @pytest.mark.contract
 def test_missing_credentials_reports_missing(monkeypatch):
     """get_auth_status reports missing_credentials for both services when no credentials
@@ -59,6 +61,7 @@ def test_missing_credentials_reports_missing(monkeypatch):
     assert result["services"]["Garmin"]["status"] == "missing_credentials"
 
 
+# REVIEWED: Contract — real get_auth_status call asserts ok for both services when creds present
 @pytest.mark.contract
 def test_ok_when_credentials_present(monkeypatch):
     """get_auth_status reports ok for both services when credentials exist and nothing
@@ -75,6 +78,7 @@ def test_ok_when_credentials_present(monkeypatch):
     assert result["services"]["Garmin"]["status"] == "ok"
 
 
+# REVIEWED: Contract — real get_auth_status call asserts Spotify rate_limited with clearance timestamp
 @pytest.mark.contract
 def test_spotify_rate_limited_reports_rate_limited(monkeypatch):
     """get_auth_status reports Spotify as rate_limited, with its clearance timestamp,

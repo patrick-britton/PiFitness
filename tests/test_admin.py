@@ -12,6 +12,7 @@ client = TestClient(app)
 # All logging schema tables should return 200, not 500
 # ---------------------------------------------------------------------------
 
+# REVIEWED: Regression — real TestClient calls to /api/admin/logs/data/{table} assert 200 and data/count envelope for every logging table
 @pytest.mark.regression
 @pytest.mark.live
 @pytest.mark.parametrize("table_name", [

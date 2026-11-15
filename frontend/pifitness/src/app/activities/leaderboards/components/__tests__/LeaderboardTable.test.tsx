@@ -87,6 +87,7 @@ beforeEach(() => {
 });
 
 describe('LeaderboardTable screen order (AC-8)', () => {
+  // REVIEWED: Unit — real LeaderboardTable orders Effort Distribution → Generate Race → filters → table
   it('orders Effort Distribution → Generate Race → filters → table', async () => {
     render(<LeaderboardTable segmentId={7} segmentName="Towpath Loop" />);
 
@@ -100,6 +101,7 @@ describe('LeaderboardTable screen order (AC-8)', () => {
     expect(appearsBefore(range, table)).toBe(true);
   });
 
+  // REVIEWED: Unit — real LeaderboardTable renders built-in name header when NOT embedded
   it('renders the built-in name header when NOT embedded', async () => {
     render(<LeaderboardTable segmentId={7} segmentName="Towpath Loop" />);
 
@@ -110,6 +112,7 @@ describe('LeaderboardTable screen order (AC-8)', () => {
     expect(screen.getByText('1 effort')).toBeInTheDocument();
   });
 
+  // REVIEWED: Unit — real LeaderboardTable suppresses built-in name header in embedded mode
   it('suppresses the built-in name header in embedded mode (host renders it)', async () => {
     render(<LeaderboardTable segmentId={7} segmentName="Towpath Loop" embedded />);
 

@@ -31,6 +31,7 @@ def _patch_all(stack, *, rate_limited=False, spotify=None, garmin=None, sql_resu
     )
 
 
+# REVIEWED: Unit — real get_auth_status call with mocked creds/DB asserts services key and per-service status fields
 @pytest.mark.unit
 def test_get_auth_status_returns_services_key():
     with ExitStack() as stack:
@@ -47,6 +48,7 @@ def test_get_auth_status_returns_services_key():
         assert "status" in result["services"][svc]
 
 
+# REVIEWED: Unit — real get_auth_status call asserts Spotify "ok" status when credentials present
 @pytest.mark.unit
 def test_spotify_ok_when_credentials_present():
     with ExitStack() as stack:
@@ -60,6 +62,7 @@ def test_spotify_ok_when_credentials_present():
     assert result["services"]["Spotify"]["status"] == "ok"
 
 
+# REVIEWED: Unit — real get_auth_status call asserts Spotify "missing_credentials" when no creds
 @pytest.mark.unit
 def test_spotify_missing_credentials():
     with ExitStack() as stack:
@@ -73,6 +76,7 @@ def test_spotify_missing_credentials():
     assert result["services"]["Spotify"]["status"] == "missing_credentials"
 
 
+# REVIEWED: Unit — real get_auth_status call asserts Spotify "rate_limited" when rate_limited flag set
 @pytest.mark.unit
 def test_spotify_rate_limited():
     with ExitStack() as stack:
@@ -86,6 +90,7 @@ def test_spotify_rate_limited():
     assert result["services"]["Spotify"]["status"] == "rate_limited"
 
 
+# REVIEWED: Unit — real get_auth_status call asserts Garmin last_error surfaced from SQL
 @pytest.mark.unit
 def test_garmin_last_error_surfaced():
     with ExitStack() as stack:

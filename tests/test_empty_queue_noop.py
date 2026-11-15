@@ -20,6 +20,7 @@ def _task(**over):
     return t
 
 
+# REVIEWED: Regression — real extract_garmin_universal call with empty activity list asserts NoWorkToSync with distinct message
 @pytest.mark.regression
 def test_empty_iterator_raises_no_work(monkeypatch):
     """extract_garmin_universal raises NoWorkToSync, with a message distinct from
@@ -37,6 +38,7 @@ def test_empty_iterator_raises_no_work(monkeypatch):
     assert 'No API response' not in msg
 
 
+# REVIEWED: Regression — real ultimate_task_executioner call with empty queue asserts successful reconcile and task result
 @pytest.mark.regression
 def test_executioner_reconciles_no_work_as_success(monkeypatch):
     """ultimate_task_executioner reconciles an empty work queue as one successful run
@@ -65,6 +67,7 @@ def test_executioner_reconciles_no_work_as_success(monkeypatch):
     assert entry['error'] is None
 
 
+# REVIEWED: Regression — real ultimate_task_executioner call with all-failed queue asserts failure reconcile and error propagation
 @pytest.mark.regression
 def test_nonempty_all_failed_still_fails(monkeypatch):
     """ultimate_task_executioner reconciles a non-empty queue whose API calls all fail

@@ -35,6 +35,7 @@ vi.mock('@/hooks/useAdmin', () => ({
 }));
 
 describe('TaskSummary failure detail (AC-9)', () => {
+  // REVIEWED: renders last_failure_message next to the Error badge (AC-9) — failure message shown alongside badge
   it('renders last_failure_message next to the Error badge', () => {
     render(<TaskSummary />);
     expect(screen.getByText('Error')).toBeInTheDocument();

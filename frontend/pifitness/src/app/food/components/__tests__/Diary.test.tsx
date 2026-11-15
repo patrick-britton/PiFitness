@@ -73,7 +73,8 @@ beforeEach(() => {
 });
 
 describe('Diary', () => {
-  it('renders stats bars + entry cards in all three layout variants', async () => {
+  // REVIEWED: renders stats bars + entry cards in all three layout variants — stats + entries render in all layouts
+it('renders stats bars + entry cards in all three layout variants', async () => {
     for (const variant of ['desktop', 'portrait', 'landscape'] as const) {
       useViewportStore.setState({ layoutVariant: variant });
       const { unmount } = render(<Diary />);
@@ -83,7 +84,8 @@ describe('Diary', () => {
     }
   });
 
-  it('shows loading skeletons while stats/entries resolve', () => {
+  // REVIEWED: shows loading skeletons while stats/entries resolve — loading skeletons shown while data fetches
+it('shows loading skeletons while stats/entries resolve', () => {
     diaryStats.mockReturnValue(new Promise(() => {}));
     diary.mockReturnValue(new Promise(() => {}));
     render(<Diary />);
@@ -91,7 +93,8 @@ describe('Diary', () => {
     expect(screen.getAllByTestId('diary-entries-loading').length).toBeGreaterThan(0);
   });
 
-  it('shows empty + error states, never a blank screen', async () => {
+  // REVIEWED: shows empty + error states, never a blank screen — empty and error states rendered
+it('shows empty + error states, never a blank screen', async () => {
     diaryStats.mockResolvedValue({ today_kcal: null, last_24h_kcal: null, avg_7d_kcal: null, scale_max: 0 });
     diary.mockResolvedValue([]);
     const { unmount } = render(<Diary />);
@@ -105,7 +108,8 @@ describe('Diary', () => {
     expect(await screen.findByText(/Diary entries/i)).toBeInTheDocument();
   });
 
-  it('day arrows load the neighbouring day', async () => {
+  // REVIEWED: day arrows load the neighbouring day — day navigation calls API with correct day
+it('day arrows load the neighbouring day', async () => {
     const user = userEvent.setup();
     render(<Diary />);
     await screen.findByText('Banana');
@@ -114,7 +118,8 @@ describe('Diary', () => {
     await waitFor(() => expect(diary).toHaveBeenCalledWith(yesterday));
   });
 
-  it('plus-circle Add swaps to add-entry mode; red cancel returns', async () => {
+  // REVIEWED: plus-circle Add swaps to add-entry mode; red cancel returns — add-entry mode toggle
+it('plus-circle Add swaps to add-entry mode; red cancel returns', async () => {
     const user = userEvent.setup();
     vi.mocked(API.food.suggest).mockResolvedValue([]);
     render(<Diary />);
@@ -126,7 +131,8 @@ describe('Diary', () => {
     expect(await screen.findByText('Banana')).toBeInTheDocument();
   });
 
-  it('tapping a card opens the edit popup', async () => {
+  // REVIEWED: tapping a card opens the edit popup — card tap opens edit dialog with live kcal
+it('tapping a card opens the edit popup', async () => {
     const user = userEvent.setup();
     updateDiaryEntry.mockResolvedValue({ ...MEAL, qty: 200 });
     render(<Diary />);
@@ -138,7 +144,8 @@ describe('Diary', () => {
     await waitFor(() => expect(updateDiaryEntry).toHaveBeenCalled());
   });
 
-  it('Delete follows undo-vs-confirm: banner + Undo, no commit', async () => {
+  // REVIEWED: Delete follows undo-vs-confirm: banner + Undo, no commit — undo banner, no commit on Undo
+it('Delete follows undo-vs-confirm: banner + Undo, no commit', async () => {
     const user = userEvent.setup();
     deleteDiaryEntry.mockResolvedValue({ success: true, entry_id: 1 });
     render(<Diary />);
@@ -149,7 +156,8 @@ describe('Diary', () => {
     expect(screen.queryByText(/1 entry removed/i)).not.toBeInTheDocument();
   });
 
-  it('T10: edit popup closes only via buttons — backdrop click does nothing', async () => {
+  // REVIEWED: T10: edit popup closes only via buttons — backdrop click does nothing — backdrop click is no-op
+it('T10: edit popup closes only via buttons — backdrop click does nothing', async () => {
     const user = userEvent.setup();
     render(<Diary />);
     await user.click(await screen.findByText('Banana'));
@@ -160,7 +168,8 @@ describe('Diary', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('010-005 T10: editing a logged recipe entry keeps its own serving unit label', async () => {
+  // REVIEWED: 010-005 T10: editing a logged recipe entry keeps its own serving unit label — recipe serving unit preserved
+it('010-005 T10: editing a logged recipe entry keeps its own serving unit label', async () => {
     const user = userEvent.setup();
     const recipeMeal = { ...MEAL, entry_id: 9, name_snapshot: 'Pancakes', qty: 3, unit: 'pancake', kcal: 300 };
     diary.mockResolvedValue([recipeMeal]);

@@ -27,6 +27,7 @@ ENVELOPE_ROUTES = [
 ]
 
 
+# REVIEWED: Smoke — real TestClient calls to each read-only route assert 200 with data envelope and integer count
 @pytest.mark.smoke
 @pytest.mark.live
 @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
@@ -41,6 +42,7 @@ def test_get_route_returns_data_envelope(path):
     assert isinstance(body["count"], int)
 
 
+# REVIEWED: Smoke — real TestClient call to /api/admin/events with limit asserts row count respects the requested limit
 @pytest.mark.smoke
 @pytest.mark.live
 def test_admin_events_limit_is_respected():
@@ -51,6 +53,7 @@ def test_admin_events_limit_is_respected():
     assert len(response.json()["data"]) <= 50
 
 
+# REVIEWED: Smoke — real TestClient calls to activity detail/telemetry/segments routes assert 200 and data field
 @pytest.mark.smoke
 @pytest.mark.live
 @pytest.mark.parametrize("suffix", ["", "/telemetry", "/segments"])

@@ -16,6 +16,7 @@ config_module = importlib.import_module('pifitness.config.router')
 client = TestClient(app)
 
 
+# REVIEWED: Contract — monkeypatched mapbox_token, real TestClient to /api/config/map asserts token passthrough
 @pytest.mark.contract
 def test_map_config_with_token(monkeypatch):
     """GET /api/config/map returns the configured Mapbox token as mapboxToken."""
@@ -25,6 +26,7 @@ def test_map_config_with_token(monkeypatch):
     assert response.json() == {"mapboxToken": "pk.test-token-123"}
 
 
+# REVIEWED: Contract — monkeypatched empty mapbox_token, real TestClient to /api/config/map asserts null passthrough
 @pytest.mark.contract
 def test_map_config_without_token(monkeypatch):
     """GET /api/config/map returns a null mapboxToken when no Mapbox credential is
@@ -36,6 +38,7 @@ def test_map_config_without_token(monkeypatch):
     assert response.json() == {"mapboxToken": None}
 
 
+# REVIEWED: Contract — monkeypatched mapbox_token raising, real TestClient to /api/config/map asserts graceful null fallback
 @pytest.mark.contract
 def test_map_config_token_resolution_error(monkeypatch):
     """GET /api/config/map answers 200 with a null mapboxToken when the credential

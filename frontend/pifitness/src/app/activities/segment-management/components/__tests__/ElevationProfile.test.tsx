@@ -61,6 +61,7 @@ describe('ElevationProfile distance axis (AC-18)', () => {
     captured.data = null;
   });
 
+  // REVIEWED: Unit — real ElevationProfile sets scales.x.max to last data distance
   it('sets scales.x.max to the last data distance (3228, not a rounded-up tick)', () => {
     const coords = coordsEndingAt(3228);
     // Guard the fixture: the route really ends at 3,228 m after rounding.
@@ -72,6 +73,7 @@ describe('ElevationProfile distance axis (AC-18)', () => {
     expect(x?.max).toBe(3228);
   });
 
+  // REVIEWED: Unit — real ElevationProfile updates axis max when route changes
   it('updates the axis max when the route changes', () => {
     const { rerender } = render(
       <ElevationProfile coords={coordsEndingAt(1000)} elevations={[5, 9]} />,
@@ -82,6 +84,7 @@ describe('ElevationProfile distance axis (AC-18)', () => {
     expect((captured.options?.scales?.x as { max?: number })?.max).toBe(2500);
   });
 
+  // REVIEWED: Unit — real ElevationProfile renders empty state without chart options for single-point route
   it('renders the empty state without chart options for a single-point route', () => {
     // A one-point path has no line to draw — the component shows its empty
     // message and never builds (or captures) chart options for it.
@@ -116,6 +119,7 @@ describe('ElevationProfile series colours (AC-24)', () => {
     document.documentElement.classList.remove('dark');
   });
 
+  // REVIEWED: Unit — real ElevationProfile draws lone profile in --chart-1 solid with no legend
   it('draws a lone profile in --chart-1, solid, with no legend', () => {
     render(<ElevationProfile coords={coordsEndingAt(1000)} elevations={[5, 9]} />);
 
@@ -128,6 +132,7 @@ describe('ElevationProfile series colours (AC-24)', () => {
     expect(legendDisplay()).toBe(false);
   });
 
+  // REVIEWED: Unit — real ElevationProfile draws comparison series in --chart-2 dashed and names both in legend
   it('draws the comparison series in --chart-2 dashed and names both in the legend', () => {
     render(
       <ElevationProfile
@@ -149,6 +154,7 @@ describe('ElevationProfile series colours (AC-24)', () => {
     expect((captured.options?.scales?.x as { max?: number })?.max).toBe(1200);
   });
 
+  // REVIEWED: Unit — real ElevationProfile re-reads both tokens for dark theme
   it('re-reads both tokens for the dark theme', () => {
     document.documentElement.classList.add('dark');
     render(
@@ -206,6 +212,7 @@ describe('ElevationProfile click-only pick (009-010 T05, FR-2)', () => {
     picked.length = 0;
   });
 
+  // REVIEWED: Unit — real ElevationProfile draws no indicator without pickDistance and reports click from event.x
   it('draws no indicator without pickDistance and reports a click from event.x', () => {
     render(
       <ElevationProfile
@@ -223,6 +230,7 @@ describe('ElevationProfile click-only pick (009-010 T05, FR-2)', () => {
     expect(picked).toEqual([420]);
   });
 
+  // REVIEWED: Unit — real ElevationProfile exposes no onHover path
   it('exposes no onHover path: hovering the plot emits nothing', () => {
     render(
       <ElevationProfile
@@ -236,6 +244,7 @@ describe('ElevationProfile click-only pick (009-010 T05, FR-2)', () => {
     expect(picked).toEqual([]);
   });
 
+  // REVIEWED: Unit — real ElevationProfile draws indicator only when pickDistance is set
   it('draws the indicator only when pickDistance is set', () => {
     const { rerender } = render(
       <ElevationProfile
@@ -269,6 +278,7 @@ describe('ElevationProfile click-only pick (009-010 T05, FR-2)', () => {
     expect(indicator()).toBeUndefined();
   });
 
+  // REVIEWED: Unit — real ElevationProfile ignores click whose event carries no chart-area x
   it('ignores a click whose event carries no chart-area x', () => {
     render(
       <ElevationProfile
@@ -301,6 +311,7 @@ describe('ElevationProfile click-only pick (009-010 T05, FR-2)', () => {
  * can reappear unnoticed.
  */
 describe('ElevationProfile deleted hover path (009-010 T05 supersedes T42)', () => {
+  // REVIEWED: Unit — real ElevationProfile schedules no animation frame and tolerates unmount
   it('schedules no animation frame and tolerates an unmount without one', () => {
     const frames = new Map<number, () => void>();
     let nextFrameId = 1;

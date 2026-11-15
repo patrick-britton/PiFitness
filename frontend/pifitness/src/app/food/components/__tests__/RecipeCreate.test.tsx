@@ -64,6 +64,7 @@ beforeEach(() => {
 });
 
 describe('RecipeCreate', () => {
+  // REVIEWED: Unit — real RecipeCreate renders in all three layouts
   it('renders in all three layouts', async () => {
     for (const v of ['desktop', 'portrait', 'landscape'] as const) {
       useViewportStore.setState({ layoutVariant: v });
@@ -73,6 +74,7 @@ describe('RecipeCreate', () => {
     }
   });
 
+  // REVIEWED: Unit — real RecipeCreate blocks save until title + ingredient set; saved rows skip persist
   it('blocks save until title + ingredient are set; saved rows skip persist', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([dbHit()]);
@@ -90,6 +92,7 @@ describe('RecipeCreate', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /Save recipe/i })).toBeEnabled());
   });
 
+  // REVIEWED: Unit — real RecipeCreate API-hit pick resolves to food_id via persist and saves payload
   it('API-hit pick resolves to a food_id via persist and saves the payload', async () => {
     const user = userEvent.setup();
     const onSaved = vi.fn();
@@ -119,6 +122,7 @@ describe('RecipeCreate', () => {
     expect(onSaved).toHaveBeenCalled();
   });
 
+  // REVIEWED: Unit — real RecipeCreate save carries built steps; skip path saves with steps: []
   it('save carries built steps; skip path saves with steps: []', async () => {
     const user = userEvent.setup();
     const onSaved = vi.fn();
@@ -146,6 +150,7 @@ describe('RecipeCreate', () => {
     expect(onSaved).toHaveBeenCalled();
   });
 
+  // REVIEWED: Unit — real RecipeCreate abandoning flow writes nothing to recipe tables
   it('abandoning the flow writes nothing to recipe tables', async () => {
     const user = userEvent.setup();
     const onBack = vi.fn();
@@ -156,6 +161,7 @@ describe('RecipeCreate', () => {
     expect(persistApiFood).not.toHaveBeenCalled();
   });
 
+  // REVIEWED: Unit — real buildSavePayload matches SaveRecipeRequest shape
   it('buildSavePayload matches SaveRecipeRequest', () => {
     expect(buildSavePayload({
       title: '  Soup ', category: 'Side', servingsCount: 2,
@@ -167,6 +173,7 @@ describe('RecipeCreate', () => {
     });
   });
 
+  // REVIEWED: Unit — real previewTotals sums convertible lines and nulls when none convert
   it('previewTotals sums convertible lines and nulls when none convert', () => {
     expect(previewTotals([
       { qty: 100, unit: 'g', kcalPer100g: 100 },

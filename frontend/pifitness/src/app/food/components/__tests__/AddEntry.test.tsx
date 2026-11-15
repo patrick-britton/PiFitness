@@ -92,12 +92,14 @@ beforeEach(() => {
 });
 
 describe('AddEntry', () => {
+  // REVIEWED: shows suggestion cards with mode qty + unit — suggestion cards render with mode-based qty/unit
   it('shows suggestion cards with mode qty + unit', async () => {
     render(<AddEntry onDone={() => {}} />);
     expect(await screen.findByText('Oatmeal')).toBeInTheDocument();
     expect(screen.getByText('40 g')).toBeInTheDocument();
   });
 
+  // REVIEWED: search shows top results; Show more reveals the rest, no extra call — tiered search results with show-more
   it('search shows top results; Show more reveals the rest, no extra call', async () => {
     const user = userEvent.setup();
     const many = Array.from({ length: 12 }, (_, i) => hit(i));
@@ -113,6 +115,7 @@ describe('AddEntry', () => {
     expect(combinedSearch).toHaveBeenCalledTimes(1);
   });
 
+  // REVIEWED: result cards carry source + percent pill (010-004 T03, no High/Medium/Low) — source badge and percent on cards
   it('result cards carry source + percent pill (010-004 T03, no High/Medium/Low)', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([{
@@ -135,6 +138,7 @@ describe('AddEntry', () => {
     expect(screen.getAllByRole('button', { name: /^All$/ })).toHaveLength(2);
   });
 
+  // REVIEWED: facet filter narrows the list client-side with no extra fetch (010-004 T03) — client-side facet filtering
   it('facet filter narrows the list client-side with no extra fetch (010-004 T03)', async () => {
     const user = userEvent.setup();
     const mk = (i: number, cat: string | undefined, unit: string | undefined): CombinedSearchResult => ({
@@ -160,6 +164,7 @@ describe('AddEntry', () => {
     expect(combinedSearch).toHaveBeenCalledTimes(1);
   });
 
+  // REVIEWED: facet control renders a dropdown at 4+ values (010-004 T03) — facet dropdown rendered for 4+ values
   it('facet control renders a dropdown at 4+ values (010-004 T03)', async () => {
     const user = userEvent.setup();
     const mk = (i: number, cat: string): CombinedSearchResult => ({
@@ -182,6 +187,7 @@ describe('AddEntry', () => {
     expect(combinedSearch).toHaveBeenCalledTimes(1);
   });
 
+  // REVIEWED: scan hit opens confirm directly; Confirm persists via from-api — barcode scan opens confirm dialog
   it('scan hit opens confirm directly; Confirm persists via from-api', async () => {
     const user = userEvent.setup();
     const onDone = vi.fn();
@@ -200,6 +206,7 @@ describe('AddEntry', () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  // REVIEWED: suggestion pick opens confirm with live kcal; Confirm logs + returns — suggestion selection logs entry
   it('suggestion pick opens confirm with live kcal; Confirm logs + returns', async () => {
     const user = userEvent.setup();
     const onDone = vi.fn();
@@ -214,6 +221,7 @@ describe('AddEntry', () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  // REVIEWED: red cancel returns to diary without logging — cancel dismisses confirm without logging
   it('red cancel returns to diary without logging', async () => {
     const user = userEvent.setup();
     const onDone = vi.fn();
@@ -224,6 +232,7 @@ describe('AddEntry', () => {
     expect(logEntry).not.toHaveBeenCalled();
   });
 
+  // REVIEWED: T08: usda pick shows editable name; Confirm sends renamed payload — USDA pick with editable name field
   it('T08: usda pick shows editable name; Confirm sends renamed payload', async () => {
     const user = userEvent.setup();
     const onDone = vi.fn();
@@ -246,6 +255,7 @@ describe('AddEntry', () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  // REVIEWED: T08: db suggestion pick has no name field; empty API name blocks save — DB pick without name field blocks save
   it('T08: db suggestion pick has no name field; empty API name blocks save', async () => {
     const user = userEvent.setup();
     logEntry.mockResolvedValue({ ...ENTRY, entry_id: 7 });
@@ -266,6 +276,7 @@ describe('AddEntry', () => {
     expect(logApiEntry).not.toHaveBeenCalled();
   });
 
+  // REVIEWED: T08: barcode already saved opens DB confirm without name field — saved barcode opens confirm without name
   it('T08: barcode already saved opens DB confirm without name field', async () => {
     const user = userEvent.setup();
     logEntry.mockResolvedValue({ ...ENTRY, entry_id: 12 });
@@ -285,6 +296,7 @@ describe('AddEntry', () => {
     expect(screen.queryByLabelText('Name for your diary')).not.toBeInTheDocument();
   });
 
+  // REVIEWED: T09: source pill renders per kind with light + dark tokens — source pill renders by kind with theme tokens
   it('T09: source pill renders per kind with light + dark tokens', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([
@@ -305,6 +317,7 @@ describe('AddEntry', () => {
     expect(dbPill).toHaveTextContent('DB');
   });
 
+  // REVIEWED: T10: suggestion pick defaults to its mode qty/unit (mode beats row serving) — mode qty takes precedence
   it('T10: suggestion pick defaults to its mode qty/unit (mode beats row serving)', async () => {
     const user = userEvent.setup();
     render(<AddEntry onDone={() => {}} />);
@@ -315,6 +328,7 @@ describe('AddEntry', () => {
     expect((screen.getByLabelText('Unit') as HTMLSelectElement).value).toBe('g');
   });
 
+  // REVIEWED: T10: API pick with feed serving opens at that serving (ml), not 100 g — feed serving used as default
   it('T10: API pick with feed serving opens at that serving (ml), not 100 g', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([
@@ -330,6 +344,7 @@ describe('AddEntry', () => {
     expect((screen.getByLabelText('Unit') as HTMLSelectElement).value).toBe('ml');
   });
 
+  // REVIEWED: T10: pick without a feed serving falls back to 100 g — 100 g fallback when no serving
   it('T10: pick without a feed serving falls back to 100 g', async () => {
     const user = userEvent.setup();
     render(<AddEntry onDone={() => {}} />);
@@ -342,6 +357,7 @@ describe('AddEntry', () => {
     expect((screen.getByLabelText('Unit') as HTMLSelectElement).value).toBe('g');
   });
 
+  // REVIEWED: T10: popup shows the saved-data panel (nutrients, serving, source, keys) — saved data panel visible
   it('T10: popup shows the saved-data panel (nutrients, serving, source, keys)', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([{
@@ -367,6 +383,7 @@ describe('AddEntry', () => {
     expect(screen.queryByText(/fdcId/)).not.toBeInTheDocument();
   });
 
+  // REVIEWED: T04: panel shows 2-column nutrient bars with OQ-7 scaling; nulls get em-dash, no fdcId (010-004) — nutrient bars with null handling
   it('T04: panel shows 2-column nutrient bars with OQ-7 scaling; nulls get em-dash, no fdcId (010-004)', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([{
@@ -412,6 +429,7 @@ describe('AddEntry', () => {
     expect(screen.queryByText(/fdcId/)).not.toBeInTheDocument();
   });
 
+  // REVIEWED: T10: backdrop click does not close the confirm popup; Cancel does — backdrop click is no-op, Cancel closes
   it('T10: backdrop click does not close the confirm popup; Cancel does', async () => {
     const user = userEvent.setup();
     render(<AddEntry onDone={() => {}} />);
@@ -423,6 +441,7 @@ describe('AddEntry', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  // REVIEWED: 010-005 T10: recipe pick opens at qty 1 in its own serving unit and logs qty 3 pancake (AC-10) — recipe defaults
   it('010-005 T10: recipe pick opens at qty 1 in its own serving unit and logs qty 3 pancake (AC-10)', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([{
@@ -458,6 +477,7 @@ describe('AddEntry', () => {
       expect.objectContaining({ food_id: 42, qty: 3, unit: 'pancake' }));
   });
 
+  // REVIEWED: 010-005 T10: recipe default beats history mode; non-recipe defaults unchanged — recipe default chain
   it('010-005 T10: recipe default beats history mode; non-recipe defaults unchanged', () => {
     // Recipe with history still opens at qty 1 in its own unit (AC-10).
     expect(defaultAmount({ mode_qty: 2, mode_unit: 'g', serving: null, sourceKind: 'db-recipe', recipe_serving_unit: 'slice' }))

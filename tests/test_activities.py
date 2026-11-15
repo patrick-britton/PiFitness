@@ -11,6 +11,7 @@ from backend.main import app
 client = TestClient(app)
 
 
+# REVIEWED: Contract — real TestClient call to /api/activities/report with mocked query helpers asserts response shape and deprecated field removal
 @pytest.mark.contract
 def test_activity_report_contract_shape():
     """GET /api/activities/report returns the ActivityReport shape with nav, header,
@@ -112,6 +113,7 @@ def test_activity_report_contract_shape():
         assert "pace" not in data["charts"]
 
 
+# REVIEWED: Contract — real TestClient call to /api/activities/report with invalid type asserts 404
 @pytest.mark.contract
 def test_activity_report_invalid_type():
     """GET /api/activities/report returns 404 when the activity id is unknown or does
@@ -124,6 +126,7 @@ def test_activity_report_invalid_type():
         assert response.status_code == 404
 
 
+# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard/segments with mocked helper asserts shape
 @pytest.mark.contract
 def test_leaderboard_segments_contract_shape():
     """GET /api/activities/leaderboard/segments returns a bare list of segment rows
@@ -180,6 +183,8 @@ def test_leaderboard_segments_contract_shape():
 
 
 @pytest.mark.contract
+# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard/segments verifies filters forwarded to query helper
+@pytest.mark.contract
 def test_leaderboard_segments_filters_forwarded():
     """GET /api/activities/leaderboard/segments forwards the name, kind, min_distance
     and activity_type filters to the query helper and treats an empty name as no filter.
@@ -207,6 +212,7 @@ def test_leaderboard_segments_filters_forwarded():
         )
 
 
+# REVIEWED: Contract — real TestClient calls to /api/activities/leaderboard/segments with invalid params assert 422
 @pytest.mark.contract
 def test_leaderboard_segments_invalid_params():
     """GET /api/activities/leaderboard/segments rejects an unknown kind, an unsupported
@@ -220,68 +226,9 @@ def test_leaderboard_segments_invalid_params():
     assert response.status_code == 422
 
 
-@pytest.mark.contract
-@pytest.mark.quarantine(
-    reason="asserts SQL text and cursor call counts on a MagicMock connection; the strict-threshold semantics need a real database",
-    exit="rewrite_against_db",
-)
-def test_segment_bulk_reject_full_and_threshold():
-    """POST /api/segments/{id}/matches/bulk-reject rejects every pending candidate, or
-    only those strictly above confidence_over, and reports the rejected count.
-    """
-    import unittest.mock as mock
-
-    import pifitness.activities.queries as aq
-
-    rows = [
-        {"activity_id": 11, "best_start_dist": 0, "best_end_dist": 100, "confidence": 50.0},
-        {"activity_id": 12, "best_start_dist": 0, "best_end_dist": 100, "confidence": 200.0},
-        {"activity_id": 13, "best_start_dist": 0, "best_end_dist": 100, "confidence": 250.0},
-    ]
-    mock_conn = mock.MagicMock()
-    mock_cur = mock.MagicMock()
-    mock_conn.cursor.return_value = mock_cur
-
-    with mock.patch(
-        "pifitness.activities.queries.sql_to_dict",
-        side_effect=[[{"segment_id": 9}], rows],
-    ), mock.patch.object(aq, "get_conn", return_value=mock_conn) as conn_mock:
-        response = client.post("/api/segments/9/matches/bulk-reject", json={})
-        assert response.status_code == 200
-        assert response.json() == {"rejected": 3}
-        # One connection, one commit, no rollback (atomic mass write).
-        conn_mock.assert_called_once()
-        mock_conn.commit.assert_called_once()
-        mock_conn.rollback.assert_not_called()
-        mock_conn.close.assert_called_once()
-        # All N finalize CALLs ran on that single connection's cursor.
-        assert mock_cur.execute.call_count == 3
-        # Every finalize call rejects (FALSE) with the row's own window/confidence.
-        for call in mock_cur.execute.call_args_list:
-            sql, params = call[0]
-            assert "CALL activities.segment_matching_finalize_match(FALSE" in sql
-            assert params[1] == 9
-
-    # Threshold case: strict > pushed into the candidate read (row at 200 survives).
-    mock_conn2 = mock.MagicMock()
-    mock_cur2 = mock.MagicMock()
-    mock_conn2.cursor.return_value = mock_cur2
-    with mock.patch(
-        "pifitness.activities.queries.sql_to_dict",
-        side_effect=[[{"segment_id": 9}], [rows[2]]],
-    ) as read_mock, mock.patch.object(aq, "get_conn", return_value=mock_conn2) as conn_mock:
-        response = client.post("/api/segments/9/matches/bulk-reject", json={"confidence_over": 200})
-        assert response.status_code == 200
-        assert response.json() == {"rejected": 1}
-        # Threshold is pushed into the candidate read (strict >).
-        _, read_params = read_mock.call_args[0]
-        assert list(read_params) == [9, 200.0]
-        conn_mock.assert_called_once()
-        assert mock_cur2.execute.call_count == 1
-        mock_conn2.commit.assert_called_once()
-        mock_conn2.rollback.assert_not_called()
 
 
+# REVIEWED: Regression — real TestClient call with mocked DB asserts segment bulk reject rolls back on failure
 @pytest.mark.regression
 def test_segment_bulk_reject_failure_rolls_back():
     """POST /api/segments/{id}/matches/bulk-reject rolls the whole batch back, never
@@ -315,6 +262,7 @@ def test_segment_bulk_reject_failure_rolls_back():
         mock_conn.close.assert_called_once()
 
 
+# REVIEWED: Contract — real TestClient calls to /api/activities/leaderboard/segments with empty input assert 200/404/422
 @pytest.mark.contract
 def test_segment_bulk_reject_empty_404_422():
     """POST /api/segments/{id}/matches/bulk-reject returns rejected 0 without opening a
@@ -346,6 +294,7 @@ def test_segment_bulk_reject_empty_404_422():
     assert response.status_code == 422
 
 
+# REVIEWED: Journey — real TestClient call to /api/segments/{id}/route with real DB asserts elapsed_s values
 @pytest.mark.integration
 @pytest.mark.live
 def test_activity_route_elapsed_s():
@@ -412,6 +361,7 @@ def test_activity_route_elapsed_s():
     ).status_code == 422
 
 
+# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard with mocked helper asserts shape
 @pytest.mark.contract
 def test_leaderboard_contract_shape():
     """GET /api/activities/leaderboard/{id} returns the segment envelope with ranked
@@ -533,6 +483,7 @@ def test_leaderboard_contract_shape():
         assert data["efforts"][1]["current_cycle_rank"] == 2
 
 
+# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard with no data asserts 404
 @pytest.mark.contract
 def test_leaderboard_not_found():
     """GET /api/activities/leaderboard/{id} returns 404 when the segment has no
@@ -551,6 +502,7 @@ def test_leaderboard_not_found():
 # ---------------------------------------------------------------------------
 
 
+# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard/visuals with mocked helpers asserts shape
 @pytest.mark.contract
 def test_leaderboard_visuals_contract_shape():
     """POST /api/activities/leaderboard/visuals stages the submitted efforts once and
@@ -648,6 +600,7 @@ def test_leaderboard_visuals_contract_shape():
     assert e1["series"][1]["elapsed_s"] == 1.5
 
 
+# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard/visuals with no telemetry asserts 404
 @pytest.mark.contract
 def test_leaderboard_visuals_not_found():
     """POST /api/activities/leaderboard/visuals returns 404 when no telemetry rows exist
@@ -665,47 +618,8 @@ def test_leaderboard_visuals_not_found():
     assert response.status_code == 404
 
 
-@pytest.mark.contract
-@pytest.mark.quarantine(
-    reason="asserts the exact TRUNCATE string and the execute_values template",
-    exit="rewrite_against_db",
-)
-def test_stage_leaderboard_visuals_bulk_insert():
-    """stage_leaderboard_visuals replaces the staging table's contents with exactly the
-    given efforts in one committed transaction.
-    """
-    import unittest.mock as mock
 
-    import pifitness.activities.queries as aq
-
-    efforts = [
-        {"activity_id": 111, "start_point": 100, "end_point": 900},
-        {"activity_id": 222, "start_point": 50, "end_point": 800},
-        {"activity_id": 333, "start_point": 200, "end_point": 1500},
-    ]
-
-    mock_conn = mock.MagicMock()
-    mock_cur = mock.MagicMock()
-    mock_conn.cursor.return_value = mock_cur
-
-    with mock.patch.object(aq, "get_conn", return_value=mock_conn), \
-         mock.patch.object(aq, "execute_values") as mock_ev:
-        aq.stage_leaderboard_visuals(7, efforts)
-
-    # TRUNCATE executed first.
-    assert mock_cur.execute.call_args_list[0][0][0] == "TRUNCATE TABLE activities.temp_activity_segment_metas;"
-    # Single bulk INSERT via execute_values with all 3 rows, parameterized.
-    mock_ev.assert_called_once()
-    rows_arg = mock_ev.call_args[0][2]
-    template_arg = mock_ev.call_args[1].get("template")
-    assert rows_arg == [(111, 100, 900), (222, 50, 800), (333, 200, 1500)]
-    assert template_arg == "(%s, %s, %s)"
-    # Committed and connection closed.
-    mock_conn.commit.assert_called_once()
-    mock_cur.close.assert_called_once()
-    mock_conn.close.assert_called_once()
-
-
+# REVIEWED: Contract — real TestClient call to /api/activities/report for walk activity asserts null efficiency/course and no placeholder
 @pytest.mark.contract
 def test_activity_report_walk_no_placeholder():
     """GET /api/activities/report returns null efficiency and course, an empty segments

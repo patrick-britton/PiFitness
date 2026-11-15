@@ -101,6 +101,7 @@ beforeEach(() => {
 });
 
 describe('TrimRouteViews layout (T22/T23)', () => {
+  // REVIEWED: orders style selector, course map, gate controls, gate maps, elevation profile — DOM order contract (T22/T23)
   it('orders style selector, course map, gate controls, gate maps, elevation profile', () => {
     renderViews();
 
@@ -122,6 +123,7 @@ describe('TrimRouteViews layout (T22/T23)', () => {
     expectBefore(endMap, profile);
   });
 
+  // REVIEWED: reserves taller gate maps than the course map in every layout variant (T22) — gate maps taller than course map
   it('reserves taller gate maps than the course map in every layout variant (T22)', () => {
     const variants: { variant: 'desktop' | 'portrait' | 'landscape'; course: string; gate: string }[] = [
       { variant: 'desktop', course: '320px', gate: '280px' },
@@ -142,6 +144,7 @@ describe('TrimRouteViews layout (T22/T23)', () => {
     }
   });
 
+  // REVIEWED: reports gate edits to the owner and keeps 1 m steps (T19/T23) — gate onChange callback and step attribute
   it('reports gate edits to the owner and keeps 1 m steps (T19/T23)', () => {
     const onStartChange = vi.fn();
     renderViews({ onStartChange });
@@ -157,6 +160,7 @@ describe('TrimRouteViews layout (T22/T23)', () => {
 });
 
 describe('TrimRouteViews gate-view zoom (T24/T25)', () => {
+  // REVIEWED: opens both gate views at the +2 step zoom while the course map still fits bounds (T24) — fixed zoom on gate maps, fitBounds on course
   it('opens both gate views at the +2 step zoom while the course map still fits bounds (T24)', () => {
     renderViews();
 
@@ -168,6 +172,7 @@ describe('TrimRouteViews gate-view zoom (T24/T25)', () => {
     expect(courseMap.fits).toHaveLength(1);
   });
 
+  // REVIEWED: re-centres on a moved gate without re-applying the fixed zoom (T25) — gate follow without re-zoom or rebuild
   it('re-centres on a moved gate without re-applying the fixed zoom (T25)', () => {
     const { rerender, props } = renderViews();
     const [courseMap, startGateMap] = recorder.maps;

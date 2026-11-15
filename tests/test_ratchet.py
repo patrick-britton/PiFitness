@@ -25,6 +25,7 @@ def write_baseline(path: Path, keys):
     path.write_text("\n".join(sorted(keys)) + ("\n" if keys else ""))
 
 
+# REVIEWED: Unit — real subprocess call to tools/ratchet.py compare asserts exit 0 when no new violations
 @pytest.mark.unit
 def test_compare_no_new_violations_exits_0(tmp_path):
     """No new violations -> exit 0."""
@@ -38,6 +39,7 @@ def test_compare_no_new_violations_exits_0(tmp_path):
     assert result.stdout.strip() == ""
 
 
+# REVIEWED: Unit — real subprocess call to tools/ratchet.py compare asserts exit 1 and prints the planted new key
 @pytest.mark.unit
 def test_compare_planted_new_key_fails(tmp_path):
     """A planted new key (not in baseline) -> exit 1 and prints the key."""
@@ -51,6 +53,7 @@ def test_compare_planted_new_key_fails(tmp_path):
     assert "check|c.py|rule3|ijkl9012" in result.stdout
 
 
+# REVIEWED: Unit — real subprocess call to tools/ratchet.py compare asserts PRUNE warning and exit 0 for removed key
 @pytest.mark.unit
 def test_compare_removed_key_warns_prune(tmp_path):
     """A removed key (in baseline but not in current) -> PRUNE warning, exit 0."""
@@ -64,6 +67,7 @@ def test_compare_removed_key_warns_prune(tmp_path):
     assert "check|b.py|rule2|efgh5678" in result.stdout
 
 
+# REVIEWED: Unit — real subprocess call to tools/ratchet.py compare reads keys from stdin and detects new key
 @pytest.mark.unit
 def test_compare_stdin_keys(tmp_path):
     """Keys read from stdin when no positional keys given."""
@@ -75,6 +79,7 @@ def test_compare_stdin_keys(tmp_path):
     assert "check|c.py|rule3|ijkl9012" in result.stdout
 
 
+# REVIEWED: Unit — real subprocess call to tools/ratchet.py prune asserts stale keys removed from baseline
 @pytest.mark.unit
 def test_prune_removes_stale_keys(tmp_path):
     """prune removes keys no longer present."""
@@ -87,6 +92,7 @@ def test_prune_removes_stale_keys(tmp_path):
     assert remaining == ["check|a.py|rule1|abcd1234"]
 
 
+# REVIEWED: Unit — real subprocess call to tools/ratchet.py compare --update-baseline asserts stale keys removed without growing
 @pytest.mark.unit
 def test_update_baseline_removes_stale_only(tmp_path):
     """--update-baseline removes stale keys but does not add new ones without --allow-grow."""
@@ -103,6 +109,7 @@ def test_update_baseline_removes_stale_only(tmp_path):
     assert "check|c.py|rule3|ijkl9012" not in remaining
 
 
+# REVIEWED: Unit — real subprocess call to tools/ratchet.py compare --update-baseline --allow-grow asserts new keys added
 @pytest.mark.unit
 def test_update_baseline_with_allow_grow_adds_new_keys(tmp_path):
     """--update-baseline --allow-grow adds new keys."""
