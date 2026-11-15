@@ -4,7 +4,7 @@ I only ever test by running the pi shell script and relying on the reported outp
 
 This is a personal-use, and single-developer application, so don't over engineer.
 
-Your task is to build undo_test_db.py -- or whatever else you think is the next appropriate step to take given the latest results from the shell output at the bottom of this file.
+Your task is to build step_regression.py -- or whatever else you think is the next appropriate step to take given the latest results from the shell output at the bottom of this file.
 
 
 # Ground rules:
