@@ -125,5 +125,4 @@ def test_update_baseline_with_allow_grow_adds_new_keys(tmp_path):
     assert remaining == [
         "check|a.py|rule1|abcd1234",
         "check|c.py|rule3|ijkl9012",
-    ]       "check|c.py|rule3|ijkl9012",
     ]
