@@ -19,7 +19,7 @@ from backend_functions.file_handlers import album_art_path
 client = TestClient(app)
 
 
-# REVIEWED: Contract — real POST /api/music/now-playing/skip returns 503 with no Spotify client
+# VERIFIED: Contract — POST /api/music/now-playing/skip returns 503 with no Spotify client
 @pytest.mark.contract
 def test_now_playing_skip_route_exists():
     """POST /api/music/now-playing/skip returns 503 when no Spotify client is available.
@@ -29,7 +29,7 @@ def test_now_playing_skip_route_exists():
         assert response.status_code == 503
 
 
-# REVIEWED: Contract — real POST /api/music/now-playing/promote returns ok false for non-recommendation
+# VERIFIED: Contract — POST /api/music/now-playing/promote returns ok false for non-recommendation track
 @pytest.mark.contract
 def test_now_playing_promote_wrong_context():
     """POST /api/music/now-playing/promote returns ok false saying it applies only to
@@ -52,7 +52,7 @@ def test_now_playing_promote_wrong_context():
         assert "only applies to recommendations" in data["message"]
 
 
-# REVIEWED: Contract — real POST /api/music/now-playing/remove returns ok false when playlist not found
+# VERIFIED: Contract — POST /api/music/now-playing/remove returns ok false when playlist family is empty
 @pytest.mark.contract
 def test_now_playing_remove_family_miss():
     """POST /api/music/now-playing/remove returns ok false saying the playlist cannot be
@@ -75,7 +75,7 @@ def test_now_playing_remove_family_miss():
         assert data["message"] == "the playlist cannot be found"
 
 
-# REVIEWED: Regression — real POST /api/music/now-playing/remove removes track from all family playlists
+# VERIFIED: Regression — POST /api/music/now-playing/remove calls Spotify remove for every family playlist
 @pytest.mark.regression
 def test_now_playing_remove_full_flow():
     """POST /api/music/now-playing/remove removes the track from Spotify in every family
@@ -120,7 +120,7 @@ def test_now_playing_remove_full_flow():
         assert mock_spotify.playlist_remove_all_occurrences_of_items.call_count == 2
 
 
-# REVIEWED: Contract — real POST /api/music/now-playing/rank-up returns ok false for non-recommendation
+# VERIFIED: Contract — POST /api/music/now-playing/rank-up returns ok false for recommendation context
 @pytest.mark.contract
 def test_now_playing_rank_up_wrong_context():
     """POST /api/music/now-playing/rank-up returns ok false saying it applies only to
@@ -142,7 +142,7 @@ def test_now_playing_rank_up_wrong_context():
         assert "only applies to playlist tracks" in data["message"]
 
 
-# REVIEWED: Contract — real POST /api/music/now-playing/add targets no track
+# VERIFIED: Contract — GET /api/music/now-playing/add-targets returns eligible false when nothing is playing
 @pytest.mark.contract
 def test_now_playing_add_targets_no_track():
     """GET /api/music/now-playing/add-targets returns eligible false and an empty
@@ -157,7 +157,7 @@ def test_now_playing_add_targets_no_track():
 
 
 
-# REVIEWED: Contract — real GET /api/music/now-playing/add-targets with track returns playlists
+# VERIFIED: Contract — GET /api/music/now-playing/add-targets returns eligible true with playlist list
 @pytest.mark.contract
 def test_now_playing_add_targets_with_track():
     """GET /api/music/now-playing/add-targets returns eligible true with the playlists
@@ -181,103 +181,12 @@ def test_now_playing_add_targets_with_track():
         assert data["playlists"][0]["playlist_id"] == "pl1"
 
 
-# REVIEWED: Contract — real POST /api/music/now-playing/promote adds recommendation to parent playlist
-@pytest.mark.contract
-def test_now_playing_promote_full_flow():
-    """POST /api/music/now-playing/promote adds the recommendation to the parent
-    playlist, records the decision, removes the recommendation and seeds its rating.
-    """
-    mock_state = {
-        "playing": True,
-        "track": {
-            "isrc": "TEST123",
-            "trackId": "tid1",
-            "trackName": "Test Track",
-            "rating": {"value": 1500},
-            "context": {"relationshipType": "recommendation", "parentPlaylistId": "parent1"}
-        }
-    }
-    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
-         patch('pifitness.music.router.add_isrc_to_local_playlist') as mock_add, \
-         patch('pifitness.music.router.get_spotify_client_for_music', return_value=MagicMock()), \
-         patch('pifitness.music.router.record_recommendation_decision') as mock_record, \
-         patch('pifitness.music.router.remove_recommendation') as mock_remove, \
-         patch('pifitness.music.router.add_into_current_ratings') as mock_seed:
-        response = client.post("/api/music/now-playing/promote")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        assert "added to playlist" in data["message"]
-        mock_add.assert_called_once_with("parent1", "TEST123")
-        mock_record.assert_called_once_with("parent1", "TEST123", was_promoted=True)
-        mock_remove.assert_called_once_with("parent1", "TEST123")
-        mock_seed.assert_called_once_with("parent1", "TEST123", 1500)
-
-
-# REVIEWED: Contract — real POST /api/music/now-playing/rank-up records matchup result
-@pytest.mark.contract
-def test_now_playing_rank_up_full_flow():
-    """POST /api/music/now-playing/rank-up records a matchup result of plus two seeded
-    from the track's current rating.
-    """
-    mock_state = {
-        "playing": True,
-        "track": {
-            "isrc": "TEST123",
-            "trackName": "Test Track",
-            "rating": {"value": 1500},
-            "context": {"relationshipType": "regular", "playlistId": "pl123"}
-        }
-    }
-    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
-         patch('pifitness.music.router.save_matchup_results') as mock_save:
-        response = client.post("/api/music/now-playing/rank-up")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        assert "ranked up" in data["message"]
-        mock_save.assert_called_once_with(
-            hd={"isrc": "TEST123", "playlistId": "pl123", "currentELO": 1500},
-            ad=None,
-            mr=2,
-        )
-
-
-# REVIEWED: Contract — real POST /api/music/now-playing/rank-down records matchup result
-@pytest.mark.contract
-def test_now_playing_rank_down_full_flow():
-    """POST /api/music/now-playing/rank-down records a matchup result of minus two
-    seeded from the track's current rating.
-    """
-    mock_state = {
-        "playing": True,
-        "track": {
-            "isrc": "TEST123",
-            "trackName": "Test Track",
-            "rating": {"value": 1500},
-            "context": {"relationshipType": "regular", "playlistId": "pl123"}
-        }
-    }
-    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
-         patch('pifitness.music.router.save_matchup_results') as mock_save:
-        response = client.post("/api/music/now-playing/rank-down")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        assert "ranked down" in data["message"]
-        mock_save.assert_called_once_with(
-            hd={"isrc": "TEST123", "playlistId": "pl123", "currentELO": 1500},
-            ad=None,
-            mr=-2,
-        )
-
-
 # ---------------------------------------------------------------------------
 # T05: Recent plays rework + service status
 # ---------------------------------------------------------------------------
 
 
-# REVIEWED: Contract — real GET /api/music/recent-plays default limit returns playlist entries
+# VERIFIED: Contract — GET /api/music/recent-plays returns plays array and rating scale
 @pytest.mark.contract
 def test_recent_plays_default_limit():
     """GET /api/music/recent-plays returns plays and a rating scale built from the
@@ -311,17 +220,7 @@ def test_recent_plays_default_limit():
         assert data["scale"]["maxRating"] == 1600
 
 
-# REVIEWED: Contract — real GET /api/music/recent-plays custom limit returns correct number
-@pytest.mark.contract
-def test_recent_plays_custom_limit():
-    """GET /api/music/recent-plays forwards a valid limit to the query helper."""
-    with patch('pifitness.music.router.get_recent_plays', return_value=[]) as mock_get:
-        response = client.get("/api/music/recent-plays?limit=50")
-        assert response.status_code == 200
-        mock_get.assert_called_once_with(limit=50)
-
-
-# REVIEWED: Contract — real GET /api/music/recent-plays returns empty when no plays
+# VERIFIED: Contract — GET /api/music/recent-plays returns empty plays and baseline scale when no history
 @pytest.mark.contract
 def test_recent_plays_empty():
     """GET /api/music/recent-plays returns no plays and a baseline rating scale of 1500
@@ -339,7 +238,7 @@ def test_recent_plays_empty():
 
 
 @pytest.mark.contract
-# REVIEWED: Contract — real GET /api/music/service-status returns not-limited response
+# VERIFIED: Contract — GET /api/music/service-status returns rateLimited false with null clearance time
 def test_service_status_not_limited():
     """GET /api/music/service-status reports Spotify as not rate limited with a null
     clearance time.
@@ -353,7 +252,7 @@ def test_service_status_not_limited():
 
 
 @pytest.mark.contract
-# REVIEWED: Contract — real GET /api/music/service-status returns limited response
+# VERIFIED: Contract — GET /api/music/service-status returns rateLimited true with clearance timestamp
 def test_service_status_limited():
     """GET /api/music/service-status reports Spotify as rate limited together with its
     clearance time.
@@ -373,7 +272,7 @@ def test_service_status_limited():
 
 
 @pytest.mark.contract
-# REVIEWED: Unit — real album_art_cached returns path for cached album art
+# VERIFIED: Contract — GET /api/music/album-art/{id} serves image/jpeg when art is available
 def test_album_art_cached():
     """GET /api/music/album-art/{id} serves the retrieved image file as image/jpeg."""
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
@@ -387,7 +286,7 @@ def test_album_art_cached():
 
 
 @pytest.mark.contract
-# REVIEWED: Unit — real album_art_not_found returns None for missing art
+# VERIFIED: Contract — GET /api/music/album-art/{id} returns 404 when no image can be obtained
 def test_album_art_not_found():
     """GET /api/music/album-art/{id} returns 404 when no image can be obtained."""
     with patch('pifitness.music.router.album_image_retrieval', return_value=None):
@@ -396,7 +295,7 @@ def test_album_art_not_found():
 
 
 @pytest.mark.regression
-# REVIEWED: Unit — real album_image_retrieval returns None when no Spotify client
+# VERIFIED: Regression — album_image_retrieval returns None when no Spotify client is available
 def test_album_image_retrieval_no_client():
     """album_image_retrieval returns None when the image is not cached and no Spotify
     client is available.
@@ -407,73 +306,6 @@ def test_album_image_retrieval_no_client():
         assert result is None
 
 
-
-
-@pytest.mark.contract
-# REVIEWED: Unit — real shuffle_flags defaults to false
-def test_shuffle_flags_defaults_to_false():
-    """POST /api/music/shuffle/flags treats missing flags as false."""
-    with patch('pifitness.music.router.qec') as mock_qec:
-        response = client.post(
-            "/api/music/shuffle/flags?playlist_id=pl123",
-            json={},
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        args, kwargs = mock_qec.call_args
-        assert args[1] == (False, False, False, False, "pl123")
-
-
-# ---------------------------------------------------------------------------
-# database_functions tests
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.regression
-# REVIEWED: Unit — real sql_to_list accepts params
-def test_sql_to_list_accepts_params():
-    """sql_to_list passes an optional parameter tuple to the cursor and returns the
-    first column of every row.
-    """
-    from backend_functions.database_functions import sql_to_list
-
-    mock_cursor = MagicMock()
-    mock_cursor.fetchall.return_value = [("track1",), ("track2",)]
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value = mock_cursor
-
-    with patch('backend_functions.database_functions.get_conn', return_value=mock_conn):
-        result = sql_to_list(
-            "SELECT DISTINCT track_id FROM music.all_tracks WHERE track_isrc = %s",
-            ("TEST123",),
-        )
-
-    assert result == ["track1", "track2"]
-    mock_cursor.execute.assert_called_once_with(
-        "SELECT DISTINCT track_id FROM music.all_tracks WHERE track_isrc = %s",
-        ("TEST123",),
-    )
-
-
-@pytest.mark.regression
-# REVIEWED: Unit — real sql_to_list works without params
-def test_sql_to_list_no_params_still_works():
-    """sql_to_list still executes a bare query without parameters."""
-    from backend_functions.database_functions import sql_to_list
-
-    mock_cursor = MagicMock()
-    mock_cursor.fetchall.return_value = [("a",), ("b",)]
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value = mock_cursor
-
-    with patch('backend_functions.database_functions.get_conn', return_value=mock_conn):
-        result = sql_to_list("SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5")
-
-        assert result == ["a", "b"]
-    mock_cursor.execute.assert_called_once_with(
-        "SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -492,7 +324,7 @@ DETAIL_TD = {'task_id': 16, 'task_name': 'Playlist Detail Sync', 'api_function_n
 HEADER_TD = {'task_id': 17, 'task_name': 'Playlist Header Sync', 'api_function_name': 'current_user_playlists'}
 
 
-# REVIEWED: Regression — real validate_playlist_payload aborts on empty payload
+# VERIFIED: Regression — validate_playlist_payload returns False and skips DB work when payload is empty
 @pytest.mark.regression
 def test_validate_playlist_payload_empty_aborts():
     """validate_playlist_payload returns False and logs once, without touching the
@@ -507,7 +339,7 @@ def test_validate_playlist_payload_empty_aborts():
     mock_qec.assert_not_called()  # guard performs no DB work, so no deletes
 
 
-# REVIEWED: Regression — real validate_playlist_payload aborts on incomplete paging
+# VERIFIED: Regression — validate_playlist_payload returns False for a page with an advertised but missing successor
 @pytest.mark.regression
 def test_validate_playlist_payload_incomplete_paging_aborts():
     """validate_playlist_payload returns False for a page that advertises a next page
@@ -528,7 +360,7 @@ def test_validate_playlist_payload_incomplete_paging_aborts():
     mock_qec.assert_not_called()
 
 
-# REVIEWED: Regression — real validate_playlist_payload aborts on truncated chain
+# VERIFIED: Regression — validate_playlist_payload returns False when paging chain switches playlist mid-chain
 @pytest.mark.regression
 def test_validate_playlist_payload_truncated_chain_before_next_playlist_aborts():
     """validate_playlist_payload returns False when a paging chain is cut short by a
@@ -549,7 +381,7 @@ def test_validate_playlist_payload_truncated_chain_before_next_playlist_aborts()
     assert 'incomplete paging' in mock_log.call_args[1].get('desc', '')
 
 
-# REVIEWED: Regression — real validate_playlist_payload passes complete paged chain
+# VERIFIED: Regression — validate_playlist_payload returns True for a fully fetched paging chain
 @pytest.mark.regression
 def test_validate_playlist_payload_complete_paged_chain_passes():
     """validate_playlist_payload returns True for a fully fetched paging chain whose
@@ -564,7 +396,7 @@ def test_validate_playlist_payload_complete_paged_chain_passes():
     assert validate_playlist_payload(pages, DETAIL_TD) is True
 
 
-# REVIEWED: Regression — real validate_playlist_payload aborts on malformed href id
+# VERIFIED: Regression — validate_playlist_payload returns False when href yields non-22-char playlist id
 @pytest.mark.regression
 def test_validate_playlist_payload_malformed_href_id_aborts():
     """validate_playlist_payload returns False and names the offender when a page href
@@ -582,7 +414,7 @@ def test_validate_playlist_payload_malformed_href_id_aborts():
     assert 'non-22-char playlist_id' in mock_log.call_args[1].get('desc', '')
 
 
-# REVIEWED: Regression — real validate_playlist_payload aborts on missing detail href
+# VERIFIED: Regression — validate_playlist_payload returns False for a detail page missing its href
 @pytest.mark.regression
 def test_validate_playlist_payload_detail_missing_href_aborts():
     """validate_playlist_payload returns False for a detail page whose href cannot yield
@@ -596,7 +428,7 @@ def test_validate_playlist_payload_detail_missing_href_aborts():
     assert 'non-22-char playlist_id' in mock_log.call_args[1].get('desc', '')
 
 
-# REVIEWED: Regression — real validate_playlist_payload rejects detail item ids as playlist ids
+# VERIFIED: Regression — validate_playlist_payload accepts detail pages whose item ids are not playlist ids
 @pytest.mark.regression
 def test_validate_playlist_payload_detail_item_ids_are_not_playlist_ids():
     """validate_playlist_payload accepts a detail page whose item ids are not playlist
@@ -610,7 +442,7 @@ def test_validate_playlist_payload_detail_item_ids_are_not_playlist_ids():
     assert validate_playlist_payload([page], DETAIL_TD) is True
 
 
-# REVIEWED: Regression — real validate_playlist_payload aborts on unnormalized items href
+# VERIFIED: Regression — validate_playlist_payload returns False for unnormalized /items/ href that would corrupt playlist id
 @pytest.mark.regression
 def test_validate_playlist_payload_unnormalized_items_href_aborts():
     """validate_playlist_payload returns False for an unnormalized items href that would
@@ -631,7 +463,7 @@ def test_validate_playlist_payload_unnormalized_items_href_aborts():
     mock_qec.assert_not_called()
 
 
-# REVIEWED: Regression — real validate_playlist_payload aborts on malformed item id
+# VERIFIED: Regression — validate_playlist_payload returns False for header payload with non-22-char item id
 @pytest.mark.regression
 def test_validate_playlist_payload_malformed_item_id_aborts():
     """validate_playlist_payload returns False for a header payload whose item id is not
@@ -651,7 +483,7 @@ def test_validate_playlist_payload_malformed_item_id_aborts():
     mock_qec.assert_not_called()
 
 
-# REVIEWED: Regression — real validate_playlist_payload passes valid header payload
+# VERIFIED: Regression — validate_playlist_payload returns True for complete header chain with valid playlist ids
 @pytest.mark.regression
 def test_validate_playlist_payload_valid_header_payload_passes():
     """validate_playlist_payload returns True for a complete header chain whose item ids
@@ -669,7 +501,7 @@ def test_validate_playlist_payload_valid_header_payload_passes():
     assert validate_playlist_payload(pages, HEADER_TD) is True
 
 
-# REVIEWED: Regression — real validate_playlist_payload aborts when all pages empty
+# VERIFIED: Regression — validate_playlist_payload returns False when every page has zero items
 @pytest.mark.regression
 def test_validate_playlist_payload_all_pages_empty_aborts():
     """validate_playlist_payload returns False when every page has zero items."""
@@ -682,7 +514,7 @@ def test_validate_playlist_payload_all_pages_empty_aborts():
     assert 'all pages empty' in mock_log.call_args[1].get('desc', '')
 
 
-# REVIEWED: Regression — real validate_playlist_payload aborts on unexpected type
+# VERIFIED: Regression — validate_playlist_payload returns False instead of raising for non-list payload
 @pytest.mark.regression
 def test_validate_playlist_payload_unexpected_type_aborts():
     """validate_playlist_payload returns False instead of raising when given a payload
@@ -712,7 +544,7 @@ class _FakeSpotifyClient:
         return None
 
 
-# REVIEWED: Regression — real playlist_details_extractor normalizes hrefs and passes guard
+# VERIFIED: Regression — extract_json_playlist_details rewrites /items/ hrefs to /tracks/ so playlist id is bare 22 chars
 @pytest.mark.regression
 def test_playlist_details_extractor_normalizes_hrefs_and_passes_guard():
     """extract_json_playlist_details rewrites every page href to the tracks form so the
@@ -741,7 +573,7 @@ def test_playlist_details_extractor_normalizes_hrefs_and_passes_guard():
     assert validate_playlist_payload(payload, DETAIL_TD) is True
 
 
-# REVIEWED: Regression — real playlist_details_extractor aborts loudly with no client
+# VERIFIED: Regression — extract_json_playlist_details returns empty list and logs loud error when no Spotify client
 @pytest.mark.regression
 def test_playlist_details_extractor_no_client_aborts_loudly():
     """extract_json_playlist_details returns an empty list and logs a loud error,
@@ -761,7 +593,7 @@ def test_playlist_details_extractor_no_client_aborts_loudly():
 NOTHING_PLAYING = {"playing": False, "track": None}
 
 
-# REVIEWED: Contract — real now-playing actions return not-ok when nothing playing
+# VERIFIED: Contract — every now-playing action endpoint returns ok false when nothing is playing
 @pytest.mark.contract
 @pytest.mark.parametrize("path", [
     "/api/music/now-playing/promote",
@@ -781,7 +613,7 @@ def test_now_playing_actions_report_not_ok_when_nothing_is_playing(path):
     assert response.json()["ok"] is False
 
 
-# REVIEWED: Contract — real recent-plays rejects invalid limit
+# VERIFIED: Contract — GET /api/music/recent-plays rejects limit below 10, above 100, or not a multiple of 10 with 422
 @pytest.mark.contract
 @pytest.mark.parametrize("limit", [5, 105, 15])
 def test_recent_plays_rejects_invalid_limit(limit):

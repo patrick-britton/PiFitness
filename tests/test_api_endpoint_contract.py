@@ -77,7 +77,7 @@ def get_backend_endpoints() -> list[str]:
     return sorted(endpoints)
 
 
-# REVIEWED: Contract — real TestClient route-table comparison asserts every frontend-expected endpoint exists on backend
+# VERIFIED: Contract — every frontend-expected endpoint exists on the backend route table
 @pytest.mark.contract
 def test_api_endpoints_exist_on_backend():
     """Every frontend-expected endpoint must exist on the backend.

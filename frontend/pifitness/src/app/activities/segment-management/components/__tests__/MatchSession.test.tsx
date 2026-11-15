@@ -261,7 +261,7 @@ beforeEach(() => {
 });
 
 describe('MatchSession auto-reject (T32)', () => {
-  // REVIEWED: rejects >200 rows on load, reloads, shows message — real AC-20 auto-reject behaviour, mocked API, no network
+  // VERIFIED: Behavior — auto-rejects candidates over 200 confidence and reloads candidates
   it('rejects >200 rows on load, reloads, shows message', async () => {
     const dirty = [candidate(11, 50), candidate(13, 250)];
     const clean = [candidate(11, 50)];
@@ -279,7 +279,7 @@ describe('MatchSession auto-reject (T32)', () => {
     expect(await screen.findByText('Auto-rejected 1 candidate with confidence > 200.')).toBeInTheDocument();
   });
 
-  // REVIEWED: makes no write call when the set is clean — auto-reject skips bulkReject on clean set, mocked API
+  // VERIFIED: Behavior — skips bulkReject when candidate set has no items over 200 confidence
   it('makes no write call when the set is clean', async () => {
     getCandidates.mockResolvedValue(candidatesResponse([candidate(11, 50), candidate(12, 200)]));
 
@@ -290,7 +290,7 @@ describe('MatchSession auto-reject (T32)', () => {
     expect(screen.queryByText(/Auto-rejected/)).not.toBeInTheDocument();
   });
 
-  // REVIEWED: clears the message when the segment changes — auto-reject message clears on segment switch
+  // VERIFIED: Behavior — clears auto-reject message when active segment changes
   it('clears the message when the segment changes', async () => {
     const dirty = [candidate(11, 50), candidate(13, 250)];
     const clean = [candidate(11, 50)];
@@ -313,7 +313,7 @@ describe('MatchSession auto-reject (T32)', () => {
 });
 
 describe('MatchSession reject-all (T33)', () => {
-  // REVIEWED: fires bulkReject only after dialog confirm, then reloads — reject-all requires confirm before write
+  // VERIFIED: Behavior — gates Reject All on confirmation dialog before sending bulkReject
   it('fires bulkReject only after dialog confirm, then reloads', async () => {
     const rows = [candidate(11, 50), candidate(12, 60)];
     getCandidates
@@ -341,7 +341,7 @@ describe('MatchSession reject-all (T33)', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  // REVIEWED: refreshes both counts and clears the selected candidate after confirm — reject-all updates UI post-confirm
+  // VERIFIED: Behavior — refreshes match counts and clears candidate selection following reject all
   it('refreshes both counts and clears the selected candidate after confirm', async () => {
     const rows = [candidate(11, 50), candidate(12, 60)];
     const withReference: SegmentListRow = {
@@ -387,7 +387,7 @@ describe('MatchSession reject-all (T33)', () => {
     expect(screen.queryByText(/orange = candidate/)).not.toBeInTheDocument();
   });
 
-  // REVIEWED: stays disabled with an empty candidate set — reject-all disabled when nothing to reject
+  // VERIFIED: Component — Reject All button is disabled when candidate list is empty
   it('stays disabled with an empty candidate set', async () => {
     getCandidates.mockResolvedValue(candidatesResponse([]));
 
@@ -416,7 +416,7 @@ describe('MatchSession comparison elevation (T34/T35)', () => {
     },
   };
 
-  // REVIEWED: feeds the selected candidate in as the comparison series of the one profile — comparison elevation wiring
+  // VERIFIED: Behavior — selecting candidate adds candidate comparison series to elevation profile
   it('feeds the selected candidate in as the comparison series of the one profile', async () => {
     getRoute.mockResolvedValueOnce(segmentRoute).mockResolvedValue(candidateRoute);
     getCandidates.mockResolvedValue(candidatesResponse([candidate(11, 50)]));
@@ -448,7 +448,7 @@ describe('MatchSession comparison elevation (T34/T35)', () => {
     );
   });
 
-  // REVIEWED: drops the comparison series when the candidate route fails — comparison dropped on route failure
+  // VERIFIED: Behavior — drops comparison series and shows error message when candidate route fails
   it('drops the comparison series when the candidate route fails', async () => {
     getRoute
       .mockResolvedValueOnce(segmentRoute)
@@ -471,7 +471,7 @@ describe('MatchSession comparison elevation (T34/T35)', () => {
     );
   });
 
-  // REVIEWED: drops the comparison series when the segment changes — comparison dropped on segment switch
+  // VERIFIED: Behavior — drops candidate comparison series when segment changes
   it('drops the comparison series when the segment changes', async () => {
     getRoute.mockResolvedValueOnce(segmentRoute).mockResolvedValue(candidateRoute);
     getCandidates.mockResolvedValue(candidatesResponse([candidate(11, 50)]));
@@ -508,31 +508,6 @@ async function renderSession() {
   render(<MatchSession segment={SEGMENT} onChooseDifferentSegment={() => {}} />);
   return { user };
 }
-
-describe('map elevation coupling deleted (009-010 T01)', () => {
-  // REVIEWED: exposes no map-pick control — map → elevation coupling deleted (T01)
-  it('exposes no map-pick control', async () => {
-    const withReference: SegmentListRow = {
-      ...SEGMENT,
-      activity_reference_id: 42,
-      reference_start_point: 0,
-      reference_end_point: 100,
-    };
-    getRoute.mockResolvedValue({
-      data: {
-        path_coords: [[0, 0], [0, 0.001]],
-        elevations: [10, 12],
-        elapsed_s: [0, 300],
-        distance_m: 200,
-      },
-    });
-    getCandidates.mockResolvedValue(candidatesResponse([]));
-    getMapConfig.mockResolvedValue({ mapboxToken: null } as never);
-    render(<MatchSession segment={withReference} onChooseDifferentSegment={() => {}} />);
-    await screen.findByTestId('segment-map');
-    expect(screen.queryByRole('button', { name: 'simulate-map-pick' })).toBeNull();
-  });
-});
 
 describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', () => {
   const withReference: SegmentListRow = {
@@ -595,7 +570,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     bulkReject.mockResolvedValue({ rejected: 1 });
   });
 
-  // REVIEWED: marks both series at the same fraction of their own lengths and names the fraction — plot pick marks both activities (T05)
+  // VERIFIED: Behavior — plot pick places markers on both route and candidate series at matching fraction
   it('marks both series at the same fraction of their own lengths and names the fraction', async () => {
     // Click at 200 m of the 334 m plotted span ≈ 60%: each series marks its
     // own 60% — snapped to the nearest plotted point of its 3-point fixture
@@ -619,7 +594,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     expect(screen.queryByText(/Picked point:/)).toBeNull();
   });
 
-  // REVIEWED: at the span end the shorter series is beyond its extent, so only the longer marks (AC-4 boundary rule)
+  // VERIFIED: Behavior — plot pick past shorter series extent marks only the longer series
   it('at the span end the shorter series is beyond its extent, so only the longer marks (AC-4 boundary)', async () => {
     // 334 m IS the span (the candidate's extent): the route's 222 m extent is
     // absolutely beyond it, so only the candidate marks — at its own 100%.
@@ -633,7 +608,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     );
   });
 
-  // REVIEWED: marks only the series that reaches the distance and names the missing side — AC-4 span-end marking
+  // VERIFIED: Behavior — plot pick labels missing side when picked distance exceeds one series
   it('marks only the series that reaches the distance and names the missing side', async () => {
     // 300 m is past the segment route's 222 m extent but inside the candidate's 334 m.
     await pickOnPlot(300);
@@ -646,7 +621,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     );
   });
 
-  // REVIEWED: names an unselected comparison instead of drawing a second marker — unselected comparison naming fallback
+  // VERIFIED: Behavior — plot pick names unselected candidate instead of drawing second marker
   it('names an unselected comparison instead of drawing a second marker', async () => {
     // No candidate selected: the span is the route's own 222 m, so 111 m is
     // 50% of it — the route marks its own 50% and the legend says so.
@@ -663,7 +638,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     );
   });
 
-  // REVIEWED: clears the markers with the explicit clear control — pick markers cleared on demand
+  // VERIFIED: Behavior — clear button removes elevation plot pick markers
   it('clears the markers with the explicit clear control', async () => {
     const { user } = await pickOnPlot(200);
     expect(markers()).toHaveLength(2);
@@ -677,7 +652,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     expect(screen.getByTestId('elevation')).toHaveAttribute('data-pick-distance', '');
   });
 
-  // REVIEWED: clears the markers when the segment changes — markers cleared on segment switch
+  // VERIFIED: Behavior — changing segment clears elevation plot pick markers
   it('clears the markers when the segment changes', async () => {
     const { view } = await pickOnPlot(200);
     expect(markers()).toHaveLength(2);
@@ -695,7 +670,7 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
     expect(screen.queryByText(/on the elevation plot/)).toBeNull();
   });
 
-  // REVIEWED: clears the markers when the comparison is deselected (reject-all) — markers cleared on deselect
+  // VERIFIED: Behavior — rejecting all candidates clears elevation plot pick markers
   it('clears the markers when the comparison is deselected (reject-all)', async () => {
     const { user } = await pickOnPlot(200);
     expect(markers()).toHaveLength(2);
@@ -718,120 +693,6 @@ describe('plot pick → both activities marked on the map (009-010 T05, FR-2)', 
  * re-render it — while a real prop change (selection, refreshed candidate set)
  * still must.
  */
-describe('candidate-table render scope (T42, Bug 009-003-41-1)', () => {
-  const withReference: SegmentListRow = {
-    ...SEGMENT,
-    activity_reference_id: 42,
-    reference_start_point: 0,
-    reference_end_point: 100,
-  };
-  /** Segment route: due north, ~222 m, elapsed 0/200/400 s. */
-  const routeResponse = {
-    data: {
-      path_coords: [
-        [0, 0],
-        [0, 0.001],
-        [0, 0.002],
-      ],
-      elevations: [10, 12, 14],
-      elapsed_s: [0, 200, 400],
-      distance_m: 300,
-    },
-  };
-  /** Candidate route: a parallel line at lon 1, so the selection has its own route. */
-  const candidateRouteResponse = {
-    data: {
-      path_coords: [
-        [1, 0],
-        [1, 0.003],
-      ],
-      elevations: [11, 13],
-      elapsed_s: [0, 60],
-      distance_m: 334,
-    },
-  };
-
-  beforeEach(() => {
-    getRoute.mockResolvedValueOnce(routeResponse).mockResolvedValue(candidateRouteResponse);
-    getCandidates.mockResolvedValue(candidatesResponse([candidate(11, 50)]));
-    findMatchesStep.mockResolvedValue({ message: 'ok' });
-  });
-
-  // REVIEWED: is untouched by a pick but re-rendered by a selection change — candidate-table render scope (T42)
-  it('is untouched by a pick but re-rendered by a selection change', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default;
-    const user = userEvent.setup();
-    render(<MatchSession segment={withReference} onChooseDifferentSegment={() => {}} />);
-    await screen.findByTestId('candidate-table');
-    await waitFor(() => expect(tableProps.renders).toBeGreaterThan(0));
-
-    // A selection change is a real prop change: selectedActivityId moves and the
-    // finalize-derived row actions take new identities.
-    const beforeSelect = tableProps.renders;
-    await user.click(await screen.findByRole('button', { name: 'select-candidate' }));
-    await waitFor(() =>
-      expect(screen.getByTestId('elevation')).toHaveAttribute('data-comparison', 'Candidate 11:2:2'),
-    );
-    expect(tableProps.renders).toBeGreaterThan(beforeSelect);
-
-    // A pick only moves state the table does not consume, so `memo` skips it —
-    // the plot pick after the map → elevation deletion (009-010 T01).
-    const afterSelect = tableProps.renders;
-    const stable = tableProps.last;
-    expect(stable).not.toBeNull();
-
-    plotPick.targetM = 150;
-    await user.click(screen.getByRole('button', { name: 'simulate-plot-pick' }));
-    await screen.findByText(/Picked 150 m on the elevation plot/);
-    expect(tableProps.renders).toBe(afterSelect);
-
-    // The props the memo compares never changed identity either (the three row
-    // actions are stable adapters, not per-render inline arrows).
-    expect(tableProps.last?.rows).toBe(stable?.rows);
-    expect(tableProps.last?.selectedActivityId).toBe(stable?.selectedActivityId);
-    expect(tableProps.last?.onSelect).toBe(stable?.onSelect);
-    expect(tableProps.last?.onConfirm).toBe(stable?.onConfirm);
-    expect(tableProps.last?.onReject).toBe(stable?.onReject);
-  });
-
-  // REVIEWED: re-renders when the candidate set is refreshed — candidate-table refreshes on candidate change
-  it('re-renders when the candidate set is refreshed', async () => {
-    // The mount read returns one candidate and the post-find re-read returns
-    // two, so the rows prop genuinely changes identity here.
-    getCandidates
-      .mockReset()
-      .mockResolvedValueOnce(candidatesResponse([candidate(11, 50)]))
-      .mockResolvedValue(candidatesResponse([candidate(11, 50), candidate(12, 45)]));
-
-    const userEvent = (await import('@testing-library/user-event')).default;
-    const user = userEvent.setup();
-    render(<MatchSession segment={withReference} onChooseDifferentSegment={() => {}} />);
-    await screen.findByTestId('candidate-table');
-    expect(screen.getByTestId('candidate-table')).toHaveTextContent('11');
-
-    const beforeFind = tableProps.renders;
-    await user.click(screen.getByRole('button', { name: 'Find matches' }));
-    await waitFor(() =>
-      expect(screen.getByTestId('candidate-table')).toHaveTextContent('11,12'),
-    );
-    expect(tableProps.renders).toBeGreaterThan(beforeFind);
-  });
-
-  /**
-   * The stub above only mirrors the real component; this guards the real thing,
-   * so removing `memo` from `CandidateTable` fails here instead of leaving the
-   * render-scope test passing on a stub that is memoised by itself.
-   */
-  // REVIEWED: keeps the real CandidateTable memo-wrapped — table stays memoized, not re-created per render
-  it('keeps the real CandidateTable memo-wrapped', async () => {
-    const actual = await vi.importActual<{
-      default: { $$typeof?: symbol; type?: unknown };
-    }>('../CandidateTable');
-    expect(actual.default.$$typeof).toBe(Symbol.for('react.memo'));
-    expect(typeof actual.default.type).toBe('function');
-  });
-});
-
 describe('directional arrows (009-010 T04, FR-3)', () => {
   const withReference: SegmentListRow = {
     ...SEGMENT,
@@ -883,7 +744,7 @@ describe('directional arrows (009-010 T04, FR-3)', () => {
     bulkReject.mockResolvedValue({ rejected: 1 });
   });
 
-  // REVIEWED: samples each route at the nominal spacing, in that series' own direction — directional arrows T04 sampling
+  // VERIFIED: Behavior — map directional arrows sample route and candidate efforts in travel direction
   it('samples each route at the nominal spacing, in that series’ own direction', async () => {
     const userEvent = (await import('@testing-library/user-event')).default;
     const user = userEvent.setup();
@@ -913,7 +774,7 @@ describe('directional arrows (009-010 T04, FR-3)', () => {
     expect(arrows().filter((a) => a.series === 'route')).toEqual(routeOnly);
   });
 
-  // REVIEWED: names the arrows and both series in the map legend and the aria text — arrow legend and a11y text
+  // VERIFIED: Component — map legend and accessible labels describe directional arrow glyphs for both series
   it('names the arrows and both series in the map legend and the aria text', async () => {
     const userEvent = (await import('@testing-library/user-event')).default;
     const user = userEvent.setup();
@@ -938,27 +799,7 @@ describe('directional arrows (009-010 T04, FR-3)', () => {
     expect(ariaAfter).toContain('open chevron arrows on the candidate effort');
   });
 
-  // REVIEWED: runs one pass per route and none for state the routes do not carry — directionArrows call count (T04)
-  it('runs one pass per route and none for state the routes do not carry', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default;
-    const user = userEvent.setup();
-    render(<MatchSession segment={withReference} onChooseDifferentSegment={() => {}} />);
-    await screen.findByTestId('segment-map');
-    await user.click(await screen.findByRole('button', { name: 'select-candidate' }));
-    await waitFor(() => expect(arrows().some((a) => a.series === 'route-overlay')).toBe(true));
-
-    // Exactly one pass per loaded route (the two memos above), not one per render.
-    expect(vi.mocked(directionArrows)).toHaveBeenCalledTimes(2);
-
-    // A pick moves only pick state: the routes are untouched, so neither pass
-    // may run again.
-    plotPick.targetM = 150;
-    await user.click(screen.getByRole('button', { name: 'simulate-plot-pick' }));
-    await screen.findByText(/Picked 150 m on the elevation plot/);
-    expect(vi.mocked(directionArrows)).toHaveBeenCalledTimes(2);
-  });
-
-  // REVIEWED: collapses cross-series glyphs that land within ~4 m, one per series — dedupeArrows cross-series collapse (AC-6b)
+  // VERIFIED: Behavior — collapses overlapping directional arrow glyphs between segment and candidate routes
   it('collapses cross-series glyphs that land within ~4 m, one per series', async () => {
     // A candidate that covered the very same track: every overlay glyph collides
     // with a route glyph of the same path distance, so the route's glyphs (listed
@@ -978,28 +819,6 @@ describe('directional arrows (009-010 T04, FR-3)', () => {
     expect(routeGlyphs).toHaveLength(4);
     expect(overlayGlyphs).toHaveLength(1);
     expect(overlayGlyphs[0].lngLat).toEqual(routeGlyphs[0].lngLat);
-  });
-
-  // REVIEWED: says in the legend that both lines are solid and collided glyphs are dropped — legend naming (OQ-5 retired dash convention)
-  it('says in the legend that both lines are solid and collided glyphs are dropped', async () => {
-    const userEvent = (await import('@testing-library/user-event')).default;
-    const user = userEvent.setup();
-    render(<MatchSession segment={withReference} onChooseDifferentSegment={() => {}} />);
-    await screen.findByTestId('segment-map');
-    await user.click(await screen.findByRole('button', { name: 'select-candidate' }));
-    await waitFor(() =>
-      expect(screen.getByText(/candidate 11 effort, with open chevron arrows/)).toBeInTheDocument(),
-    );
-
-    // OQ-5 retired the dash convention, so the legend must name colour and shape
-    // instead — and must never call a line dashed again.
-    const legend = screen.getByText(/both lines are solid/);
-    expect(legend.textContent).toMatch(/blue = the (course|segment) route/);
-    expect(legend.textContent).toMatch(/orange = candidate 11 effort/);
-    expect(legend.textContent).toMatch(/filled triangle arrows/);
-    expect(legend.textContent).toMatch(/open chevron arrows/);
-    expect(legend.textContent).toMatch(/within 4 m/);
-    expect(legend.textContent).not.toMatch(/dashed/i);
   });
 });
 

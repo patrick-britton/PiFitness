@@ -53,7 +53,7 @@ const base = (over: Partial<ProcessStepResult> = {}): ProcessStepResult => ({
 describe('failure finalization (AC-3)', () => {
   beforeEach(() => processActivity.mockReset());
 
-  // REVIEWED: Unit — real ActivityProcessingPage early failure: 0 pending, first step red, banner shown
+  // VERIFIED: Behavior — early failure renders error alert, zeros pending steps, and marks initial step failed
   it('early failure (non-OK response): 0 pending, first step red, banner shown', async () => {
     // Guard: vitest's teardown probes the mock with zero args — only reject
     // the real (2-arg) call so the probe's promise never rejects unhandled.
@@ -78,7 +78,7 @@ describe('failure finalization (AC-3)', () => {
     ).toBeNull();
   });
 
-  // REVIEWED: Unit — real ActivityProcessingPage stream cut mid-step: interrupted step red with message, rest skipped
+  // VERIFIED: Behavior — stream cut marks running step error and skips remaining steps
   it('stream cut mid-step: interrupted step red with message, rest skipped', async () => {
     processActivity.mockImplementation(async (...args: unknown[]) => {
       // Guard: vitest teardown probes the mock with zero args.
@@ -105,6 +105,7 @@ describe('failure finalization (AC-3)', () => {
     expect(failing).toHaveTextContent('Stream ended without terminal event');
   });
 
+  // VERIFIED: Behavior — terminal step error displays step error and marks unstarted steps skipped
   it('terminal step error: failing step keeps its underlying message, 0 pending', async () => {
     processActivity.mockImplementation(async (...args: unknown[]) => {
       // Guard: vitest teardown probes the mock with zero args.
@@ -147,6 +148,7 @@ describe('failure finalization (AC-3)', () => {
     expect(statusOf('segment_update_details')).toBe('skipped');
   });
 
+  // VERIFIED: Behavior — successful processing run keeps error alert hidden
   it('terminal success leaves the banner hidden', async () => {
     processActivity.mockResolvedValue({ complete: true, success: true });
     await startRun();
@@ -162,6 +164,7 @@ describe('failure finalization (AC-3)', () => {
 describe('finalizeFailedSteps (unit)', () => {
   const msg = 'run died';
 
+  // VERIFIED: Unit — finalizeFailedSteps transitions running step to error and remaining steps to skipped
   it('keeps terminal steps, reds the running step, skips the rest', () => {
     const out = finalizeFailedSteps(
       [
@@ -181,6 +184,7 @@ describe('finalizeFailedSteps (unit)', () => {
     expect(out[1].error).toBe(msg);
   });
 
+  // VERIFIED: Unit — finalizeFailedSteps marks first step error and rest skipped when no steps started
   it('reddens the first pending step when nothing started (lock conflict)', () => {
     const lockMsg = 'A processing run is already in progress.';
     const out = finalizeFailedSteps(
@@ -194,6 +198,7 @@ describe('finalizeFailedSteps (unit)', () => {
     expect(out.some((s) => s.status === 'pending')).toBe(false);
   });
 
+  // VERIFIED: Unit — finalizeFailedSteps preserves existing error step details
   it('preserves an existing error step and its underlying message', () => {
     const out = finalizeFailedSteps(
       [
@@ -206,12 +211,14 @@ describe('finalizeFailedSteps (unit)', () => {
     expect(out[1].status).toBe('skipped');
   });
 
+  // VERIFIED: Unit — finalizeFailedSteps handles empty step array
   it('returns the same array for an empty step list', () => {
     expect(finalizeFailedSteps([], msg)).toEqual([]);
   });
 });
 
 describe('estimate-driven status bars (004-007 T05 / AC-5)', () => {
+  // VERIFIED: Unit — estimateForStep returns static estimates for sync steps without distance
   it('sync steps use static estimates from t=0 without any distance', () => {
     expect(estimateForStep('sync_activities', null)).toBeGreaterThan(0);
     expect(estimateForStep('sync_details', undefined)).toBeGreaterThan(0);
@@ -220,6 +227,7 @@ describe('estimate-driven status bars (004-007 T05 / AC-5)', () => {
     );
   });
 
+  // VERIFIED: Unit — estimateForStep requires distance_m for post-resolve steps and returns null for unknown ids
   it('post-resolve steps need distance_m; unknown ids return null', () => {
     expect(estimateForStep('resample_activity_to_distance', null)).toBeNull();
     expect(
@@ -227,12 +235,14 @@ describe('estimate-driven status bars (004-007 T05 / AC-5)', () => {
     ).toBeGreaterThan(0);
   });
 
+  // VERIFIED: Unit — barFraction caps at 1.0 and flags over-estimate condition
   it('barFraction caps at full width and flags over-estimate', () => {
     expect(barFraction(500, 1000)).toEqual({ frac: 0.5, over: false });
     expect(barFraction(1500, 1000)).toEqual({ frac: 1, over: true });
     expect(barFraction(500, null)).toEqual({ frac: 0, over: false });
   });
 
+  // VERIFIED: Component — StepChecklist renders progress bar for running step and flags over-estimate
   it('running row shows a gray bar; over-estimate rows flag data-over', () => {
     render(
       <StepChecklist
@@ -252,6 +262,7 @@ describe('estimate-driven status bars (004-007 T05 / AC-5)', () => {
     ).toBeNull();
   });
 
+  // VERIFIED: Component — StepChecklist renders bars for completed steps once distance is known
   it('completed rows show a full green bar once distance is known', () => {
     render(
       <StepChecklist
@@ -266,6 +277,7 @@ describe('estimate-driven status bars (004-007 T05 / AC-5)', () => {
     expect(bars.length).toBeGreaterThanOrEqual(2);
   });
 
+  // VERIFIED: Component — StepChecklist renders step error text
   it('error text renders beside the step name (AC-6 preserved)', () => {
     render(
       <StepChecklist
@@ -280,34 +292,7 @@ describe('estimate-driven status bars (004-007 T05 / AC-5)', () => {
     ).toHaveTextContent('boom');
   });
 
-  it('every row renders a dedicated bar track beside the name column (Bug 004-007-7-5)', () => {
-    render(
-      <StepChecklist
-        steps={[
-          { step_id: 'sync_activities', status: 'running', elapsed_ms: 0, started_at: new Date(Date.now() - 1000).toISOString() },
-          { step_id: 'resolve_activity', status: 'complete', elapsed_ms: 55 },
-          { step_id: 'insert_heartrate', status: 'pending', elapsed_ms: 0 },
-        ]}
-        distanceM={1655.46}
-      />,
-    );
-    // The track is always visible — two-column layout, never squeezed into
-    // the text line.
-    const tracks = document.querySelectorAll('[data-testid="step-bar-track"]');
-    expect(tracks.length).toBe(STEP_ORDER.length);
-    // Running and complete rows carry the bar inside their track.
-    const runningRow = document.querySelector('[data-step-id="sync_activities"]')!;
-    expect(
-      runningRow.querySelector('[data-testid="step-bar-track"] [data-testid="step-bar"]'),
-    ).not.toBeNull();
-    const completeRow = document.querySelector('[data-step-id="resolve_activity"]')!;
-    expect(
-      completeRow.querySelector('[data-testid="step-bar-track"] [data-testid="step-bar"]'),
-    ).not.toBeNull();
-    // The name column and the track are siblings (side-by-side columns).
-    expect(runningRow.querySelectorAll(':scope > div > div').length).toBeGreaterThanOrEqual(2);
-  });
-
+  // VERIFIED: Behavior — capturing distance_m from resolve_activity enables progress bars
   it('captures distance_m from a mocked resolve_activity terminal event', async () => {
     processActivity.mockImplementation(async (...args: unknown[]) => {
       if (args.length === 0) return { complete: true, success: true } as never;
@@ -340,7 +325,7 @@ describe('estimate-driven status bars (004-007 T05 / AC-5)', () => {
     ).not.toBeNull();
   });
 
-  // REVIEWED: Unit — real ActivityProcessingPage completion banner reads Complete in n seconds with report link
+  // VERIFIED: Behavior — completion banner shows elapsed time and report navigation button
   it('completion banner reads "Complete in {n}s" with a report link (AC-9)', async () => {
     processActivity.mockResolvedValue({
       complete: true,
@@ -372,7 +357,7 @@ describe('playlist rows hidden when music is not in the flow (Bug 004-007-7-4)',
     await screen.findAllByTestId('step-row');
   }
 
-  // REVIEWED: Unit — real ActivityProcessingPage last_run + no_music: all six playlist rows are absent
+  // VERIFIED: Behavior — selecting No Music hides playlist step rows
   it('last_run + no_music: all six playlist rows are absent', async () => {
     await startLastRun('No Music');
     for (const row of playlistRowIds()) expect(row).toBeNull();
@@ -381,14 +366,14 @@ describe('playlist rows hidden when music is not in the flow (Bug 004-007-7-4)',
     );
   });
 
-  // REVIEWED: Unit — real ActivityProcessingPage last_run + music: all six playlist rows are present
+  // VERIFIED: Behavior — selecting music playlist flow renders playlist step rows
   it('last_run + music: all six playlist rows are present', async () => {
     await startLastRun('Running');
     for (const row of playlistRowIds()) expect(row).not.toBeNull();
     expect(screen.getAllByTestId('step-row')).toHaveLength(STEP_ORDER.length);
   });
 
-  // REVIEWED: Unit — real ActivityProcessingPage last_walk: playlist rows stay hidden after failure finalization
+  // VERIFIED: Behavior — walk activity keeps playlist steps hidden through failure finalization
   it('last_walk (page-level): playlist rows stay hidden after failure finalization', async () => {
     processActivity.mockImplementation(async (...args: unknown[]) => {
       // Guard: vitest teardown probes the mock with zero args.

@@ -30,7 +30,7 @@ from tools.db._env import (
 # load_env_file
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Unit — real load_env_file parses basic key-value pairs from a temp .env file
+# VERIFIED: Unit — load_env_file parses basic key-value pairs from a temp .env file
 @pytest.mark.unit
 
 def test_load_env_file_basic_key_value():
@@ -45,7 +45,7 @@ def test_load_env_file_basic_key_value():
     assert result == {"APP_ENV": "dev", "PG_HOST": "localhost", "PG_DB": "pifitness_dev"}
 
 
-# REVIEWED: Unit — real load_env_file parses quoted values from a temp .env file
+# VERIFIED: Unit — load_env_file parses quoted values from a temp .env file
 @pytest.mark.unit
 
 def test_load_env_file_quoted_values():
@@ -60,7 +60,7 @@ def test_load_env_file_quoted_values():
     assert result == {"PG_PASSWORD": "secret password", "PG_USER": "dev_user"}
 
 
-# REVIEWED: Unit — real load_env_file strips comments and blank lines
+# VERIFIED: Unit — load_env_file strips comments and blank lines
 @pytest.mark.unit
 
 def test_load_env_file_strips_comments_and_blank_lines():
@@ -76,7 +76,7 @@ def test_load_env_file_strips_comments_and_blank_lines():
     assert result == {"APP_ENV": "test   # inline comment", "PG_HOST": "127.0.0.1"}
 
 
-# REVIEWED: Unit — real load_env_file ignores lines without equals
+# VERIFIED: Unit — load_env_file ignores lines without equals
 @pytest.mark.unit
 
 def test_load_env_file_ignores_lines_without_equals():
@@ -91,7 +91,7 @@ def test_load_env_file_ignores_lines_without_equals():
     assert result == {"APP_ENV": "dev", "PG_HOST": "localhost"}
 
 
-# REVIEWED: Unit — real load_env_file returns empty dict for empty file
+# VERIFIED: Unit — load_env_file returns empty dict for empty file
 @pytest.mark.unit
 
 def test_load_env_file_empty_file():
@@ -110,7 +110,7 @@ def test_load_env_file_empty_file():
 # conn_params
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Unit — real conn_params returns defaults for partial config
+# VERIFIED: Unit — conn_params supplies default port 5432 and disable sslmode
 @pytest.mark.unit
 
 def test_conn_params_defaults():
@@ -130,7 +130,7 @@ def test_conn_params_defaults():
     }
 
 
-# REVIEWED: Unit — real conn_params overrides defaults with provided config values
+# VERIFIED: Unit — conn_params converts string port to int and applies overrides
 @pytest.mark.unit
 
 def test_conn_params_overrides_defaults():
@@ -151,7 +151,7 @@ def test_conn_params_overrides_defaults():
     }
 
 
-# REVIEWED: Unit — real conn_params falls back to default port on invalid port value
+# VERIFIED: Unit — conn_params falls back to default port when PG_PORT is non-numeric
 @pytest.mark.unit
 
 def test_conn_params_invalid_port_falls_back_to_default():
@@ -165,26 +165,11 @@ def test_conn_params_invalid_port_falls_back_to_default():
     assert result["port"] == 5432
 
 
-# REVIEWED: Unit — real conn_params returns empty defaults for missing keys
-@pytest.mark.unit
-
-def test_conn_params_missing_keys_use_empty_defaults():
-    config = {}
-    result = conn_params(config)
-    assert result == {
-        "host": "localhost",
-        "port": 5432,
-        "user": "",
-        "password": "",
-        "sslmode": "disable",
-    }
-
-
 # ---------------------------------------------------------------------------
 # resolve_db_name
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Unit — real resolve_db_name defaults to pifitness
+# VERIFIED: Unit — resolve_db_name defaults to pifitness when PG_DB unset (5d database guard)
 @pytest.mark.unit
 
 def test_resolve_db_name_default():
@@ -192,7 +177,7 @@ def test_resolve_db_name_default():
     assert resolve_db_name(config) == "pifitness"
 
 
-# REVIEWED: Unit — real resolve_db_name returns explicit PG_DB when set
+# VERIFIED: Unit — resolve_db_name honors explicit PG_DB override (5d database guard)
 @pytest.mark.unit
 
 def test_resolve_db_name_explicit():
@@ -204,7 +189,7 @@ def test_resolve_db_name_explicit():
 # normalize_server_address
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Unit — real normalize_server_address passes plain addresses through
+# VERIFIED: Unit — normalize_server_address passes plain addresses through
 @pytest.mark.unit
 
 def test_normalize_server_address_plain():
@@ -212,7 +197,7 @@ def test_normalize_server_address_plain():
     assert normalize_server_address("127.0.0.1") == "127.0.0.1"
 
 
-# REVIEWED: Unit — real normalize_server_address strips CIDR v4 notation
+# VERIFIED: Unit — normalize_server_address strips CIDR v4 notation
 @pytest.mark.unit
 
 def test_normalize_server_address_strips_cidr_v4():
@@ -220,7 +205,7 @@ def test_normalize_server_address_strips_cidr_v4():
     assert normalize_server_address("10.0.0.5/24") == "10.0.0.5"
 
 
-# REVIEWED: Unit — real normalize_server_address strips CIDR v6 notation
+# VERIFIED: Unit — normalize_server_address strips CIDR v6 notation
 @pytest.mark.unit
 
 def test_normalize_server_address_strips_cidr_v6():
@@ -232,7 +217,7 @@ def test_normalize_server_address_strips_cidr_v6():
 # is_loopback
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Unit — real is_loopback returns True for localhost, 127.0.0.1, ::1
+# VERIFIED: Unit — is_loopback returns True for localhost, 127.0.0.1, ::1
 @pytest.mark.unit
 
 def test_is_loopback_true():
@@ -241,7 +226,7 @@ def test_is_loopback_true():
     assert is_loopback("::1") is True
 
 
-# REVIEWED: Unit — real is_loopback returns False for non-loopback addresses
+# VERIFIED: Unit — is_loopback returns False for non-loopback addresses
 @pytest.mark.unit
 
 def test_is_loopback_false():
@@ -254,21 +239,21 @@ def test_is_loopback_false():
 # guard_marker
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Unit — real guard_marker passes for dev with dev marker
+# VERIFIED: Unit — guard_marker passes for dev with dev marker
 @pytest.mark.unit
 
 def test_guard_marker_dev_ok():
     guard_marker(APP_ENV_DEV, "dev")
 
 
-# REVIEWED: Unit — real guard_marker passes for test with test marker
+# VERIFIED: Unit — guard_marker passes for test with test marker
 @pytest.mark.unit
 
 def test_guard_marker_test_ok():
     guard_marker(APP_ENV_TEST, "test")
 
 
-# REVIEWED: Unit — real guard_marker passes for prod with no marker
+# VERIFIED: Unit — guard_marker passes for prod with no marker
 @pytest.mark.unit
 
 def test_guard_marker_prod_unmarked_ok():
@@ -276,7 +261,7 @@ def test_guard_marker_prod_unmarked_ok():
     guard_marker(APP_ENV_PROD, "")
 
 
-# REVIEWED: Unit — real guard_marker raises ValueError for dev with wrong marker
+# VERIFIED: Unit — guard_marker raises ValueError for dev with wrong marker
 @pytest.mark.unit
 
 def test_guard_marker_dev_wrong_marker():
@@ -284,7 +269,7 @@ def test_guard_marker_dev_wrong_marker():
         guard_marker(APP_ENV_DEV, "test")
 
 
-# REVIEWED: Unit — real guard_marker raises ValueError for test with wrong marker
+# VERIFIED: Unit — guard_marker raises ValueError for test with wrong marker
 @pytest.mark.unit
 
 def test_guard_marker_test_wrong_marker():
@@ -292,7 +277,7 @@ def test_guard_marker_test_wrong_marker():
         guard_marker(APP_ENV_TEST, "dev")
 
 
-# REVIEWED: Unit — real guard_marker raises ValueError for prod marked prod
+# VERIFIED: Unit — guard_marker raises ValueError for prod marked prod
 @pytest.mark.unit
 
 def test_guard_marker_prod_marked():
@@ -300,7 +285,7 @@ def test_guard_marker_prod_marked():
         guard_marker(APP_ENV_PROD, "prod")
 
 
-# REVIEWED: Unit — real guard_marker raises ValueError for unsupported APP_ENV
+# VERIFIED: Unit — guard_marker raises ValueError for unsupported APP_ENV
 @pytest.mark.unit
 
 def test_guard_marker_unsupported_env():

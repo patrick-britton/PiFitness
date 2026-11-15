@@ -54,7 +54,7 @@ def _config(env, db, user):
     }
 
 
-# REVIEWED: Unit — real _latest_backup selects newest matching custom archive
+# VERIFIED: Unit — _latest_backup selects newest matching custom archive (5d database guard)
 @pytest.mark.unit
 def test_latest_backup_selects_newest_matching_custom_archive(tmp_path, monkeypatch):
     older = tmp_path / "pifitness_prd_older.dump"
@@ -77,7 +77,7 @@ def test_latest_backup_selects_newest_matching_custom_archive(tmp_path, monkeypa
     assert checksum == recovery._sha256_file(newer)
 
 
-# REVIEWED: Unit — real _latest_backup refuses wrong source database
+# VERIFIED: Unit — _latest_backup refuses wrong source database (5d database guard)
 @pytest.mark.unit
 def test_latest_backup_refuses_wrong_source_database(tmp_path, monkeypatch):
     backup = tmp_path / "pifitness_prd_latest.dump"
@@ -92,7 +92,7 @@ def test_latest_backup_refuses_wrong_source_database(tmp_path, monkeypatch):
         recovery._latest_backup(tmp_path, "*.dump", "personal_fitness", runner=runner)
 
 
-# REVIEWED: Unit — real _latest_backup refuses older than 24 hours
+# VERIFIED: Unit — _latest_backup refuses backup older than 24 hours (5d database guard)
 @pytest.mark.unit
 def test_latest_backup_refuses_older_than_24_hours(tmp_path, monkeypatch):
     backup = tmp_path / "pifitness_prd_old.dump"
@@ -108,7 +108,7 @@ def test_latest_backup_refuses_older_than_24_hours(tmp_path, monkeypatch):
         recovery._latest_backup(tmp_path, "*.dump", "personal_fitness", now=now, runner=runner)
 
 
-# REVIEWED: Unit — real _latest_backup does not fall back if newest archive is invalid
+# VERIFIED: Unit — _latest_backup fails closed if newest archive is invalid (5d database guard)
 @pytest.mark.unit
 def test_latest_backup_does_not_fall_back_if_newest_archive_is_invalid(tmp_path, monkeypatch):
     older = tmp_path / "pifitness_prd_older.dump"
@@ -127,7 +127,7 @@ def test_latest_backup_does_not_fall_back_if_newest_archive_is_invalid(tmp_path,
         recovery._latest_backup(tmp_path, "*.dump", "personal_fitness", runner=runner)
 
 
-# REVIEWED: Unit — real _latest_backup rejects symlinked directory and path glob
+# VERIFIED: Unit — _latest_backup rejects symlinked directory and path traversal (5d database guard)
 @pytest.mark.unit
 def test_latest_backup_rejects_symlinked_directory_and_path_glob(tmp_path):
     real = tmp_path / "real"
@@ -193,7 +193,7 @@ def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=F
 
 
 
-# REVIEWED: Unit — real backup filename timestamp uses host local timezone
+# VERIFIED: Unit — backup filename timestamp parses in host local timezone
 @pytest.mark.unit
 def test_backup_filename_timestamp_uses_host_local_timezone(monkeypatch):
     import os
@@ -215,7 +215,7 @@ def test_backup_filename_timestamp_uses_host_local_timezone(monkeypatch):
         time.tzset()
 
 
-# REVIEWED: Unit — real all PRD extension versions must be available before destructive restore
+# VERIFIED: Unit — PRD extension versions validated before destructive restore (5d database guard)
 @pytest.mark.unit
 def test_all_prd_extension_versions_must_be_available_before_destructive_restore(monkeypatch):
     class Cursor:
@@ -242,7 +242,7 @@ def test_all_prd_extension_versions_must_be_available_before_destructive_restore
         recovery._load_extension_specs(_config("prod", "personal_fitness", "devuser"), "personal_fitness")
 
 
-# REVIEWED: Unit — real pg_restore uses admin and ownership transfer avoids cluster-wide reassign
+# VERIFIED: Unit — restore uses admin connection and database-scoped ownership transfer (5d database guard)
 @pytest.mark.unit
 def test_pg_restore_uses_admin_and_ownership_transfer_avoids_cluster_wide_reassign(monkeypatch, tmp_path):
     captured = {}
@@ -272,7 +272,7 @@ def test_pg_restore_uses_admin_and_ownership_transfer_avoids_cluster_wide_reassi
     assert "--no-owner" in args and "--no-acl" in args
 
 
-# REVIEWED: Unit — real ownership provisioning is database-scoped and never reassigns shared objects
+# VERIFIED: Unit — ownership transfer is scoped to target database (5d database guard)
 @pytest.mark.unit
 def test_ownership_provisioning_is_database_scoped_and_never_reassigns_shared_objects(monkeypatch):
     captured = []
@@ -303,7 +303,7 @@ def test_ownership_provisioning_is_database_scoped_and_never_reassigns_shared_ob
     assert "ALTER SCHEMA public OWNER TO \"pifitness_test_app\"" in ownership_sql
 
 
-# REVIEWED: Unit — real old incomplete journal never drops a newer completed baseline
+# VERIFIED: Unit — incomplete journal entry never drops newer completed baseline (5d database guard)
 @pytest.mark.unit
 def test_old_incomplete_journal_never_drops_a_newer_completed_baseline(tmp_path, monkeypatch):
     dbs, conn = _install_fake_recovery(monkeypatch, original_exists=False)
@@ -332,7 +332,7 @@ def test_old_incomplete_journal_never_drops_a_newer_completed_baseline(tmp_path,
     assert dbs["personal_fitness_test"]["oid"] == 99
     assert conn.closed
 
-# REVIEWED: Unit — real recovery replaces bad test and keeps only verified PRD baseline
+# VERIFIED: Unit — recovery replaces invalid TEST database and keeps verified PRD baseline (5d database guard)
 @pytest.mark.unit
 def test_recovery_replaces_bad_test_and_keeps_only_verified_prd_baseline(tmp_path, monkeypatch):
     dbs, conn = _install_fake_recovery(monkeypatch)
@@ -358,7 +358,7 @@ def test_recovery_replaces_bad_test_and_keeps_only_verified_prd_baseline(tmp_pat
     assert conn.closed
 
 
-# REVIEWED: Unit — real missing test database is created directly without snapshot
+# VERIFIED: Unit — missing TEST database created directly from backup (5d database guard)
 @pytest.mark.unit
 def test_missing_test_database_is_created_directly_without_snapshot(tmp_path, monkeypatch):
     dbs, _ = _install_fake_recovery(monkeypatch, original_exists=False)
@@ -372,7 +372,7 @@ def test_missing_test_database_is_created_directly_without_snapshot(tmp_path, mo
     assert set(dbs) == {"personal_fitness", "personal_fitness_test"}
 
 
-# REVIEWED: Unit — real restore failure removes partial test database and records failure
+# VERIFIED: Unit — restore failure cleans up partial database and records failure (5d database guard)
 @pytest.mark.unit
 def test_restore_failure_removes_partial_test_database_and_records_failure(tmp_path, monkeypatch):
     dbs, _ = _install_fake_recovery(monkeypatch, restore_fails=True)
@@ -389,7 +389,7 @@ def test_restore_failure_removes_partial_test_database_and_records_failure(tmp_p
     assert set(dbs) == {"personal_fitness"}
 
 
-# REVIEWED: Unit — real live PRD schema change after nightly backup does not discard restored baseline
+# VERIFIED: Unit — schema drift after backup does not discard restored baseline (5d database guard)
 @pytest.mark.unit
 def test_live_prd_schema_change_after_nightly_backup_does_not_discard_restored_baseline(tmp_path, monkeypatch):
     dbs, _ = _install_fake_recovery(monkeypatch, schema_status="different")
@@ -406,7 +406,7 @@ def test_live_prd_schema_change_after_nightly_backup_does_not_discard_restored_b
     assert dbs["personal_fitness_test"]["oid"] == 3
 
 
-# REVIEWED: Unit — real recovery reconciler keeps a completed PRD baseline
+# VERIFIED: Unit — recovery reconciler preserves completed PRD baseline (5d database guard)
 @pytest.mark.unit
 def test_recovery_reconciler_keeps_a_completed_prd_baseline(tmp_path, monkeypatch):
     dbs, _ = _install_fake_recovery(monkeypatch, original_exists=False)
@@ -426,7 +426,7 @@ def test_recovery_reconciler_keeps_a_completed_prd_baseline(tmp_path, monkeypatc
     assert dbs["personal_fitness_test"]["oid"] == 3
 
 
-# REVIEWED: Unit — real admin preflight failure does not drop existing test
+# VERIFIED: Unit — admin preflight failure aborts before dropping existing TEST database (5d database guard)
 @pytest.mark.unit
 def test_admin_preflight_failure_does_not_drop_existing_test(tmp_path, monkeypatch):
     dbs, _ = _install_fake_recovery(monkeypatch)
@@ -442,7 +442,7 @@ def test_admin_preflight_failure_does_not_drop_existing_test(tmp_path, monkeypat
     assert json.loads(state_path.read_text())["status"] == "failed_before_database_change"
 
 
-# REVIEWED: Unit — real test role must be login enabled and non-superuser before drop
+# VERIFIED: Unit — superuser TEST role rejected before dropping database (5d database guard)
 @pytest.mark.unit
 def test_test_role_must_be_login_enabled_and_non_superuser_before_drop(tmp_path, monkeypatch):
     dbs, _ = _install_fake_recovery(monkeypatch)
@@ -460,7 +460,7 @@ def test_test_role_must_be_login_enabled_and_non_superuser_before_drop(tmp_path,
     assert json.loads(state_path.read_text())["status"] == "failed_before_database_change"
 
 
-# REVIEWED: Unit — real test role must be login enabled before drop
+# VERIFIED: Unit — non-login TEST role rejected before dropping database (5d database guard)
 @pytest.mark.unit
 def test_test_role_must_be_login_enabled_before_drop(tmp_path, monkeypatch):
     dbs, _ = _install_fake_recovery(monkeypatch)
@@ -478,7 +478,7 @@ def test_test_role_must_be_login_enabled_before_drop(tmp_path, monkeypatch):
     assert json.loads(state_path.read_text())["status"] == "failed_before_database_change"
 
 
-# REVIEWED: Unit — real bad test password detected before dropping existing database
+# VERIFIED: Unit — bad TEST password detected before dropping existing database (5d database guard)
 @pytest.mark.unit
 def test_bad_test_password_is_detected_before_dropping_existing_database(tmp_path, monkeypatch):
     dbs, _ = _install_fake_recovery(monkeypatch)
@@ -497,7 +497,7 @@ def test_bad_test_password_is_detected_before_dropping_existing_database(tmp_pat
     assert json.loads(state_path.read_text())["status"] == "failed_before_database_change"
 
 
-# REVIEWED: Unit — real test role credential probe checks database user and same loopback endpoint
+# VERIFIED: Unit — credential probe verifies database user on same loopback endpoint (5d database guard)
 @pytest.mark.unit
 def test_test_role_credential_probe_checks_database_user_and_same_loopback_endpoint(monkeypatch):
     class Cursor:
@@ -531,7 +531,7 @@ def test_test_role_credential_probe_checks_database_user_and_same_loopback_endpo
     assert test_conn.closed is True
 
 
-# REVIEWED: Unit — real test role credential probe skips if role cannot connect to postgres
+# VERIFIED: Unit — credential probe skips gracefully when role lacks connect privilege (5d database guard)
 @pytest.mark.unit
 def test_test_role_credential_probe_skips_if_role_cannot_connect_to_postgres(monkeypatch):
     class Cursor:

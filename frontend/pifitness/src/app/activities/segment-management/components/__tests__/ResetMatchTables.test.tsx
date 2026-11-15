@@ -22,7 +22,7 @@ describe('ResetMatchTables', () => {
     resetMock.mockReset();
   });
 
-  // REVIEWED: opens the confirmation dialog and only posts on confirm (OQ-2) — confirm-before-write guard
+  // VERIFIED: Behavior — ResetMatchTables gates database table reset on dialog confirmation
   it('opens the confirmation dialog and only posts on confirm (OQ-2)', async () => {
     const user = userEvent.setup();
     resetMock.mockResolvedValue({ message: 'Reset 5 tables.', truncated_count: 5 });
@@ -40,7 +40,7 @@ describe('ResetMatchTables', () => {
     expect(onReset).toHaveBeenCalled();
   });
 
-  // REVIEWED: cancel closes the dialog without posting — cancel path does not call API
+  // VERIFIED: Behavior — ResetMatchTables cancels dialog without calling reset API
   it('cancel closes the dialog without posting', async () => {
     const user = userEvent.setup();
     render(<ResetMatchTables onReset={vi.fn()} />);
@@ -53,7 +53,7 @@ describe('ResetMatchTables', () => {
     expect(resetMock).not.toHaveBeenCalled();
   });
 
-  // REVIEWED: reports a reset failure inside the dialog — error alert shown on API rejection
+  // VERIFIED: Behavior — ResetMatchTables renders error alert when reset API fails
   it('reports a reset failure inside the dialog', async () => {
     const user = userEvent.setup();
     resetMock.mockRejectedValueOnce(new Error('boom'));

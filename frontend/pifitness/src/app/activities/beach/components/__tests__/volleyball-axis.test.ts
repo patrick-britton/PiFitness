@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { volleyballAxis } from '../VolleyballScoreChart';
 
 describe('volleyballAxis (006-003, AC-5)', () => {
-  // REVIEWED: Unit — real volleyballAxis reproduces spec worked examples
+  // VERIFIED: Unit — volleyballAxis computes correct yMax and axisLength across standard and deuce scores
   it('reproduces the spec worked examples', () => {
     // [sr, opp, points, expected yMax, expected axisLength]
     const cases: [number, number, number, number, number][] = [
@@ -25,12 +25,12 @@ describe('volleyballAxis (006-003, AC-5)', () => {
     }
   });
 
-  // REVIEWED: Unit — real volleyballAxis points-count guard extends axis past score minimum
+  // VERIFIED: Unit — volleyballAxis extends axisLength when pointCount exceeds minimum
   it('points-count guard extends the axis past the score minimum', () => {
     expect(volleyballAxis(3, 3, 30)).toEqual({ yMax: 21, axisLength: 30 });
   });
 
-  // REVIEWED: Unit — real volleyballAxis never shrinks below 21 slots even for a single point
+  // VERIFIED: Unit — volleyballAxis maintains minimum floor of 21 slots
   it('never shrinks below 21 slots even for a single point', () => {
     expect(volleyballAxis(1, 0, 1)).toEqual({ yMax: 21, axisLength: 21 });
   });

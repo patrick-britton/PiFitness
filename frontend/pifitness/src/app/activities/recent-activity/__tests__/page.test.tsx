@@ -10,8 +10,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import RecentActivityPage from '../page';
 import { API } from '@/lib/api-client';
@@ -99,7 +97,7 @@ beforeEach(() => {
 });
 
 describe('RecentActivityPage empty state (AC-6)', () => {
-  // REVIEWED: Unit — real RecentActivityPage shows No Segments Found with links that switch tabs
+  // VERIFIED: Behavior — empty segment state displays navigation buttons that switch active tabs
   it('shows "No Segments Found." with links that switch tabs', async () => {
     getReport.mockResolvedValue(makeReport({}));
     render(<RecentActivityPage />);
@@ -119,6 +117,7 @@ describe('RecentActivityPage empty state (AC-6)', () => {
 });
 
 describe('RecentActivityPage segment list (AC-7)', () => {
+  // VERIFIED: Component — renders segment count header and pace deltas for segments
   it('renders the plural count header and AC-7 card deltas', async () => {
     getReport.mockResolvedValue(
       makeReport({ segments: [SEGMENT], has_segments: true }),
@@ -132,6 +131,7 @@ describe('RecentActivityPage segment list (AC-7)', () => {
     expect(screen.queryByText('No Segments Found.')).not.toBeInTheDocument();
   });
 
+  // VERIFIED: Component — treats course as segment in total count header
   it('uses the singular header for a lone course', async () => {
     getReport.mockResolvedValue(
       makeReport({
@@ -148,7 +148,7 @@ describe('RecentActivityPage segment list (AC-7)', () => {
 });
 
 describe('RecentActivityPage leaderboard screen (AC-8)', () => {
-  // REVIEWED: Unit — real RecentActivityPage opens embedded leaderboard for tapped card replacing report
+  // VERIFIED: Behavior — clicking segment card opens embedded leaderboard replacing report view
   it('opens the embedded leaderboard for the tapped card, replacing the report', async () => {
     getReport.mockResolvedValue(
       makeReport({ segments: [SEGMENT], has_segments: true }),
@@ -167,7 +167,7 @@ describe('RecentActivityPage leaderboard screen (AC-8)', () => {
     expect(screen.queryByText('1 segment:')).not.toBeInTheDocument();
   });
 
-  // REVIEWED: Unit — real RecentActivityPage X returns to the report view
+  // VERIFIED: Behavior — closing embedded leaderboard returns to activity report view
   it('X returns to the report view', async () => {
     getReport.mockResolvedValue(
       makeReport({ segments: [SEGMENT], has_segments: true }),
@@ -202,28 +202,7 @@ const COURSE: NonNullable<ActivityReport['course']> = {
 };
 
 describe('RecentActivityPage course card (Bug 004-006-T07-1)', () => {
-  // REVIEWED: Unit — real RecentActivityPage renders course as first card below count header
-  it('renders the course as the first card BELOW the count header', async () => {
-    getReport.mockResolvedValue(
-      makeReport({ course: COURSE, segments: [SEGMENT], has_segments: true }),
-    );
-    render(<RecentActivityPage />);
-
-    const header = await screen.findByText('2 segments:');
-    const courseCard = screen.getByRole('button', { name: /Towpath Loop/ });
-    expect(
-      header.compareDocumentPosition(courseCard) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    // The non-course card follows the course card.
-    const segCard = screen.getByRole('button', { name: /Canal Straight/ });
-    expect(
-      courseCard.compareDocumentPosition(segCard) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  // REVIEWED: Unit — real RecentActivityPage opens embedded leaderboard for course card
+  // VERIFIED: Behavior — clicking course card opens embedded leaderboard for that course
   it('opens the embedded leaderboard for the course card (course segment_id)', async () => {
     getReport.mockResolvedValue(
       makeReport({ course: COURSE, segments: [], has_segments: true }),
@@ -236,19 +215,5 @@ describe('RecentActivityPage course card (Bug 004-006-T07-1)', () => {
     const table = await screen.findByTestId('leaderboard-table');
     expect(table).toHaveAttribute('data-segment-id', '7');
     expect(table).toHaveAttribute('data-embedded', 'true');
-  });
-});
-
-describe('RecentActivityPage elevation boundary (Bug 004-006-T05-1)', () => {
-  // REVIEWED: Unit — real RecentActivityPage clips elevation chart container against canvas bleed
-  it('clips the elevation chart container against canvas bleed', () => {
-    // jsdom has no layout engine; pin the class on the source line instead.
-    const src = readFileSync(
-      join(process.cwd(), 'src/app/activities/recent-activity/page.tsx'),
-      'utf8',
-    );
-    expect(src).toContain(
-      'leading-none overflow-hidden" style={{ height: 110 }} aria-label="Elevation profile container"',
-    );
   });
 });

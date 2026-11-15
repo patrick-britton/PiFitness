@@ -19,7 +19,7 @@ import pytest
 from pifitness.core.config import get_settings, guard_db_marker
 
 
-# REVIEWED: Regression — real get_settings raises RuntimeError when PG_HOST missing
+# VERIFIED: Regression — get_settings raises RuntimeError when PG_HOST missing
 @pytest.mark.regression
 def test_get_settings_raises_when_pg_host_missing(monkeypatch):
     """Fail-loud: get_settings() must raise when PG_HOST is unresolvable."""
@@ -34,7 +34,7 @@ def test_get_settings_raises_when_pg_host_missing(monkeypatch):
         get_settings()
 
 
-# REVIEWED: Regression — real get_settings uses PG_HOST when set
+# VERIFIED: Regression — get_settings uses PG_HOST when set
 @pytest.mark.regression
 def test_get_settings_uses_pg_host_when_set(monkeypatch):
     """Existing behavior preserved: explicit PG_HOST wins."""
@@ -48,7 +48,7 @@ def test_get_settings_uses_pg_host_when_set(monkeypatch):
 
 # --- D8 marker guard unit tests (mocked read_db_marker) ---
 
-# REVIEWED: Regression — real guard_db_marker allows dev with dev marker
+# VERIFIED: Regression — guard_db_marker allows dev with dev marker
 @pytest.mark.regression
 def test_guard_dev_env_with_dev_marker_ok(monkeypatch):
     """APP_ENV=dev with marker=dev is allowed."""
@@ -59,7 +59,7 @@ def test_guard_dev_env_with_dev_marker_ok(monkeypatch):
     guard_db_marker("dev", "dev")  # should not raise
 
 
-# REVIEWED: Regression — real guard_db_marker raises for dev with wrong marker
+# VERIFIED: Regression — guard_db_marker raises for dev with wrong marker
 @pytest.mark.regression
 def test_guard_dev_env_with_wrong_marker_raises(monkeypatch):
     """APP_ENV=dev with marker=test or None-marker-known-wrong raises."""
@@ -71,7 +71,7 @@ def test_guard_dev_env_with_wrong_marker_raises(monkeypatch):
         guard_db_marker("dev", "test")
 
 
-# REVIEWED: Regression — real guard_db_marker allows dev with unknown marker
+# VERIFIED: Regression — guard_db_marker allows dev with unknown marker
 @pytest.mark.regression
 def test_guard_dev_env_unknown_marker_ok(monkeypatch):
     """APP_ENV=dev with marker unknown (None) does not raise."""
@@ -82,7 +82,7 @@ def test_guard_dev_env_unknown_marker_ok(monkeypatch):
     guard_db_marker("dev", None)  # should not raise
 
 
-# REVIEWED: Regression — real guard_db_marker raises for unset env with dev marker
+# VERIFIED: Regression — guard_db_marker raises for unset env with dev marker
 @pytest.mark.regression
 def test_guard_unset_env_with_dev_marker_raises(monkeypatch):
     """APP_ENV unset/prod with marker=dev raises (protects dev data)."""
@@ -94,7 +94,7 @@ def test_guard_unset_env_with_dev_marker_raises(monkeypatch):
         guard_db_marker("", "dev")
 
 
-# REVIEWED: Regression — real guard_db_marker raises for prod with dev marker
+# VERIFIED: Regression — guard_db_marker raises for prod with dev marker
 @pytest.mark.regression
 def test_guard_prod_env_with_dev_marker_raises(monkeypatch):
     """APP_ENV=prod with marker=dev raises."""
@@ -106,7 +106,7 @@ def test_guard_prod_env_with_dev_marker_raises(monkeypatch):
         guard_db_marker("prod", "dev")
 
 
-# REVIEWED: Regression — real guard_db_marker allows test with test marker
+# VERIFIED: Regression — guard_db_marker allows test with test marker
 @pytest.mark.regression
 def test_guard_test_env_with_test_marker_ok(monkeypatch):
     """APP_ENV=test with marker=test is allowed."""
@@ -117,7 +117,7 @@ def test_guard_test_env_with_test_marker_ok(monkeypatch):
     guard_db_marker("test", "test")  # should not raise
 
 
-# REVIEWED: Regression — real guard_db_marker raises for test with dev marker
+# VERIFIED: Regression — guard_db_marker raises for test with dev marker
 @pytest.mark.regression
 def test_guard_test_env_with_dev_marker_raises(monkeypatch):
     """APP_ENV=test with marker=dev raises."""
@@ -129,7 +129,7 @@ def test_guard_test_env_with_dev_marker_raises(monkeypatch):
         guard_db_marker("test", "dev")
 
 
-# REVIEWED: Regression — real get_settings succeeds with dev env and dev marker
+# VERIFIED: Regression — get_settings succeeds with dev env and dev marker
 @pytest.mark.regression
 def test_get_settings_dev_env_with_dev_marker(monkeypatch):
     """get_settings() with APP_ENV=dev and reachable marker=dev succeeds."""
@@ -144,7 +144,7 @@ def test_get_settings_dev_env_with_dev_marker(monkeypatch):
     assert settings.db_host == "localhost"
 
 
-# REVIEWED: Regression — real get_settings raises for unset env with dev marker
+# VERIFIED: Regression — get_settings raises for unset env with dev marker
 @pytest.mark.regression
 def test_get_settings_unset_env_with_dev_marker_raises(monkeypatch):
     """get_settings() with APP_ENV unset and marker=dev raises (protects dev)."""

@@ -155,7 +155,7 @@ def _configs():
     )
 
 
-# REVIEWED: Unit — real inspect_test_database selects create_from_prd when TEST DB missing
+# VERIFIED: Unit — inspect_test_database selects create_from_prd when TEST DB missing (5d database guard)
 def test_missing_test_database_selects_create_from_prd_without_comparison(monkeypatch):
     handles = _install_connections(monkeypatch, test_exists=False)
     compare_calls = []
@@ -173,8 +173,8 @@ def test_missing_test_database_selects_create_from_prd_without_comparison(monkey
     assert handles["prd_connection"].readonly is True
 
 
+# VERIFIED: Unit — inspect_test_database selects refresh when marker wrong (5d database guard)
 @pytest.mark.parametrize("marker", [None, "", "dev", "prod", "unexpected"])
-# REVIEWED: Unit — real inspect_test_database selects refresh when marker wrong
 def test_missing_or_wrong_test_marker_selects_refresh_without_comparison(
     monkeypatch, marker
 ):
@@ -193,7 +193,7 @@ def test_missing_or_wrong_test_marker_selects_refresh_without_comparison(
     assert compare_calls == []
 
 
-# REVIEWED: Unit — real inspect_test_database reuses TEST when schema identical
+# VERIFIED: Unit — inspect_test_database reuses TEST when schema identical (5d database guard)
 @pytest.mark.unit
 def test_identical_schema_reuses_test_and_offers_refresh(monkeypatch):
     handles = _install_connections(monkeypatch)
@@ -215,8 +215,7 @@ def test_identical_schema_reuses_test_and_offers_refresh(monkeypatch):
     assert len(compare_calls) == 1
 
 
-
-# REVIEWED: Unit — real inspect_test_database selects refresh on bad TEST permissions
+# VERIFIED: Unit — inspect_test_database selects refresh on bad TEST permissions (5d database guard)
 def test_bad_test_permissions_select_refresh_without_schema_comparison(monkeypatch):
     handles = _install_connections(monkeypatch, test_permissions=(True, True, True, False))
     compare_calls = []
@@ -229,7 +228,8 @@ def test_bad_test_permissions_select_refresh_without_schema_comparison(monkeypat
     assert compare_calls == []
     assert not handles["test_connection"].closed
 
-# REVIEWED: Unit — real inspect_test_database selects refresh when schema differs
+
+# VERIFIED: Unit — inspect_test_database selects refresh when schema differs (5d database guard)
 def test_different_schema_selects_refresh(monkeypatch):
     _install_connections(monkeypatch)
 
@@ -242,7 +242,7 @@ def test_different_schema_selects_refresh(monkeypatch):
     assert report["schema_comparison"]["statement_count"] == 2
 
 
-# REVIEWED: Unit — real inspect_test_database reflects explicit refresh request
+# VERIFIED: Unit — inspect_test_database reflects explicit refresh request (5d database guard)
 def test_explicit_refresh_is_reflected_in_decision(monkeypatch):
     _install_connections(monkeypatch)
 
@@ -256,7 +256,7 @@ def test_explicit_refresh_is_reflected_in_decision(monkeypatch):
     assert "explicitly requested" in report["decision"]["reason"]
 
 
-# REVIEWED: Unit — real inspect_test_database fails closed on comparator exception
+# VERIFIED: Unit — inspect_test_database fails closed on comparator exception (5d database guard)
 def test_schema_comparator_exception_fails_closed(monkeypatch):
     _install_connections(monkeypatch)
 
@@ -271,7 +271,7 @@ def test_schema_comparator_exception_fails_closed(monkeypatch):
     assert "MigraDiff connection failed" in report["decision"]["reason"]
 
 
-# REVIEWED: Unit — real inspect_test_database fails closed on malformed comparator result
+# VERIFIED: Unit — inspect_test_database fails closed on malformed comparator result (5d database guard)
 def test_malformed_comparator_result_fails_closed(monkeypatch):
     _install_connections(monkeypatch)
 
@@ -283,7 +283,7 @@ def test_malformed_comparator_result_fails_closed(monkeypatch):
     assert report["decision"]["action"] == "abort"
 
 
-# REVIEWED: Unit — real inspect_test_database fails closed when TEST on different server
+# VERIFIED: Unit — inspect_test_database fails closed when TEST on different server (5d database guard)
 def test_test_database_on_different_server_fails_closed(monkeypatch):
     _install_connections(monkeypatch, test_address="127.0.0.2")
     compare_calls = []
@@ -300,7 +300,7 @@ def test_test_database_on_different_server_fails_closed(monkeypatch):
 
 
 
-# REVIEWED: Unit — real inspect_test_database accepts IPv6 loopback inet prefix
+# VERIFIED: Unit — inspect_test_database accepts IPv6 loopback inet prefix (5d database guard)
 def test_ipv6_loopback_inet_prefix_is_accepted_and_normalized(monkeypatch):
     _install_connections(
         monkeypatch,
@@ -319,7 +319,7 @@ def test_ipv6_loopback_inet_prefix_is_accepted_and_normalized(monkeypatch):
     assert report["decision"]["action"] == "reuse_test"
 
 
-# REVIEWED: Unit — real inspect_test_database failure report includes stage code and next step
+# VERIFIED: Unit — inspect_test_database failure report includes stage code and next step
 def test_failure_report_includes_stage_code_and_actionable_next_step(monkeypatch):
     _install_connections(monkeypatch, test_address="192.168.1.20")
 
@@ -336,7 +336,7 @@ def test_failure_report_includes_stage_code_and_actionable_next_step(monkeypatch
     assert "Next action:" in human
     assert "No database was modified" in human
 
-# REVIEWED: Unit — real inspect_test_database fails closed on TEST port mismatch
+# VERIFIED: Unit — inspect_test_database fails closed on TEST port mismatch (5d database guard)
 def test_test_database_port_mismatch_fails_closed(monkeypatch):
     _install_connections(monkeypatch, test_port=5433)
 
@@ -346,7 +346,7 @@ def test_test_database_port_mismatch_fails_closed(monkeypatch):
     assert "Connected to PostgreSQL port 5433" in report["error"]
 
 
-# REVIEWED: Unit — real inspect_test_database does not treat connection error as bad marker
+# VERIFIED: Unit — inspect_test_database does not treat connection error as bad marker (5d database guard)
 def test_test_database_connection_error_is_not_treated_as_bad_marker(monkeypatch):
     _install_connections(
         monkeypatch,
@@ -360,7 +360,7 @@ def test_test_database_connection_error_is_not_treated_as_bad_marker(monkeypatch
     assert "permission denied" in report["error"]
 
 
-# REVIEWED: Unit — real inspect_test_database fails closed when catalog disallows connections
+# VERIFIED: Unit — inspect_test_database fails closed when catalog disallows connections (5d database guard)
 def test_test_database_catalog_disallow_connections_fails_closed(monkeypatch):
     _install_connections(monkeypatch, catalog_allow_connections=False)
 
@@ -370,7 +370,7 @@ def test_test_database_catalog_disallow_connections_fails_closed(monkeypatch):
     assert "disallows connections" in report["error"]
 
 
-# REVIEWED: Unit — real inspect_test_database fails closed when catalog is template flag
+# VERIFIED: Unit — inspect_test_database fails closed when catalog is template flag (5d database guard)
 def test_test_database_catalog_template_flag_fails_closed(monkeypatch):
     _install_connections(monkeypatch, catalog_is_template=True)
 
@@ -380,7 +380,7 @@ def test_test_database_catalog_template_flag_fails_closed(monkeypatch):
     assert "PostgreSQL template" in report["error"]
 
 
-# REVIEWED: Unit — real inspect_test_database requires PRD to remain unmarked
+# VERIFIED: Unit — inspect_test_database requires PRD to remain unmarked (5d database guard)
 def test_prd_must_remain_unmarked(monkeypatch):
     _install_connections(monkeypatch, prd_marker="prod")
 
@@ -390,7 +390,7 @@ def test_prd_must_remain_unmarked(monkeypatch):
     assert "PRD must remain unmarked" in report["error"]
 
 
-# REVIEWED: Unit — real inspect_test_database rejects same TEST and PRD database
+# VERIFIED: Unit — inspect_test_database rejects same TEST and PRD database (5d database guard)
 def test_same_test_and_prd_database_is_rejected(monkeypatch):
     test_config, prd_config = _configs()
     test_config["PG_DB"] = prd_config["PG_DB"]
@@ -401,7 +401,7 @@ def test_same_test_and_prd_database_is_rejected(monkeypatch):
     assert "same database" in report["error"]
 
 
-# REVIEWED: Unit — real inspect_test_database rejects wrong APP_ENV
+# VERIFIED: Unit — inspect_test_database rejects wrong APP_ENV (5d database guard)
 def test_wrong_app_env_is_rejected(monkeypatch):
     test_config, prd_config = _configs()
     test_config["APP_ENV"] = "dev"
@@ -412,7 +412,7 @@ def test_wrong_app_env_is_rejected(monkeypatch):
     assert "APP_ENV=test" in report["error"]
 
 
-# REVIEWED: Unit — real inspect_test_database rejects nonlocal host before connecting
+# VERIFIED: Unit — inspect_test_database rejects nonlocal host before connecting (5d database guard)
 def test_nonlocal_host_is_rejected_before_connecting(monkeypatch):
     test_config, prd_config = _configs()
     test_config["PG_HOST"] = "db.example.com"
@@ -432,7 +432,7 @@ def test_nonlocal_host_is_rejected_before_connecting(monkeypatch):
     assert connect_calls == []
 
 
-# REVIEWED: Unit — real inspect_test_database forwards diff_file to comparator
+# VERIFIED: Unit — inspect_test_database forwards diff_file to comparator (5d database guard)
 def test_diff_file_is_forwarded_to_comparator(monkeypatch, tmp_path):
     _install_connections(monkeypatch)
     path = str(tmp_path / "diff.json")
@@ -450,7 +450,7 @@ def test_diff_file_is_forwarded_to_comparator(monkeypatch, tmp_path):
     assert seen["diff_file"] == path
 
 
-# REVIEWED: Unit — real CLI requires explicit PRD authorization flag
+# VERIFIED: Unit — CLI requires explicit PRD authorization flag (5d database guard)
 def test_cli_requires_explicit_prd_authorization(capsys):
     code = inspect_test_db.main(
         [
@@ -465,7 +465,7 @@ def test_cli_requires_explicit_prd_authorization(capsys):
     assert "explicit authorization" in captured.err
 
 
-# REVIEWED: Unit — real inspect_test_database reuses verified baseline with valid migrations
+# VERIFIED: Unit — inspect_test_database reuses verified baseline with valid migrations (5d database guard)
 def test_verified_baseline_with_checksum_valid_migrations_is_reused_without_schema_compare(monkeypatch, tmp_path):
     _install_connections(monkeypatch, catalog_oid=777)
     state = {
@@ -500,7 +500,7 @@ def test_verified_baseline_with_checksum_valid_migrations_is_reused_without_sche
     assert compare_calls == []
 
 
-# REVIEWED: Unit — real inspect_test_database does not bypass schema compare on OID mismatch
+# VERIFIED: Unit — inspect_test_database does not bypass schema compare on OID mismatch (5d database guard)
 def test_baseline_journal_oid_mismatch_does_not_bypass_schema_comparison(monkeypatch, tmp_path):
     _install_connections(monkeypatch, catalog_oid=777)
     (tmp_path / "test-db-recovery-stale.json").write_text(json.dumps({
@@ -521,7 +521,7 @@ def test_baseline_journal_oid_mismatch_does_not_bypass_schema_comparison(monkeyp
     assert len(compare_calls) == 1
 
 
-# REVIEWED: Unit — real inspect_test_database fails closed on corrupt migration ledger
+# VERIFIED: Unit — inspect_test_database fails closed on corrupt migration ledger (5d database guard)
 def test_corrupt_migration_ledger_fails_closed_instead_of_recloning(monkeypatch, tmp_path):
     _install_connections(monkeypatch, catalog_oid=777)
     (tmp_path / "test-db-recovery-baseline.json").write_text(json.dumps({
@@ -550,7 +550,7 @@ def test_corrupt_migration_ledger_fails_closed_instead_of_recloning(monkeypatch,
     assert compare_calls == []
 
 
-# REVIEWED: Unit — real inspect_test_database reuses verified baseline with no applied migrations
+# VERIFIED: Unit — inspect_test_database reuses verified baseline with no applied migrations (5d database guard)
 def test_verified_baseline_with_no_applied_migrations_is_reused_without_schema_compare(monkeypatch, tmp_path):
     _install_connections(monkeypatch, catalog_oid=777)
     (tmp_path / "test-db-recovery-baseline.json").write_text(json.dumps({

@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-# REVIEWED: Regression — real ensure_playlist_relationships call with no missing rows asserts None result, no writes, no DELETE
+# VERIFIED: Regression — ensure_playlist_relationships no missing rows returns None, no writes, no DELETE
 @pytest.mark.regression
 def test_ensure_playlist_relationships_no_delete_on_empty():
     """ensure_playlist_relationships returns None and performs no database writes when
@@ -26,7 +26,7 @@ def test_ensure_playlist_relationships_no_delete_on_empty():
     mock_qec.assert_not_called()
 
 
-# REVIEWED: Regression — real ensure_playlist_relationships call with missing rows asserts child creation, INSERT only, no DELETE
+# VERIFIED: Regression — ensure_playlist_relationships creates missing children, INSERT only, no DELETE
 @pytest.mark.regression
 def test_ensure_playlist_relationships_no_delete_on_rows():
     """ensure_playlist_relationships creates each missing child playlist and records it

@@ -4,16 +4,13 @@ they finish.
 import pytest
 
 import backend_functions.activity_smoothing as sm
-import pifitness.activities.router as act
-from pifitness.activities.schemas import ProcessActivityRequest
-
 
 
 # ---------------------------------------------------------------------------
 # 1. Real generator: start marker yielded BEFORE the sub-step runs
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Regression — real activity_post_processing_steps yields marker before sub-step runs
+# VERIFIED: Regression — activity_post_processing_steps yields start marker before executing step function
 @pytest.mark.regression
 def test_post_processing_steps_yields_marker_before_execution(monkeypatch):
     """activity_post_processing_steps yields each sub-step's start marker before the

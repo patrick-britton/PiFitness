@@ -63,7 +63,7 @@ class FakeConn:
         self.closed = True
 
 
-# REVIEWED: Unit — real get_isrc_dupe_count call with mocked one_sql_result asserts count halved to pairs
+# VERIFIED: Unit — get_isrc_dupe_count returns stored row count divided by two
 @pytest.mark.unit
 def test_dupe_count_halves_rows_to_pairs():
     """get_isrc_dupe_count returns the stored row count divided by two."""
@@ -74,7 +74,7 @@ def test_dupe_count_halves_rows_to_pairs():
         assert get_isrc_dupe_count() == 3
 
 
-# REVIEWED: Unit — real get_isrc_dupe_count call with None result asserts zero
+# VERIFIED: Unit — get_isrc_dupe_count returns 0 when count query returns nothing
 @pytest.mark.unit
 def test_dupe_count_empty_is_zero():
     """get_isrc_dupe_count returns 0 when the count query returns nothing."""
@@ -85,7 +85,7 @@ def test_dupe_count_empty_is_zero():
         assert get_isrc_dupe_count() == 0
 
 
-# REVIEWED: Regression — real process_isrc_dupe_decision accept path asserts single connection, one commit, swaps insert, pair delete, atomicity
+# VERIFIED: Regression — process_isrc_dupe_decision accept path records swaps, deletes pair in one transaction
 @pytest.mark.regression
 def test_accept_writes_swaps_and_deletes_pair_in_one_transaction():
     """process_isrc_dupe_decision with accept true records both ISRCs as swaps to the
@@ -119,7 +119,7 @@ def test_accept_writes_swaps_and_deletes_pair_in_one_transaction():
     assert del_params == ('ISRC-A', 'ISRC-B', 'ISRC-B', 'ISRC-A')
 
 
-# REVIEWED: Regression — real process_isrc_dupe_decision reject path asserts single connection, one commit, non-swaps insert with ON CONFLICT DO NOTHING, pair delete
+# VERIFIED: Regression — process_isrc_dupe_decision reject path records non-swaps, deletes pair in one transaction
 @pytest.mark.regression
 def test_reject_writes_non_swaps_and_deletes_pair_in_one_transaction():
     """process_isrc_dupe_decision with accept false records both ISRCs as non-swaps and
@@ -148,7 +148,7 @@ def test_reject_writes_non_swaps_and_deletes_pair_in_one_transaction():
     assert del_params == ('ISRC-A', 'ISRC-B', 'ISRC-B', 'ISRC-A')
 
 
-# REVIEWED: Regression — real process_isrc_dupe_decision asserts rollback on insert failure, nothing committed, connection closed
+# VERIFIED: Regression — process_isrc_dupe_decision rolls back on insert failure, nothing committed
 @pytest.mark.regression
 def test_decision_insert_failure_rolls_back_and_raises():
     """process_isrc_dupe_decision rolls back, commits nothing and re-raises when the
@@ -167,7 +167,7 @@ def test_decision_insert_failure_rolls_back_and_raises():
     assert fake.closed is True
 
 
-# REVIEWED: Regression — real process_isrc_dupe_decision asserts rollback on delete failure after insert, nothing committed, connection closed
+# VERIFIED: Regression — process_isrc_dupe_decision rolls back on delete failure after insert, nothing committed
 @pytest.mark.regression
 def test_decision_delete_failure_rolls_back_and_raises():
     """process_isrc_dupe_decision rolls back the earlier insert and re-raises when
@@ -188,7 +188,7 @@ def test_decision_delete_failure_rolls_back_and_raises():
     assert fake.closed is True
 
 
-# REVIEWED: Regression — real run_isrc_duplicate_finder asserts one connection, single CALL procedure, one commit
+# VERIFIED: Regression — run_isrc_duplicate_finder runs finder procedure on one connection, commits once
 @pytest.mark.regression
 def test_rescan_issues_call_in_one_transaction():
     """run_isrc_duplicate_finder runs the finder procedure on one connection and commits
@@ -210,7 +210,7 @@ def test_rescan_issues_call_in_one_transaction():
     assert fake.closed is True
 
 
-# REVIEWED: Regression — real run_isrc_duplicate_finder asserts rollback and re-raise on procedure failure, nothing committed
+# VERIFIED: Regression — run_isrc_duplicate_finder rolls back and re-raises on procedure failure, nothing committed
 @pytest.mark.regression
 def test_rescan_failure_rolls_back_and_raises():
     """run_isrc_duplicate_finder rolls back and re-raises when the procedure call fails.

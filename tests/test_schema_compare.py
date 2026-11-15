@@ -130,8 +130,7 @@ def _install_migradiff(monkeypatch, *, statements=None, stdout=None, returncode=
     return captured
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real validate_pair requires test and prod envs and distinct databases
+# VERIFIED: Unit — validate_pair requires test and prod envs and distinct databases (5d database guard)
 @pytest.mark.unit
 def test_validate_pair_requires_test_and_prod_envs_and_distinct_databases(monkeypatch):
     test = _config("test", "fitness_test")
@@ -147,8 +146,7 @@ def test_validate_pair_requires_test_and_prod_envs_and_distinct_databases(monkey
         compare_schema._validate_pair(test, _config("prod", "fitness_test"))
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real validate_pair rejects wrong or missing markers
+# VERIFIED: Unit — validate_pair rejects wrong or missing markers (5d database guard)
 @pytest.mark.unit
 def test_validate_pair_rejects_wrong_or_missing_markers(monkeypatch):
     test = _config("test", "fitness_test")
@@ -162,8 +160,7 @@ def test_validate_pair_rejects_wrong_or_missing_markers(monkeypatch):
         compare_schema._validate_pair(test, prd)
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real validate_pair requires same configured and actual endpoint
+# VERIFIED: Unit — validate_pair requires same configured and actual endpoint (5d database guard)
 @pytest.mark.unit
 def test_validate_pair_requires_same_configured_and_actual_endpoint(monkeypatch):
     test = _config("test", "fitness_test", port=5432)
@@ -183,10 +180,7 @@ def test_validate_pair_requires_same_configured_and_actual_endpoint(monkeypatch)
         compare_schema._validate_pair(test, prd)
 
 
-@pytest.mark.unit
-
-
-# REVIEWED: Unit — real validate_pair treats IPv6 inet prefix and bare address as same endpoint
+# VERIFIED: Unit — validate_pair treats IPv6 inet prefix and bare address as same endpoint
 @pytest.mark.unit
 def test_validate_pair_treats_ipv6_inet_prefix_and_bare_address_as_same_endpoint(monkeypatch):
     test = _config("test", "fitness_test")
@@ -202,8 +196,8 @@ def test_validate_pair_treats_ipv6_inet_prefix_and_bare_address_as_same_endpoint
     assert test_identity["server_address"] == "::1"
     assert prd_identity["server_address"] == "::1"
 
+# VERIFIED: Unit — validate_pair rejects non-loopback hosts (5d database guard)
 @pytest.mark.unit
-# REVIEWED: Unit — real validate_pair rejects non-loopback hosts
 def test_validate_pair_rejects_non_loopback_hosts():
     test = _config("test", "fitness_test", host="db.example.com")
     prd = _config("prod", "fitness_prd", host="db.example.com")
@@ -211,8 +205,8 @@ def test_validate_pair_rejects_non_loopback_hosts():
         compare_schema._validate_pair(test, prd)
 
 
+# VERIFIED: Unit — pgpass escaping and database URL never include plaintext password
 @pytest.mark.unit
-# REVIEWED: Unit — real pgpass escaping and database URL never include password
 def test_pgpass_escaping_and_database_url_never_include_password():
     config = _config("test", "fitness:test", user="name:with\\colon", password="p:a\\ss")
     entry = compare_schema._pgpass_entry(config)
@@ -225,8 +219,8 @@ def test_pgpass_escaping_and_database_url_never_include_password():
     assert "fitness%3Atest" in url
 
 
+# VERIFIED: Unit — database URL brackets IPv6 and includes sslmode
 @pytest.mark.unit
-# REVIEWED: Unit — real database URL brackets IPv6 and includes sslmode
 def test_database_url_brackets_ipv6_and_includes_sslmode():
     config = _config("test", "fitness_test", host="::1")
     url = compare_schema._database_url(config)
@@ -234,8 +228,7 @@ def test_database_url_brackets_ipv6_and_includes_sslmode():
     assert "sslmode=disable" in url
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real compare identical schemas uses migradiff JSON without applying SQL
+# VERIFIED: Unit — compare identical schemas uses migradiff JSON without applying SQL (5d database guard)
 @pytest.mark.unit
 def test_compare_identical_schemas_uses_migradiff_json_without_applying_sql(monkeypatch):
     test = _config("test", "fitness_test")
@@ -265,8 +258,7 @@ def test_compare_identical_schemas_uses_migradiff_json_without_applying_sql(monk
     assert not os.path.exists(captured["kwargs"]["env"]["PGPASSFILE"])
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real compare structural change reports different and risk
+# VERIFIED: Unit — compare structural change reports different and flags risk level
 @pytest.mark.unit
 def test_compare_structural_change_reports_different_and_risk(monkeypatch):
     test = _config("test", "fitness_test")
@@ -291,8 +283,7 @@ def test_compare_structural_change_reports_different_and_risk(monkeypatch):
     assert "ALTER TABLE" in report["diff_preview"][0]
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real ledger and comments excluded from structural compatibility
+# VERIFIED: Unit — schema_migrations ledger and comments excluded from structural compatibility
 @pytest.mark.unit
 def test_ledger_and_comments_are_excluded_from_structural_compatibility(monkeypatch):
     test = _config("test", "fitness_test")
@@ -323,8 +314,7 @@ def test_ledger_and_comments_are_excluded_from_structural_compatibility(monkeypa
     assert report["ignored_statement_count"] == 2
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real diff file is private JSON and never overwritten
+# VERIFIED: Unit — diff file is private 0600 JSON and fails if file exists
 @pytest.mark.unit
 def test_diff_file_is_private_json_and_never_overwritten(monkeypatch, tmp_path):
     test = _config("test", "fitness_test")
@@ -348,8 +338,7 @@ def test_diff_file_is_private_json_and_never_overwritten(monkeypatch, tmp_path):
         compare_schema._write_diff_file(str(target), {"replacement": True})
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real migradiff nonzero exit fails closed and redacts password
+# VERIFIED: Unit — migradiff nonzero exit fails closed and redacts password
 @pytest.mark.unit
 def test_migradiff_nonzero_exit_fails_closed_and_redacts_password(monkeypatch):
     test = _config("test", "fitness_test")
@@ -362,8 +351,7 @@ def test_migradiff_nonzero_exit_fails_closed_and_redacts_password(monkeypatch):
     assert "<redacted>" in str(exc.value)
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real invalid migradiff JSON fails closed
+# VERIFIED: Unit — invalid migradiff JSON output fails closed
 @pytest.mark.unit
 def test_invalid_migradiff_json_fails_closed(monkeypatch):
     test = _config("test", "fitness_test")
@@ -374,8 +362,7 @@ def test_invalid_migradiff_json_fails_closed(monkeypatch):
         compare_schema.compare_databases(test, prd)
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real malformed statement list fails closed
+# VERIFIED: Unit — malformed statement list fails closed
 @pytest.mark.unit
 def test_malformed_statement_list_fails_closed(monkeypatch):
     test = _config("test", "fitness_test")
@@ -386,8 +373,7 @@ def test_malformed_statement_list_fails_closed(monkeypatch):
         compare_schema.compare_databases(test, prd)
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real migradiff version must match pinned release
+# VERIFIED: Unit — migradiff version mismatch against pinned release raises SchemaComparisonError
 @pytest.mark.unit
 def test_migradiff_version_must_match_the_pinned_release(monkeypatch):
     test = _config("test", "fitness_test")
@@ -399,8 +385,7 @@ def test_migradiff_version_must_match_the_pinned_release(monkeypatch):
         compare_schema.compare_databases(test, prd)
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real missing migradiff fails closed
+# VERIFIED: Unit — missing migradiff executable fails closed
 @pytest.mark.unit
 def test_missing_migradiff_fails_closed(monkeypatch):
     _install_identity_stubs(monkeypatch)
@@ -410,8 +395,8 @@ def test_missing_migradiff_fails_closed(monkeypatch):
         compare_schema.compare_databases(_config("test", "fitness_test"), _config("prod", "fitness_prd"))
 
 
+# VERIFIED: Unit — CLI requires explicit PRD authorization (5d database guard)
 @pytest.mark.unit
-# REVIEWED: Unit — real CLI requires explicit PRD authorization
 def test_cli_requires_explicit_prd_authorization():
     assert compare_schema.main([
         "--test-env-file", "unused-test.env",
@@ -419,8 +404,7 @@ def test_cli_requires_explicit_prd_authorization():
     ]) == 1
 
 
-@pytest.mark.unit
-# REVIEWED: Unit — real CLI error output is machine readable
+# VERIFIED: Unit — CLI error output is formatted as machine-readable JSON
 @pytest.mark.unit
 def test_cli_error_output_is_machine_readable(monkeypatch, capsys):
     monkeypatch.setattr(compare_schema._env, "load_env_file", lambda _path: _config("test", "fitness_test"))

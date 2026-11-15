@@ -62,7 +62,7 @@ def write_state_equivalent(target, fields, phase):
         os.umask(old_umask)
 
 
-# REVIEWED: Unit — real write_state_equivalent renames temp file without leftovers
+# VERIFIED: Unit — atomic write renames temp file without leftovers
 @pytest.mark.unit
 def test_atomic_write_renames_temp_file_without_leftovers(tmp_path):
     target = str(tmp_path / "state")
@@ -78,7 +78,7 @@ def test_atomic_write_renames_temp_file_without_leftovers(tmp_path):
     assert parsed["PRD_COMMIT"] == "c" * 40
 
 
-# REVIEWED: Unit — real write_state_equivalent creates restrictive permissions
+# VERIFIED: Unit — atomic write creates restrictive permissions
 @pytest.mark.unit
 def test_atomic_write_creates_restrictive_permissions(tmp_path):
     if os.name == "nt":
@@ -89,7 +89,7 @@ def test_atomic_write_creates_restrictive_permissions(tmp_path):
     assert mode == 0o600, "expected mode 0600, got {0}".format(oct(mode))
 
 
-# REVIEWED: Unit — real state records all required fields
+# VERIFIED: Unit — state records all required fields
 @pytest.mark.unit
 def test_state_records_all_required_fields(tmp_path):
     target = str(tmp_path / "state")
@@ -116,7 +116,7 @@ def test_state_records_all_required_fields(tmp_path):
         assert key in parsed, "missing state field: {0}".format(key)
 
 
-# REVIEWED: Unit — real state sufficient for test-down restore decisions
+# VERIFIED: Unit — state sufficient for test-down restore decisions
 @pytest.mark.unit
 def test_state_sufficient_for_test_down_restore_decisions(tmp_path):
     target = str(tmp_path / "state")

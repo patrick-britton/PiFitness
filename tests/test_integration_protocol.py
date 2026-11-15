@@ -43,7 +43,7 @@ def assert_conforms(provider):
     )
 
 
-# REVIEWED: Contract — real garmin_provider instance asserts AuthProvider protocol conformance (name, methods, get_status)
+# VERIFIED: Contract — garmin_provider instance conforms to AuthProvider protocol
 @pytest.mark.contract
 def test_garmin_provider_conforms():
     """The Garmin provider exposes a non-empty name and callable is_configured,
@@ -55,7 +55,7 @@ def test_garmin_provider_conforms():
     assert_conforms(garmin_provider)
 
 
-# REVIEWED: Contract — real spotify_provider instance asserts AuthProvider protocol conformance (name, methods, get_status)
+# VERIFIED: Contract — spotify_provider instance conforms to AuthProvider protocol
 @pytest.mark.contract
 def test_spotify_provider_conforms():
     """The Spotify provider exposes a non-empty name and callable is_configured,

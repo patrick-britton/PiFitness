@@ -8,7 +8,7 @@ from pifitness.integrations.garmin.endpoints import resolve_endpoint
 from pifitness.worker.json_extractors import get_garmin_data
 
 
-# REVIEWED: Contract — real get_garmin_data call with MagicMock client asserts happy-path data and error=None plus request args
+# VERIFIED: Contract — get_garmin_data returns client JSON with no error, requesting resolved endpoint args
 @pytest.mark.contract
 def test_get_garmin_data_happy_path():
     """get_garmin_data returns the client's JSON and no error, requesting the resolved
@@ -30,7 +30,7 @@ def test_get_garmin_data_happy_path():
     )
 
 
-# REVIEWED: Contract — real get_garmin_data call with unknown endpoint asserts None data and error naming endpoint
+# VERIFIED: Contract — get_garmin_data returns None data and error naming endpoint when endpoint unknown
 @pytest.mark.contract
 def test_get_garmin_data_invalid_endpoint_returns_error():
     """get_garmin_data returns no data and an error naming the endpoint when the
@@ -45,7 +45,7 @@ def test_get_garmin_data_invalid_endpoint_returns_error():
     assert endpoint in error
 
 
-# REVIEWED: Contract — real get_garmin_data call with raising client asserts None data and error containing message
+# VERIFIED: Contract — get_garmin_data returns None data and error containing message when client raises
 @pytest.mark.contract
 def test_get_garmin_data_client_exception_returns_error():
     """get_garmin_data returns no data and an error containing the message when the

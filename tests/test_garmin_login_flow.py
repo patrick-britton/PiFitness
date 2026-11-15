@@ -63,7 +63,7 @@ def _fake_session(now: int | None = None) -> NativeOAuth2Session:
 # Layer 1 — DB session reuse (THE over-login protection test)
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Regression — real garmin_login orchestrates DB session reuse without Playwright
+# VERIFIED: Regression — garmin_login reuses DB session without invoking browser login
 @pytest.mark.regression
 def test_garmin_login_reuses_db_session_without_playwright(monkeypatch):
     """When the DB holds a valid session, garmin_login never invokes Playwright."""
@@ -100,7 +100,7 @@ def test_garmin_login_reuses_db_session_without_playwright(monkeypatch):
 # Session save-back — proves DB sync always happens
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Regression — real garmin_login saves session to DB after auth
+# VERIFIED: Regression — garmin_login saves session to DB after successful authentication
 @pytest.mark.regression
 def test_garmin_login_saves_session_to_db_after_auth(monkeypatch):
     """Every successful garmin_login call saves the session back to the DB."""
@@ -128,7 +128,7 @@ def test_garmin_login_saves_session_to_db_after_auth(monkeypatch):
 # Layer 3 — Playwright fires when create_browser_session is invoked
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Regression — real create_browser_session invokes Playwright login
+# VERIFIED: Regression — AuthManager.create_browser_session invokes browser login and exchanges tokens
 @pytest.mark.regression
 def test_create_browser_session_invokes_playwright_login(tmp_path):
     """create_browser_session calls login_via_browser (the load-bearing fresh-login mechanism)."""
@@ -168,7 +168,7 @@ def test_create_browser_session_invokes_playwright_login(tmp_path):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.regression
-# REVIEWED: Contract — real get_garmin_client returns well-formed token without relogin
+# VERIFIED: Contract — get_garmin_client returns valid existing client without triggering re-login
 @pytest.mark.contract
 def test_get_garmin_client_returns_well_formed_token_without_relogin():
     """get_garmin_client returns a well-formed incoming_token without calling garmin_login."""
@@ -193,7 +193,7 @@ def test_get_garmin_client_returns_well_formed_token_without_relogin():
 # Bug 1 fix — get_status uses correct service name
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Contract — real get_status queries DB with capital-G 'Garmin'
+# VERIFIED: Contract — GarminProvider.get_status queries DB with service Garmin and returns authenticated True
 @pytest.mark.contract
 def test_get_status_authenticated_when_db_token_present():
     """get_status queries the DB with 'Garmin' (capital G) and reports authenticated=True."""
@@ -212,7 +212,7 @@ def test_get_status_authenticated_when_db_token_present():
 # Bug 2 fix — is_configured requires both email and password
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Contract — real is_configured returns False when creds missing
+# VERIFIED: Contract — GarminProvider.is_configured returns False when credentials missing
 @pytest.mark.contract
 def test_is_configured_false_when_creds_missing():
     """is_configured returns False when garmin_creds yields (None, None)."""

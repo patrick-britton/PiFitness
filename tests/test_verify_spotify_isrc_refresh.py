@@ -39,7 +39,7 @@ def _row_count(playlist_id):
 # Negative: no usable client must fail loudly (T10-6 regression guard)
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Regression — real verify_spotify call with unusable client asserts RuntimeError raised instead of silent success
+# VERIFIED: Regression — verify_spotify raises RuntimeError without usable Spotify client instead of silent success
 @pytest.mark.regression
 def test_verify_spotify_fails_without_client(monkeypatch):
     """verify_spotify raises RuntimeError instead of silently succeeding when no usable

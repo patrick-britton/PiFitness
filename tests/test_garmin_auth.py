@@ -59,7 +59,7 @@ def _mock_client(handler):
     return httpx.Client(transport=httpx.MockTransport(handler), timeout=1.0)
 
 
-# REVIEWED: Unit — real AuthManager.refresh_di_token_slot with MockTransport asserts POST to DI token URL and new token
+# VERIFIED: Unit — AuthManager.refresh_di_token_slot POSTs to DI token URL and returns new token
 @pytest.mark.unit
 def test_refresh_di_token_slot_success(tmp_path):
     captured = {}
@@ -86,7 +86,7 @@ def test_refresh_di_token_slot_success(tmp_path):
 
 
 
-# REVIEWED: Unit — real AuthManager.refresh_it_token_slot with MockTransport asserts POST to IT token URL and new token
+# VERIFIED: Unit — AuthManager.refresh_it_token_slot POSTs to IT token URL and returns new token
 @pytest.mark.unit
 def test_refresh_it_token_slot_success(tmp_path):
     captured = {}
@@ -110,7 +110,7 @@ def test_refresh_it_token_slot_success(tmp_path):
     assert new_slot.client_id == "IT_CLIENT"
 
 
-# REVIEWED: Unit — real AuthManager.refresh_it_token_slot asserts GarminAuthError on expired IT refresh token, no HTTP attempted
+# VERIFIED: Unit — AuthManager.refresh_it_token_slot raises GarminAuthError on expired IT refresh token, no HTTP attempted
 @pytest.mark.unit
 def test_refresh_it_token_slot_raises_when_refresh_token_expired(tmp_path):
     called = []
@@ -126,7 +126,7 @@ def test_refresh_it_token_slot_raises_when_refresh_token_expired(tmp_path):
     assert called == []
 
 
-# REVIEWED: Unit — real AuthManager.refresh_it_token_slot asserts GarminAuthError on HTTP 500 with body text
+# VERIFIED: Unit — AuthManager.refresh_it_token_slot raises GarminAuthError on HTTP 500 with body text
 @pytest.mark.unit
 def test_refresh_it_token_slot_raises_on_http_error(tmp_path):
     def handler(request):
@@ -144,11 +144,11 @@ def test_refresh_it_token_slot_raises_on_http_error(tmp_path):
 
 # Sanity check: the JWT client-id extractor is exercised indirectly above (falls
 # back to slot.client_id for non-JWT tokens). Confirm it behaves as expected.
-# REVIEWED: Unit — real _extract_client_id_from_access_token call with non-JWT string asserts None
+# VERIFIED: Unit — _extract_client_id_from_access_token returns None for non-JWT string
 @pytest.mark.unit
 def test_extract_client_id_from_non_jwt_returns_none():
     assert _extract_client_id_from_access_token("not-a-jwt-at-all") is None
-# REVIEWED: Unit — real AuthManager.refresh_di_token_slot asserts GarminAuthError on expired DI refresh token, no HTTP attempted
+# VERIFIED: Unit — AuthManager.refresh_di_token_slot raises GarminAuthError on expired DI refresh token, no HTTP attempted
 @pytest.mark.unit
 def test_refresh_di_token_slot_raises_when_refresh_token_expired(tmp_path):
     called = []
@@ -165,7 +165,7 @@ def test_refresh_di_token_slot_raises_when_refresh_token_expired(tmp_path):
     assert called == []
 
 
-# REVIEWED: Unit — real AuthManager.refresh_di_token_slot asserts GarminAuthError on HTTP 401 with body text
+# VERIFIED: Unit — AuthManager.refresh_di_token_slot raises GarminAuthError on HTTP 401 with body text
 @pytest.mark.unit
 def test_refresh_di_token_slot_raises_on_http_error(tmp_path):
     def handler(request):

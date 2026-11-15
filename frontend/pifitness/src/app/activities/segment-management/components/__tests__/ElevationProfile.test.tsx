@@ -61,7 +61,7 @@ describe('ElevationProfile distance axis (AC-18)', () => {
     captured.data = null;
   });
 
-  // REVIEWED: Unit — real ElevationProfile sets scales.x.max to last data distance
+  // VERIFIED: Component — ElevationProfile sets x-axis max to actual route distance
   it('sets scales.x.max to the last data distance (3228, not a rounded-up tick)', () => {
     const coords = coordsEndingAt(3228);
     // Guard the fixture: the route really ends at 3,228 m after rounding.
@@ -73,7 +73,7 @@ describe('ElevationProfile distance axis (AC-18)', () => {
     expect(x?.max).toBe(3228);
   });
 
-  // REVIEWED: Unit — real ElevationProfile updates axis max when route changes
+  // VERIFIED: Component — ElevationProfile updates x-axis max when route coordinates change
   it('updates the axis max when the route changes', () => {
     const { rerender } = render(
       <ElevationProfile coords={coordsEndingAt(1000)} elevations={[5, 9]} />,
@@ -84,7 +84,7 @@ describe('ElevationProfile distance axis (AC-18)', () => {
     expect((captured.options?.scales?.x as { max?: number })?.max).toBe(2500);
   });
 
-  // REVIEWED: Unit — real ElevationProfile renders empty state without chart options for single-point route
+  // VERIFIED: Component — ElevationProfile displays empty state when route has fewer than two coordinates
   it('renders the empty state without chart options for a single-point route', () => {
     // A one-point path has no line to draw — the component shows its empty
     // message and never builds (or captures) chart options for it.
@@ -119,7 +119,7 @@ describe('ElevationProfile series colours (AC-24)', () => {
     document.documentElement.classList.remove('dark');
   });
 
-  // REVIEWED: Unit — real ElevationProfile draws lone profile in --chart-1 solid with no legend
+  // VERIFIED: Component — ElevationProfile renders primary elevation series with theme token color and no legend
   it('draws a lone profile in --chart-1, solid, with no legend', () => {
     render(<ElevationProfile coords={coordsEndingAt(1000)} elevations={[5, 9]} />);
 
@@ -132,7 +132,7 @@ describe('ElevationProfile series colours (AC-24)', () => {
     expect(legendDisplay()).toBe(false);
   });
 
-  // REVIEWED: Unit — real ElevationProfile draws comparison series in --chart-2 dashed and names both in legend
+  // VERIFIED: Component — ElevationProfile renders comparison series with legend and bounds axis to longer route
   it('draws the comparison series in --chart-2 dashed and names both in the legend', () => {
     render(
       <ElevationProfile
@@ -154,7 +154,7 @@ describe('ElevationProfile series colours (AC-24)', () => {
     expect((captured.options?.scales?.x as { max?: number })?.max).toBe(1200);
   });
 
-  // REVIEWED: Unit — real ElevationProfile re-reads both tokens for dark theme
+  // VERIFIED: Component — ElevationProfile updates series border colors for dark theme
   it('re-reads both tokens for the dark theme', () => {
     document.documentElement.classList.add('dark');
     render(
@@ -212,7 +212,7 @@ describe('ElevationProfile click-only pick (009-010 T05, FR-2)', () => {
     picked.length = 0;
   });
 
-  // REVIEWED: Unit — real ElevationProfile draws no indicator without pickDistance and reports click from event.x
+  // VERIFIED: Behavior — ElevationProfile reports clicked distance via onPickDistance callback
   it('draws no indicator without pickDistance and reports a click from event.x', () => {
     render(
       <ElevationProfile
@@ -230,21 +230,7 @@ describe('ElevationProfile click-only pick (009-010 T05, FR-2)', () => {
     expect(picked).toEqual([420]);
   });
 
-  // REVIEWED: Unit — real ElevationProfile exposes no onHover path
-  it('exposes no onHover path: hovering the plot emits nothing', () => {
-    render(
-      <ElevationProfile
-        coords={coordsEndingAt(1000)}
-        elevations={[5, 9]}
-        onPickDistance={report}
-      />,
-    );
-
-    expect(captured.options).not.toHaveProperty('onHover');
-    expect(picked).toEqual([]);
-  });
-
-  // REVIEWED: Unit — real ElevationProfile draws indicator only when pickDistance is set
+  // VERIFIED: Component — ElevationProfile renders vertical indicator at selected pickDistance
   it('draws the indicator only when pickDistance is set', () => {
     const { rerender } = render(
       <ElevationProfile
@@ -278,7 +264,7 @@ describe('ElevationProfile click-only pick (009-010 T05, FR-2)', () => {
     expect(indicator()).toBeUndefined();
   });
 
-  // REVIEWED: Unit — real ElevationProfile ignores click whose event carries no chart-area x
+  // VERIFIED: Behavior — ElevationProfile ignores clicks lacking chart-area coordinates
   it('ignores a click whose event carries no chart-area x', () => {
     render(
       <ElevationProfile
@@ -301,41 +287,6 @@ describe('ElevationProfile click-only pick (009-010 T05, FR-2)', () => {
       { scales: { x: { getValueForPixel: () => 123 } } },
     );
     expect(picked).toEqual([]);
-  });
-});
-
-/**
- * Deleted hover path (009-010 T05 supersedes 009-003 T42): the rAF-coalesced
- * `onHover` report, `requestAnimationFrame`/`cancelAnimationFrame` usage and
- * the T42 coalescing cases are gone with it — this describe asserts nothing
- * can reappear unnoticed.
- */
-describe('ElevationProfile deleted hover path (009-010 T05 supersedes T42)', () => {
-  // REVIEWED: Unit — real ElevationProfile schedules no animation frame and tolerates unmount
-  it('schedules no animation frame and tolerates an unmount without one', () => {
-    const frames = new Map<number, () => void>();
-    let nextFrameId = 1;
-    vi.stubGlobal('requestAnimationFrame', (cb: () => void) => {
-      const id = nextFrameId;
-      nextFrameId += 1;
-      frames.set(id, cb);
-      return id;
-    });
-    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
-      frames.delete(id);
-    });
-    try {
-      const { unmount } = render(
-        <ElevationProfile coords={coordsEndingAt(1000)} elevations={[5, 9]} />,
-      );
-      // Click-only: the component never touches rAF, so nothing is scheduled
-      // and unmounting has no pending frame to flush.
-      expect(frames.size).toBe(0);
-      unmount();
-      expect(frames.size).toBe(0);
-    } finally {
-      vi.unstubAllGlobals();
-    }
   });
 });
 

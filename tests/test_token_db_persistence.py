@@ -21,7 +21,7 @@ def _garmin_session(di_expires=None, it_expires=None):
     return s
 
 
-# REVIEWED: Unit — real save_token_to_db call with both expiries asserts min() used and INSERT SQL has all columns
+# VERIFIED: Unit — save_token_to_db with both expiries uses min() and INSERT SQL has all columns
 @pytest.mark.unit
 def test_save_garmin_with_both_expires_uses_min():
     s = _garmin_session(di_expires=2000, it_expires=1000)
@@ -34,7 +34,7 @@ def test_save_garmin_with_both_expires_uses_min():
     assert "refresh_token_expires_at_utc" in insert_sql
 
 
-# REVIEWED: Unit — real save_token_to_db call without expiries asserts 3-column INSERT (no expires column)
+# VERIFIED: Unit — save_token_to_db without expiries asserts 3-column INSERT (no expires column)
 @pytest.mark.unit
 def test_save_garmin_no_expires_3col():
     s = _garmin_session()
@@ -45,7 +45,7 @@ def test_save_garmin_no_expires_3col():
     assert "is_active" in insert_sql
 
 
-# REVIEWED: Unit — real save_token_to_db call with qec error asserts RuntimeError raised on deactivate failure (fail-loud)
+# VERIFIED: Unit — save_token_to_db raises RuntimeError on deactivate failure (fail-loud)
 @pytest.mark.unit
 def test_save_raises_on_deactivate_fail():
     s = _garmin_session()
@@ -55,7 +55,7 @@ def test_save_raises_on_deactivate_fail():
             save_token_to_db("Garmin", s)
 
 
-# REVIEWED: Unit — real save_token_to_db call with qec insert error asserts RuntimeError raised on insert failure (fail-loud)
+# VERIFIED: Unit — save_token_to_db raises RuntimeError on insert failure (fail-loud)
 @pytest.mark.unit
 def test_save_raises_on_insert_fail():
     s = _garmin_session()

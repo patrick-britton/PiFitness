@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from fastapi.testclient import TestClient
 from backend.main import app
 
-# REVIEWED: Smoke test — real TestClient call to /api/health asserts 200 and status/database/timestamp fields
+# VERIFIED: Smoke — GET /api/health returns 200 with status, database, timestamp fields
 @pytest.mark.smoke
 @pytest.mark.live
 def test_health():

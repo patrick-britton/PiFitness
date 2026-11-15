@@ -52,7 +52,7 @@ def _patch(monkeypatch, captured):
     monkeypatch.setattr(mf, "json_loading", fake_json_loading)
 
 
-# REVIEWED: Regression — real playlist_to_db call with mocked Spotify asserts all page hrefs normalized before json_loading
+# VERIFIED: Regression — playlist_to_db normalizes all page hrefs to tracks form before json_loading
 @pytest.mark.regression
 def test_all_pages_normalized_before_json_loading(monkeypatch):
     """playlist_to_db rewrites every page's href from the items form to the tracks form

@@ -19,7 +19,7 @@ def _noop(*args, **kwargs):
 # 1. activity_post_processing: all queued activities processed, aggregate raise
 # ---------------------------------------------------------------------------
 
-# REVIEWED: Regression — real activity_post_processing processes all activities then raises aggregate error naming failures
+# VERIFIED: Regression — activity_post_processing processes all activities then raises aggregate error naming failures
 @pytest.mark.regression
 def test_post_processing_processes_all_then_raises_aggregate(monkeypatch):
     """activity_post_processing processes every queued activity after a failure, then
@@ -53,7 +53,7 @@ def test_post_processing_processes_all_then_raises_aggregate(monkeypatch):
     assert 'cannot affect row a second time' in msg
 
 
-# REVIEWED: Regression — real activity_post_processing returns True when all activities succeed
+# VERIFIED: Regression — activity_post_processing returns True when all activities succeed
 @pytest.mark.regression
 def test_post_processing_success_returns_true(monkeypatch):
     """activity_post_processing returns True after processing every queued activity when
@@ -74,7 +74,7 @@ def test_post_processing_success_returns_true(monkeypatch):
     assert processed == [7, 8]
 
 
-# REVIEWED: Regression — real activity_post_processing returns True for empty queue
+# VERIFIED: Regression — activity_post_processing returns True for empty queue
 @pytest.mark.regression
 def test_post_processing_empty_queue_returns_true(monkeypatch):
     """activity_post_processing returns True without processing anything when the queue
@@ -103,7 +103,7 @@ def _install_fake_python_function(monkeypatch, fn):
 
 
 @pytest.mark.regression
-# REVIEWED: Regression — real execute_python returns failure message without reconciling task dates
+# VERIFIED: Regression — execute_python returns failure message without reconciling task dates
 @pytest.mark.regression
 def test_execute_python_returns_failure_message_without_reconciling(monkeypatch):
     """execute_python returns a failing function's error text and does not reconcile
@@ -161,7 +161,7 @@ def _run_single_task(monkeypatch, fn):
 
 
 @pytest.mark.regression
-# REVIEWED: Regression — real ultimate_task_executioner reconciles failed task with IDs in message
+# VERIFIED: Regression — ultimate_task_executioner reconciles failed task with IDs in message
 @pytest.mark.regression
 def test_executioner_reconciles_failed_with_ids_in_message(monkeypatch):
     """ultimate_task_executioner reconciles a failed python task exactly once with the
@@ -187,7 +187,7 @@ def test_executioner_reconciles_failed_with_ids_in_message(monkeypatch):
 
 
 @pytest.mark.regression
-# REVIEWED: Regression — real ultimate_task_executioner reports success when all tasks pass
+# VERIFIED: Regression — ultimate_task_executioner reports success when all tasks pass
 @pytest.mark.regression
 def test_executioner_reports_success_when_all_pass(monkeypatch):
     """ultimate_task_executioner reconciles a passing python task exactly once as a
@@ -206,7 +206,7 @@ def test_executioner_reports_success_when_all_pass(monkeypatch):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.regression
-# REVIEWED: Regression — real run_step marks error on failed results
+# VERIFIED: Regression — run_step marks error on failed results
 def test_run_step_marks_error_on_failed_results():
     """run_step returns status error naming the task and its error when the runner's
     results include a failed task.
@@ -231,7 +231,7 @@ def test_run_step_marks_error_on_failed_results():
 
 
 @pytest.mark.regression
-# REVIEWED: Regression — real run_step completes on all success results
+# VERIFIED: Regression — run_step completes on all success results
 def test_run_step_complete_on_all_success_results():
     """run_step returns status complete with no error when every runner result
     succeeded.
@@ -250,7 +250,7 @@ def test_run_step_complete_on_all_success_results():
 
 
 @pytest.mark.regression
-# REVIEWED: Regression — real run_step handles non-task return shapes
+# VERIFIED: Regression — run_step handles non-task return shapes
 def test_run_step_complete_on_non_task_return_shapes():
     """run_step treats a None return, a dict without results and results lacking a
     success flag as complete.
@@ -264,7 +264,7 @@ def test_run_step_complete_on_non_task_return_shapes():
 
 
 @pytest.mark.regression
-# REVIEWED: Regression — real run_step error on exception is unchanged
+# VERIFIED: Regression — run_step error on exception is unchanged
 def test_run_step_error_on_exception_unchanged():
     """run_step converts a raised exception into status error carrying the exception
     message.
@@ -278,7 +278,7 @@ def test_run_step_error_on_exception_unchanged():
 
 
 @pytest.mark.unit
-# REVIEWED: Regression — real task_failure_message is conservative with partial data
+# VERIFIED: Regression — task_failure_message is conservative with partial data
 def test_task_failure_message_is_conservative():
     """task_failure_message returns None unless some result has success False, and then
     returns the task name and error joined by a colon.
@@ -325,7 +325,7 @@ def _run_single_extract_task(monkeypatch, task_overrides, extract_retval):
     return calls, summary
 
 
-# REVIEWED: Regression — real ultimate_task_executioner reconciles extract failure exactly once
+# VERIFIED: Regression — ultimate_task_executioner reconciles extract failure exactly once
 @pytest.mark.regression
 def test_executioner_single_reconcile_on_extract_failure(monkeypatch):
     """ultimate_task_executioner reconciles an extract-phase failure exactly once with
@@ -344,7 +344,7 @@ def test_executioner_single_reconcile_on_extract_failure(monkeypatch):
     assert entry['error'] == 'extraction error: 401 unauthorized'
 
 
-# REVIEWED: Regression — real extract_load_flatten does not reconcile task dates itself
+# VERIFIED: Regression — extract_load_flatten does not reconcile task dates itself
 @pytest.mark.regression
 def test_extract_load_flatten_does_not_reconcile(monkeypatch):
     """extract_load_flatten returns the login failure message without reconciling task
@@ -365,7 +365,7 @@ def test_extract_load_flatten_does_not_reconcile(monkeypatch):
     assert calls == []
 
 
-# REVIEWED: Regression — real execute_sproc does not reconcile task dates itself
+# VERIFIED: Regression — execute_sproc does not reconcile task dates itself
 @pytest.mark.regression
 def test_execute_sproc_does_not_reconcile(monkeypatch):
     """execute_sproc returns a failure message for a missing sproc key and None on

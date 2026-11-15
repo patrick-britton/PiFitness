@@ -12,7 +12,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / "backend" / ".env",
 from backend.pifitness.admin.services import failed_run_message
 
 
-# REVIEWED: Unit — real failed_run_message asserts underlying error text appears in admin API message
+# VERIFIED: Unit — failed_run_message includes failure count, task name, and underlying error text
 @pytest.mark.unit
 def test_failed_run_message_carries_underlying_error():
     """failed_run_message includes the failure count, the failed task's name and its
@@ -26,7 +26,7 @@ def test_failed_run_message_carries_underlying_error():
     assert "No API response to load" in msg
 
 
-# REVIEWED: Unit — real failed_run_message asserts total failure count and every failed task's error
+# VERIFIED: Unit — failed_run_message reports total failure count and every failed task's error
 @pytest.mark.unit
 def test_failed_run_message_aggregates_multiple():
     """failed_run_message reports the total failure count and every failed task's error

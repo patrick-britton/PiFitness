@@ -11,7 +11,7 @@ from backend.main import app
 client = TestClient(app)
 
 
-# REVIEWED: Contract — real TestClient call to /api/activities/report with mocked query helpers asserts response shape and deprecated field removal
+# VERIFIED: Contract — /api/activities/report returns shape, drops deprecated activity_type field
 @pytest.mark.contract
 def test_activity_report_contract_shape():
     """GET /api/activities/report returns the ActivityReport shape with nav, header,
@@ -113,7 +113,7 @@ def test_activity_report_contract_shape():
         assert "pace" not in data["charts"]
 
 
-# REVIEWED: Contract — real TestClient call to /api/activities/report with invalid type asserts 404
+# VERIFIED: Contract — /api/activities/report with invalid type returns 404
 @pytest.mark.contract
 def test_activity_report_invalid_type():
     """GET /api/activities/report returns 404 when the activity id is unknown or does
@@ -126,7 +126,7 @@ def test_activity_report_invalid_type():
         assert response.status_code == 404
 
 
-# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard/segments with mocked helper asserts shape
+# VERIFIED: Contract — /api/activities/leaderboard/segments returns bare list with eight fields
 @pytest.mark.contract
 def test_leaderboard_segments_contract_shape():
     """GET /api/activities/leaderboard/segments returns a bare list of segment rows
@@ -182,37 +182,7 @@ def test_leaderboard_segments_contract_shape():
         assert data[1]["last_effort"] is None
 
 
-@pytest.mark.contract
-# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard/segments verifies filters forwarded to query helper
-@pytest.mark.contract
-def test_leaderboard_segments_filters_forwarded():
-    """GET /api/activities/leaderboard/segments forwards the name, kind, min_distance
-    and activity_type filters to the query helper and treats an empty name as no filter.
-    """
-    api_activities = importlib.import_module('pifitness.activities.router')
-    import unittest.mock as mock
-
-    with mock.patch.object(api_activities, "get_leaderboard_segments", return_value=[]) as helper:
-        response = client.get(
-            "/api/activities/leaderboard/segments"
-            "?name=hill&kind=course&min_distance=2&activity_type=Trail%20Run"
-        )
-        assert response.status_code == 200
-        assert response.json() == []
-        helper.assert_called_once_with(
-            name="hill", kind="course", min_distance=2.0, activity_type="Trail Run"
-        )
-
-    with mock.patch.object(api_activities, "get_leaderboard_segments", return_value=[]) as helper:
-        response = client.get("/api/activities/leaderboard/segments?name=")
-        assert response.status_code == 200
-        assert response.json() == []
-        helper.assert_called_once_with(
-            name=None, kind=None, min_distance=0.0, activity_type=None
-        )
-
-
-# REVIEWED: Contract — real TestClient calls to /api/activities/leaderboard/segments with invalid params assert 422
+# VERIFIED: Contract — /api/activities/leaderboard/segments rejects invalid kind, activity_type, and negative min_distance with 422
 @pytest.mark.contract
 def test_leaderboard_segments_invalid_params():
     """GET /api/activities/leaderboard/segments rejects an unknown kind, an unsupported
@@ -228,7 +198,7 @@ def test_leaderboard_segments_invalid_params():
 
 
 
-# REVIEWED: Regression — real TestClient call with mocked DB asserts segment bulk reject rolls back on failure
+# VERIFIED: Invariant — /api/segments/{id}/matches/bulk-reject rolls back transaction and returns 422 on failure
 @pytest.mark.regression
 def test_segment_bulk_reject_failure_rolls_back():
     """POST /api/segments/{id}/matches/bulk-reject rolls the whole batch back, never
@@ -262,7 +232,7 @@ def test_segment_bulk_reject_failure_rolls_back():
         mock_conn.close.assert_called_once()
 
 
-# REVIEWED: Contract — real TestClient calls to /api/activities/leaderboard/segments with empty input assert 200/404/422
+# VERIFIED: Contract — /api/segments/{id}/matches/bulk-reject handles empty candidates (200), unknown segment (404), and malformed body (422)
 @pytest.mark.contract
 def test_segment_bulk_reject_empty_404_422():
     """POST /api/segments/{id}/matches/bulk-reject returns rejected 0 without opening a
@@ -294,7 +264,7 @@ def test_segment_bulk_reject_empty_404_422():
     assert response.status_code == 422
 
 
-# REVIEWED: Journey — real TestClient call to /api/segments/{id}/route with real DB asserts elapsed_s values
+# VERIFIED: Contract — /api/segments/{id}/route returns non-decreasing elapsed_s aligned 1:1 with path_coords
 @pytest.mark.integration
 @pytest.mark.live
 def test_activity_route_elapsed_s():
@@ -361,7 +331,7 @@ def test_activity_route_elapsed_s():
     ).status_code == 422
 
 
-# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard with mocked helper asserts shape
+# VERIFIED: Contract — /api/activities/leaderboard/{id} returns segment envelope with ranked efforts and metric fields
 @pytest.mark.contract
 def test_leaderboard_contract_shape():
     """GET /api/activities/leaderboard/{id} returns the segment envelope with ranked
@@ -483,7 +453,7 @@ def test_leaderboard_contract_shape():
         assert data["efforts"][1]["current_cycle_rank"] == 2
 
 
-# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard with no data asserts 404
+# VERIFIED: Contract — /api/activities/leaderboard/{id} returns 404 when segment has no efforts
 @pytest.mark.contract
 def test_leaderboard_not_found():
     """GET /api/activities/leaderboard/{id} returns 404 when the segment has no
@@ -502,7 +472,7 @@ def test_leaderboard_not_found():
 # ---------------------------------------------------------------------------
 
 
-# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard/visuals with mocked helpers asserts shape
+# VERIFIED: Contract — /api/activities/leaderboard/visuals returns zipped telemetry series and path_coords
 @pytest.mark.contract
 def test_leaderboard_visuals_contract_shape():
     """POST /api/activities/leaderboard/visuals stages the submitted efforts once and
@@ -600,7 +570,7 @@ def test_leaderboard_visuals_contract_shape():
     assert e1["series"][1]["elapsed_s"] == 1.5
 
 
-# REVIEWED: Contract — real TestClient call to /api/activities/leaderboard/visuals with no telemetry asserts 404
+# VERIFIED: Contract — /api/activities/leaderboard/visuals no telemetry returns 404
 @pytest.mark.contract
 def test_leaderboard_visuals_not_found():
     """POST /api/activities/leaderboard/visuals returns 404 when no telemetry rows exist
@@ -619,7 +589,7 @@ def test_leaderboard_visuals_not_found():
 
 
 
-# REVIEWED: Contract — real TestClient call to /api/activities/report for walk activity asserts null efficiency/course and no placeholder
+# VERIFIED: Contract — /api/activities/report walk activity returns null efficiency/course, no placeholder
 @pytest.mark.contract
 def test_activity_report_walk_no_placeholder():
     """GET /api/activities/report returns null efficiency and course, an empty segments

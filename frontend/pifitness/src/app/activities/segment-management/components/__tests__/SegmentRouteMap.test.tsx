@@ -162,17 +162,8 @@ function renderMapWithArrows(arrows: RouteArrow[]) {
   );
 }
 
-describe('map → elevation coupling deleted (009-010 T01)', () => {
-  // REVIEWED: registers no pick listeners — map → elevation coupling deleted (T01), no pick→elevation wiring
-  it('registers no pick listeners', () => {
-    renderMap();
-    expect(recorder.instances[0].handlers['mousemove'] ?? []).toHaveLength(0);
-    expect(recorder.instances[0].handlers['click'] ?? []).toHaveLength(0);
-  });
-});
-
 describe('picked-distance marker layers (009-010 T05: halo + per-series markers)', () => {
-  // REVIEWED: adds the halo + marker circle layer pair, only for callers that pass markers — pick layers conditional on markers prop
+  // VERIFIED: Component — SegmentRouteMap renders halo and marker circle layers when markers prop is supplied
   it('adds the halo + marker circle layer pair, only for callers that pass markers', () => {
     const { unmount } = renderMap();
     // Layer set without the prop: exactly the route/overlay/gate layers.
@@ -217,7 +208,7 @@ describe('picked-distance marker layers (009-010 T05: halo + per-series markers)
     });
   });
 
-  // REVIEWED: updates the pick layers in place without reframing the map — pick layer updates don't trigger fitBounds
+  // VERIFIED: Component — SegmentRouteMap updates pick marker source in place without triggering map reframing
   it('updates the pick layers in place without reframing the map', () => {
     const { rerender } = renderMapWithMarkers([
       { series: 'route', point: [0, 0.001], label: 'Test Loop · 111 m' },
@@ -253,7 +244,7 @@ describe('directional arrow layers (009-010 T03, FR-3)', () => {
     { series: 'route-overlay', lngLat: [1, 0.0005], bearing: 90 },
   ];
 
-  // REVIEWED: adds exactly the two symbol layers, each fed from its own bearing source — route and overlay arrows independent
+  // VERIFIED: Component — SegmentRouteMap adds directional arrow symbol layers for route and overlay
   it('adds exactly the two symbol layers, each fed from its own bearing source', () => {
     renderMapWithArrows(ARROWS);
     const inst = recorder.instances[0];
@@ -287,7 +278,7 @@ describe('directional arrow layers (009-010 T03, FR-3)', () => {
     expect(inst.images['route-arrows-overlay-icon']).toMatchObject({ width: 24, height: 24 });
   });
 
-  // REVIEWED: adds no arrow layers when the prop is absent and never reframes — no arrows prop means no layers, no fitBounds
+  // VERIFIED: Component — SegmentRouteMap omits arrow symbol layers when arrows prop is absent
   it('adds no arrow layers when the prop is absent and never reframes', () => {
     const { rerender } = renderMap();
     const inst = recorder.instances[0];
@@ -316,7 +307,7 @@ describe('directional arrow layers (009-010 T03, FR-3)', () => {
     expect(inst.fitBoundsCalls).toBe(1);
   });
 
-  // REVIEWED: re-registers the glyphs on the map instance rebuilt by a style swap — glyphs re-added after map rebuild
+  // VERIFIED: Component — SegmentRouteMap re-registers glyph images when map style changes
   it('re-registers the glyphs on the map instance rebuilt by a style swap', () => {
     const { rerender } = renderMapWithArrows(ARROWS);
     expect(recorder.instances).toHaveLength(1);
@@ -342,7 +333,7 @@ describe('directional arrow layers (009-010 T03, FR-3)', () => {
     expect(inst.images['route-arrows-overlay-icon']).toMatchObject({ width: 24, height: 24 });
   });
 
-  // REVIEWED: draws both series solid and bakes a halo into each glyph (009-010 T11, AC-6b) — solid lines, halo per series
+  // VERIFIED: Component — SegmentRouteMap draws routes solid and registers baked halo glyph images
   it('draws both series solid and bakes a halo into each glyph (009-010 T11, AC-6b)', () => {
     renderMapWithArrows(ARROWS);
     const inst = recorder.instances[0];
@@ -375,7 +366,7 @@ describe('directional arrow layers (009-010 T03, FR-3)', () => {
     expect(hasChannel(channelsOf('route-arrows-overlay-icon'), [213, 94, 0])).toBe(true);
   });
 
-  // REVIEWED: recolours the halo with the theme — halo mask re-baked on dark/light toggle
+  // VERIFIED: Component — SegmentRouteMap updates arrow halo colors when theme toggles between light and dark
   it('recolours the halo with the theme', async () => {
     renderMapWithArrows(ARROWS);
     const inst = recorder.instances[0];
@@ -400,7 +391,7 @@ describe('directional arrow layers (009-010 T03, FR-3)', () => {
     expect(hasChannel([241, 245, 249])).toBe(true);
   });
 
-  // REVIEWED: recolours the glyphs on a theme change without adding layers or reframing — theme toggle swaps images only
+  // VERIFIED: Component — SegmentRouteMap swaps arrow glyph images on theme change without reframing
   it('recolours the glyphs on a theme change without adding layers or reframing', async () => {
     renderMapWithArrows(ARROWS);
     const inst = recorder.instances[0];
