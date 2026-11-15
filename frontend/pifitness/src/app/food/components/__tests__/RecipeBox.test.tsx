@@ -31,8 +31,8 @@ beforeEach(() => {
   useViewportStore.setState({ layoutVariant: 'desktop' });
 });
 describe('RecipeBox', () => {
-  // REVIEWED: renders in all three layouts — RecipeBox renders in desktop/portrait/landscape
-it('renders in all three layouts', async () => {
+  // VERIFIED: Recipe box view renders create button across desktop, portrait, and landscape viewport layouts
+  it('renders in all three layouts', async () => {
     recipes.mockResolvedValue([]);
     for (const v of ['desktop', 'portrait', 'landscape'] as const) {
       useViewportStore.setState({ layoutVariant: v });
@@ -41,20 +41,23 @@ it('renders in all three layouts', async () => {
       unmount();
     }
   });
-  // REVIEWED: shows loading state — loading testid shown while recipes fetch
-it('shows loading state', async () => {
+
+  // VERIFIED: Recipe list displays loading skeleton while recipes fetch asynchronously
+  it('shows loading state', async () => {
     recipes.mockReturnValue(new Promise(() => {}));
     render(<RecipeBox />);
     expect(screen.getByTestId('recipe-loading')).toBeInTheDocument();
   });
-  // REVIEWED: shows empty state when the box has no recipes — empty state text shown
-it('shows empty state when the box has no recipes', async () => {
+
+  // VERIFIED: Recipe box displays empty state message when no recipes are saved
+  it('shows empty state when the box has no recipes', async () => {
     recipes.mockResolvedValue([]);
     render(<RecipeBox />);
     expect(await screen.findByText(/No recipes yet/i)).toBeInTheDocument();
   });
-  // REVIEWED: shows error state with a retry that reloads — alert shown, retry reloads
-it('shows error state with a retry that reloads', async () => {
+
+  // VERIFIED: Network error displays alert banner with retry action that successfully re-fetches recipes
+  it('shows error state with a retry that reloads', async () => {
     const user = userEvent.setup();
     recipes.mockRejectedValueOnce(new Error('down'));
     recipes.mockResolvedValueOnce([]);
@@ -64,6 +67,8 @@ it('shows error state with a retry that reloads', async () => {
     expect(await screen.findByText(/No recipes yet/i)).toBeInTheDocument();
     expect(recipes).toHaveBeenCalledTimes(2);
   });
+
+  // VERIFIED: Recipe cards sort by preparation frequency descending with alphabetical tie-breaking
   it('sorts cards most-made first (title asc on ties)', async () => {
     recipes.mockResolvedValue([
       { recipe_id: 1, title: 'Stew', category: 'Dinner', times_prepared: 5 },
@@ -78,6 +83,7 @@ it('shows error state with a retry that reloads', async () => {
     expect(metas[2].closest('li')).toHaveTextContent('Salad');
   });
 
+  // VERIFIED: Category chip filters toggle active recipe cards and show category empty state
   it('filters by category with single-select chips', async () => {
     const user = userEvent.setup();
     recipes.mockResolvedValue([
@@ -100,6 +106,7 @@ it('shows error state with a retry that reloads', async () => {
     expect(screen.getByText('No recipes in this category')).toBeInTheDocument();
   });
 
+  // VERIFIED: Create recipe button opens recipe creation mode and back button returns to recipe box
   it('opens create mode and returns to the list', async () => {
     const user = userEvent.setup();
     recipes.mockResolvedValue([
@@ -114,6 +121,7 @@ it('shows error state with a retry that reloads', async () => {
     expect(await screen.findByText('Pancakes')).toBeInTheDocument();
   });
 
+  // VERIFIED: Editing a recipe from cook mode opens ingredient list and back returns to cook view
   it('edit from cook mode re-enters at the ingredient list; back returns to cook', async () => {
     const user = userEvent.setup();
     recipes.mockResolvedValue([
@@ -143,6 +151,7 @@ it('shows error state with a retry that reloads', async () => {
     expect(await screen.findByTestId('recipe-cook')).toBeInTheDocument();
   });
 
+  // VERIFIED: Selecting a recipe card opens cook view and back button returns to recipe list
   it('opens cook mode for the tapped card and returns', async () => {
     const user = userEvent.setup();
     recipes.mockResolvedValue([
@@ -166,6 +175,7 @@ it('shows error state with a retry that reloads', async () => {
     expect(await screen.findByText('Salad')).toBeInTheDocument();
   });
 
+  // VERIFIED: Completing a recipe increments preparation count and re-sorts recipe list
   it('complete bumps the count and re-sorts most-made first', async () => {
     const user = userEvent.setup();
     recipes.mockResolvedValue([

@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 
 describe('RecipeSteps', () => {
-  // REVIEWED: Unit — real RecipeSteps renders in all three layouts
+  // VERIFIED: Recipe steps builder renders across desktop, portrait, and landscape viewport layouts
   it('renders in all three layouts', () => {
     for (const v of ['desktop', 'portrait', 'landscape'] as const) {
       useViewportStore.setState({ layoutVariant: v });
@@ -41,7 +41,7 @@ describe('RecipeSteps', () => {
     }
   });
 
-  // REVIEWED: Unit — real RecipeSteps timer math: default 60s, min/sec map to int seconds
+  // VERIFIED: Timer parser converts minutes and seconds components to integer seconds and formats back
   it('timer math: default 60s, min/sec map to int seconds', () => {
     expect(partsToSeconds(true, '1', '0')).toBe(60);
     expect(partsToSeconds(true, '2', '30')).toBe(150);
@@ -49,7 +49,7 @@ describe('RecipeSteps', () => {
     expect(secondsToParts(150)).toEqual({ minutes: 2, seconds: 30 });
   });
 
-  // REVIEWED: Unit — real RecipeSteps adds one step at a time with default 60s timer
+  // VERIFIED: Adding a step creates sequential step record with default sixty second timer
   it('adds one step at a time with default 60s timer', async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -62,7 +62,7 @@ describe('RecipeSteps', () => {
     expect(steps[0].timer_seconds).toBe(60);
   });
 
-  // REVIEWED: Unit — real RecipeSteps attaches same ingredient to two steps with partial qty
+  // VERIFIED: Single recipe ingredient can be allocated across multiple steps with partial quantities
   it('attaches the same ingredient to two steps with partial qty', async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -86,7 +86,7 @@ describe('RecipeSteps', () => {
     expect(steps[1].foods).toEqual([{ food_id: 11, qty: 50, unit: 'g' }]);
   });
 
-  // REVIEWED: Unit — real RecipeSteps edits and removes a step, renumbering survivors
+  // VERIFIED: Step removal re-indexes remaining steps and editing updates instructions and timer
   it('edits and removes a step, renumbering survivors', async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -108,7 +108,7 @@ describe('RecipeSteps', () => {
     expect(steps[0]).toMatchObject({ instruction: 'Second, revised.', timer_seconds: null });
   });
 
-  // REVIEWED: Unit — real RecipeSteps draftToStep rejects empty instruction and bad portions
+  // VERIFIED: Step validator rejects blank instructions and non-positive ingredient quantities
   it('draftToStep rejects empty instruction and bad portions', () => {
     expect(draftToStep(
       { instruction: '  ', timerEnabled: true, minutes: '1', seconds: '0', portions: [] }, 1,

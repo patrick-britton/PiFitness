@@ -11,8 +11,8 @@ const updateFood = vi.mocked(API.food.updateFood);
 const row = (o: object) => ({ food_id: 1, name: 'Oats', nutrients: { kcal_per_100g: 100, protein_g: null, fat_g: null, carbs_g: null, fiber_g: null, sugars_g: null, sodium_mg: null, caffeine_mg: null }, is_deleted: false, deleted_at: null, ...o });
 beforeEach(() => { vi.clearAllMocks(); useViewportStore.setState({ layoutVariant: 'desktop' }); });
 describe('FoodDatabase', () => {
-  // REVIEWED: renders in all three layouts — FoodDatabase renders in desktop/portrait/landscape
-it('renders in all three layouts', async () => {
+  // VERIFIED: Food database view renders heading across desktop, portrait, and landscape viewport layouts
+  it('renders in all three layouts', async () => {
     foods.mockResolvedValue({ data: [], next_cursor: null });
     for (const v of ['desktop', 'portrait', 'landscape'] as const) {
       useViewportStore.setState({ layoutVariant: v });
@@ -21,14 +21,16 @@ it('renders in all three layouts', async () => {
       unmount();
     }
   });
-  // REVIEWED: shows backend-missing placeholder on error — placeholder shown when API fails
-it('shows backend-missing placeholder on error', async () => {
+
+  // VERIFIED: Network failure displays placeholder notice rather than crashing
+  it('shows backend-missing placeholder on error', async () => {
     foods.mockRejectedValue(new Error('down'));
     render(<FoodDatabase />);
     expect(await screen.findByText(/backend not yet available/i)).toBeInTheDocument();
   });
-  // REVIEWED: shows edit/delete affordances and hides deleted by default — edit/delete buttons, deleted hidden
-it('shows edit/delete affordances and hides deleted by default', async () => {
+
+  // VERIFIED: Food list displays edit and delete controls for active items while hiding soft-deleted items
+  it('shows edit/delete affordances and hides deleted by default', async () => {
     foods.mockResolvedValue({ data: [row({}), row({ food_id: 2, name: 'Gone', is_deleted: true })], next_cursor: null });
     render(<FoodDatabase />);
     expect(await screen.findByText('Oats')).toBeInTheDocument();
@@ -36,16 +38,18 @@ it('shows edit/delete affordances and hides deleted by default', async () => {
     expect(screen.getByRole('button', { name: /Delete Oats/i })).toBeInTheDocument();
     expect(screen.queryByText('Gone')).not.toBeInTheDocument();
   });
-  // REVIEWED: show-deleted reveals + restore appears — show deleted toggle, restore button appears
-it('show-deleted reveals + restore appears', async () => {
+
+  // VERIFIED: Toggling show-deleted filter reveals soft-deleted items with restore controls
+  it('show-deleted reveals + restore appears', async () => {
     const user = userEvent.setup();
     foods.mockResolvedValue({ data: [row({ food_id: 2, name: 'Gone', is_deleted: true })], next_cursor: null });
     render(<FoodDatabase />);
     await user.click(screen.getByLabelText(/Show deleted/i));
     expect(await screen.findByRole('button', { name: /Restore Gone/i })).toBeInTheDocument();
   });
-  // REVIEWED: opens a pre-filled editor on Edit and persists via updateFood — edit pre-fills, updateFood called
-it('opens a pre-filled editor on Edit and persists via updateFood', async () => {
+
+  // VERIFIED: Editing a food pre-fills existing values and persists name changes via updateFood API
+  it('opens a pre-filled editor on Edit and persists via updateFood', async () => {
     const user = userEvent.setup();
     foods.mockResolvedValue({ data: [row({ food_id: 1, name: 'Oats' })], next_cursor: null });
     updateFood.mockResolvedValue(row({ food_id: 1, name: 'Rolled Oats' }));
