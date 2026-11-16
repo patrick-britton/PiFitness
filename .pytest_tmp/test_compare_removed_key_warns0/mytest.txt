@@ -1,2 +1,0 @@
-check|a.py|rule1|abcd1234
-check|b.py|rule2|efgh5678
