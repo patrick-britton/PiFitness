@@ -82,7 +82,7 @@ Common tells:
 - Asserts on private helpers (`_underscore` names), call counts, call order, or "was called with" on a mock.
 - Asserts SQL text, log text, UI copy, CSS classes, test-ids, or exact error-message wording.
 - One example, one parametrize case, or a hand-built fixture shaped exactly like what the code expected at feature time.
-- Frontend: snapshots, "renders without crashing", checks of internal component state, or a pinned default (for example "adds a step with a default 60s timer"), instead of what the user can do and see.
+- Frontend: snapshots, "renders without crashing", checks of internal component state, or a pinned default (for example "adds a step with a default 60s timer"), instead of what the user can do and see. **When scanning, flag any test that asserts a literal default value (e.g., timer_seconds = 60, pageSize = 20, default sort order) or contains keywords like "default", "exactly", "_default_", "_exactly_", "not_reintroduced". Such tests are likely acceptance‑criteria tests and should be considered for deletion.**
 - The test exists to confirm a spec bullet, not to catch a regression.
 
 **What a good test looks like here:** it exercises real code through the boundary callers depend on (HTTP status and payload fields callers use, return values, persisted rows, what the user can do in the UI), with several inputs including edges, or asserts an invariant (atomicity, idempotency, fail-loud on bad config, no placeholder for missing data). It stays green through a behavior-preserving refactor and goes red for a real bug. A cheap `smoke` import/route-shape check is fine, one per area.
