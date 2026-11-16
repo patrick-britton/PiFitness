@@ -10,6 +10,7 @@ fi
 REPO="/home/god/PiFitness"
 BOOTSTRAP_DIR="/home/god/pifitness-bootstrap"
 
+PRD_ENV="/home/god/.config/pifitness/prd.env"
 TEST_ENV="/home/god/.config/pifitness/test.env"
 
 echo
@@ -27,10 +28,10 @@ while true; do
 
     case "${choice,,}" in
         1|p|prd)
-            echo
-            echo "PRD deployment is not yet enabled."
-            echo "The new bootstrap has not been merged into main."
-            exit 0
+            ENVIRONMENT="prd"
+            BRANCH="main"
+            ENV_FILE="$PRD_ENV"
+            break
             ;;
         2|t|test|tst)
             ENVIRONMENT="test"
@@ -49,7 +50,7 @@ while true; do
 done
 
 if [[ ! -f "$ENV_FILE" ]]; then
-    echo "ERROR: TEST environment file not found: $ENV_FILE" >&2
+    echo "ERROR: ${ENVIRONMENT^^} environment file not found: $ENV_FILE" >&2
     exit 1
 fi
 

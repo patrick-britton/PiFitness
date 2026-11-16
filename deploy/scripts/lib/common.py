@@ -802,6 +802,10 @@ class PgTarget:
         self.password = password
         self.dbname = dbname
 
+    def for_db(self, dbname):
+        """Return a copy of this target connected to a different database (e.g. maintenance DB)."""
+        return PgTarget(self.label, self.host, self.port, self.user, self.password, dbname)
+
     @classmethod
     def from_values(cls, label, values, source):
         """Build a target from a Pi env file's values. No defaults: a missing or

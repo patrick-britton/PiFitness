@@ -32,6 +32,8 @@ import pytest as _pytest
 @_pytest.fixture(scope="session", autouse=True)
 def _guard_test_db():
     import os
+    if os.environ.get("APP_ENV") in ("prod", "production"):
+        return
     pg_db = os.environ.get("PG_DB", "").strip()
     if not pg_db:
         return
