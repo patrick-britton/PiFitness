@@ -18,13 +18,52 @@ Be honest about what could not be tested.
 7. If the user must execute manual steps, you must lay them out in clear, step-by-step, idiot-proof instructions, including which machine, file, and values to change or execute.
 
 # Latest Shell output (trailing, all omitted lines above pass):
+[STEP 1/10] preflight ...................................... PASS (4.3s)
+[STEP 2/10] checkout ....................................... START
+    (1/8) Configuration ...
+  EVIDENCE: environment = test
+  EVIDENCE: requested_sha = ce027ce3ce337ce09072b35cf5b3a1cba23c7b22
+  EVIDENCE: app_dir = /home/god/PiFitness-test (previous checkout present)
+  EVIDENCE: source_repo = /home/god/PiFitness (contains the commit)
+  EVIDENCE: origin_remote = https://github.com/patrick-britton/PiFitness.git (copied onto the new checkout)
+  EVIDENCE: staging_dir = /home/god/PiFitness-test.stage-autodeploy-test-20261116T170100Z-ce027ce
+  EVIDENCE: env_file_wiring = symlink backend file backend/.env -> /home/god/.config/pifitness/test.env
+  EVIDENCE: previous_checkout_policy = deleted right after the swap
+  EVIDENCE: leftover_stage_dirs = 0
+    (2/8) Fetch the exact commit ...
+      git: From /home/god/PiFitness
+      git:  * branch            ce027ce3ce337ce09072b35cf5b3a1cba23c7b22 -> FETCH_HEAD
+  EVIDENCE: fetch_method = shallow fetch of the exact SHA from the local repo
+  EVIDENCE: origin_remote_set = https://github.com/patrick-britton/PiFitness.git
+    (3/8) Verify the checkout ...
+  EVIDENCE: actual_sha = ce027ce3ce337ce09072b35cf5b3a1cba23c7b22
+  EVIDENCE: clean_tree = yes (git status --porcelain is empty)
+  EVIDENCE: expected_paths = backend deploy/scripts (all present)
+  EVIDENCE: file_count = 520 on disk, 520 tracked
+  EVIDENCE: running_scripts_match_checkout = 27 identical, 0 differ, 0 missing
+    (4/8) Persistent resources ...
+  EVIDENCE: persistent_resources_preserved = none
+    (5/8) Environment file ...
+  EVIDENCE: env_file = symlink backend/.env -> /home/god/.config/pifitness/test.env
+    (6/8) Final checks ...
+  EVIDENCE: untracked_files = 0 (apart from persistent resources and backend/.env)
+  EVIDENCE: file_count_final = 521
+    (7/8) Swap in ...
+  EVIDENCE: swap_method = atomic exchange (renameat2)
+  EVIDENCE: live_checkout = /home/god/PiFitness-test at ce027ce3ce337ce09072b35cf5b3a1cba23c7b22
+    (8/8) Previous checkout ...
+  WARNING: previous TEST checkout held top-level entries that are NOT in the new one and are being discarded: .pytest_cache
+  EVIDENCE: old_checkout_removed = /home/god/PiFitness-test.stage-autodeploy-test-20261116T170100Z-ce027ce
+  EVIDENCE: checkout = ready: /home/god/PiFitness-test is commit ce027ce3ce33
+    checkout complete (2.1s)
+[STEP 2/10] checkout ....................................... PASS (2.2s)
 [STEP 3/10] dependencies ................................... START
     (1/5) Configuration and paths ...
   EVIDENCE: app_dir = /home/god/PiFitness-test
   EVIDENCE: venv_dir = /home/god/.local/share/pifitness/test-venv (outside the app dir: yes)
   EVIDENCE: python_project_dir = /home/god/PiFitness-test/backend
   EVIDENCE: frontend_dir = /home/god/PiFitness-test/frontend/pifitness
-  EVIDENCE: tools_file = /home/god/pifitness-bootstrap/bootstrap.Lch0ZJ/deploy/scripts/tools.conf
+  EVIDENCE: tools_file = /home/god/pifitness-bootstrap/bootstrap.gIMjep/deploy/scripts/tools.conf
   EVIDENCE: uv_sync_command = uv sync --locked --no-editable --python /usr/bin/python3 --extra dev --group deployment
     (2/5) Non-pip tools ...
   EVIDENCE: installable_tools = dbmate
@@ -36,12 +75,12 @@ Be honest about what could not be tested.
   EVIDENCE: uv_lock_sha256 = 700116ff33861ae442a0946475f845a8411e2c4f7476c012344c929a95c7bb8c
   EVIDENCE: venv_before = 51 packages
     uv sync --locked --no-editable --python /usr/bin/python3 --extra dev --group deployment
-      Resolved 52 packages in 0.78ms
+      Resolved 52 packages in 0.79ms
          Building pifitness @ file:///home/god/PiFitness-test/backend
             Built pifitness @ file:///home/god/PiFitness-test/backend
-      Prepared 1 package in 1.30s
+      Prepared 1 package in 1.27s
       Uninstalled 1 package in 1ms
-      Installed 1 package in 2ms
+      Installed 1 package in 1ms
        ~ pifitness==0.1.0 (from file:///home/god/PiFitness-test/backend)
   EVIDENCE: packages_added = 0
   EVIDENCE: packages_removed = 0
@@ -63,19 +102,19 @@ Be honest about what could not be tested.
       [copy-zxing-wasm] zxing_reader.wasm -> public/wasm/zxing_reader.wasm
       [copy-zxing-wasm] copied 1 file(s) to public/wasm/
 
-      added 270 packages in 17s
+      added 270 packages in 16s
   EVIDENCE: npm_ci = ok, /home/god/PiFitness-test/frontend/pifitness/node_modules
     (5/5) Playwright browsers ...
   EVIDENCE: playwright_version = Version 1.60.0
     playwright install chromium
   EVIDENCE: browser_chromium = launches, version 148.0.7778.0
   EVIDENCE: dependencies = reconciled
-[STEP 3/10] dependencies ................................... PASS (20.1s)
+[STEP 3/10] dependencies ................................... PASS (19.8s)
 [STEP 4/10] db_prepare ..................................... START
     (1/8) Decision ...  [elapsed 0s]
   EVIDENCE: db_action = keep
   EVIDENCE: test_state_marker = clean
-  EVIDENCE: test_clean_baseline = /home/god/Documents/DB_Backups/test_baseline_20261114T233555Z.dump (1.2 GiB, 1d 0h old)
+  EVIDENCE: test_clean_baseline = /home/god/Documents/DB_Backups/test_baseline_20261114T233555Z.dump (1.2 GiB, 1d 17h old)
   EVIDENCE: prd_database = PRD database was not modified
 [STEP 4/10] db_prepare ..................................... SKIPPED (not required)
 [STEP 5/10] migrate ........................................ START
@@ -109,37 +148,37 @@ Be honest about what could not be tested.
   EVIDENCE: undo_registered = test_db
   EVIDENCE: test_state_marker = dirty (set before dbmate up)
       Applying: 20261108000000_int19b_move_tokens_to_api_services.sql
-      Applied: 20261108000000_int19b_move_tokens_to_api_services.sql in 286.036048ms
+      Applied: 20261108000000_int19b_move_tokens_to_api_services.sql in 276.93328ms
       Applying: 20261108000001_int25_repoint_get_spotify_client.sql
-      Applied: 20261108000001_int25_repoint_get_spotify_client.sql in 6.769252ms
+      Applied: 20261108000001_int25_repoint_get_spotify_client.sql in 1.948294ms
       Applying: 20261108000002_int31d_repoint_garmin_dispatchers.sql
-      Applied: 20261108000002_int31d_repoint_garmin_dispatchers.sql in 5.012374ms
+      Applied: 20261108000002_int31d_repoint_garmin_dispatchers.sql in 1.063877ms
       Applying: 20261108000003_int35_repoint_pirate_dispatchers.sql
-      Applied: 20261108000003_int35_repoint_pirate_dispatchers.sql in 6.346625ms
+      Applied: 20261108000003_int35_repoint_pirate_dispatchers.sql in 1.910071ms
       Applying: 20261108000004_int38_repoint_worker_tasks.sql
-      Applied: 20261108000004_int38_repoint_worker_tasks.sql in 1.776544ms
+      Applied: 20261108000004_int38_repoint_worker_tasks.sql in 2.587379ms
       Applying: 20261108000005_comment_backfill_exercises.sql
-      Applied: 20261108000005_comment_backfill_exercises.sql in 4.072992ms
+      Applied: 20261108000005_comment_backfill_exercises.sql in 2.421992ms
       Applying: 20261108000006_comment_backfill_activities.sql
-      Applied: 20261108000006_comment_backfill_activities.sql in 30.217153ms
+      Applied: 20261108000006_comment_backfill_activities.sql in 30.269035ms
       Applying: 20261108000007_comment_backfill_api_services.sql
-      Applied: 20261108000007_comment_backfill_api_services.sql in 2.190597ms
+      Applied: 20261108000007_comment_backfill_api_services.sql in 2.207253ms
       Applying: 20261108000008_comment_backfill_food.sql
-      Applied: 20261108000008_comment_backfill_food.sql in 4.754894ms
+      Applied: 20261108000008_comment_backfill_food.sql in 6.937423ms
       Applying: 20261108000009_comment_backfill_health.sql
-      Applied: 20261108000009_comment_backfill_health.sql in 4.975004ms
+      Applied: 20261108000009_comment_backfill_health.sql in 4.733725ms
       Applying: 20261108000010_comment_backfill_logging.sql
-      Applied: 20261108000010_comment_backfill_logging.sql in 4.330675ms
+      Applied: 20261108000010_comment_backfill_logging.sql in 4.277508ms
       Applying: 20261108000011_comment_backfill_music.sql
-      Applied: 20261108000011_comment_backfill_music.sql in 15.958821ms
+      Applied: 20261108000011_comment_backfill_music.sql in 13.440129ms
       Applying: 20261108000012_comment_backfill_staging.sql
-      Applied: 20261108000012_comment_backfill_staging.sql in 14.932865ms
+      Applied: 20261108000012_comment_backfill_staging.sql in 14.95726ms
       Applying: 20261108000013_comment_backfill_tasks.sql
-      Applied: 20261108000013_comment_backfill_tasks.sql in 7.483043ms
+      Applied: 20261108000013_comment_backfill_tasks.sql in 7.386215ms
       Applying: 20261108000014_comment_backfill_volleyball.sql
-      Applied: 20261108000014_comment_backfill_volleyball.sql in 1.731989ms
+      Applied: 20261108000014_comment_backfill_volleyball.sql in 1.794702ms
       Applying: 20261108000015_dev_reset_replay_sentinel.sql
-      Applied: 20261108000015_dev_reset_replay_sentinel.sql in 2.563909ms
+      Applied: 20261108000015_dev_reset_replay_sentinel.sql in 4.614431ms
   EVIDENCE: migrations_applied = 16 (20261108000000_int19b_move_tokens_to_api_services.sql, 20261108000001_int25_repoint_get_spotify_client.sql, 20261108000002_int31d_repoint_garmin_dispatchers.sql, 20261108000003_int35_repoint_pirate_dispatchers.sql, 20261108000004_int38_repoint_worker_tasks.sql, 20261108000005_comment_backfill_exercises.sql, 20261108000006_comment_backfill_activities.sql, 20261108000007_comment_backfill_api_services.sql, 20261108000008_comment_backfill_food.sql, 20261108000009_comment_backfill_health.sql, 20261108000010_comment_backfill_logging.sql, 20261108000011_comment_backfill_music.sql, 20261108000012_comment_backfill_staging.sql, 20261108000013_comment_backfill_tasks.sql, 20261108000014_comment_backfill_volleyball.sql, 20261108000015_dev_reset_replay_sentinel.sql)
   EVIDENCE: dbmate_up_seconds = 0.4
     (4/4) Verify ...  [elapsed 0s]
@@ -165,7 +204,7 @@ Be honest about what could not be tested.
   EVIDENCE: applied_after = 16 (latest 20261108000015)
   EVIDENCE: pending_after = 0
   EVIDENCE: prd_database = PRD database was not modified
-[STEP 5/10] migrate ........................................ PASS (0.9s)
+[STEP 5/10] migrate ........................................ PASS (0.8s)
 [STEP 6/10] regression ..................................... START
     (1/3) Checks ...
   EVIDENCE: tests_conf = /home/god/PiFitness-test/deploy/tests.conf
@@ -186,37 +225,8 @@ Be honest about what could not be tested.
       testpaths: tests
       plugins: anyio-4.16.0, asyncio-1.4.0
       asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-      collected 326 items / 1 error
+^A^A      collected 333 items
 
-      ==================================== ERRORS ====================================
-      ____________________ ERROR collecting tests/test_ratchet.py ____________________
-      ../.local/share/pifitness/test-venv/lib/python3.13/site-packages/_pytest/python.py:508: in importtestmodule
-          mod = import_path(
-      ../.local/share/pifitness/test-venv/lib/python3.13/site-packages/_pytest/pathlib.py:596: in import_path
-          importlib.import_module(module_name)
-      /usr/lib/python3.13/importlib/__init__.py:88: in import_module
-          return _bootstrap._gcd_import(name[level:], package, level)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-      <frozen importlib._bootstrap>:1387: in _gcd_import
-          ???
-      <frozen importlib._bootstrap>:1360: in _find_and_load
-          ???
-      <frozen importlib._bootstrap>:1331: in _find_and_load_unlocked
-          ???
-      <frozen importlib._bootstrap>:935: in _load_unlocked
-          ???
-      ../.local/share/pifitness/test-venv/lib/python3.13/site-packages/_pytest/assertion/rewrite.py:179: in exec_module
-          source_stat, co = _rewrite_test(fn, self.config)
-                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-      ../.local/share/pifitness/test-venv/lib/python3.13/site-packages/_pytest/assertion/rewrite.py:348: in _rewrite_test
-          tree = ast.parse(source, filename=strfn)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-      /usr/lib/python3.13/ast.py:50: in parse
-          return compile(source, filename, mode, flags,
-      E     File "/home/god/PiFitness-test/tests/test_ratchet.py", line 129
-      E       ]
-      E       ^
-      E   SyntaxError: unmatched ']'
       =============================== warnings summary ===============================
       ../.local/share/pifitness/test-venv/lib/python3.13/site-packages/fastapi/testclient.py:1
         /home/god/.local/share/pifitness/test-venv/lib/python3.13/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
@@ -231,21 +241,20 @@ Be honest about what could not be tested.
           message: str = Field(
 
       -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-      - generated xml file: /home/god/pifitness-logs/autodeploy-test-20261115T233908Z-61f0c32.d/reports/pytest.xml -
-      =========================== short test summary info ============================
-      ERROR tests/test_ratchet.py
-      ========================= 3 warnings, 1 error in 4.80s =========================
+      - generated xml file: /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d/reports/pytest.xml -
+      ============================= 3 warnings in 4.72s ==============================
       ERROR: test classification problems:
-        tests/test_garmin_login_flow.py::test_get_garmin_client_returns_well_formed_token_without_relogin: needs exactly one purpose marker, has ['contract', 'regression']
+        tests/test_garmin_login_flow.py::test_get_status_authenticated_when_db_token_present: needs exactly one purpose marker, has none
+        tests/test_garmin_login_flow.py::test_is_configured_false_when_creds_missing: needs exactly one purpose marker, has none
 
   EVIDENCE: suite_pytest_command = cd $APP_DIR && $VENV_DIR/bin/python -m pytest --junitxml=$REPORT
   EVIDENCE: suite_pytest_exit_code = 4
-  EVIDENCE: suite_pytest_tests = passed 0, failed 1, skipped 0 (total 1)
-  EVIDENCE: suite_pytest_duration = 6.3s
-  EVIDENCE: suite_pytest_report = /home/god/pifitness-logs/autodeploy-test-20261115T233908Z-61f0c32.d/reports/pytest.xml
+  EVIDENCE: suite_pytest_tests = passed 0, failed 0, skipped 0 (total 0)
+  EVIDENCE: suite_pytest_duration = 6.2s
+  EVIDENCE: suite_pytest_report = /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d/reports/pytest.xml
   EVIDENCE: suite_pytest_result = FAIL (exit status 4)
-        failed: tests.test_ratchet
         last output lines:
+          ../.local/share/pifitness/test-venv/lib/python3.13/site-packages/fastapi/testclient.py:1
             /home/god/.local/share/pifitness/test-venv/lib/python3.13/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.te
               from starlette.testclient import TestClient as TestClient  # noqa
           ../.local/share/pifitness/test-venv/lib/python3.13/site-packages/starlette/testclient.py:53
@@ -255,82 +264,45 @@ Be honest about what could not be tested.
             /home/god/PiFitness-test/backend/pifitness/volleyball/schemas.py:62: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and wil
               message: str = Field(
           -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-          - generated xml file: /home/god/pifitness-logs/autodeploy-test-20261115T233908Z-61f0c32.d/reports/pytest.xml -
-          =========================== short test summary info ============================
-          ERROR tests/test_ratchet.py
-          ========================= 3 warnings, 1 error in 4.80s =========================
+          - generated xml file: /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d/reports/pytest.xml -
+          ============================= 3 warnings in 4.72s ==============================
           ERROR: test classification problems:
-            tests/test_garmin_login_flow.py::test_get_garmin_client_returns_well_formed_token_without_relogin: needs exactly one purpose marker, has ['contract', 'regress
+            tests/test_garmin_login_flow.py::test_get_status_authenticated_when_db_token_present: needs exactly one purpose marker, has none
+            tests/test_garmin_login_flow.py::test_is_configured_false_when_creds_missing: needs exactly one purpose marker, has none
     suite npm: cd $APP_DIR/frontend/pifitness && CI=true npm test -- --reporter=junit --outputFile=$REPORT
 
       > pifitness-frontend@0.1.0 test
-      > vitest run --reporter=junit --outputFile=/home/god/pifitness-logs/autodeploy-test-20261115T233908Z-61f0c32.d/reports/npm.xml
+      > vitest run --reporter=junit --outputFile=/home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d/reports/npm.xml
 
-      (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
-        - ESM syntax in a file loaded as CommonJS (vitest.config.ts:11:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
-      Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
-      Not implemented: HTMLMediaElement's play() method
-      Not implemented: HTMLMediaElement's play() method
-      Not implemented: HTMLMediaElement's play() method
-      Not implemented: HTMLMediaElement's play() method
-      Not implemented: HTMLMediaElement's play() method
-      Not implemented: HTMLMediaElement's play() method
-      Not implemented: HTMLMediaElement's play() method
-      Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-      Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-      Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-      Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-      Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-      Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-      Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-      JUNIT report written to /home/god/pifitness-logs/autodeploy-test-20261115T233908Z-61f0c32.d/reports/npm.xml
+      JUNIT report written to /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d/reports/npm.xml
   EVIDENCE: suite_npm_command = cd $APP_DIR/frontend/pifitness && CI=true npm test -- --reporter=junit --outputFile=$REPORT
-  EVIDENCE: suite_npm_exit_code = 1
-  EVIDENCE: suite_npm_tests = passed 327, failed 3, skipped 0 (total 330)
-  EVIDENCE: suite_npm_duration = 30.4s
-  EVIDENCE: suite_npm_report = /home/god/pifitness-logs/autodeploy-test-20261115T233908Z-61f0c32.d/reports/npm.xml
-  EVIDENCE: suite_npm_result = FAIL (exit status 1)
-        failed: src/app/food/components/__tests__/RecipeCreate.test.tsx > RecipeCreate > save carries built steps; skip path saves with steps: []
-        failed: src/app/food/components/__tests__/RecipeSteps.test.tsx > RecipeSteps > adds one step at a time with default 60s timer
-        failed: src/app/food/components/__tests__/RecipeSteps.test.tsx > RecipeSteps > edits and removes a step, renumbering survivors
-        last output lines:
-          Not implemented: HTMLMediaElement's play() method
-          Not implemented: HTMLMediaElement's play() method
-          Not implemented: HTMLMediaElement's play() method
-          Not implemented: HTMLMediaElement's play() method
-          Not implemented: HTMLMediaElement's play() method
-          Not implemented: HTMLMediaElement's play() method
-          Not implemented: HTMLMediaElement's play() method
-          Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-          Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-          Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-          Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-          Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-          Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-          Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-          JUNIT report written to /home/god/pifitness-logs/autodeploy-test-20261115T233908Z-61f0c32.d/reports/npm.xml
+  EVIDENCE: suite_npm_exit_code = 0
+  EVIDENCE: suite_npm_tests = passed 317, failed 0, skipped 0 (total 317)
+  EVIDENCE: suite_npm_duration = 28.6s
+  EVIDENCE: suite_npm_report = /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d/reports/npm.xml
+  EVIDENCE: suite_npm_result = PASS
   WARNING: the TEST state marker stays 'dirty': the exit handler restores the clean baseline
-[STEP 6/10] regression ..................................... FAIL (36.9s)
-  REASON: 2 of 2 suite(s) failed: pytest, npm
+[STEP 6/10] regression ..................................... FAIL (35.1s)
+  REASON: 1 of 2 suite(s) failed: pytest
   WHERE: /home/god/PiFitness-test/deploy/tests.conf
   last output:
-    |         Not implemented: HTMLMediaElement's play() method
-    |         Not implemented: HTMLMediaElement's play() method
-    |         Not implemented: HTMLMediaElement's play() method
-    |         Not implemented: HTMLMediaElement's play() method
-    |         Not implemented: HTMLMediaElement's play() method
-    |         Not implemented: HTMLMediaElement's play() method
-    |         Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-    |         Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-    |         Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-    |         Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-    |         Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-    |         Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-    |         Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
-    |         JUNIT report written to /home/god/pifitness-logs/autodeploy-test-20261115T233908Z-61f0c32.d/reports/npm.xml
+    |           /home/god/PiFitness-test/backend/pifitness/volleyball/schemas.py:62: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and wil
+    |             message: str = Field(
+    |         -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+    |         - generated xml file: /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d/reports/pytest.xml -
+    |         ============================= 3 warnings in 4.72s ==============================
+    |         ERROR: test classification problems:
+    |           tests/test_garmin_login_flow.py::test_get_status_authenticated_when_db_token_present: needs exactly one purpose marker, has none
+    |           tests/test_garmin_login_flow.py::test_is_configured_false_when_creds_missing: needs exactly one purpose marker, has none
+    |   suite npm: cd $APP_DIR/frontend/pifitness && CI=true npm test -- --reporter=junit --outputFile=$REPORT
+    |
+    |     > pifitness-frontend@0.1.0 test
+    |     > vitest run --reporter=junit --outputFile=/home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d/reports/npm.xml
+    |
+    |     JUNIT report written to /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d/reports/npm.xml
     | WARNING: the TEST state marker stays 'dirty': the exit handler restores the clean baseline
 [autodeploy] ERROR: helper failed: run_step.py exited with status 1
-[autodeploy] ERROR:   called as: run_step.py --run-dir /home/god/pifitness-logs/autodeploy-test-20261115T233908Z-61f0c32.d --step regression --number 6 --total 10
+[autodeploy] ERROR:   called as: run_step.py --run-dir /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d --step regression --number 6 --total 10
 [autodeploy] ERROR: step 6/10 (regression) failed with exit status 1
 [autodeploy] run ended with status 1; no further steps will run; entering cleanup...
 
@@ -346,8 +318,79 @@ Be honest about what could not be tested.
 [UNDO 1/2] test_db ......................................... START
   EVIDENCE: outcome = failure
   EVIDENCE: test_state_marker = dirty
-  EVIDENCE: baseline_dump = /home/god/Documents/DB_Backups/test_baseline_20261114T233555Z.dump (1.2 GiB, 1d 0h old)
+  EVIDENCE: baseline_dump = /home/god/Documents/DB_Backups/test_baseline_20261114T233555Z.dump (1.2 GiB, 1d 17h old)
     rolling the TEST database back to test_baseline_20261114T233555Z.dump
     dropping database personal_fitness_test (other sessions are terminated)
     creating database personal_fitness_test
     pg_restore test_baseline_20261114T233555Z.dump  (1.2 GiB)
+      ... still running (30s)
+  ... still running (60s)
+      ... still running (60s)
+      ... still running (90s)
+  ... still running (120s)
+      ... still running (120s)
+  ... still running (150s)
+      ... still running (150s)
+      ... still running (180s)
+  ... still running (210s)
+      ... still running (210s)
+  ... still running (240s)
+      ... still running (240s)
+      ... still running (270s)
+  ... still running (300s)
+      ... still running (300s)
+  ... still running (330s)
+      ... still running (330s)
+  ... still running (360s)
+      ... still running (360s)
+  ... still running (390s)
+      ... still running (390s)
+  ... still running (420s)
+      ... still running (420s)
+  ... still running (450s)
+      ... still running (450s)
+  ... still running (480s)
+      ... still running (480s)
+  ... still running (510s)
+      ... still running (510s)
+  ... still running (540s)
+      ... still running (540s)
+  EVIDENCE: restore_seconds = 555 (9m15s)
+  EVIDENCE: rolled_back_to = /home/god/Documents/DB_Backups/test_baseline_20261114T233555Z.dump
+  EVIDENCE: rollback_seconds = 556
+  EVIDENCE: test_state_marker = clean
+  EVIDENCE: prd_database = PRD database was not modified
+[UNDO 1/2] test_db ......................................... PASS (556.1s)
+[UNDO 2/2] checkout ........................................ START
+  EVIDENCE: outcome = failure
+  EVIDENCE: app_dir = /home/god/PiFitness-test
+  SKIPPED: the new checkout is live and no previous checkout remains
+[UNDO 2/2] checkout ........................................ SKIPPED (the new checkout is live and no previous checkout remains)
+(2/3) Undo registered actions ... DONE
+(3/3) Summary
+========================================================================
+RUN SUMMARY   environment=test   commit=ce027ce3ce33
+========================================================================
+  #  Step               Status               Time  Detail
+  1  preflight          PASS                 4.3s
+  2  checkout           PASS                 2.2s
+  3  dependencies       PASS                19.8s
+  4  db_prepare         SKIPPED              0.1s  not required
+  5  migrate            PASS                 0.8s
+  6  regression         FAIL                35.1s  1 of 2 suite(s) failed: pytest
+  7  stop_services      not run                 -
+  8  start_services     not run                 -
+  9  smoke              not run                 -
+ 10  manual_gate        not run                 -
+
+Undo actions (in the order they ran):
+     test_db                  PASS
+     checkout                 SKIPPED  the new checkout is live and no previous checkout remains
+
+Outcome : failure
+Result  : FAIL (exit status 1)
+Log     : /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.log
+========================================================================
+[autodeploy] ERROR: helper failed: cleanup.py exited with status 1
+[autodeploy] ERROR:   called as: cleanup.py --run-dir /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.d --exit-status 1
+[autodeploy] run finished: exit status 1 (log: /home/god/pifitness-logs/autodeploy-test-20261116T170100Z-ce027ce.log)
