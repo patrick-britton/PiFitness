@@ -7,10 +7,10 @@ Wants=postgresql.service
 Type=oneshot
 User=god
 Group=god
-WorkingDirectory=/home/god/PiFitness/backend
-Environment="PATH=/home/god/PiFitness/venv/bin:/usr/local/bin:/usr/bin:/bin"
-EnvironmentFile=/home/god/PiFitness/.env
-ExecStart=/home/god/PiFitness/venv/bin/python3 -m pifitness.worker.background_task_execution
+WorkingDirectory=@APP_DIR@/backend
+Environment="PATH=@VENV_DIR@/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=@APP_DIR@/backend/.env
+ExecStart=@VENV_DIR@/bin/python3 -m pifitness.worker.background_task_execution
 StandardOutput=journal
 StandardError=journal
 
@@ -25,4 +25,4 @@ TimeoutStopSec=30
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=read-only
-ReadWritePaths=/home/god/PiFitness /home/god/Documents/PiFitness_Local /home/god/Documents/DB_Backups
+ReadWritePaths=@APP_DIR@ /home/god/Documents/PiFitness_Local /home/god/Documents/DB_Backups

@@ -114,17 +114,27 @@ def guarded(reporter, ctx, body, failure_note=""):
         body()
         return 0
     except HelperError as exc:
-        reporter.say("FAIL at stage %s" % ctx.get("stage", "(startup)"))
-        reporter.say("REASON: %s" % exc.reason)
+        lines = ["FAIL at stage %s" % ctx.get("stage", "(startup)"),
+                 "REASON: %s" % exc.reason]
         if exc.where:
-            reporter.say("WHERE: %s" % exc.where)
+            lines.append("WHERE: %s" % exc.where)
+        if failure_note:
+            lines.append(failure_note)
+        for line in lines:
+            reporter.say(line)
+            if reporter.stream is None:
+                print("%s %s" % (reporter.tag, line), file=sys.stderr, flush=True)
     except Exception as exc:  # a bug in the helper: still be informative
-        reporter.say("FAIL at stage %s" % ctx.get("stage", "(startup)"))
-        reporter.say("REASON: unexpected %s: %s" % (type(exc).__name__, exc))
+        lines = ["FAIL at stage %s" % ctx.get("stage", "(startup)"),
+                 "REASON: unexpected %s: %s" % (type(exc).__name__, exc)]
         for line in traceback.format_exc().rstrip().splitlines():
-            reporter.say("    " + line)
-    if failure_note:
-        reporter.say(failure_note)
+            lines.append("    " + line)
+        if failure_note:
+            lines.append(failure_note)
+        for line in lines:
+            reporter.say(line)
+            if reporter.stream is None:
+                print("%s %s" % (reporter.tag, line), file=sys.stderr, flush=True)
     return 1
 
 

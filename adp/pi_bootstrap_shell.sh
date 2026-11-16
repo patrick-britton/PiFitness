@@ -54,10 +54,12 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 echo
-echo "Fetching origin/$BRANCH..."
+printf "Fetching origin/%s... " "$BRANCH"
 
-git -C "$REPO" fetch --no-tags origin \
+git -C "$REPO" fetch --quiet --no-tags origin \
     "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+
+echo "OK"
 
 COMMIT=$(git -C "$REPO" rev-parse --verify \
     "refs/remotes/origin/$BRANCH^{commit}")
@@ -101,19 +103,10 @@ SCRIPT="$TMP_DIR/deploy/scripts/autodeploy.sh"
     { echo "ERROR: Bootstrap script missing from commit." >&2; exit 1; }
 
 
-echo
-echo "Environment: $ENVIRONMENT"
-echo "Branch:      $BRANCH"
-echo "Commit:      $COMMIT"
-echo "Environment: $ENV_FILE"
-echo
+bash -n "$SCRIPT" || { echo "ERROR: Bootstrap script syntax check failed." >&2; exit 1; }
 
-bash -n "$SCRIPT"
-
-echo "Bootstrap and supporting library syntax verified."
-
+echo "Executing $ENVIRONMENT bootstrap (commit: ${COMMIT:0:7})..."
 echo
-echo "Executing $ENVIRONMENT bootstrap..."
 
 bash "$SCRIPT" \
     --environment "$ENVIRONMENT" \

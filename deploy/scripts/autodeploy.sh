@@ -161,13 +161,21 @@ LIB="$SCRIPT_DIR/lib"
 export PYTHONUNBUFFERED=1
 export PYTHONDONTWRITEBYTECODE=1
 
+# Save original console on fd 3
+exec 3>&1
+
+# Output only to log file (or stdout before redirection)
 note() {
     printf '[autodeploy] %s\n' "$*"
-    printf '[autodeploy] %s\n' "$*" >&3 2>/dev/null || true
+}
+# Output to BOTH log file and console
+console_note() {
+    printf '[autodeploy] %s\n' "$*"
+    printf '[autodeploy] %s\n' "$*" >&3
 }
 err()  {
     printf '[autodeploy] ERROR: %s\n' "$*" >&2
-    printf '[autodeploy] ERROR: %s\n' "$*" >&3 2>/dev/null || true
+    printf '[autodeploy] ERROR: %s\n' "$*" >&3
 }
 
 # Run one helper. Explains a missing helper (with directory listings) and any
@@ -194,9 +202,6 @@ run_helper() {
     return "$rc"
 }
 
-note "starting: $0 $*"
-note "script dir: $SCRIPT_DIR"
-
 # --- 1. Validate and initialise (nothing is touched if this fails) -----------
 rc=0
 LOG_FILE="$(run_helper new_run.py "$@")" || rc=$?
@@ -207,8 +212,9 @@ fi
 RUN_DIR="${LOG_FILE%.log}.d"
 
 # --- 2. Route full output to log file; keep console on fd 3 -------------------
-exec 3>&1
 exec >> "$LOG_FILE" 2>&1
+note "starting: $0 $*"
+note "script dir: $SCRIPT_DIR"
 note "log file:      $LOG_FILE"
 note "run directory: $RUN_DIR"
 
@@ -219,9 +225,14 @@ on_exit() {
     trap - EXIT
     trap '' INT TERM HUP    # cleanup must not be cut short by a second signal
 
-    note "run ended with status $status; no further steps will run; entering cleanup..."
-    run_helper cleanup.py --run-dir "$RUN_DIR" --exit-status "$status" || final=$?
-    note "run finished: exit status $final (log: $LOG_FILE)"
+    console_note "run ended with status $status; no further steps will run; entering cleanup..."
+    if [[ ! -f "$LIB/cleanup.py" ]]; then
+        err "cleanup helper not found: $LIB/cleanup.py"
+        final=127
+    else
+        "$PYTHON" "$LIB/cleanup.py" --run-dir "$RUN_DIR" --exit-status "$status" || final=$?
+    fi
+    console_note "run finished: exit status $final (log: $LOG_FILE)"
 
     exec 3>&- 2>/dev/null || true
     exit "$final"
@@ -238,7 +249,7 @@ run_helper startup_report.py --run-dir "$RUN_DIR"
 mapfile -t STEPS < "$RUN_DIR/steps"
 TOTAL="${#STEPS[@]}"
 NUMBER=0
-note "steps to run: $TOTAL (${STEPS[*]})"
+console_note "steps to run: $TOTAL (${STEPS[*]})"
 
 for STEP in "${STEPS[@]}"; do
     NUMBER=$((NUMBER + 1))
@@ -250,7 +261,7 @@ for STEP in "${STEPS[@]}"; do
         --total "$TOTAL" || rc=$?
 
     if [[ $rc -eq 10 ]]; then   # clean stop: NOT IMPLEMENTED or --through reached
-        note "step sequence stopped cleanly at step $NUMBER/$TOTAL ($STEP)"
+        console_note "step sequence stopped cleanly at step $NUMBER/$TOTAL ($STEP)"
         break
     elif [[ $rc -ne 0 ]]; then  # step failed; exit handler does the rest
         err "step $NUMBER/$TOTAL ($STEP) failed with exit status $rc"

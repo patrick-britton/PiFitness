@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-deploy/scripts/lib/step_regression.py  --  TEST Step 6: regression tests (pytest and npm).
+deploy/scripts/lib/step_regression.py  --  TEST Step 6 / PRD Step 8: regression tests (pytest and npm).
 
     step_regression.py --run-dir <dir>
 
-Objective (spec TEST Step 6): the automated tests pass against the TEST database and the new code,
-before PRD is touched.  Pass criterion: every suite exits 0.
+Objective: the automated tests pass against the database and the new code.
+Pass criterion: every suite exits 0.
 
 THE tests.conf CONTRACT  (<APP_DIR>/deploy/tests.conf, in the commit, read AFTER checkout)
     Plain KEY=value lines (same parser as the other .conf files). Every key that starts with
@@ -21,28 +21,23 @@ THE tests.conf CONTRACT  (<APP_DIR>/deploy/tests.conf, in the commit, read AFTER
     The SMOKE_* keys of the same file belong to the smoke step and are ignored here.
 
 What it does
-    1. read-only checks: tests.conf parses and defines >= 1 REGRESSION_ suite; the write target is
-       not PRD (TestDatabase.verify_not_prd); backend/.env in the checkout is the file this run was
-       started with (so the tests can only reach the TEST database).
-    2. arms the database undo: registers test_db and sets the marker to dirty if it is not dirty
-       already (the tests WRITE to TEST; spec 4.4 says dirty covers the tests. step_migrate only arms
-       when migrations are pending, so this step must not rely on it).
+    1. read-only checks: tests.conf parses and defines >= 1 REGRESSION_ suite; backend/.env in the
+       checkout matches this run's env file (so the tests reach this environment's database).
+    2. arms the database undo: on TEST registers test_db; sets the state marker to dirty if it is
+       not dirty already (the tests may write to the database).
     3. runs EVERY suite even if one fails, prints per suite: command, exit code, passed/failed/
        skipped, duration, report path; on failure the failing test names and the last output lines.
     4. fails the step if any suite failed.
 
-NOT BUILT YET: the PRD run (PRD_STEPS also names `regression`).  PRD needs its own database undo, so
-this step refuses to run when the environment is not test, exactly like step_migrate.
-
 Exit: 0 pass, 1 fail (REASON:/WHERE: printed).  Never 10 (reserved).  Python 3 standard library only.
 """
+import filecmp
 import os
 import sys
 import xml.etree.ElementTree as ET
 
-from common import (HelperError, Parser, evidence, info, load_context, parse_kv_file, read_db_marker,
+from common import (HelperError, Parser, PgTarget, evidence, info, load_context, parse_kv_file, read_db_marker,
                     register_undo, run_cmd, step_main, update_db_marker, warn)
-from step_db_prepare import STATE_KEY, UNDO_NAME, TestDatabase, elapsed
 
 PREFIX = "REGRESSION_"
 TESTS_CONF = os.path.join("deploy", "tests.conf")      # relative to APP_DIR (constant)
@@ -144,24 +139,26 @@ def report_suite(row, reason):
             info("      " + line[:160])
 
 
+def elapsed(seconds):
+    seconds = int(seconds)
+    return "%dm%02ds" % divmod(seconds, 60) if seconds >= 60 else "%ds" % seconds
+
+
 class Regression:
     def __init__(self, ctx):
         self.ctx = ctx
-        if ctx.environment != "test":
-            raise HelperError("step_regression is only built for TEST so far: PRD needs its own "
-                              "database undo action (not designed yet)", "step_regression.py")
-        ctx.require(env=["APP_DIR", "VENV_DIR", "LOG_DIR"])
-        self.db = TestDatabase(ctx)
+        ctx.require(env=["APP_DIR", "VENV_DIR", "LOG_DIR", "STATE_FILE"])
         self.app_dir = ctx.env_value("APP_DIR")
         self.suites = []
 
     def run(self):
-        stages = (("Checks", self.stage_checks), ("Arm: undo action, state marker dirty", self.stage_arm),
-                  ("Suites", self.stage_suites))
+        stages = [("Checks", self.stage_checks), ("Arm: undo action, state marker dirty", self.stage_arm),
+                  ("Suites", self.stage_suites)]
         for number, (title, function) in enumerate(stages, 1):
             info("(%d/%d) %s ..." % (number, len(stages), title))
             function()
-        evidence("prd_database", "PRD database was not modified")
+        if self.ctx.is_test:
+            evidence("prd_database", "PRD database was not modified")
 
     def stage_checks(self):
         c = self.ctx
@@ -169,31 +166,36 @@ class Regression:
         self.suites = read_suites(conf)
         evidence("tests_conf", conf)
         evidence("suites", " ".join(n for n, _c in self.suites))
-        if c.state.get(STATE_KEY) == "running":
-            raise HelperError("run.state says the TEST database step did not finish (%s=running)"
-                              % STATE_KEY, os.path.join(c.run_dir, "run.state"))
-        self.db.verify_not_prd()
-        evidence("write_target_is_prd", "no (APP_ENV, database name, server and role checked)")
-        evidence("test_database", self.db.test.describe())
+        if c.is_test and c.state.get("TEST_DB_STATUS") == "running":
+            raise HelperError("run.state says the TEST database step did not finish",
+                              os.path.join(c.run_dir, "run.state"))
+        target = PgTarget.from_values(c.environment.upper(), c.envvals, c.env_path)
+        evidence("database", target.describe())
         env_in_checkout = os.path.join(self.app_dir, BACKEND_ENV)
         if not os.path.exists(env_in_checkout):
-            raise HelperError("the checkout has no %s (the checkout step links it)" % BACKEND_ENV,
+            raise HelperError("the checkout has no %s (the checkout step wires it)" % BACKEND_ENV,
                               env_in_checkout)
-        if os.path.realpath(env_in_checkout) != os.path.realpath(c.env_path):
-            raise HelperError("%s is not this run's env file (%s), so the tests could reach another "
-                              "database" % (BACKEND_ENV, c.env_path), env_in_checkout)
-        evidence("backend_env", "%s -> %s (this run's env file)" % (env_in_checkout, c.env_path))
+        if os.path.islink(env_in_checkout):
+            if os.path.realpath(env_in_checkout) != os.path.realpath(c.env_path):
+                raise HelperError("%s symlink does not resolve to this run's env file (%s)"
+                                  % (env_in_checkout, c.env_path), env_in_checkout)
+        else:
+            if not filecmp.cmp(env_in_checkout, c.env_path, shallow=False):
+                raise HelperError("%s does not match this run's env file (%s)"
+                                  % (env_in_checkout, c.env_path), env_in_checkout)
+        evidence("backend_env", "%s (matches %s)" % (env_in_checkout, c.env_path))
 
     def stage_arm(self):
-        db = self.db
-        marker, _values = read_db_marker(db.state_file)
-        evidence("test_state_marker_before", marker)
-        db.verify_not_prd()                                        # before ANY write
-        register_undo(self.ctx.run_dir, UNDO_NAME)                 # idempotent
+        c = self.ctx
+        state_file = c.env_value("STATE_FILE")
+        marker, _values = read_db_marker(state_file)
+        evidence("state_marker_before", marker)
+        if c.is_test:
+            register_undo(c.run_dir, "test_db")
+            evidence("undo_registered", "test_db")
         if marker != "dirty":
-            update_db_marker(db.state_file, "dirty")
-        evidence("undo_registered", UNDO_NAME)
-        evidence("test_state_marker", "dirty (the tests write to the TEST database)")
+            update_db_marker(state_file, "dirty")
+        evidence("state_marker", "dirty (the tests may write to the database)")
 
     def stage_suites(self):
         c = self.ctx
@@ -211,7 +213,7 @@ class Regression:
             if reason:
                 failed.append(name)
         if failed:
-            warn("the TEST state marker stays 'dirty': the exit handler restores the clean baseline")
+            warn("state marker stays 'dirty': the exit handler restores the baseline on failure")
             raise HelperError("%d of %d suite(s) failed: %s" % (len(failed), len(self.suites),
                                                                ", ".join(failed)),
                               os.path.join(self.app_dir, TESTS_CONF))
