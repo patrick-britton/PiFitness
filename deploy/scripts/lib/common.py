@@ -77,9 +77,9 @@ class Parser(argparse.ArgumentParser):
 class Reporter:
     """Prints '[tag] message' lines immediately and remembers them."""
 
-    def __init__(self, tag, stream=None, echo_evidence=False):
+    def __init__(self, tag, stream=sys.stdout, echo_evidence=False):
         self.tag = tag
-        self.stream = stream if stream is not None else sys.stdout
+        self.stream = stream
         self.echo_evidence = echo_evidence
         self.lines = []
 

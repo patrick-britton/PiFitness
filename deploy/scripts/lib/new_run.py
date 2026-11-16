@@ -71,8 +71,8 @@ ENVIRONMENTS = ("test", "prd")
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 STEP_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
-# Progress is recorded to the log file; stderr is used only on failure.
-R = Reporter(TAG, stream=None)
+# Live progress goes to stderr (stdout is reserved for the log path).
+R = Reporter(TAG, stream=sys.stderr)
 
 
 # ----------------------------------------------------------------------------

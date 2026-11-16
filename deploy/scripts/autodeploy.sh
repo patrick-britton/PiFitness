@@ -209,6 +209,7 @@ if [[ $rc -ne 0 ]]; then
     err "run initialisation failed (exit $rc); nothing was changed on the Pi."
     exit "$rc"
 fi
+LOG_FILE="$(printf '%s\n' "$LOG_FILE" | tail -n 1 | tr -d '\r\n')"
 RUN_DIR="${LOG_FILE%.log}.d"
 
 # --- 2. Route full output to log file; keep console on fd 3 -------------------
