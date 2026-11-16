@@ -595,6 +595,14 @@ class RunContext:
         self.environment = state["ENVIRONMENT"]
         self.commit = state["COMMIT"]
 
+    @property
+    def is_test(self):
+        return self.environment == "test"
+
+    @property
+    def is_prd(self):
+        return self.environment == "prd"
+
     def require(self, env=(), conf=(), env_may_be_empty=(), conf_may_be_empty=()):
         """Fail (listing EVERY gap) unless all keys are present in the right file.
 

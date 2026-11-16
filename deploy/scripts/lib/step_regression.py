@@ -166,8 +166,8 @@ class Regression:
         self.suites = read_suites(conf)
         evidence("tests_conf", conf)
         evidence("suites", " ".join(n for n, _c in self.suites))
-        if c.is_test and c.state.get("TEST_DB_STATUS") == "running":
-            raise HelperError("run.state says the TEST database step did not finish",
+        if c.is_test and c.state.get("DB_PREPARE_STATE") == "running":
+            raise HelperError("run.state says the TEST database step did not finish (DB_PREPARE_STATE=running)",
                               os.path.join(c.run_dir, "run.state"))
         target = PgTarget.from_values(c.environment.upper(), c.envvals, c.env_path)
         evidence("database", target.describe())
