@@ -12,13 +12,9 @@ from backend.main import app
 # VERIFIED: Smoke — GET /api/health returns 200 with status, database, timestamp fields
 @pytest.mark.smoke
 @pytest.mark.live
-def test_health():
+def test_health(client):
     """GET /api/health answers 200 with status ok and the database and timestamp fields.
     """
-    # Create a test client for FastAPI
-    client = TestClient(app)
-
-    # Make request to health endpoint
     response = client.get("/api/health")
 
     # Assert the response

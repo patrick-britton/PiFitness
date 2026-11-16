@@ -41,3 +41,12 @@ def _guard_test_db():
             f"Tests refuse to run: PG_DB={pg_db!r} is not a dev/test database. "
             f"Allowed substrings: {allowed}. Set PG_DB=pifitness_dev or unset."
         )
+
+
+@pytest.fixture(scope="session")
+def client():
+    """Session-scoped TestClient to avoid repeated app startup and mount overhead."""
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    with TestClient(app) as test_client:
+        yield test_client

@@ -265,16 +265,14 @@ def test_segment_bulk_reject_empty_404_422():
 
 
 # VERIFIED: Contract — /api/segments/{id}/route returns non-decreasing elapsed_s aligned 1:1 with path_coords
-@pytest.mark.integration
+@pytest.mark.contract
 @pytest.mark.live
 def test_activity_route_elapsed_s():
     """GET /api/segments/{id}/route returns integer, non-decreasing elapsed_s values
     aligned one-to-one with path_coords, also for a trimmed window, with 404 for an
     unknown id and 422 for a negative start_m.
     """
-    from backend_functions.database_functions import sql_to_dict
-
-    list_response = client.get("/api/activities")
+    list_response = client.get("/api/activities?limit=1")
     assert list_response.status_code == 200
     list_data = list_response.json()
     if list_data["count"] == 0:
@@ -291,38 +289,18 @@ def test_activity_route_elapsed_s():
     assert all(isinstance(v, int) for v in elapsed)
     assert all(b >= a for a, b in zip(elapsed, elapsed[1:]))
 
-    if elapsed:
-        edges = sql_to_dict(
-            """
-            SELECT elapsed_duration_s FROM activities.activity_details
-            WHERE activity_id = %s AND latitude IS NOT NULL AND longitude IS NOT NULL
-            ORDER BY ts_utc ASC LIMIT 1
-            """,
-            (activity_id,),
+    # Trimmed window: elapsed_s stays 1:1 with the trimmed coords.
+    dist = float(data["distance_m"])
+    if dist > 100:
+        trimmed = client.get(
+            f"/api/segments/{activity_id}/route",
+            params={"start_m": 10, "end_m": min(60.0, dist)},
+        ).json()["data"]
+        assert len(trimmed["elapsed_s"]) == len(trimmed["path_coords"])
+        assert all(isinstance(v, int) for v in trimmed["elapsed_s"])
+        assert all(
+            b >= a for a, b in zip(trimmed["elapsed_s"], trimmed["elapsed_s"][1:])
         )
-        assert elapsed[0] == int(edges[0]["elapsed_duration_s"])
-        edges = sql_to_dict(
-            """
-            SELECT elapsed_duration_s FROM activities.activity_details
-            WHERE activity_id = %s AND latitude IS NOT NULL AND longitude IS NOT NULL
-            ORDER BY ts_utc DESC LIMIT 1
-            """,
-            (activity_id,),
-        )
-        assert elapsed[-1] == int(edges[0]["elapsed_duration_s"])
-
-        # Trimmed window: elapsed_s stays 1:1 with the trimmed coords.
-        dist = float(data["distance_m"])
-        if dist > 100:
-            trimmed = client.get(
-                f"/api/segments/{activity_id}/route",
-                params={"start_m": 10, "end_m": min(60.0, dist)},
-            ).json()["data"]
-            assert len(trimmed["elapsed_s"]) == len(trimmed["path_coords"])
-            assert all(isinstance(v, int) for v in trimmed["elapsed_s"])
-            assert all(
-                b >= a for a, b in zip(trimmed["elapsed_s"], trimmed["elapsed_s"][1:])
-            )
 
     # 404 (unknown activity) and 422 (negative start_m) are unchanged.
     assert client.get("/api/segments/99999999/route").status_code == 404

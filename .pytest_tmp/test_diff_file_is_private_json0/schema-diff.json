@@ -1,0 +1,64 @@
+{
+  "ignored_statements": [],
+  "migradiff": {
+    "generated_at": "2026-11-11T00:00:00Z",
+    "source": "postgresql://test_migrator@localhost:5432/fitness_test",
+    "statements": [
+      {
+        "risk": "safe",
+        "sql": "ALTER TABLE \"public\".\"example\" ADD COLUMN \"x\" integer;"
+      }
+    ],
+    "summary": {
+      "has_destructive_operations": false,
+      "risk_level": "low",
+      "total_statements": 1
+    },
+    "target": "postgresql://prd_migrator@localhost:5432/fitness_prd",
+    "version": "1.0"
+  },
+  "report": {
+    "comparison_engine": "migradiff",
+    "comparison_engine_version": "1.7.2",
+    "diff_fingerprint": "754c521e40be67ecf8fe809711babe02c42855c6f7399879c195e1571612805e",
+    "diff_preview": [
+      "ALTER TABLE \"public\".\"example\" ADD COLUMN \"x\" integer;"
+    ],
+    "diff_truncated": false,
+    "direction": "TEST-to-PRD; generated SQL is diagnostic only and is never executed",
+    "event": "schema_comparison",
+    "ignored_statement_count": 0,
+    "ok": true,
+    "prd": {
+      "database": "fitness_prd",
+      "environment": "prod",
+      "marker": null,
+      "server_address": "127.0.0.1",
+      "server_port": 5432
+    },
+    "risk_level": "low",
+    "scope": {
+      "excluded": [
+        "table and sequence data",
+        "object ownership",
+        "ACLs and grants (MigraDiff privilege comparison is not enabled)",
+        "COMMENT ON statements (documentation metadata, not structural compatibility)",
+        "the schema_migrations bookkeeping table and objects that reference it",
+        "database-level roles and role memberships (cluster-level objects)"
+      ],
+      "included": [
+        "schemas and application objects represented by MigraDiff",
+        "tables, columns, defaults, constraints, indexes, sequences, views, routines, types, triggers, row-level-security policies, and extensions"
+      ]
+    },
+    "statement_count": 1,
+    "status": "different",
+    "test": {
+      "database": "fitness_test",
+      "environment": "test",
+      "marker": "test",
+      "server_address": "127.0.0.1",
+      "server_port": 5432
+    }
+  }
+}

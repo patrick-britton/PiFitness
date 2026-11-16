@@ -10,11 +10,11 @@ from backend.main import app
 client = TestClient(app)
 
 ENVELOPE_ROUTES = [
-    "/api/activities",
+    "/api/activities?limit=1",
     "/api/admin/tasks",
     "/api/admin/tasks/schedule",
     "/api/admin/tasks/names",
-    "/api/admin/events",
+    "/api/admin/events?limit=1",
     "/api/admin/events?search=test&errors_only=true&ignore_skips=true&event_type=INFO&limit=50",
     "/api/admin/db-info/task-summary",
     "/api/admin/db-info/db-size-chart",
@@ -61,7 +61,7 @@ def test_activity_detail_routes_respond_for_latest_activity(suffix):
     """The by-id, telemetry and segments routes answer 200 with a data field for the
     most recent activity, skipping explicitly when none exist.
     """
-    listing = client.get("/api/activities")
+    listing = client.get("/api/activities?limit=1")
     assert listing.status_code == 200
     rows = listing.json()["data"]
     if not rows:

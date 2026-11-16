@@ -1,0 +1,13 @@
+PHASE=prd-stopped
+PHASE=prd-stopped
+PRD_COMMIT=cccccccccccccccccccccccccccccccccccccccc
+PRD_DB=pifitness
+TEST_DB=pifitness_test
+DB_HOST=localhost
+DB_PORT=15432
+PRD_DIR=/home/god/PiFitness
+TEST_DIR=/home/god/PiFitness-test
+FASTAPI_ACTIVE=active
+AGENT_TIMER_ACTIVE=inactive
+HARDWARE_HEALTH_TIMER_ACTIVE=active
+PM2_NEXTPROD_ACTIVE=online

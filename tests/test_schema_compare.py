@@ -201,7 +201,7 @@ def test_validate_pair_treats_ipv6_inet_prefix_and_bare_address_as_same_endpoint
 def test_validate_pair_rejects_non_loopback_hosts():
     test = _config("test", "fitness_test", host="db.example.com")
     prd = _config("prod", "fitness_prd", host="db.example.com")
-    with pytest.raises(RuntimeError, match="remote host"):
+    with pytest.raises(RuntimeError, match="non-loopback host"):
         compare_schema._validate_pair(test, prd)
 
 
