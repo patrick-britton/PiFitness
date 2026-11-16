@@ -1,0 +1,10 @@
+ current_user | rolsuper | rolcreatedb
+--------------+----------+-------------
+ devuser      | t        | f
+(1 row)
+
+ datname | owner | datallowconn
+---------+-------+--------------
+(0 rows)
+
+psql: error: connection to server at "localhost" (::1), port 5432 failed: FATAL:  database "personal_fitness_test" does not exist

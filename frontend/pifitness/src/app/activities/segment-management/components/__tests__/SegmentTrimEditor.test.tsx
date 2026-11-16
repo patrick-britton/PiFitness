@@ -46,7 +46,11 @@ vi.mock('maplibre-gl', () => {
     remove() {}
   }
   class NavigationControl {}
-  return { default: { Map, NavigationControl } };
+  return {
+  Map,
+  NavigationControl,
+  setWorkerUrl: vi.fn(),
+};
 });
 
 vi.mock('../ElevationProfile', () => ({ default: () => <div data-testid="elevation" /> }));
@@ -87,6 +91,7 @@ beforeEach(() => {
 });
 
 describe('SegmentTrimEditor', () => {
+  // VERIFIED: Component — SegmentTrimEditor renders activity metadata and default trim range
   it('shows the activity meta and the selected range (AC-2/AC-4)', async () => {
     render(<SegmentTrimEditor activity={ACTIVITY} onChooseNewActivity={vi.fn()} />);
 
@@ -96,6 +101,7 @@ describe('SegmentTrimEditor', () => {
     expect(await screen.findByText(/Selected range: 0–1111 m \(0\.69 mi\)/)).toBeInTheDocument();
   });
 
+  // VERIFIED: Behavior — updating gate inputs recomputes selected distance range
   it('re-bounds the displayed range when a gate moves (AC-4)', async () => {
     render(<SegmentTrimEditor activity={ACTIVITY} onChooseNewActivity={vi.fn()} />);
     const startGate = await screen.findByLabelText('Select start gate');
@@ -106,6 +112,7 @@ describe('SegmentTrimEditor', () => {
     expect(await screen.findByText(/Selected range: 500–1111 m \(0\.38 mi\)/)).toBeInTheDocument();
   });
 
+  // VERIFIED: Behavior — submitting trim editor creates course or segment and displays confirmation
   it('sends the gate meters and chosen kind, then confirms the new id (AC-5)', async () => {
     createSegment.mockResolvedValue({ segment_id: 555 });
     render(<SegmentTrimEditor activity={ACTIVITY} onChooseNewActivity={vi.fn()} />);
@@ -128,6 +135,7 @@ describe('SegmentTrimEditor', () => {
     );
   });
 
+  // VERIFIED: Behavior — requires segment name before submission and displays validation alert
   it('refuses to create without a name (AC-5)', async () => {
     render(<SegmentTrimEditor activity={ACTIVITY} onChooseNewActivity={vi.fn()} />);
     await screen.findByLabelText('Segment Name');
@@ -138,6 +146,7 @@ describe('SegmentTrimEditor', () => {
     expect(createSegment).not.toHaveBeenCalled();
   });
 
+  // VERIFIED: Behavior — provides controls to create another segment or select a different activity
   it('offers both AC-6 controls: choose new activity, or new segment from the same activity', async () => {
     const onChooseNewActivity = vi.fn();
     createSegment.mockResolvedValue({ segment_id: 556 });
@@ -156,6 +165,7 @@ describe('SegmentTrimEditor', () => {
     expect(onChooseNewActivity).toHaveBeenCalled();
   });
 
+  // VERIFIED: Behavior — displays route load error and allows retry
   it('reports a route-load failure with a retry (error state)', async () => {
     getRoute.mockRejectedValueOnce(new Error('boom'));
     render(<SegmentTrimEditor activity={ACTIVITY} onChooseNewActivity={vi.fn()} />);
@@ -167,6 +177,7 @@ describe('SegmentTrimEditor', () => {
     expect(await screen.findByText(/Selected range:/)).toBeInTheDocument();
   });
 
+  // VERIFIED: Component — displays empty state when activity has no GPS route data
   it('explains when the activity has no GPS route (empty state)', async () => {
     getRoute.mockResolvedValue({ data: { path_coords: [], elevations: [], elapsed_s: [], distance_m: 5000 } });
     render(<SegmentTrimEditor activity={ACTIVITY} onChooseNewActivity={vi.fn()} />);

@@ -36,6 +36,7 @@ beforeEach(() => {
 });
 
 describe('ActivitySourceList', () => {
+  // VERIFIED: Component — ActivitySourceList renders activity columns including type, date, distance, and counts
   it('lists type, start date, distance, child and matched counts (AC-1)', async () => {
     getActivities.mockResolvedValue({ data: [ROW], count: 1 });
     render(<ActivitySourceList onSelect={vi.fn()} />);
@@ -47,6 +48,7 @@ describe('ActivitySourceList', () => {
     expect(screen.getByText('5')).toBeInTheDocument();
   });
 
+  // VERIFIED: Behavior — selecting activity type filter queries server with filter and resets paging offset
   it('sends the activity-type filter to the server and resets paging', async () => {
     getActivities.mockResolvedValue({ data: [ROW], count: 1 });
     render(<ActivitySourceList onSelect={vi.fn()} />);
@@ -62,6 +64,7 @@ describe('ActivitySourceList', () => {
     expect(screen.getByRole('button', { name: 'Trail Run' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  // VERIFIED: Behavior — selecting activity row invokes onSelect callback with activity summary
   it('hands the chosen activity to the caller', async () => {
     getActivities.mockResolvedValue({ data: [ROW], count: 1 });
     const onSelect = vi.fn();
@@ -73,6 +76,7 @@ describe('ActivitySourceList', () => {
     expect(onSelect).toHaveBeenCalledWith(ROW);
   });
 
+  // VERIFIED: Component — ActivitySourceList switches from table to stacked card layout in portrait view
   it('renders stacked cards instead of a table in portrait', async () => {
     useViewportStore.setState({ layoutVariant: 'portrait' });
     getActivities.mockResolvedValue({ data: [ROW], count: 1 });
@@ -85,6 +89,7 @@ describe('ActivitySourceList', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
+  // VERIFIED: Component — ActivitySourceList renders empty state when query returns zero activities
   it('shows an empty state when nothing matches', async () => {
     getActivities.mockResolvedValue({ data: [], count: 0 });
     render(<ActivitySourceList onSelect={vi.fn()} />);
@@ -92,6 +97,7 @@ describe('ActivitySourceList', () => {
     expect(await screen.findByText('No matching activities found.')).toBeInTheDocument();
   });
 
+  // VERIFIED: Behavior — ActivitySourceList renders error banner and retry button refetches activities
   it('shows an error state with a retry that refetches', async () => {
     getActivities.mockRejectedValueOnce(new Error('boom'));
     render(<ActivitySourceList onSelect={vi.fn()} />);
@@ -103,6 +109,7 @@ describe('ActivitySourceList', () => {
     expect(await screen.findByText('running')).toBeInTheDocument();
   });
 
+  // VERIFIED: Behavior — ActivitySourceList paginates activities and hides Load more when page is exhausted
   it('offers Load more only while a full page came back', async () => {
     const page = Array.from({ length: 50 }, (_, i) => ({ ...ROW, activity_id: 1000 + i }));
     const nextPage = Array.from({ length: 1 }, (_, i) => ({ ...ROW, activity_id: 5000 + i }));

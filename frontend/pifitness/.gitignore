@@ -1,0 +1,5 @@
+# Next.js generates next-env.d.ts on every dev/build run. Kept untracked so
+# a clean install/build never leaves a tracked-file modification in the
+# checkout (see plan task 5.9 / audit item B33). tsconfig.json still
+# includes it, so Next.js types continue to resolve.
+next-env.d.ts

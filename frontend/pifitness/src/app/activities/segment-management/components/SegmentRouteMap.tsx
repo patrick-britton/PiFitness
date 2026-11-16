@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import maplibregl, { type StyleSpecification } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { maplibregl } from '@/lib/maplibre';
+import type { StyleSpecification } from 'maplibre-gl';
 import { buildStyleUrl } from '@/lib/map-styles';
 import { boundsOf } from '@/lib/geo';
 import {

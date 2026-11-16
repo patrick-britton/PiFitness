@@ -1,0 +1,6 @@
+ table_schema |     table_name
+--------------+--------------------
+ activities   | segments
+ food         | diary_entries
+ logging      | application_events
+(3 rows)

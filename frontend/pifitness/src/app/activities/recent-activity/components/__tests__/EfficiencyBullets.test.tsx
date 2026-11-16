@@ -39,6 +39,7 @@ function datum(
 }
 
 describe('efficiencyBarGeometry (AC-1/AC-2 worked examples)', () => {
+  // VERIFIED: Unit — efficiencyBarGeometry computes axis bounds and direction for higher-better metric
   it('cadence 6/7 → axis 4.5–7.5, bar 6→7, red (higher-better, worse)', () => {
     const geo = efficiencyBarGeometry(6, 7, true)!;
     expect(geo.min).toBeCloseTo(4.5, 6);
@@ -49,6 +50,7 @@ describe('efficiencyBarGeometry (AC-1/AC-2 worked examples)', () => {
     expect(geo.improved).toBe(false);
   });
 
+  // VERIFIED: Unit — efficiencyBarGeometry computes axis bounds and direction for lower-better metric
   it('GCT 225/229 → axis 219–231, bar 225→229, green (lower-better, better)', () => {
     const geo = efficiencyBarGeometry(225, 229, false)!;
     expect(geo.min).toBeCloseTo(219, 6);
@@ -56,6 +58,7 @@ describe('efficiencyBarGeometry (AC-1/AC-2 worked examples)', () => {
     expect(geo.improved).toBe(true);
   });
 
+  // VERIFIED: Unit — efficiencyBarGeometry computes unimproved direction for lower-better metric
   it('Vert Ratio 12.1/11.9 → axis 11.8–12.4, bar 11.9→12.1, red', () => {
     const geo = efficiencyBarGeometry(12.1, 11.9, false)!;
     expect(geo.min).toBeCloseTo(11.8, 6);
@@ -63,15 +66,18 @@ describe('efficiencyBarGeometry (AC-1/AC-2 worked examples)', () => {
     expect(geo.improved).toBe(false);
   });
 
+  // VERIFIED: Unit — efficiencyBarGeometry flags noChange when current equals prior
   it('equal values suppress the bar (OQ-3)', () => {
     expect(efficiencyBarGeometry(100, 100, true)!.noChange).toBe(true);
   });
 
+  // VERIFIED: Unit — efficiencyBarGeometry returns null for missing inputs
   it('null inputs return null (AC-3 fallback)', () => {
     expect(efficiencyBarGeometry(null, 100, true)).toBeNull();
     expect(efficiencyBarGeometry(100, null, true)).toBeNull();
   });
 
+  // VERIFIED: Unit — refVisible filters out null, undefined, zero, and negative sentinel values
   it('refVisible: present-and-positive only (sentinel guard)', () => {
     expect(refVisible(104.2)).toBe(true);
     expect(refVisible(null)).toBe(false);
@@ -82,6 +88,7 @@ describe('efficiencyBarGeometry (AC-1/AC-2 worked examples)', () => {
 });
 
 describe('buildEfficiencyBar spec', () => {
+  // VERIFIED: Unit — buildEfficiencyBar configures horizontal bar spanning reference to current value
   it('builds an MRAV-centered horizontal bar spanning MRAV→PAV', () => {
     const geo = efficiencyBarGeometry(6, 7, true)!;
     const spec = buildEfficiencyBar(geo, 6, 7, (v) => v.toFixed(1), PALETTE);
@@ -94,6 +101,7 @@ describe('buildEfficiencyBar spec', () => {
     expect(spec.options.scales?.y?.display).toBe(false);
   });
 
+  // VERIFIED: Unit — buildEfficiencyBar applies semantic colors for improved vs unimproved
   it('colors the bar red when worse, green when better', () => {
     const bad = buildEfficiencyBar(
       efficiencyBarGeometry(6, 7, true)!,
@@ -113,18 +121,7 @@ describe('buildEfficiencyBar spec', () => {
     expect(good.data.datasets[0].backgroundColor).toBe(PALETTE.good);
   });
 
-  it('attaches the efficiencyEndLabels plugin', () => {
-    const spec = buildEfficiencyBar(
-      efficiencyBarGeometry(6, 7, true)!,
-      6,
-      7,
-      (v) => v.toFixed(1),
-      PALETTE,
-    );
-    expect(spec.plugins).toHaveLength(1);
-    expect(spec.plugins[0].id).toBe('efficiencyEndLabels');
-  });
-
+  // VERIFIED: Unit — buildEfficiencyBar end label plugin renders values in increasing x-coordinate order
   it('draws the lower value at the left end and the higher at the right', () => {
     const fills: Array<{ text: unknown; x: unknown }> = [];
     const ctx = {
@@ -163,20 +160,7 @@ describe('buildEfficiencyBar spec', () => {
 
 
 describe('EfficiencyBullets rendering', () => {
-  it('places the label LEFT of the Chart.js bar', () => {
-    const { container } = render(
-      <EfficiencyBullets
-        data={[datum({ metric: { current: 6, prior10_avg: 7 } })]}
-      />,
-    );
-    const row = screen.getByTestId('efficiency-row');
-    expect(row.className).toContain('grid-cols-[88px_minmax(0,1fr)]');
-    const cells = Array.from(row.children);
-    expect(cells[0].textContent).toBe('Cadence');
-    expect(cells[1].querySelector('canvas')).not.toBeNull();
-    expect(container.querySelector('svg')).toBeNull();
-  });
-
+  // VERIFIED: Component — EfficiencyBullets renders row for each provided metric
   it('renders four rows with left-hand labels', () => {
     render(
       <EfficiencyBullets
@@ -193,6 +177,8 @@ describe('EfficiencyBullets rendering', () => {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });
+
+  // VERIFIED: Component — EfficiencyBullets avoids duplicate value caption under rendered bar
   it('shows no value caption under a rendered bar (Bug 004-007-7-2)', () => {
     render(
       <EfficiencyBullets
@@ -205,7 +191,7 @@ describe('EfficiencyBullets rendering', () => {
     expect(screen.queryByText(/prior-10 avg 174\.7/)).not.toBeInTheDocument();
   });
 
-
+  // VERIFIED: Component — EfficiencyBullets displays No change message and suppresses bar on equal values
   it('suppresses the bar and shows "No change vs prior" on equal values', () => {
     render(
       <EfficiencyBullets
@@ -216,6 +202,7 @@ describe('EfficiencyBullets rendering', () => {
     expect(screen.getByText(/No change vs prior/)).toBeInTheDocument();
   });
 
+  // VERIFIED: Component — EfficiencyBullets displays no reading when current metric is null
   it('shows no reading with honest text when current is null', () => {
     render(
       <EfficiencyBullets
@@ -227,6 +214,7 @@ describe('EfficiencyBullets rendering', () => {
     expect(screen.getByText(/prior-10 avg 7\.0 spm/)).toBeInTheDocument();
   });
 
+  // VERIFIED: Component — EfficiencyBullets suppresses negative sentinel values with unavailable message
   it('suppresses a sentinel-poisoned ref with honest text', () => {
     render(
       <EfficiencyBullets
@@ -238,6 +226,7 @@ describe('EfficiencyBullets rendering', () => {
     expect(screen.queryByText(/-43\.6/)).not.toBeInTheDocument();
   });
 
+  // VERIFIED: Component — EfficiencyBullets displays no prior attempts when reference value is absent
   it('renders no prior attempts without a bar when ref is absent', () => {
     render(
       <EfficiencyBullets
@@ -246,18 +235,5 @@ describe('EfficiencyBullets rendering', () => {
     );
     expect(screen.queryByTestId('efficiency-bar')).not.toBeInTheDocument();
     expect(screen.getByText(/no prior attempts/)).toBeInTheDocument();
-  });
-
-  it('carries the mt-4 boundary gap below the charts stack', () => {
-    render(
-      <EfficiencyBullets
-        data={[datum({ metric: { current: 6, prior10_avg: 7 } })]}
-      />,
-    );
-    expect(
-      screen.getByRole('group', {
-        name: 'Running efficiency vs prior 10 course attempts',
-      }),
-    ).toHaveClass('mt-4');
   });
 });

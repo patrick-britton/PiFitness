@@ -121,7 +121,7 @@ export function ConfirmPopup({
         <div className="mt-3">
           <AmountPicker value={{ qty: initial.qty, unit: (initial.unit as AmountUnit) ?? 'g' }}
             extraUnit={extraUnit}
-            onChange={(a) => { setQty(a.qty); setUnit(a.unit); }} />
+            onChange={(a) => { setQty(a.qty ?? 0); setUnit(a.unit); }} />
         </div>
         <p role="status" className="mt-3 text-sm text-gray-700 dark:text-gray-300">
           {preview != null ? `≈ ${Math.round(preview)} kcal` : 'kcal unavailable'}
@@ -173,7 +173,7 @@ export function ConfirmPopup({
               return;
             }
             onConfirm(name.trim() || title, qty, unit);
-          }} disabled={saving}
+          }} disabled={saving || error != null}
             className="rounded-md bg-blue-600 hover:bg-blue-700 px-4 py-2 min-h-[44px] text-sm font-medium text-white disabled:opacity-60">
             {saving ? 'Saving…' : 'Confirm'}
           </button>
@@ -186,6 +186,7 @@ export default function AddEntry({ onDone }: { onDone: () => void }) {
   const [confirm, setConfirm] = useState<AddEntryPick | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [qtyErr, setQtyErr] = useState<string | null>(null);
   const [pickMeta, setPickMeta] = useState<{ query?: string; rank?: number; result_source?: string }>({});
   const openConfirm = useCallback((pick: AddEntryPick) => {
     setSaveErr(null);
@@ -196,6 +197,12 @@ export default function AddEntry({ onDone }: { onDone: () => void }) {
     if (!confirm) return;
     setSaving(true);
     setSaveErr(null);
+    setQtyErr(null);
+    if (qty == null || qty <= 0) {
+      setQtyErr('Quantity must be greater than 0');
+      setSaving(false);
+      return;
+    }
     try {
       if (confirm.payload) {
         const key = confirm.payload.provider === 'usda' ? 'usda_payload' : 'off_payload';
@@ -233,7 +240,7 @@ export default function AddEntry({ onDone }: { onDone: () => void }) {
           initial={defaultAmount(confirm)}
           extraUnit={confirm.recipe_serving_unit ?? null}
           ownServing={confirm.row_serving ?? null}
-          saving={saving} error={saveErr}
+          saving={saving} error={saveErr || qtyErr}
           editableName={confirm.payload != null}
           nutrients={confirm.nutrients}
           serving={confirm.serving}

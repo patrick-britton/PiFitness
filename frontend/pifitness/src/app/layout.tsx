@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import Layout from "./components/Layout";
 import Providers from "./providers";
@@ -24,25 +25,23 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var theme = localStorage.getItem('pifitness-theme');
-                  if (!theme) {
-                    var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    theme = isDark ? 'dark' : 'light';
-                    localStorage.setItem('pifitness-theme', theme);
-                  }
-                  if (theme === 'dark') {
-                    document.documentElement.classList.add('dark');
-                  }
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
+        <Script strategy="afterInteractive">
+          {`
+            (function() {
+              try {
+                var theme = localStorage.getItem('pifitness-theme');
+                if (!theme) {
+                  var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  theme = isDark ? 'dark' : 'light';
+                  localStorage.setItem('pifitness-theme', theme);
+                }
+                if (theme === 'dark') {
+                  document.documentElement.classList.add('dark');
+                }
+              } catch (e) {}
+            })();
+          `}
+        </Script>
       </head>
       <body className="min-h-screen text-gray-900 antialiased">
         <Providers>

@@ -42,6 +42,7 @@ afterEach(() => {
 });
 
 describe('classifyCameraError', () => {
+  // VERIFIED: Unit — classifyCameraError maps each browser camera error name to a user-visible ScannerErrorCode
   it.each<[string, ScannerErrorCode]>([
     ['NotAllowedError', 'denied'],
     ['PermissionDeniedError', 'denied'],
@@ -56,11 +57,13 @@ describe('classifyCameraError', () => {
     expect(classifyCameraError(named(name))).toBe(expected);
   });
 
+  // VERIFIED: Unit — classifyCameraError falls back to unknown for anything else
   it('falls back to unknown for anything else', () => {
     expect(classifyCameraError(new Error('boom'))).toBe('unknown');
     expect(classifyCameraError(null)).toBe('unknown');
   });
 
+  // VERIFIED: Unit — every ScannerErrorCode has a non-empty user-visible message (invariant)
   it('has a user-visible message for every code', () => {
     const codes: ScannerErrorCode[] = [
       'denied',
@@ -76,6 +79,7 @@ describe('classifyCameraError', () => {
     }
   });
 
+  // VERIFIED: Unit — decoder failure has a user-visible message telling the user to load it manually (camera can be healthy while decoder is not)
   it('has a message for a decoder that could not be created', () => {
     // The camera can be perfectly healthy while the decoder is not (T08).
     expect(SCANNER_ERROR_MESSAGES.decoder).toMatch(/decoder could not be loaded/i);
@@ -84,6 +88,7 @@ describe('classifyCameraError', () => {
 });
 
 describe('describeError', () => {
+  // VERIFIED: Unit — describeError includes the error name and message
   it('includes the error name and message', () => {
     expect(describeError(named('NotAllowedError'))).toBe('NotAllowedError: NotAllowedError');
     expect(describeError(new Error('wasm instantiate failed'))).toBe(
@@ -91,6 +96,7 @@ describe('describeError', () => {
     );
   });
 
+  // VERIFIED: Unit — describeError falls back to the string form and ignores empty values
   it('falls back to the string form and ignores empty values', () => {
     expect(describeError('boom')).toBe('boom');
     expect(describeError(null)).toBeNull();
@@ -101,6 +107,7 @@ describe('describeError', () => {
 });
 
 describe('stopMediaStream', () => {
+  // VERIFIED: Unit — stopMediaStream stops every track so the camera indicator light goes off
   it('stops every track so the camera indicator goes off', () => {
     const { stream, stopA, stopB } = fakeStream();
     stopMediaStream(stream);
@@ -108,6 +115,7 @@ describe('stopMediaStream', () => {
     expect(stopB).toHaveBeenCalledTimes(1);
   });
 
+  // VERIFIED: Unit — stopMediaStream is a no-op for a missing stream
   it('is a no-op for a missing stream', () => {
     expect(() => stopMediaStream(null)).not.toThrow();
     expect(() => stopMediaStream(undefined)).not.toThrow();
@@ -115,10 +123,12 @@ describe('stopMediaStream', () => {
 });
 
 describe('isCameraSupported / isSecureCameraContext', () => {
+  // VERIFIED: Unit — isCameraSupported reports no camera when getUserMedia is absent
   it('reports no camera when getUserMedia is absent', () => {
     expect(isCameraSupported()).toBe(false);
   });
 
+  // VERIFIED: Unit — isCameraSupported reports a camera once getUserMedia exists
   it('reports a camera once getUserMedia exists', () => {
     Object.defineProperty(navigator, 'mediaDevices', {
       value: { getUserMedia: vi.fn() },
@@ -127,10 +137,12 @@ describe('isCameraSupported / isSecureCameraContext', () => {
     expect(isCameraSupported()).toBe(true);
   });
 
+  // VERIFIED: Unit — isSecureCameraContext treats localhost/127.0.0.1 and https as secure
   it('treats localhost/127.0.0.1 and https as secure', () => {
     expect(isSecureCameraContext()).toBe(true); // jsdom default origin is http://localhost
   });
 
+  // VERIFIED: Unit — isSecureLocation classifies contexts by protocol/hostname (plain http to a LAN IP is insecure)
   it('classifies contexts by protocol/hostname', () => {
     expect(isSecureLocation('https:', 'pifitness.duckdns.org', false)).toBe(true);
     expect(isSecureLocation('http:', 'localhost', false)).toBe(true);
@@ -143,10 +155,12 @@ describe('isCameraSupported / isSecureCameraContext', () => {
 });
 
 describe('requestRearCamera', () => {
+  // VERIFIED: Unit — requestRearCamera fails as unsupported when the browser has no camera API
   it('fails as unsupported when the browser has no camera API', async () => {
     await expect(requestRearCamera()).rejects.toMatchObject({ name: 'TypeError' });
   });
 
+  // VERIFIED: Unit — requestRearCamera asks for the rear camera at 1280x720 with no audio (CAMERA_CONSTRAINTS)
   it('asks for the rear camera at 1280x720 with no audio', async () => {
     const getUserMedia = vi.fn().mockResolvedValue(fakeStream().stream);
     Object.defineProperty(navigator, 'mediaDevices', {

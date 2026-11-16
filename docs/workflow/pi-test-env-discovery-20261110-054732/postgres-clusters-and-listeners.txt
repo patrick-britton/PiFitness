@@ -1,0 +1,10 @@
+=== clusters ===
+Ver Cluster  Port Status Owner    Data directory                  Log file
+18  main     5432 down   postgres /var/lib/postgresql/18/main     /var/log/postgresql/postgresql-18-main.log
+18  main_new 5432 online postgres /var/lib/postgresql/18/main_new /var/log/postgresql/postgresql-18-main_new.log
+=== listeners ===
+LISTEN 0      40           0.0.0.0:5432      0.0.0.0:*    users:(("postgres",pid=70809,fd=6))
+LISTEN 0      40              [::]:5432         [::]:*    users:(("postgres",pid=70809,fd=7))
+=== PostgreSQL service units ===
+  postgresql.service                                          loaded    active   exited  PostgreSQL RDBMS
+  postgresql@18-main_new.service                              loaded    active   running PostgreSQL Cluster 18-main_new

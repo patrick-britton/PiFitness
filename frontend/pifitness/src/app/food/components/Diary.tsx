@@ -154,9 +154,9 @@ function EditPopup({
 
         <div className="mt-3">
           <AmountPicker key={entry.entry_id}
-            value={{ qty: entry.qty, unit: (entry.unit as AmountUnit) ?? 'g' }}
+            value={{ qty, unit: unit as AmountUnit }}
             extraUnit={entry.unit ?? null}
-            onChange={(a) => { setQty(a.qty); setUnit(a.unit); }} />
+            onChange={(a) => { setQty(a.qty ?? 0); setUnit(a.unit); }} />
         </div>
 
         <label htmlFor="edit-when" className="mt-3 block text-xs font-medium text-gray-600 dark:text-gray-300">

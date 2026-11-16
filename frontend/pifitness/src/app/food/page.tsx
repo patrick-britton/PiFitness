@@ -10,7 +10,6 @@ import { useState, useCallback } from 'react';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore, MODULE_SUB_PAGES } from '../../stores/uiStore';
 import TriTipTimer from './components/TriTipTimer';
-import ApiExplorer from './components/ApiExplorer';
 import Diary from './components/Diary';
 import RecipeBox from './components/RecipeBox';
 import FoodDatabase from './components/FoodDatabase';
@@ -148,8 +147,6 @@ export default function FoodPage() {
             <FoodDatabase />
           ) : activeTab === 'tri-tip-timer' ? (
             <TriTipTimer />
-          ) : activeTab === 'api-explorer' ? (
-            <ApiExplorer />
           ) : (
             <div className="p-8 text-center">
               <p className="text-gray-500 dark:text-gray-400 text-lg">

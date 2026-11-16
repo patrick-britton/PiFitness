@@ -37,6 +37,7 @@ beforeEach(() => {
 });
 
 describe('IsrcDupeHomeBanner', () => {
+  // VERIFIED: Component — IsrcDupeHomeBanner displays count when duplicates exist
   it('shows the pending pair count when duplicates exist', async () => {
     getIsrcDupeCount.mockResolvedValue({ count: 3 });
 
@@ -47,6 +48,7 @@ describe('IsrcDupeHomeBanner', () => {
     ).toBeInTheDocument();
   });
 
+  // VERIFIED: Component — IsrcDupeHomeBanner renders nothing when duplicate count is zero
   it('renders nothing when the queue is empty', async () => {
     getIsrcDupeCount.mockResolvedValue({ count: 0 });
 
@@ -56,6 +58,7 @@ describe('IsrcDupeHomeBanner', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  // VERIFIED: Component — IsrcDupeHomeBanner stays hidden while count query is loading
   it('renders nothing while the count is still loading', () => {
     // Never resolves — the banner must not flash a count it does not have.
     getIsrcDupeCount.mockImplementation(() => new Promise(() => {}));

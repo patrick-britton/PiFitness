@@ -1,0 +1,27 @@
+bash              /usr/bin/bash
+git               /usr/bin/git
+tar               /usr/bin/tar
+realpath          /usr/bin/realpath
+python3           /usr/bin/python3
+node              /usr/bin/node
+npm               /usr/bin/npm
+psql              /usr/bin/psql
+pg_dump           /usr/bin/pg_dump
+pg_restore        /usr/bin/pg_restore
+createdb          /usr/bin/createdb
+dropdb            /usr/bin/dropdb
+pg_lsclusters     /usr/bin/pg_lsclusters
+systemctl         /usr/bin/systemctl
+systemd-analyze   /usr/bin/systemd-analyze
+pm2               /usr/bin/pm2
+curl              /usr/bin/curl
+jq                MISSING
+=== versions ===
+Python 3.13.5
+v24.21.0
+11.19.0
+psql (PostgreSQL) 18.6 (Debian 18.6-1.pgdg13+2)
+pg_dump (PostgreSQL) 18.6 (Debian 18.6-1.pgdg13+2)
+systemd 257 (257.13-1~deb13u1)
+=== Python venv support ===
+AVAILABLE

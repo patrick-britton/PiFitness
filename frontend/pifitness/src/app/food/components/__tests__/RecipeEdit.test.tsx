@@ -54,6 +54,7 @@ beforeEach(() => {
 });
 
 describe('detailToEditInitial', () => {
+  // VERIFIED: Unit — detailToEditInitial maps detail into ingredient-first edit initials
   it('maps detail into ingredient-first edit initials', () => {
     const init = detailToEditInitial(DETAIL);
     expect(init.recipeId).toBe(7);
@@ -69,6 +70,7 @@ describe('detailToEditInitial', () => {
 });
 
 describe('RecipeEdit', () => {
+  // VERIFIED: Component — renders in all three layouts starting at the ingredient list
   it('renders in all three layouts starting at the ingredient list', async () => {
     for (const v of ['desktop', 'portrait', 'landscape'] as const) {
       useViewportStore.setState({ layoutVariant: v });
@@ -83,6 +85,7 @@ describe('RecipeEdit', () => {
     }
   });
 
+  // VERIFIED: Component — save issues PUT with the full payload (ingredients + steps + servings)
   it('save issues PUT with the full payload (ingredients + steps + servings)', async () => {
     const user = userEvent.setup();
     const onSaved = vi.fn();
@@ -99,6 +102,7 @@ describe('RecipeEdit', () => {
     expect(onSaved).toHaveBeenCalledTimes(1);
   });
 
+  // VERIFIED: Component — delete asks for confirmation, then deletes and leaves edit
   it('delete asks for confirmation, then deletes and leaves edit', async () => {
     const user = userEvent.setup();
     const onBack = vi.fn();
@@ -113,6 +117,7 @@ describe('RecipeEdit', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  // VERIFIED: Component — delete cancel keeps the recipe (no DELETE)
   it('delete cancel keeps the recipe (no DELETE)', async () => {
     const user = userEvent.setup();
     render(<RecipeEdit recipeId={7} onBack={vi.fn()} onSaved={vi.fn()} />);

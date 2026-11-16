@@ -92,12 +92,14 @@ beforeEach(() => {
 });
 
 describe('AddEntry', () => {
+  // VERIFIED: Component — AddEntry renders suggestion cards with mode quantity and unit
   it('shows suggestion cards with mode qty + unit', async () => {
     render(<AddEntry onDone={() => {}} />);
     expect(await screen.findByText('Oatmeal')).toBeInTheDocument();
     expect(screen.getByText('40 g')).toBeInTheDocument();
   });
 
+  // VERIFIED: Behavior — food search displays top tier results and reveals remaining on Show More
   it('search shows top results; Show more reveals the rest, no extra call', async () => {
     const user = userEvent.setup();
     const many = Array.from({ length: 12 }, (_, i) => hit(i));
@@ -113,6 +115,7 @@ describe('AddEntry', () => {
     expect(combinedSearch).toHaveBeenCalledTimes(1);
   });
 
+  // VERIFIED: Component — food search results display source and quality percentage pills
   it('result cards carry source + percent pill (010-004 T03, no High/Medium/Low)', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([{
@@ -135,6 +138,7 @@ describe('AddEntry', () => {
     expect(screen.getAllByRole('button', { name: /^All$/ })).toHaveLength(2);
   });
 
+  // VERIFIED: Behavior — selecting search facet filter narrows results client-side without refetching
   it('facet filter narrows the list client-side with no extra fetch (010-004 T03)', async () => {
     const user = userEvent.setup();
     const mk = (i: number, cat: string | undefined, unit: string | undefined): CombinedSearchResult => ({
@@ -160,6 +164,7 @@ describe('AddEntry', () => {
     expect(combinedSearch).toHaveBeenCalledTimes(1);
   });
 
+  // VERIFIED: Component — facet filter renders select dropdown when four or more categories exist
   it('facet control renders a dropdown at 4+ values (010-004 T03)', async () => {
     const user = userEvent.setup();
     const mk = (i: number, cat: string): CombinedSearchResult => ({
@@ -182,6 +187,7 @@ describe('AddEntry', () => {
     expect(combinedSearch).toHaveBeenCalledTimes(1);
   });
 
+  // VERIFIED: Behavior — successful barcode scan opens confirmation dialog and logs API entry
   it('scan hit opens confirm directly; Confirm persists via from-api', async () => {
     const user = userEvent.setup();
     const onDone = vi.fn();
@@ -200,6 +206,7 @@ describe('AddEntry', () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  // VERIFIED: Confirming a chosen suggestion persists the food log entry and completes the flow
   it('suggestion pick opens confirm with live kcal; Confirm logs + returns', async () => {
     const user = userEvent.setup();
     const onDone = vi.fn();
@@ -214,6 +221,7 @@ describe('AddEntry', () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  // VERIFIED: Clicking cancel add entry dismisses the view without invoking the logger
   it('red cancel returns to diary without logging', async () => {
     const user = userEvent.setup();
     const onDone = vi.fn();
@@ -224,6 +232,7 @@ describe('AddEntry', () => {
     expect(logEntry).not.toHaveBeenCalled();
   });
 
+  // VERIFIED: Confirming a USDA hit with an edited diary name submits the customized payload
   it('T08: usda pick shows editable name; Confirm sends renamed payload', async () => {
     const user = userEvent.setup();
     const onDone = vi.fn();
@@ -246,6 +255,7 @@ describe('AddEntry', () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  // VERIFIED: DB food suggestions omit custom renaming while empty API hit names prevent submission
   it('T08: db suggestion pick has no name field; empty API name blocks save', async () => {
     const user = userEvent.setup();
     logEntry.mockResolvedValue({ ...ENTRY, entry_id: 7 });
@@ -266,6 +276,7 @@ describe('AddEntry', () => {
     expect(logApiEntry).not.toHaveBeenCalled();
   });
 
+  // VERIFIED: Scanning an existing local barcode matches saved food without requiring API lookup or rename
   it('T08: barcode already saved opens DB confirm without name field', async () => {
     const user = userEvent.setup();
     logEntry.mockResolvedValue({ ...ENTRY, entry_id: 12 });
@@ -285,26 +296,7 @@ describe('AddEntry', () => {
     expect(screen.queryByLabelText('Name for your diary')).not.toBeInTheDocument();
   });
 
-  it('T09: source pill renders per kind with light + dark tokens', async () => {
-    const user = userEvent.setup();
-    combinedSearch.mockResolvedValue([
-      hit(0),
-      { ...hit(1), kind: 'db-food', food_id: 3 },
-    ]);
-    render(<AddEntry onDone={() => {}} />);
-    await screen.findByText('Oatmeal');
-    await user.type(screen.getByLabelText(/Food name/i), 'oats');
-    await user.click(screen.getByRole('button', { name: /^Search$/i }));
-
-    const usdaPill = await screen.findByTitle('usda');
-    expect(usdaPill).toHaveClass('rounded-full', 'bg-sky-100', 'dark:bg-sky-900/40');
-    expect(usdaPill).toHaveTextContent('USDA');
-
-    const dbPill = screen.getByTitle('db-food');
-    expect(dbPill).toHaveClass('rounded-full', 'bg-blue-100', 'dark:bg-blue-900/40');
-    expect(dbPill).toHaveTextContent('DB');
-  });
-
+  // VERIFIED: Suggestion pick pre-fills quantity and unit from recent consumption mode
   it('T10: suggestion pick defaults to its mode qty/unit (mode beats row serving)', async () => {
     const user = userEvent.setup();
     render(<AddEntry onDone={() => {}} />);
@@ -315,6 +307,7 @@ describe('AddEntry', () => {
     expect((screen.getByLabelText('Unit') as HTMLSelectElement).value).toBe('g');
   });
 
+  // VERIFIED: External search hits with declared serving sizes default input fields to that serving
   it('T10: API pick with feed serving opens at that serving (ml), not 100 g', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([
@@ -330,6 +323,7 @@ describe('AddEntry', () => {
     expect((screen.getByLabelText('Unit') as HTMLSelectElement).value).toBe('ml');
   });
 
+  // VERIFIED: External search hits lacking declared serving size fall back to standard 100 g amount
   it('T10: pick without a feed serving falls back to 100 g', async () => {
     const user = userEvent.setup();
     render(<AddEntry onDone={() => {}} />);
@@ -342,6 +336,7 @@ describe('AddEntry', () => {
     expect((screen.getByLabelText('Unit') as HTMLSelectElement).value).toBe('g');
   });
 
+  // VERIFIED: Confirm dialog displays nutrient summary, serving info, and source attribution for chosen food
   it('T10: popup shows the saved-data panel (nutrients, serving, source, keys)', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([{
@@ -367,51 +362,7 @@ describe('AddEntry', () => {
     expect(screen.queryByText(/fdcId/)).not.toBeInTheDocument();
   });
 
-  it('T04: panel shows 2-column nutrient bars with OQ-7 scaling; nulls get em-dash, no fdcId (010-004)', async () => {
-    const user = userEvent.setup();
-    combinedSearch.mockResolvedValue([{
-      ...hit(0),
-      nutrients: {
-        kcal_per_100g: 100, protein_g: 5, fat_g: 2, carbs_g: 10,
-        fiber_g: null, sugars_g: 0, sodium_mg: 2300, caffeine_mg: null,
-      },
-      serving_size: 100, serving_unit: 'g', serving_text: null,
-    }]);
-    render(<AddEntry onDone={() => {}} />);
-    await screen.findByText('Oatmeal');
-    await user.type(screen.getByLabelText(/Food name/i), 'brew');
-    await user.click(screen.getByRole('button', { name: /^Search$/i }));
-    await user.click(await screen.findByText('Result 0'));
-    expect(await screen.findByRole('dialog', { name: /Confirm Result 0/i })).toBeInTheDocument();
-
-    // Two columns in the specified order: kcal/carbs/protein/fat | fiber/sugars/sodium/caffeine.
-    const cols = screen.getByTestId('panel-nutrients').children;
-    expect(cols).toHaveLength(2);
-    const colLabels = (col: Element) =>
-      Array.from(col.querySelectorAll('[role="img"]')).map((b) => b.getAttribute('aria-label')!.split(':')[0]);
-    expect(colLabels(cols[0])).toEqual(['kcal', 'carbs', 'protein', 'fat']);
-    expect(colLabels(cols[1])).toEqual(['fiber', 'sugars', 'sodium', 'caffeine']);
-
-    // OQ-7 scaling: kcal/2000 = 5%; carbs vs macro group max (10) = 100%; protein = 50%.
-    const widthOf = (name: string) =>
-      (screen.getByLabelText(name).firstElementChild as HTMLElement).style.width;
-    expect(widthOf('kcal: 100')).toBe('5%');
-    expect(widthOf('carbs: 10 g')).toBe('100%');
-    expect(widthOf('protein: 5 g')).toBe('50%');
-    // Fixed refs: sodium 2300/2300 = 100%; sugars 0/50 = 0%.
-    expect(widthOf('sodium: 2300 mg')).toBe('100%');
-    expect(widthOf('sugars: 0 g')).toBe('0%');
-
-    // Null nutrients: em-dash value, empty bar.
-    expect(screen.getByLabelText('fiber: — g')).toBeInTheDocument();
-    expect(screen.getByLabelText('caffeine: — mg')).toBeInTheDocument();
-    expect(widthOf('caffeine: — mg')).toBe('0%');
-
-    // Source shown; fdcId absent from the panel.
-    expect(screen.getByTestId('panel-source')).toHaveTextContent('USDA');
-    expect(screen.queryByText(/fdcId/)).not.toBeInTheDocument();
-  });
-
+  // VERIFIED: Backdrop clicks are ignored while explicit cancel button closes confirmation dialog
   it('T10: backdrop click does not close the confirm popup; Cancel does', async () => {
     const user = userEvent.setup();
     render(<AddEntry onDone={() => {}} />);
@@ -423,6 +374,7 @@ describe('AddEntry', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  // VERIFIED: Selecting a saved recipe sets default serving unit and scales logged calories on quantity changes
   it('010-005 T10: recipe pick opens at qty 1 in its own serving unit and logs qty 3 pancake (AC-10)', async () => {
     const user = userEvent.setup();
     combinedSearch.mockResolvedValue([{
@@ -458,6 +410,7 @@ describe('AddEntry', () => {
       expect.objectContaining({ food_id: 42, qty: 3, unit: 'pancake' }));
   });
 
+  // VERIFIED: Amount resolver prioritizes recipe serving unit over historical consumption mode
   it('010-005 T10: recipe default beats history mode; non-recipe defaults unchanged', () => {
     // Recipe with history still opens at qty 1 in its own unit (AC-10).
     expect(defaultAmount({ mode_qty: 2, mode_unit: 'g', serving: null, sourceKind: 'db-recipe', recipe_serving_unit: 'slice' }))

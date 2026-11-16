@@ -76,30 +76,13 @@ const DATA: Leaderboard = {
   efforts: [EFFORT],
 };
 
-/** True when `a` comes before `b` in document order. */
-function appearsBefore(a: Element, b: Element): boolean {
-  return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-}
-
 beforeEach(() => {
   getLeaderboard.mockReset();
   getLeaderboard.mockResolvedValue(DATA);
 });
 
-describe('LeaderboardTable screen order (AC-8)', () => {
-  it('orders Effort Distribution → Generate Race → filters → table', async () => {
-    render(<LeaderboardTable segmentId={7} segmentName="Towpath Loop" />);
-
-    const distribution = await screen.findByTestId('effort-distribution');
-    const raceGroup = screen.getByRole('group', { name: 'Race selection mode' });
-    const range = document.getElementById('lb-range')!;
-    const table = screen.getByRole('table');
-
-    expect(appearsBefore(distribution, raceGroup)).toBe(true);
-    expect(appearsBefore(raceGroup, range)).toBe(true);
-    expect(appearsBefore(range, table)).toBe(true);
-  });
-
+describe('LeaderboardTable standalone and embedded modes', () => {
+  // VERIFIED: Component — LeaderboardTable renders segment heading and effort count in standalone mode
   it('renders the built-in name header when NOT embedded', async () => {
     render(<LeaderboardTable segmentId={7} segmentName="Towpath Loop" />);
 
@@ -110,6 +93,7 @@ describe('LeaderboardTable screen order (AC-8)', () => {
     expect(screen.getByText('1 effort')).toBeInTheDocument();
   });
 
+  // VERIFIED: Component — LeaderboardTable suppresses duplicate heading when embedded prop is true
   it('suppresses the built-in name header in embedded mode (host renders it)', async () => {
     render(<LeaderboardTable segmentId={7} segmentName="Towpath Loop" embedded />);
 

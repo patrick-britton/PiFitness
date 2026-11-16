@@ -61,10 +61,12 @@ afterEach(() => {
 });
 
 describe('isNativeDecoderSufficient', () => {
+  // VERIFIED: Unit — isNativeDecoderSufficient is false when the native API is absent
   it('is false when the native API is absent', async () => {
     await expect(isNativeDecoderSufficient()).resolves.toBe(false);
   });
 
+  // VERIFIED: Unit — isNativeDecoderSufficient is true only when every requested format is supported
   it('is true only when every requested format is supported', async () => {
     installNative([...RETAIL_BARCODE_FORMATS]);
     await expect(isNativeDecoderSufficient()).resolves.toBe(true);
@@ -73,6 +75,7 @@ describe('isNativeDecoderSufficient', () => {
     await expect(isNativeDecoderSufficient()).resolves.toBe(false);
   });
 
+  // VERIFIED: Unit — isNativeDecoderSufficient is false when getSupportedFormats throws
   it('is false when getSupportedFormats throws', async () => {
     installNative('rejects');
     await expect(isNativeDecoderSufficient()).resolves.toBe(false);
@@ -80,6 +83,7 @@ describe('isNativeDecoderSufficient', () => {
 });
 
 describe('createBarcodeDecoder', () => {
+  // VERIFIED: Unit — createBarcodeDecoder uses the native detector when it covers the retail formats
   it('uses the native detector when it covers the retail formats', async () => {
     const { detect, ctorSpy } = installNative([...RETAIL_BARCODE_FORMATS]);
     const decoder = await createBarcodeDecoder();
@@ -89,6 +93,7 @@ describe('createBarcodeDecoder', () => {
     expect(mocks.ponyfillCtor).not.toHaveBeenCalled();
   });
 
+  // VERIFIED: Unit — createBarcodeDecoder falls back to the ponyfill when the native API is absent
   it('falls back to the ponyfill when the native API is absent', async () => {
     const decoder = await createBarcodeDecoder();
     expect(mocks.ensureZxingConfigured).toHaveBeenCalledTimes(1);
@@ -96,22 +101,26 @@ describe('createBarcodeDecoder', () => {
     await expect(decoder.detect({} as HTMLVideoElement)).resolves.toEqual([]);
   });
 
+  // VERIFIED: Unit — createBarcodeDecoder falls back when the native API supports only some formats
   it('falls back when the native API supports only some formats', async () => {
     installNative(['ean_13', 'ean_8']);
     await createBarcodeDecoder();
     expect(mocks.ponyfillCtor).toHaveBeenCalledTimes(1);
   });
 
+  // VERIFIED: Unit — createBarcodeDecoder falls back when native format probing fails
   it('falls back when native format probing fails', async () => {
     installNative('rejects');
     await createBarcodeDecoder();
     expect(mocks.ponyfillCtor).toHaveBeenCalledTimes(1);
   });
 
+  // VERIFIED: Unit — createBarcodeDecoder requests only the retail EAN/UPC family
   it('requests only the retail EAN/UPC family', () => {
     expect([...RETAIL_BARCODE_FORMATS]).toEqual(['ean_13', 'ean_8', 'upc_a', 'upc_e']);
   });
 
+  // VERIFIED: Unit — createBarcodeDecoder reports which backend decodes and what the native API advertised
   it('reports which backend decodes and what the native API advertised', async () => {
     installNative([...RETAIL_BARCODE_FORMATS]);
     const native = await createBarcodeDecoder();
@@ -124,6 +133,7 @@ describe('createBarcodeDecoder', () => {
     expect(ponyfill.nativeFormats).toBeNull();
   });
 
+  // VERIFIED: Unit — createBarcodeDecoder explains a partially-supporting native API in the fallback metadata
   it('explains a partially-supporting native API in the fallback metadata', async () => {
     installNative(['ean_13']);
     const decoder = await createBarcodeDecoder();
@@ -131,6 +141,7 @@ describe('createBarcodeDecoder', () => {
     expect(decoder.nativeFormats).toEqual(['ean_13']);
   });
 
+  // VERIFIED: Unit — createBarcodeDecoder probes the native format list once per browser instance
   it('probes the native format list once per browser instance', async () => {
     const { formatsSpy } = installNative([...RETAIL_BARCODE_FORMATS]);
     await createBarcodeDecoder();

@@ -1,0 +1,44 @@
+-- migrate:up
+COMMENT ON TABLE api_services."api_service_list" IS 'List of api services accessible by the application';
+COMMENT ON COLUMN api_services."api_service_list"."api_service_name" IS 'Name of the external API service.';
+COMMENT ON COLUMN api_services."api_service_list"."api_service_function" IS 'Function/endpoint name within the service.';
+COMMENT ON COLUMN api_services."api_service_list"."api_credential_requirements" IS 'Credential type required (e.g. token).';
+COMMENT ON COLUMN api_services."api_service_list"."rate_limit_detected_utc" IS 'When a rate limit was detected (UTC).';
+COMMENT ON COLUMN api_services."api_service_list"."rate_limit_cleared_utc" IS 'When the rate limit cleared (UTC).';
+COMMENT ON TABLE api_services."api_tokens" IS 'Token storage for the various api services';
+COMMENT ON COLUMN api_services."api_tokens"."id" IS 'Primary key.';
+COMMENT ON COLUMN api_services."api_tokens"."service_name" IS 'Name of the service these tokens belong to.';
+COMMENT ON COLUMN api_services."api_tokens"."token_data" IS 'Serialized OAuth token payload.';
+COMMENT ON COLUMN api_services."api_tokens"."created_at_utc" IS 'Record creation timestamp (UTC).';
+COMMENT ON COLUMN api_services."api_tokens"."updated_at_utc" IS 'Record last update timestamp (UTC).';
+COMMENT ON COLUMN api_services."api_tokens"."is_active" IS 'Whether the record is active.';
+COMMENT ON COLUMN api_services."api_tokens"."refresh_token_expires_at_utc" IS 'Refresh token expiry (UTC).';
+COMMENT ON TABLE api_services."credentials" IS 'Credential storage for various api services';
+COMMENT ON COLUMN api_services."credentials"."api_service_name" IS 'Name of the external API service.';
+COMMENT ON COLUMN api_services."credentials"."api_credentials" IS 'Encrypted/stored API credentials.';
+COMMENT ON TABLE api_services."function_library" IS 'Various functions/endpoints available from api services';
+COMMENT ON COLUMN api_services."function_library"."friendly_name" IS 'Friendly name for the function.';
+COMMENT ON COLUMN api_services."function_library"."api_service_name" IS 'Name of the external API service.';
+COMMENT ON COLUMN api_services."function_library"."api_function_name" IS 'Underlying API function name.';
+COMMENT ON COLUMN api_services."function_library"."python_extraction_function" IS 'Python function used to extract data.';
+COMMENT ON COLUMN api_services."function_library"."flatten_sproc" IS 'Stored procedure used to flatten results.';
+COMMENT ON COLUMN api_services."function_library"."value_recency" IS 'Timestamp of most recent value retrieved.';
+COMMENT ON COLUMN api_services."function_library"."loop_strategy" IS 'Strategy for iterating over results.';
+COMMENT ON COLUMN api_services."function_library"."iter_path_keys" IS 'Keys used to iterate response paths.';
+COMMENT ON COLUMN api_services."function_library"."iter_query_keys" IS 'Keys used to build query params.';
+COMMENT ON COLUMN api_services."function_library"."static_path_params" IS 'Static path parameters.';
+COMMENT ON COLUMN api_services."function_library"."static_query_params" IS 'Static query parameters.';
+COMMENT ON TABLE api_services."spotify_auth_metadata" IS 'Where metadata for the spotify authorization can be stored.';
+COMMENT ON COLUMN api_services."spotify_auth_metadata"."id" IS 'Primary key.';
+COMMENT ON COLUMN api_services."spotify_auth_metadata"."authorized_at_utc" IS 'When authorization occurred (UTC).';
+COMMENT ON COLUMN api_services."spotify_auth_metadata"."refresh_token_hash" IS 'Hash of the refresh token.';
+COMMENT ON COLUMN api_services."spotify_auth_metadata"."expires_at_utc" IS 'Token expiry (UTC).';
+COMMENT ON COLUMN api_services."spotify_auth_metadata"."is_active" IS 'Whether the record is active.';
+COMMENT ON COLUMN api_services."spotify_auth_metadata"."created_at" IS 'Record creation timestamp.';
+
+-- migrate:down
+COMMENT ON TABLE api_services."api_service_list" IS NULL;
+COMMENT ON TABLE api_services."api_tokens" IS NULL;
+COMMENT ON TABLE api_services."credentials" IS NULL;
+COMMENT ON TABLE api_services."function_library" IS NULL;
+COMMENT ON TABLE api_services."spotify_auth_metadata" IS NULL;

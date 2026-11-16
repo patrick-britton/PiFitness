@@ -1,0 +1,7 @@
+[Unit]
+Description=PiFitness hardware health snapshot
+
+[Service]
+Type=oneshot
+WorkingDirectory=@APP_DIR@
+ExecStart=@VENV_DIR@/bin/python3 @APP_DIR@/tools/pifitness-hardware-health.py

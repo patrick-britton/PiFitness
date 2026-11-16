@@ -1,9 +1,5 @@
-"""ISRC dupe review query helpers (008-005, T03; single-transaction rewrite T08).
-
-Accept writes swaps (arbiter: PK original_isrc, valid_mapping TRUE); reject
-writes non-swaps (bare ON CONFLICT DO NOTHING — no unique); both delete the
-decided pair bidirectionally; rescan CALLs the finder. Every path runs on one
-connection inside one transaction and rolls back + re-raises on failure.
+"""ISRC duplicate-review query helpers run each decision or rescan in a single
+transaction that rolls back and re-raises on failure.
 """
 
 import sys
@@ -14,7 +10,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from backend_functions.queries.music_queries import (
+from pifitness.music.queries import (
     get_isrc_dupe_count,
     process_isrc_dupe_decision,
     run_isrc_duplicate_finder,
@@ -67,26 +63,37 @@ class FakeConn:
         self.closed = True
 
 
+# VERIFIED: Unit — get_isrc_dupe_count returns stored row count divided by two
+@pytest.mark.unit
 def test_dupe_count_halves_rows_to_pairs():
+    """get_isrc_dupe_count returns the stored row count divided by two."""
     with patch(
-        'backend_functions.queries.music_queries.one_sql_result',
+        'pifitness.music.queries.one_sql_result',
         return_value=7,
     ):
         assert get_isrc_dupe_count() == 3
 
 
+# VERIFIED: Unit — get_isrc_dupe_count returns 0 when count query returns nothing
+@pytest.mark.unit
 def test_dupe_count_empty_is_zero():
+    """get_isrc_dupe_count returns 0 when the count query returns nothing."""
     with patch(
-        'backend_functions.queries.music_queries.one_sql_result',
+        'pifitness.music.queries.one_sql_result',
         return_value=None,
     ):
         assert get_isrc_dupe_count() == 0
 
 
+# VERIFIED: Regression — process_isrc_dupe_decision accept path records swaps, deletes pair in one transaction
+@pytest.mark.regression
 def test_accept_writes_swaps_and_deletes_pair_in_one_transaction():
+    """process_isrc_dupe_decision with accept true records both ISRCs as swaps to the
+    preferred ISRC and deletes the pair in one committed transaction.
+    """
     fake = FakeConn()
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ) as mock_get_conn:
         process_isrc_dupe_decision('ISRC-A', 'ISRC-B', 'ISRC-A', True)
@@ -112,10 +119,15 @@ def test_accept_writes_swaps_and_deletes_pair_in_one_transaction():
     assert del_params == ('ISRC-A', 'ISRC-B', 'ISRC-B', 'ISRC-A')
 
 
+# VERIFIED: Regression — process_isrc_dupe_decision reject path records non-swaps, deletes pair in one transaction
+@pytest.mark.regression
 def test_reject_writes_non_swaps_and_deletes_pair_in_one_transaction():
+    """process_isrc_dupe_decision with accept false records both ISRCs as non-swaps and
+    deletes the pair in one committed transaction.
+    """
     fake = FakeConn()
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ):
         process_isrc_dupe_decision('ISRC-A', 'ISRC-B', 'ISRC-A', False)
@@ -136,10 +148,15 @@ def test_reject_writes_non_swaps_and_deletes_pair_in_one_transaction():
     assert del_params == ('ISRC-A', 'ISRC-B', 'ISRC-B', 'ISRC-A')
 
 
+# VERIFIED: Regression — process_isrc_dupe_decision rolls back on insert failure, nothing committed
+@pytest.mark.regression
 def test_decision_insert_failure_rolls_back_and_raises():
+    """process_isrc_dupe_decision rolls back, commits nothing and re-raises when the
+    insert fails.
+    """
     fake = FakeConn(fail_on='executemany')
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ):
         with pytest.raises(RuntimeError):
@@ -150,11 +167,16 @@ def test_decision_insert_failure_rolls_back_and_raises():
     assert fake.closed is True
 
 
+# VERIFIED: Regression — process_isrc_dupe_decision rolls back on delete failure after insert, nothing committed
+@pytest.mark.regression
 def test_decision_delete_failure_rolls_back_and_raises():
+    """process_isrc_dupe_decision rolls back the earlier insert and re-raises when
+    deleting the pair fails.
+    """
     # Inserts succeed, the pool delete fails -> the whole decision is rolled back.
     fake = FakeConn(fail_on='execute')
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ):
         with pytest.raises(RuntimeError):
@@ -166,10 +188,15 @@ def test_decision_delete_failure_rolls_back_and_raises():
     assert fake.closed is True
 
 
+# VERIFIED: Regression — run_isrc_duplicate_finder runs finder procedure on one connection, commits once
+@pytest.mark.regression
 def test_rescan_issues_call_in_one_transaction():
+    """run_isrc_duplicate_finder runs the finder procedure on one connection and commits
+    once.
+    """
     fake = FakeConn()
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ) as mock_get_conn:
         run_isrc_duplicate_finder()
@@ -183,11 +210,15 @@ def test_rescan_issues_call_in_one_transaction():
     assert fake.closed is True
 
 
+# VERIFIED: Regression — run_isrc_duplicate_finder rolls back and re-raises on procedure failure, nothing committed
+@pytest.mark.regression
 def test_rescan_failure_rolls_back_and_raises():
+    """run_isrc_duplicate_finder rolls back and re-raises when the procedure call fails.
+    """
     # T08: a failed CALL must not look like a successful re-scan.
     fake = FakeConn(fail_on='execute')
     with patch(
-        'backend_functions.queries.music_queries.get_conn',
+        'pifitness.music.queries.get_conn',
         return_value=fake,
     ):
         with pytest.raises(RuntimeError):

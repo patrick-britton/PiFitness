@@ -1,0 +1,27 @@
+[Unit]
+Description=PiFitness Frontend Next.js
+After=network.target pifitness-fastapi.service
+Wants=pifitness-fastapi.service
+
+[Service]
+Type=simple
+User=god
+Group=god
+WorkingDirectory=@APP_DIR@/frontend/pifitness
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run start -- --port 3000 --hostname 127.0.0.1
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=@APP_DIR@/frontend/pifitness
+
+[Install]
+WantedBy=multi-user.target

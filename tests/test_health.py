@@ -1,3 +1,6 @@
+"""Smoke check that the application boots and its health route reports ok."""
+
+import pytest
 import sys
 import os
 
@@ -6,11 +9,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from fastapi.testclient import TestClient
 from backend.main import app
 
-def test_health():
-    # Create a test client for FastAPI
-    client = TestClient(app)
-
-    # Make request to health endpoint
+# VERIFIED: Smoke — GET /api/health returns 200 with status, database, timestamp fields
+@pytest.mark.smoke
+@pytest.mark.live
+def test_health(client):
+    """GET /api/health answers 200 with status ok and the database and timestamp fields.
+    """
     response = client.get("/api/health")
 
     # Assert the response

@@ -20,13 +20,23 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from backend.config import get_settings
-from backend.api import activities, health, admin, music, segments, auth, tri_tip, volleyball, exercises, config, food_lookup, food
+from pifitness.core.config import get_settings
+from pifitness.segments import router as segments
+from pifitness.health import router as health
+from pifitness.exercises import router as exercises
+from pifitness.volleyball import router as volleyball
+from pifitness.admin import router as admin
+from pifitness.food import router as food
+from pifitness.food import food_lookup
+from pifitness.music import router as music
+from pifitness.activities import router as activities
+from pifitness.auth import router as auth
+from pifitness.config import router as config
+from pifitness.tri_tip import router as tri_tip
 
 # ---------------------------------------------------------------------------
 # Application Initialization
@@ -115,22 +125,22 @@ async def global_exception_handler(request: Request, exc: Exception):
 # ---------------------------------------------------------------------------
 
 # Include API routers
-app.include_router(activities.router)
-app.include_router(config.router)
-app.include_router(health.router)
-app.include_router(admin.router)
-app.include_router(music.router)
-app.include_router(segments.router)
+app.include_router(activities)
+app.include_router(config)
+app.include_router(health)
+app.include_router(admin)
+app.include_router(music)
+app.include_router(segments)
 app.include_router(auth.router)
-app.include_router(tri_tip.router)
-app.include_router(volleyball.router)
-app.include_router(exercises.router)
+app.include_router(tri_tip)
+app.include_router(volleyball)
+app.include_router(exercises)
 
 # 010-001: food API raw-JSON diagnostic proxy (dev-only viewer backend)
 app.include_router(food_lookup.router)
 
 # 010-002: food skeleton routes (Option B stubs, contract shapes)
-app.include_router(food.router)
+app.include_router(food)
 
 @app.get("/api/health")
 async def health():

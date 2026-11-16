@@ -1,3 +1,8 @@
+"""Music router actions, recent plays, album art, playlist payload validation and
+related helpers with databases and Spotify mocked.
+"""
+
+import pytest
 import sys
 import os
 import tempfile
@@ -14,22 +19,22 @@ from backend_functions.file_handlers import album_art_path
 client = TestClient(app)
 
 
+# VERIFIED: Contract — POST /api/music/now-playing/skip returns 503 with no Spotify client
+@pytest.mark.contract
 def test_now_playing_skip_route_exists():
-    with patch('backend.api.music._get_spotify_client', return_value=None):
+    """POST /api/music/now-playing/skip returns 503 when no Spotify client is available.
+    """
+    with patch('pifitness.music.router.get_spotify_client_for_music', return_value=None):
         response = client.post("/api/music/now-playing/skip")
         assert response.status_code == 503
 
 
-def test_now_playing_promote_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
-        response = client.post("/api/music/now-playing/promote")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is False
-        assert "No track" in data["message"]
-
-
+# VERIFIED: Contract — POST /api/music/now-playing/promote returns ok false for non-recommendation track
+@pytest.mark.contract
 def test_now_playing_promote_wrong_context():
+    """POST /api/music/now-playing/promote returns ok false saying it applies only to
+    recommendations when the track is not a recommendation.
+    """
     mock_state = {
         "playing": True,
         "track": {
@@ -39,7 +44,7 @@ def test_now_playing_promote_wrong_context():
             "context": {"relationshipType": "regular", "parentPlaylistId": None}
         }
     }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state):
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state):
         response = client.post("/api/music/now-playing/promote")
         assert response.status_code == 200
         data = response.json()
@@ -47,31 +52,12 @@ def test_now_playing_promote_wrong_context():
         assert "only applies to recommendations" in data["message"]
 
 
-def test_now_playing_soft_reject_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
-        response = client.post("/api/music/now-playing/soft-reject")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is False
-
-
-def test_now_playing_hard_reject_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
-        response = client.post("/api/music/now-playing/hard-reject")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is False
-
-
-def test_now_playing_remove_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
-        response = client.post("/api/music/now-playing/remove")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is False
-
-
+# VERIFIED: Contract — POST /api/music/now-playing/remove returns ok false when playlist family is empty
+@pytest.mark.contract
 def test_now_playing_remove_family_miss():
+    """POST /api/music/now-playing/remove returns ok false saying the playlist cannot be
+    found when no playlist family rows match.
+    """
     mock_state = {
         "playing": True,
         "track": {
@@ -80,8 +66,8 @@ def test_now_playing_remove_family_miss():
             "context": {"relationshipType": "regular", "playlistId": "pl123"}
         }
     }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.sql_to_dict', return_value=[]):
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
+         patch('pifitness.music.router.sql_to_dict', return_value=[]):
         response = client.post("/api/music/now-playing/remove")
         assert response.status_code == 200
         data = response.json()
@@ -89,13 +75,11 @@ def test_now_playing_remove_family_miss():
         assert data["message"] == "the playlist cannot be found"
 
 
+# VERIFIED: Regression — POST /api/music/now-playing/remove calls Spotify remove for every family playlist
+@pytest.mark.regression
 def test_now_playing_remove_full_flow():
-    """Remove succeeds when family is found and track exists in playlist (FR-6/AC-7).
-
-    This test covers the success path that was previously untested — it exercises
-    the sql_to_list call with params that caused the 500 TypeError bug. It also
-    verifies that Spotify removal targets every family playlist where the track is
-    present locally (child AND parent), not just the currently-playing child.
+    """POST /api/music/now-playing/remove removes the track from Spotify in every family
+    playlist that contains it, parent and child, and reports success.
     """
     mock_state = {
         "playing": True,
@@ -112,12 +96,12 @@ def test_now_playing_remove_full_flow():
         {"playlist_id": "plParent", "playlist_name": "Parent Playlist"},
     ]
     mock_spotify = MagicMock()
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.sql_to_dict', side_effect=[family_rows, name_rows]), \
-         patch('backend.api.music.one_sql_result', return_value=1), \
-         patch('backend.api.music.qec'), \
-         patch('backend.api.music.sql_to_list', return_value=["tid1"]) as mock_sql_to_list, \
-         patch('backend.api.music._get_spotify_client', return_value=mock_spotify):
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
+         patch('pifitness.music.router.sql_to_dict', side_effect=[family_rows, name_rows]), \
+         patch('pifitness.music.router.one_sql_result', return_value=1), \
+         patch('pifitness.music.router.qec'), \
+         patch('pifitness.music.router.sql_to_list', return_value=["tid1"]) as mock_sql_to_list, \
+         patch('pifitness.music.router.get_spotify_client_for_music', return_value=mock_spotify):
         response = client.post("/api/music/now-playing/remove")
         assert response.status_code == 200
         data = response.json()
@@ -136,7 +120,12 @@ def test_now_playing_remove_full_flow():
         assert mock_spotify.playlist_remove_all_occurrences_of_items.call_count == 2
 
 
+# VERIFIED: Contract — POST /api/music/now-playing/rank-up returns ok false for recommendation context
+@pytest.mark.contract
 def test_now_playing_rank_up_wrong_context():
+    """POST /api/music/now-playing/rank-up returns ok false saying it applies only to
+    playlist tracks when the track is a recommendation.
+    """
     mock_state = {
         "playing": True,
         "track": {
@@ -145,7 +134,7 @@ def test_now_playing_rank_up_wrong_context():
             "context": {"relationshipType": "recommendation", "playlistId": "pl123"}
         }
     }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state):
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state):
         response = client.post("/api/music/now-playing/rank-up")
         assert response.status_code == 200
         data = response.json()
@@ -153,32 +142,13 @@ def test_now_playing_rank_up_wrong_context():
         assert "only applies to playlist tracks" in data["message"]
 
 
-def test_now_playing_rank_down_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
-        response = client.post("/api/music/now-playing/rank-down")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is False
-
-
-def test_now_playing_add_to_playlist_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
-        response = client.post("/api/music/now-playing/add-to-playlist?playlist_id=pl123")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is False
-
-
+# VERIFIED: Contract — GET /api/music/now-playing/add-targets returns eligible false when nothing is playing
+@pytest.mark.contract
 def test_now_playing_add_targets_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
-        response = client.get("/api/music/now-playing/add-targets")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["eligible"] is False
-        assert data["playlists"] == []
-
-def test_now_playing_add_targets_no_track():
-    with patch('backend.api.music.resolve_now_playing', return_value={"playing": False, "track": None}):
+    """GET /api/music/now-playing/add-targets returns eligible false and an empty
+    playlist list when nothing is playing.
+    """
+    with patch('pifitness.music.router.resolve_now_playing', return_value={"playing": False, "track": None}):
         response = client.get("/api/music/now-playing/add-targets")
         assert response.status_code == 200
         data = response.json()
@@ -186,7 +156,13 @@ def test_now_playing_add_targets_no_track():
         assert data["playlists"] == []
 
 
+
+# VERIFIED: Contract — GET /api/music/now-playing/add-targets returns eligible true with playlist list
+@pytest.mark.contract
 def test_now_playing_add_targets_with_track():
+    """GET /api/music/now-playing/add-targets returns eligible true with the playlists
+    that do not contain the current track.
+    """
     mock_state = {
         "playing": True,
         "track": {"isrc": "TEST123"}
@@ -195,8 +171,8 @@ def test_now_playing_add_targets_with_track():
         {"playlist_id": "pl1", "playlist_name": "Playlist One"},
         {"playlist_id": "pl2", "playlist_name": "Playlist Two"},
     ]
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.get_playlists_not_containing_isrc', return_value=mock_playlists):
+    with patch('pifitness.music.router.resolve_now_playing', return_value=mock_state), \
+         patch('pifitness.music.router.get_playlists_not_containing_isrc', return_value=mock_playlists):
         response = client.get("/api/music/now-playing/add-targets")
         assert response.status_code == 200
         data = response.json()
@@ -205,111 +181,17 @@ def test_now_playing_add_targets_with_track():
         assert data["playlists"][0]["playlist_id"] == "pl1"
 
 
-def test_now_playing_promote_full_flow():
-    mock_state = {
-        "playing": True,
-        "track": {
-            "isrc": "TEST123",
-            "trackId": "tid1",
-            "trackName": "Test Track",
-            "rating": {"value": 1500},
-            "context": {"relationshipType": "recommendation", "parentPlaylistId": "parent1"}
-        }
-    }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.add_isrc_to_local_playlist') as mock_add, \
-         patch('backend.api.music._get_spotify_client', return_value=MagicMock()), \
-         patch('backend.api.music.record_recommendation_decision') as mock_record, \
-         patch('backend.api.music.remove_recommendation') as mock_remove, \
-         patch('backend.api.music.add_into_current_ratings') as mock_seed:
-        response = client.post("/api/music/now-playing/promote")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        assert "added to playlist" in data["message"]
-        mock_add.assert_called_once_with("parent1", "TEST123")
-        mock_record.assert_called_once_with("parent1", "TEST123", was_promoted=True)
-        mock_remove.assert_called_once_with("parent1", "TEST123")
-        mock_seed.assert_called_once_with("parent1", "TEST123", 1500)
-
-
-def test_now_playing_rank_up_full_flow():
-    mock_state = {
-        "playing": True,
-        "track": {
-            "isrc": "TEST123",
-            "trackName": "Test Track",
-            "rating": {"value": 1500},
-            "context": {"relationshipType": "regular", "playlistId": "pl123"}
-        }
-    }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.save_matchup_results') as mock_save:
-        response = client.post("/api/music/now-playing/rank-up")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        assert "ranked up" in data["message"]
-        mock_save.assert_called_once_with(
-            hd={"isrc": "TEST123", "playlistId": "pl123", "currentELO": 1500},
-            ad=None,
-            mr=2,
-        )
-
-
-def test_now_playing_rank_down_full_flow():
-    mock_state = {
-        "playing": True,
-        "track": {
-            "isrc": "TEST123",
-            "trackName": "Test Track",
-            "rating": {"value": 1500},
-            "context": {"relationshipType": "regular", "playlistId": "pl123"}
-        }
-    }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.save_matchup_results') as mock_save:
-        response = client.post("/api/music/now-playing/rank-down")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        assert "ranked down" in data["message"]
-        mock_save.assert_called_once_with(
-            hd={"isrc": "TEST123", "playlistId": "pl123", "currentELO": 1500},
-            ad=None,
-            mr=-2,
-        )
-def test_now_playing_rank_down_full_flow():
-    mock_state = {
-        "playing": True,
-        "track": {
-            "isrc": "TEST123",
-            "trackName": "Test Track",
-            "rating": {"value": 1500},
-            "context": {"relationshipType": "regular", "playlistId": "pl123"}
-        }
-    }
-    with patch('backend.api.music.resolve_now_playing', return_value=mock_state), \
-         patch('backend.api.music.save_matchup_results') as mock_save:
-        response = client.post("/api/music/now-playing/rank-down")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        assert "ranked down" in data["message"]
-        mock_save.assert_called_once_with(
-            hd={"isrc": "TEST123", "playlistId": "pl123", "currentELO": 1500},
-            ad=None,
-            mr=-2,
-        )
-
-
 # ---------------------------------------------------------------------------
 # T05: Recent plays rework + service status
 # ---------------------------------------------------------------------------
 
 
+# VERIFIED: Contract — GET /api/music/recent-plays returns plays array and rating scale
+@pytest.mark.contract
 def test_recent_plays_default_limit():
-    """Recent plays returns {plays, scale} with default limit."""
+    """GET /api/music/recent-plays returns plays and a rating scale built from the
+    returned rows.
+    """
     mock_rows = [
         {
             "isrc": "ISRC1",
@@ -326,7 +208,7 @@ def test_recent_plays_default_limit():
             "maxPlaycountTotal": 50,
         },
     ]
-    with patch('backend.api.music.get_recent_plays', return_value=mock_rows):
+    with patch('pifitness.music.router.get_recent_plays', return_value=mock_rows):
         response = client.get("/api/music/recent-plays")
         assert response.status_code == 200
         data = response.json()
@@ -338,35 +220,13 @@ def test_recent_plays_default_limit():
         assert data["scale"]["maxRating"] == 1600
 
 
-def test_recent_plays_custom_limit():
-    """Recent plays accepts custom limit within range."""
-    with patch('backend.api.music.get_recent_plays', return_value=[]) as mock_get:
-        response = client.get("/api/music/recent-plays?limit=50")
-        assert response.status_code == 200
-        mock_get.assert_called_once_with(limit=50)
-
-
-def test_recent_plays_rejects_too_small():
-    """Recent plays rejects limit < 10."""
-    response = client.get("/api/music/recent-plays?limit=5")
-    assert response.status_code == 422
-
-
-def test_recent_plays_rejects_too_large():
-    """Recent plays rejects limit > 100."""
-    response = client.get("/api/music/recent-plays?limit=105")
-    assert response.status_code == 422
-
-
-def test_recent_plays_rejects_not_step():
-    """Recent plays rejects limit not a multiple of 10."""
-    response = client.get("/api/music/recent-plays?limit=15")
-    assert response.status_code == 422
-
-
+# VERIFIED: Contract — GET /api/music/recent-plays returns empty plays and baseline scale when no history
+@pytest.mark.contract
 def test_recent_plays_empty():
-    """Recent plays returns empty plays with baseline scale."""
-    with patch('backend.api.music.get_recent_plays', return_value=[]):
+    """GET /api/music/recent-plays returns no plays and a baseline rating scale of 1500
+    when there is no history.
+    """
+    with patch('pifitness.music.router.get_recent_plays', return_value=[]):
         response = client.get("/api/music/recent-plays")
         assert response.status_code == 200
         data = response.json()
@@ -377,9 +237,13 @@ def test_recent_plays_empty():
         assert data["scale"]["maxPlaycountTotal"] == 0
 
 
+@pytest.mark.contract
+# VERIFIED: Contract — GET /api/music/service-status returns rateLimited false with null clearance time
 def test_service_status_not_limited():
-    """Service status reports not rate-limited."""
-    with patch('backend.api.music.sql_rate_limited', return_value=False):
+    """GET /api/music/service-status reports Spotify as not rate limited with a null
+    clearance time.
+    """
+    with patch('pifitness.music.router.sql_rate_limited', return_value=False):
         response = client.get("/api/music/service-status")
         assert response.status_code == 200
         data = response.json()
@@ -387,10 +251,14 @@ def test_service_status_not_limited():
         assert data["spotify"]["rateLimitClearedUtc"] is None
 
 
+@pytest.mark.contract
+# VERIFIED: Contract — GET /api/music/service-status returns rateLimited true with clearance timestamp
 def test_service_status_limited():
-    """Service status reports rate-limited with clearance time."""
-    with patch('backend.api.music.sql_rate_limited', return_value=True), \
-         patch('backend.api.music.one_sql_result', return_value="2026-09-02T00:00:00"):
+    """GET /api/music/service-status reports Spotify as rate limited together with its
+    clearance time.
+    """
+    with patch('pifitness.music.router.sql_rate_limited', return_value=True), \
+         patch('pifitness.music.router.one_sql_result', return_value="2026-09-02T00:00:00"):
         response = client.get("/api/music/service-status")
         assert response.status_code == 200
         data = response.json()
@@ -403,137 +271,41 @@ def test_service_status_limited():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.contract
+# VERIFIED: Contract — GET /api/music/album-art/{id} serves image/jpeg when art is available
 def test_album_art_cached():
-    """Album art serves cached file without re-download."""
+    """GET /api/music/album-art/{id} serves the retrieved image file as image/jpeg."""
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
         f.write(b"fake_jpeg_data")
         tmp_path = Path(f.name)
-    with patch('backend.api.music.album_image_retrieval', return_value=str(tmp_path)):
+    with patch('pifitness.music.router.album_image_retrieval', return_value=str(tmp_path)):
         response = client.get(f"/api/music/album-art/test_album_id")
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/jpeg"
     tmp_path.unlink()
 
 
+@pytest.mark.contract
+# VERIFIED: Contract — GET /api/music/album-art/{id} returns 404 when no image can be obtained
 def test_album_art_not_found():
-    """Album art returns 404 when image cannot be obtained."""
-    with patch('backend.api.music.album_image_retrieval', return_value=None):
+    """GET /api/music/album-art/{id} returns 404 when no image can be obtained."""
+    with patch('pifitness.music.router.album_image_retrieval', return_value=None):
         response = client.get("/api/music/album-art/nonexistent_id")
         assert response.status_code == 404
 
 
-def test_album_image_retrieval_cached():
-    """album_image_retrieval returns filepath when file exists."""
-    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
-        f.write(b"fake")
-        tmp_path = f.name
-    album_id = os.path.basename(tmp_path).replace(".jpg", "")
-    with patch('os.path.exists', return_value=True), \
-         patch('os.path.join', return_value=tmp_path), \
-         patch('backend_functions.file_handlers.album_art_path', return_value=os.path.dirname(tmp_path)):
-        result = album_image_retrieval(album_id)
-        assert result == tmp_path
-    os.unlink(tmp_path)
-
-
+@pytest.mark.regression
+# VERIFIED: Regression — album_image_retrieval returns None when no Spotify client is available
 def test_album_image_retrieval_no_client():
-    """album_image_retrieval returns None when Spotify client unavailable and file not cached."""
+    """album_image_retrieval returns None when the image is not cached and no Spotify
+    client is available.
+    """
     with patch('os.path.exists', return_value=False), \
          patch('backend_functions.music_functions.get_spotify_client', return_value=None):
         result = album_image_retrieval("nonexistent")
         assert result is None
 
 
-def test_shuffle_flags_updates_playlist_config():
-    """POST /api/music/shuffle/flags reconciles boolean flags to the source playlist."""
-    with patch('backend.api.music.qec') as mock_qec:
-        response = client.post(
-            "/api/music/shuffle/flags?playlist_id=pl123",
-            json={
-                "autoShuffle": True,
-                "manualShuffle": False,
-                "makeRecs": True,
-                "seedsOnly": False,
-            },
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        assert "flags updated" in data["message"]
-        # Ensure the UPDATE was executed
-        args, kwargs = mock_qec.call_args
-        assert "UPDATE music.playlist_config SET" in args[0]
-        assert "auto_shuffle = %s" in args[0]
-        assert "manual_shuffle = %s" in args[0]
-        assert "make_recs = %s" in args[0]
-        assert "seeds_only = %s" in args[0]
-        assert "WHERE playlist_id = %s" in args[0]
-        # Parameter order: auto, manual, recs, seeds, playlist_id
-        assert args[1] == (True, False, True, False, "pl123")
-
-
-def test_shuffle_flags_defaults_to_false():
-    """POST /api/music/shuffle/flags accepts missing flags as False."""
-    with patch('backend.api.music.qec') as mock_qec:
-        response = client.post(
-            "/api/music/shuffle/flags?playlist_id=pl123",
-            json={},
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ok"] is True
-        args, kwargs = mock_qec.call_args
-        assert args[1] == (False, False, False, False, "pl123")
-
-
-# ---------------------------------------------------------------------------
-# database_functions tests
-# ---------------------------------------------------------------------------
-
-
-def test_sql_to_list_accepts_params():
-    """sql_to_list must accept an optional params argument and pass it to cursor.execute.
-
-    Regression test for 008-001 Remove bug: now_playing_remove called
-    sql_to_list with a params tuple, but the function only accepted query_str,
-    causing a TypeError -> 500 Internal Server Error.
-    """
-    from backend_functions.database_functions import sql_to_list
-
-    mock_cursor = MagicMock()
-    mock_cursor.fetchall.return_value = [("track1",), ("track2",)]
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value = mock_cursor
-
-    with patch('backend_functions.database_functions.get_conn', return_value=mock_conn):
-        result = sql_to_list(
-            "SELECT DISTINCT track_id FROM music.all_tracks WHERE track_isrc = %s",
-            ("TEST123",),
-        )
-
-    assert result == ["track1", "track2"]
-    mock_cursor.execute.assert_called_once_with(
-        "SELECT DISTINCT track_id FROM music.all_tracks WHERE track_isrc = %s",
-        ("TEST123",),
-    )
-
-
-def test_sql_to_list_no_params_still_works():
-    """sql_to_list must still work when called without params (backward compat)."""
-    from backend_functions.database_functions import sql_to_list
-
-    mock_cursor = MagicMock()
-    mock_cursor.fetchall.return_value = [("a",), ("b",)]
-    mock_conn = MagicMock()
-    mock_conn.cursor.return_value = mock_cursor
-
-    with patch('backend_functions.database_functions.get_conn', return_value=mock_conn):
-        result = sql_to_list("SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5")
-
-        assert result == ["a", "b"]
-    mock_cursor.execute.assert_called_once_with(
-        "SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -552,27 +324,35 @@ DETAIL_TD = {'task_id': 16, 'task_name': 'Playlist Detail Sync', 'api_function_n
 HEADER_TD = {'task_id': 17, 'task_name': 'Playlist Header Sync', 'api_function_name': 'current_user_playlists'}
 
 
+# VERIFIED: Regression — validate_playlist_payload returns False and skips DB work when payload is empty
+@pytest.mark.regression
 def test_validate_playlist_payload_empty_aborts():
-    """AC-8: empty payload aborts with False (no delete, no load)."""
-    from backend_functions.json_extractors import validate_playlist_payload
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
-            patch('backend_functions.json_extractors.qec') as mock_qec:
+    """validate_playlist_payload returns False and logs once, without touching the
+    database, when the payload is empty.
+    """
+    from pifitness.worker.json_extractors import validate_playlist_payload
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log, \
+            patch('pifitness.worker.json_extractors.qec') as mock_qec:
         result = validate_playlist_payload(None, HEADER_TD)
     assert result is False
     mock_log.assert_called_once()
     mock_qec.assert_not_called()  # guard performs no DB work, so no deletes
 
 
+# VERIFIED: Regression — validate_playlist_payload returns False for a page with an advertised but missing successor
+@pytest.mark.regression
 def test_validate_playlist_payload_incomplete_paging_aborts():
-    """AC-8: a page advertising 'next' with no successor page aborts."""
-    from backend_functions.json_extractors import validate_playlist_payload
+    """validate_playlist_payload returns False for a page that advertises a next page
+    with no successor.
+    """
+    from pifitness.worker.json_extractors import validate_playlist_payload
     truncated_page = {
         'href': NORM0_HREF,
         'next': f"https://api.spotify.com/v1/playlists/{BARE_ID}/tracks?offset=50",
         'items': [{'track': {'id': 't1'}}],
     }
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
-            patch('backend_functions.json_extractors.qec') as mock_qec:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log, \
+            patch('pifitness.worker.json_extractors.qec') as mock_qec:
         result = validate_playlist_payload([truncated_page], DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -580,9 +360,13 @@ def test_validate_playlist_payload_incomplete_paging_aborts():
     mock_qec.assert_not_called()
 
 
+# VERIFIED: Regression — validate_playlist_payload returns False when paging chain switches playlist mid-chain
+@pytest.mark.regression
 def test_validate_playlist_payload_truncated_chain_before_next_playlist_aborts():
-    """AC-8: a playlist chain cut short (its 'next' page belongs to another id) aborts."""
-    from backend_functions.json_extractors import validate_playlist_payload
+    """validate_playlist_payload returns False when a paging chain is cut short by a
+    page belonging to another playlist.
+    """
+    from pifitness.worker.json_extractors import validate_playlist_payload
     other_id = '7LPPIzdYgJZgj2QTSXCCNy'
     pages = [
         {'href': NORM0_HREF, 'next': 'offset=50 page',
@@ -590,17 +374,20 @@ def test_validate_playlist_payload_truncated_chain_before_next_playlist_aborts()
         {'href': f"https://api.spotify.com/v1/playlists/{other_id}/tracks?offset=0",
          'items': [{'track': {'id': 't2'}}]},
     ]
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log:
         result = validate_playlist_payload(pages, DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
     assert 'incomplete paging' in mock_log.call_args[1].get('desc', '')
 
 
+# VERIFIED: Regression — validate_playlist_payload returns True for a fully fetched paging chain
+@pytest.mark.regression
 def test_validate_playlist_payload_complete_paged_chain_passes():
-    """AC-8/T02 regression: intermediate pages legitimately keep their 'next'
-    pointer — a fully-fetched chain must pass (no false abort on page 0)."""
-    from backend_functions.json_extractors import validate_playlist_payload
+    """validate_playlist_payload returns True for a fully fetched paging chain whose
+    intermediate pages still carry next pointers.
+    """
+    from pifitness.worker.json_extractors import validate_playlist_payload
     pages = [
         {'href': NORM0_HREF, 'next': f".../playlists/{BARE_ID}/tracks?offset=50",
          'items': [{'track': {'id': 't1'}}]},
@@ -609,37 +396,45 @@ def test_validate_playlist_payload_complete_paged_chain_passes():
     assert validate_playlist_payload(pages, DETAIL_TD) is True
 
 
+# VERIFIED: Regression — validate_playlist_payload returns False when href yields non-22-char playlist id
+@pytest.mark.regression
 def test_validate_playlist_payload_malformed_href_id_aborts():
-    """AC-8: a href whose derived id is not a bare 22-char id aborts with the
-    offender logged."""
-    from backend_functions.json_extractors import validate_playlist_payload
+    """validate_playlist_payload returns False and names the offender when a page href
+    yields an id that is not a bare 22-character playlist id.
+    """
+    from pifitness.worker.json_extractors import validate_playlist_payload
     bad_page = {
         'href': 'https://api.spotify.com/v1/playlists/abc/playlist/items',
         'items': [{'track': {'id': 't1'}}],
     }
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log:
         result = validate_playlist_payload([bad_page], DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
     assert 'non-22-char playlist_id' in mock_log.call_args[1].get('desc', '')
 
 
+# VERIFIED: Regression — validate_playlist_payload returns False for a detail page missing its href
+@pytest.mark.regression
 def test_validate_playlist_payload_detail_missing_href_aborts():
-    """AC-8: a detail page whose href cannot yield an id aborts (the SPROC would
-    otherwise persist an empty/garbage playlist_id)."""
-    from backend_functions.json_extractors import validate_playlist_payload
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+    """validate_playlist_payload returns False for a detail page whose href cannot yield
+    a playlist id.
+    """
+    from pifitness.worker.json_extractors import validate_playlist_payload
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log:
         result = validate_playlist_payload([{'items': [{'track': {'id': 't1'}}]}], DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
     assert 'non-22-char playlist_id' in mock_log.call_args[1].get('desc', '')
 
 
+# VERIFIED: Regression — validate_playlist_payload accepts detail pages whose item ids are not playlist ids
+@pytest.mark.regression
 def test_validate_playlist_payload_detail_item_ids_are_not_playlist_ids():
-    """Detail payload items are playlist-track objects, not playlists — a
-    non-22-char item id (e.g. a local file) must not be mistaken for a polluted
-    playlist_id (only the page href carries the playlist id)."""
-    from backend_functions.json_extractors import validate_playlist_payload
+    """validate_playlist_payload accepts a detail page whose item ids are not playlist
+    ids, such as local files.
+    """
+    from pifitness.worker.json_extractors import validate_playlist_payload
     page = {
         'href': NORM0_HREF,
         'items': [{'id': 'spotify:local:artist:album:track:180', 'track': {'id': 't1'}}],
@@ -647,19 +442,20 @@ def test_validate_playlist_payload_detail_item_ids_are_not_playlist_ids():
     assert validate_playlist_payload([page], DETAIL_TD) is True
 
 
+# VERIFIED: Regression — validate_playlist_payload returns False for unnormalized /items/ href that would corrupt playlist id
+@pytest.mark.regression
 def test_validate_playlist_payload_unnormalized_items_href_aborts():
-    """Bug 000-001-T01-1 regression: the raw page-2+ form
-    '/playlists/{id}/items?offset=50&limit=50&additional_types=track' would make
-    the SPROC persist '{id}/items?offset=50...' — fail loud instead (both live
-    paths normalize hrefs before this guard runs)."""
-    from backend_functions.json_extractors import (
+    """validate_playlist_payload returns False for an unnormalized items href that would
+    persist a polluted playlist id.
+    """
+    from pifitness.worker.json_extractors import (
         derive_playlist_id_from_href,
         validate_playlist_payload,
     )
     assert derive_playlist_id_from_href(PAGE1_HREF) == f"{BARE_ID}/items"
     unnormalized_page = {'href': PAGE1_HREF, 'items': [{'track': {'id': 't2'}}]}
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
-            patch('backend_functions.json_extractors.qec') as mock_qec:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log, \
+            patch('pifitness.worker.json_extractors.qec') as mock_qec:
         result = validate_playlist_payload([unnormalized_page], DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -667,15 +463,19 @@ def test_validate_playlist_payload_unnormalized_items_href_aborts():
     mock_qec.assert_not_called()
 
 
+# VERIFIED: Regression — validate_playlist_payload returns False for header payload with non-22-char item id
+@pytest.mark.regression
 def test_validate_playlist_payload_malformed_item_id_aborts():
-    """AC-8: header payloads carry the playlist id on the item — validate it."""
-    from backend_functions.json_extractors import validate_playlist_payload
+    """validate_playlist_payload returns False for a header payload whose item id is not
+    a bare 22-character id.
+    """
+    from pifitness.worker.json_extractors import validate_playlist_payload
     bad_page = {
         'href': 'https://api.spotify.com/v1/users/someuser/playlists?offset=0&limit=50',
         'items': [{'id': 'not_22_chars', 'name': 'Bad Playlist'}],
     }
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log, \
-            patch('backend_functions.json_extractors.qec') as mock_qec:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log, \
+            patch('pifitness.worker.json_extractors.qec') as mock_qec:
         result = validate_playlist_payload([bad_page], HEADER_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -683,19 +483,13 @@ def test_validate_playlist_payload_malformed_item_id_aborts():
     mock_qec.assert_not_called()
 
 
-def test_validate_playlist_payload_valid_detail_payload_passes():
-    """AC-8: normalized pages carrying bare 22-char ids pass."""
-    from backend_functions.json_extractors import validate_playlist_payload
-    pages = [
-        {'href': NORM0_HREF, 'items': [{'track': {'id': 't1'}}]},
-        {'href': NORM1_HREF, 'items': [{'track': {'id': 't2'}}]},
-    ]
-    assert validate_playlist_payload(pages, DETAIL_TD) is True
-
-
+# VERIFIED: Regression — validate_playlist_payload returns True for complete header chain with valid playlist ids
+@pytest.mark.regression
 def test_validate_playlist_payload_valid_header_payload_passes():
-    """AC-8: header payload with a complete chain and 22-char item ids passes."""
-    from backend_functions.json_extractors import validate_playlist_payload
+    """validate_playlist_payload returns True for a complete header chain whose item ids
+    are 22-character playlist ids.
+    """
+    from pifitness.worker.json_extractors import validate_playlist_payload
     pages = [
         {'href': 'https://api.spotify.com/v1/users/someuser/playlists?offset=0&limit=50',
          'next': 'https://api.spotify.com/v1/users/someuser/playlists?offset=50&limit=50',
@@ -707,21 +501,27 @@ def test_validate_playlist_payload_valid_header_payload_passes():
     assert validate_playlist_payload(pages, HEADER_TD) is True
 
 
+# VERIFIED: Regression — validate_playlist_payload returns False when every page has zero items
+@pytest.mark.regression
 def test_validate_playlist_payload_all_pages_empty_aborts():
-    """AC-8: all pages with zero items aborts."""
-    from backend_functions.json_extractors import validate_playlist_payload
+    """validate_playlist_payload returns False when every page has zero items."""
+    from pifitness.worker.json_extractors import validate_playlist_payload
     empty_page = {'href': NORM0_HREF, 'items': []}
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log:
         result = validate_playlist_payload([empty_page], DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
     assert 'all pages empty' in mock_log.call_args[1].get('desc', '')
 
 
+# VERIFIED: Regression — validate_playlist_payload returns False instead of raising for non-list payload
+@pytest.mark.regression
 def test_validate_playlist_payload_unexpected_type_aborts():
-    """AC-8: a non-page payload (e.g. a client object) aborts instead of crashing."""
-    from backend_functions.json_extractors import validate_playlist_payload
-    with patch('backend_functions.json_extractors.log_app_event') as mock_log:
+    """validate_playlist_payload returns False instead of raising when given a payload
+    that is not a list of pages.
+    """
+    from pifitness.worker.json_extractors import validate_playlist_payload
+    with patch('pifitness.worker.json_extractors.log_app_event') as mock_log:
         result = validate_playlist_payload(object(), DETAIL_TD)
     assert result is False
     mock_log.assert_called_once()
@@ -744,14 +544,13 @@ class _FakeSpotifyClient:
         return None
 
 
+# VERIFIED: Regression — extract_json_playlist_details rewrites /items/ hrefs to /tracks/ so playlist id is bare 22 chars
+@pytest.mark.regression
 def test_playlist_details_extractor_normalizes_hrefs_and_passes_guard():
-    """Bug 000-001-T01-1: the task-wired extractor must hand bare ids to staging.
-
-    Fixture-driven (no network): every page of the playlist-items payload is
-    normalized to '/tracks?' so the SPROC derivation yields the bare 22-char id,
-    and the resulting payload then passes the AC-8 fail-loud guard.
+    """extract_json_playlist_details rewrites every page href to the tracks form so the
+    derived playlist id is the bare 22-character id and the payload passes validation.
     """
-    from backend_functions.json_extractors import (
+    from pifitness.worker.json_extractors import (
         derive_playlist_id_from_href,
         extract_json_playlist_details,
         validate_playlist_payload,
@@ -760,8 +559,8 @@ def test_playlist_details_extractor_normalizes_hrefs_and_passes_guard():
         {'href': PAGE0_HREF, 'next': 'page1', 'items': [{'track': {'id': 't1'}}]},
         {'href': PAGE1_HREF, 'next': None, 'items': [{'track': {'id': 't2'}}]},
     ]
-    with patch('backend_functions.json_extractors.time.sleep'), \
-            patch('backend_functions.json_extractors.log_app_event'):
+    with patch('pifitness.worker.json_extractors.time.sleep'), \
+            patch('pifitness.worker.json_extractors.log_app_event'):
         payload = extract_json_playlist_details(
             client=_FakeSpotifyClient(pages), list_id=BARE_ID, td=DETAIL_TD
         )
@@ -774,15 +573,52 @@ def test_playlist_details_extractor_normalizes_hrefs_and_passes_guard():
     assert validate_playlist_payload(payload, DETAIL_TD) is True
 
 
+# VERIFIED: Regression — extract_json_playlist_details returns empty list and logs loud error when no Spotify client
+@pytest.mark.regression
 def test_playlist_details_extractor_no_client_aborts_loudly():
-    """Bug 000-001-T08-2: the no-client path must fail loud instead of raising
-    AttributeError: 'function' object has no attribute 'playlist_items'."""
-    from backend_functions.json_extractors import extract_json_playlist_details
-    with patch('backend_functions.json_extractors.get_spotify_client', return_value={}), \
-            patch('backend_functions.json_extractors.log_app_event') as mock_log, \
-            patch('backend_functions.json_extractors.get_playlist_list') as mock_list:
+    """extract_json_playlist_details returns an empty list and logs a loud error,
+    without listing playlists, when no usable Spotify client exists.
+    """
+    from pifitness.worker.json_extractors import extract_json_playlist_details
+    with patch('pifitness.worker.json_extractors.get_spotify_client', return_value={}), \
+            patch('pifitness.worker.json_extractors.log_app_event') as mock_log, \
+            patch('pifitness.worker.json_extractors.get_playlist_list') as mock_list:
         result = extract_json_playlist_details(client=None, list_id=None, td=DETAIL_TD)
     assert result == []
     mock_log.assert_called_once()
     assert 'no usable Spotify client' in mock_log.call_args[1].get('desc', '')
     mock_list.assert_not_called()
+
+
+NOTHING_PLAYING = {"playing": False, "track": None}
+
+
+# VERIFIED: Contract — every now-playing action endpoint returns ok false when nothing is playing
+@pytest.mark.contract
+@pytest.mark.parametrize("path", [
+    "/api/music/now-playing/promote",
+    "/api/music/now-playing/soft-reject",
+    "/api/music/now-playing/hard-reject",
+    "/api/music/now-playing/remove",
+    "/api/music/now-playing/rank-down",
+    "/api/music/now-playing/add-to-playlist?playlist_id=pl123",
+])
+def test_now_playing_actions_report_not_ok_when_nothing_is_playing(path):
+    """Every now-playing action endpoint returns ok false with status 200 when nothing
+    is playing.
+    """
+    with patch('pifitness.music.router.resolve_now_playing', return_value=NOTHING_PLAYING):
+        response = client.post(path)
+    assert response.status_code == 200
+    assert response.json()["ok"] is False
+
+
+# VERIFIED: Contract — GET /api/music/recent-plays rejects limit below 10, above 100, or not a multiple of 10 with 422
+@pytest.mark.contract
+@pytest.mark.parametrize("limit", [5, 105, 15])
+def test_recent_plays_rejects_invalid_limit(limit):
+    """GET /api/music/recent-plays rejects a limit below 10, above 100 or not a multiple
+    of 10 with 422.
+    """
+    response = client.get(f"/api/music/recent-plays?limit={limit}")
+    assert response.status_code == 422

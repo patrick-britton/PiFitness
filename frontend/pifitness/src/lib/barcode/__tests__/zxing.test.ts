@@ -15,6 +15,7 @@ vi.mock('barcode-detector/ponyfill', () => ({
 import { ZXING_WASM_BASE_PATH, ensureZxingConfigured } from '../zxing';
 
 describe('ensureZxingConfigured', () => {
+  // VERIFIED: Unit — ensureZxingConfigured resolves the wasm to own origin (/wasm) and configures ZXing exactly once, guarding against the jsDelivr CDN fallback
   it('resolves the wasm to our own origin and configures only once', () => {
     ensureZxingConfigured();
     ensureZxingConfigured();

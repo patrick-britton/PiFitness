@@ -73,6 +73,7 @@ beforeEach(() => {
 });
 
 describe('Diary', () => {
+  // VERIFIED: Diary view renders calorie summary and food entry cards across desktop, portrait, and landscape viewport layouts
   it('renders stats bars + entry cards in all three layout variants', async () => {
     for (const variant of ['desktop', 'portrait', 'landscape'] as const) {
       useViewportStore.setState({ layoutVariant: variant });
@@ -83,6 +84,7 @@ describe('Diary', () => {
     }
   });
 
+  // VERIFIED: Loading skeleton placeholders display while stats and diary entries fetch asynchronously
   it('shows loading skeletons while stats/entries resolve', () => {
     diaryStats.mockReturnValue(new Promise(() => {}));
     diary.mockReturnValue(new Promise(() => {}));
@@ -91,6 +93,7 @@ describe('Diary', () => {
     expect(screen.getAllByTestId('diary-entries-loading').length).toBeGreaterThan(0);
   });
 
+  // VERIFIED: Empty diary lists and network errors display explanatory fallbacks instead of crashing or blanking
   it('shows empty + error states, never a blank screen', async () => {
     diaryStats.mockResolvedValue({ today_kcal: null, last_24h_kcal: null, avg_7d_kcal: null, scale_max: 0 });
     diary.mockResolvedValue([]);
@@ -105,6 +108,7 @@ describe('Diary', () => {
     expect(await screen.findByText(/Diary entries/i)).toBeInTheDocument();
   });
 
+  // VERIFIED: Navigating to previous day requests food logs for the corresponding calendar date
   it('day arrows load the neighbouring day', async () => {
     const user = userEvent.setup();
     render(<Diary />);
@@ -114,6 +118,7 @@ describe('Diary', () => {
     await waitFor(() => expect(diary).toHaveBeenCalledWith(yesterday));
   });
 
+  // VERIFIED: Add entry button switches view to food search picker and cancel button returns to diary list
   it('plus-circle Add swaps to add-entry mode; red cancel returns', async () => {
     const user = userEvent.setup();
     vi.mocked(API.food.suggest).mockResolvedValue([]);
@@ -126,6 +131,7 @@ describe('Diary', () => {
     expect(await screen.findByText('Banana')).toBeInTheDocument();
   });
 
+  // VERIFIED: Selecting diary entry card opens edit dialog and saving updates entry quantity via API
   it('tapping a card opens the edit popup', async () => {
     const user = userEvent.setup();
     updateDiaryEntry.mockResolvedValue({ ...MEAL, qty: 200 });
@@ -138,6 +144,7 @@ describe('Diary', () => {
     await waitFor(() => expect(updateDiaryEntry).toHaveBeenCalled());
   });
 
+  // VERIFIED: Deleting a diary entry displays undo banner allowing immediate restoration without permanent loss
   it('Delete follows undo-vs-confirm: banner + Undo, no commit', async () => {
     const user = userEvent.setup();
     deleteDiaryEntry.mockResolvedValue({ success: true, entry_id: 1 });
@@ -149,6 +156,7 @@ describe('Diary', () => {
     expect(screen.queryByText(/1 entry removed/i)).not.toBeInTheDocument();
   });
 
+  // VERIFIED: Diary edit modal ignores backdrop dismiss clicks requiring explicit cancel action
   it('T10: edit popup closes only via buttons — backdrop click does nothing', async () => {
     const user = userEvent.setup();
     render(<Diary />);
@@ -160,6 +168,7 @@ describe('Diary', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  // VERIFIED: Editing a recipe-based diary entry preserves custom serving unit selection upon save
   it('010-005 T10: editing a logged recipe entry keeps its own serving unit label', async () => {
     const user = userEvent.setup();
     const recipeMeal = { ...MEAL, entry_id: 9, name_snapshot: 'Pancakes', qty: 3, unit: 'pancake', kcal: 300 };

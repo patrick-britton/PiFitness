@@ -1,10 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
-import maplibregl, {
-  type StyleSpecification,
-} from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { maplibregl } from '@/lib/maplibre';
+import type { StyleSpecification } from 'maplibre-gl';
 import {
   Chart as ChartJS,
   LinearScale,

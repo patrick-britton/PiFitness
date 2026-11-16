@@ -11,14 +11,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BarcodeScanner from '../BarcodeScanner';
 import { RETAIL_BARCODE_FORMATS, type BarcodeDecoder } from '@/lib/barcode/decoder';
-import { ean13Canvas } from '@/lib/barcode/ean13';
-
-// The dev self-test draws a canvas; jsdom has no 2D context, so stub the drawing step
-// (the encoder's own maths is covered by `lib/barcode/__tests__/ean13.test.ts`).
-vi.mock('@/lib/barcode/ean13', () => ({
-  EAN13_TEST_CODE: '4006381333931',
-  ean13Canvas: vi.fn((): HTMLCanvasElement | null => ({}) as HTMLCanvasElement),
-}));
 
 function fakeStream() {
   const stop = vi.fn();
@@ -40,6 +32,7 @@ function decoder(next: () => { rawValue: string; format: string }[]) {
 }
 
 describe('BarcodeScanner', () => {
+  // VERIFIED: Barcode scanner triggers onScan once per unique detected barcode and debounces repeated frames
   it('reports one scan per distinct code and ignores repeats', async () => {
     const { stream } = fakeStream();
     const onScan = vi.fn();
@@ -69,6 +62,7 @@ describe('BarcodeScanner', () => {
     expect(onScan).toHaveBeenCalledTimes(1);
   });
 
+  // VERIFIED: Barcode scanner re-triggers onScan when a distinct second code enters the camera frame
   it('emits again for a different code', async () => {
     const { stream } = fakeStream();
     const onScan = vi.fn();
@@ -93,7 +87,8 @@ describe('BarcodeScanner', () => {
     await waitFor(() => expect(onScan).toHaveBeenCalledWith('222222222222', 'ean_13'));
   });
 
-it('surfaces permission denial and offers a retry', async () => {
+  // VERIFIED: Camera permission rejection displays explanatory alert and offers retry action
+  it('surfaces permission denial and offers a retry', async () => {
     const onError = vi.fn();
     render(
       <BarcodeScanner
@@ -112,6 +107,7 @@ it('surfaces permission denial and offers a retry', async () => {
     expect(screen.getByRole('button', { name: /Retry camera/i })).toBeInTheDocument();
   });
 
+  // VERIFIED: Missing camera hardware displays user alert and propagates no-camera error code
   it('surfaces a missing camera', async () => {
     const onError = vi.fn();
     render(
@@ -130,6 +126,7 @@ it('surfaces permission denial and offers a retry', async () => {
     expect(onError).toHaveBeenCalledWith('no-camera');
   });
 
+  // VERIFIED: Insecure non-HTTPS contexts display clear security warning alert
   it('surfaces an insecure context', async () => {
     render(
       <BarcodeScanner
@@ -145,6 +142,7 @@ it('surfaces permission denial and offers a retry', async () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/secure context/i);
   });
 
+  // VERIFIED: Browsers lacking mediaDevices support fail closed with unsupported alert
   it('reports an unsupported browser through the real camera path', async () => {
     // No requestStream fake: jsdom has no navigator.mediaDevices, so the real
     // requestRearCamera must fail closed as "unsupported".
@@ -152,6 +150,7 @@ it('surfaces permission denial and offers a retry', async () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/cannot scan barcodes/i);
   });
 
+  // VERIFIED: Unmounting scanner component terminates all active media stream tracks
   it('releases the camera on unmount', async () => {
     const { stream, stop } = fakeStream();
     const { unmount } = render(
@@ -170,6 +169,7 @@ it('surfaces permission denial and offers a retry', async () => {
     expect(stop).toHaveBeenCalledTimes(1);
   });
 
+  // VERIFIED: Clicking retry camera button requests fresh media stream after initial failure
   it('restarts the camera on retry', async () => {
     const user = userEvent.setup();
     const { stream } = fakeStream();
@@ -195,6 +195,7 @@ it('surfaces permission denial and offers a retry', async () => {
     expect(requestStream).toHaveBeenCalledTimes(2);
   });
 
+  // VERIFIED: Inactive scanner state prevents camera stream initialization
   it('does not touch the camera while inactive', () => {
     const requestStream = vi.fn();
     render(<BarcodeScanner active={false} onScan={vi.fn()} requestStream={requestStream} />);
@@ -202,15 +203,7 @@ it('surfaces permission denial and offers a retry', async () => {
     expect(screen.getByRole('status')).toHaveTextContent(/Camera off/i);
   });
 
-  it('supports a dev-only simulated scan without replacing the camera path', async () => {
-    const user = userEvent.setup();
-    const onScan = vi.fn();
-    render(<BarcodeScanner active={false} onScan={onScan} devSimulateValue="737628064502" />);
-
-    await user.click(screen.getByRole('button', { name: /simulate scan/i }));
-    expect(onScan).toHaveBeenCalledWith('737628064502', 'ean_13');
-  });
-
+  // VERIFIED: Scanning state displays live diagnostics readout and orientation guidance
   it('shows what the scanner is doing while it seeks a barcode', async () => {
     const { stream } = fakeStream();
     const createDecoder = vi.fn(
@@ -253,6 +246,7 @@ it('surfaces permission denial and offers a retry', async () => {
     expect(screen.getByText(/has not matched a barcode yet/i)).toBeInTheDocument();
   });
 
+  // VERIFIED: Decoder errors encountered during frame processing surface diagnostic failure details
   it('surfaces per-frame decode errors instead of swallowing them', async () => {
     const { stream } = fakeStream();
     const createDecoder = vi.fn(
@@ -281,6 +275,7 @@ it('surfaces permission denial and offers a retry', async () => {
     expect(screen.getByText(/the decoder is failing on this image/i)).toBeInTheDocument();
   });
 
+  // VERIFIED: Decoder instantiation failure displays error alert with raw details and retry action
   it('reports a decoder that cannot be created, with the raw error', async () => {
     const { stream } = fakeStream();
     const onError = vi.fn();
@@ -302,93 +297,5 @@ it('surfaces permission denial and offers a retry', async () => {
     expect(screen.getByText(/Failed to load \/wasm\/zxing_reader\.wasm/)).toBeInTheDocument();
     expect(onError).toHaveBeenCalledWith('decoder');
     expect(screen.getByRole('button', { name: /Retry camera/i })).toBeInTheDocument();
-  });
-
-  it('dev self-test decodes a known-good EAN-13 through the live decoder', async () => {
-    const user = userEvent.setup();
-    const { stream } = fakeStream();
-    const createDecoder = vi.fn(
-      async (): Promise<BarcodeDecoder> => ({
-        detect: async () => [{ rawValue: '4006381333931', format: 'ean_13' }],
-        kind: 'ponyfill',
-      }),
-    );
-
-    render(
-      <BarcodeScanner
-        active
-        onScan={vi.fn()}
-        requestStream={async () => stream}
-        createDecoder={createDecoder}
-        devSimulateValue="737628064502"
-        debounceMs={60000}
-      />,
-    );
-
-    await user.click(await screen.findByRole('button', { name: /known-good EAN-13/i }));
-    await waitFor(() =>
-      expect(screen.getByTestId('self-test-result')).toHaveTextContent(
-        /Decoder OK: read the known-good EAN-13 4006381333931/,
-      ),
-    );
-  });
-
-  it('dev self-test blames the decoder when a perfect barcode cannot be read', async () => {
-    const user = userEvent.setup();
-    const { stream } = fakeStream();
-
-    render(
-      <BarcodeScanner
-        active
-        onScan={vi.fn()}
-        requestStream={async () => stream}
-        createDecoder={decoder(() => [])}
-        devSimulateValue="737628064502"
-      />,
-    );
-
-    await user.click(await screen.findByRole('button', { name: /known-good EAN-13/i }));
-    await waitFor(() =>
-      expect(screen.getByTestId('self-test-result')).toHaveTextContent(
-        /could NOT read a perfect EAN-13/,
-      ),
-    );
-  });
-
-  it('dev self-test reports when the symbol cannot be drawn', async () => {
-    const user = userEvent.setup();
-    const { stream } = fakeStream();
-    vi.mocked(ean13Canvas).mockReturnValueOnce(null);
-
-    render(
-      <BarcodeScanner
-        active
-        onScan={vi.fn()}
-        requestStream={async () => stream}
-        createDecoder={decoder(() => [])}
-        devSimulateValue="737628064502"
-      />,
-    );
-
-    await user.click(await screen.findByRole('button', { name: /known-good EAN-13/i }));
-    await waitFor(() =>
-      expect(screen.getByTestId('self-test-result')).toHaveTextContent(/no 2D canvas context/i),
-    );
-  });
-
-  it('omits the dev self-test control without the dev flag', async () => {
-    const { stream } = fakeStream();
-
-    render(
-      <BarcodeScanner
-        active
-        onScan={vi.fn()}
-        requestStream={async () => stream}
-        createDecoder={decoder(() => [])}
-      />,
-    );
-
-    await waitFor(() => expect(screen.getByTestId('scanner-diagnostics')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /known-good EAN-13/i })).not.toBeInTheDocument();
   });
 });

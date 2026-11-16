@@ -1,0 +1,4750 @@
+{
+  "identity": {
+    "database": "pifitness_dev",
+    "user": "dev",
+    "server_addr": "172.18.0.2",
+    "server_port": 5432
+  },
+  "comments": [
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "activities",
+      "column": null,
+      "comment": "Table activities."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "activity_details",
+      "column": null,
+      "comment": "Table activity_details."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "activity_details_distance",
+      "column": null,
+      "comment": "Table activity_details_distance."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "activity_processing_queue",
+      "column": null,
+      "comment": "Table activity_processing_queue."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "activity_resampled_1m",
+      "column": null,
+      "comment": "Table activity_resampled_1m."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "courses",
+      "column": null,
+      "comment": "Table courses."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "distinct_segments",
+      "column": null,
+      "comment": "Table distinct_segments."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "elevation_reference",
+      "column": null,
+      "comment": "Table elevation_reference."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "metric_list",
+      "column": null,
+      "comment": "Table metric_list."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "overlap_queue",
+      "column": null,
+      "comment": "Table overlap_queue."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "race_predictions_raw",
+      "column": null,
+      "comment": "Table race_predictions_raw."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "segment_match_exclusions",
+      "column": null,
+      "comment": "Table segment_match_exclusions."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "segment_matches",
+      "column": null,
+      "comment": "Table segment_matches."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "segments",
+      "column": null,
+      "comment": "Table segments."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "segments_details",
+      "column": null,
+      "comment": "Table segments_details."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "steps_raw",
+      "column": null,
+      "comment": "Table steps_raw."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "temp_activity_segment_metas",
+      "column": null,
+      "comment": "Table temp_activity_segment_metas."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "temp_segment_details",
+      "column": null,
+      "comment": "Table temp_segment_details."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "temp_segment_matches_downselect",
+      "column": null,
+      "comment": "Table temp_segment_matches_downselect."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "temp_segment_matches_v1",
+      "column": null,
+      "comment": "Table temp_segment_matches_v1."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "temp_segment_matching_activities",
+      "column": null,
+      "comment": "Table temp_segment_matching_activities."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "temp_segment_matching_segments",
+      "column": null,
+      "comment": "Table temp_segment_matching_segments."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "temp_segments_v1",
+      "column": null,
+      "comment": "Table temp_segments_v1."
+    },
+    {
+      "kind": "table",
+      "schema": "activities",
+      "table": "training_cycle_dates",
+      "column": null,
+      "comment": "Table training_cycle_dates."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_date",
+      "comment": "Column activity_date."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_end_point",
+      "comment": "Column activity_end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_end_point",
+      "comment": "Column activity_end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_end_point",
+      "comment": "Column activity_end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_end_point",
+      "comment": "Column activity_end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_end_point",
+      "comment": "Column activity_end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_id",
+      "comment": "Column activity_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_name",
+      "comment": "Column activity_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_pace",
+      "comment": "Column activity_pace."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_path",
+      "comment": "Column activity_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_path",
+      "comment": "Column activity_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_path",
+      "comment": "Column activity_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_path",
+      "comment": "Column activity_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_path",
+      "comment": "Column activity_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_path",
+      "comment": "Column activity_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_path",
+      "comment": "Column activity_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_path",
+      "comment": "Column activity_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_path",
+      "comment": "Column activity_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_reference_id",
+      "comment": "Column activity_reference_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_reference_id",
+      "comment": "Column activity_reference_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_reference_id",
+      "comment": "Column activity_reference_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_reference_id",
+      "comment": "Column activity_reference_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_reference_id",
+      "comment": "Column activity_reference_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_start_date",
+      "comment": "Column activity_start_date."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_start_point",
+      "comment": "Column activity_start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_start_point",
+      "comment": "Column activity_start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_start_point",
+      "comment": "Column activity_start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_start_point",
+      "comment": "Column activity_start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_start_point",
+      "comment": "Column activity_start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_start_utc",
+      "comment": "Column activity_start_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_time_s",
+      "comment": "Column activity_time_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type",
+      "comment": "Column activity_type."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_basic",
+      "comment": "Column activity_type_basic."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_id",
+      "comment": "Column activity_type_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_id",
+      "comment": "Column activity_type_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_id",
+      "comment": "Column activity_type_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_id",
+      "comment": "Column activity_type_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_id",
+      "comment": "Column activity_type_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_id",
+      "comment": "Column activity_type_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_id",
+      "comment": "Column activity_type_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_id",
+      "comment": "Column activity_type_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_id",
+      "comment": "Column activity_type_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_name",
+      "comment": "Column activity_type_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_name",
+      "comment": "Column activity_type_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_name",
+      "comment": "Column activity_type_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "activity_type_name",
+      "comment": "Column activity_type_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "acute_load_delta",
+      "comment": "Column acute_load_delta."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "air_temp_c",
+      "comment": "Column air_temp_c."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "air_temp_c",
+      "comment": "Column air_temp_c."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "air_temp_c",
+      "comment": "Column air_temp_c."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "all_time_rank",
+      "comment": "Column all_time_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "all_time_rank",
+      "comment": "Column all_time_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "all_time_rank",
+      "comment": "Column all_time_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "all_time_rank",
+      "comment": "Column all_time_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "altitude_acclimation_m",
+      "comment": "Column altitude_acclimation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "altitude_acclimation_m",
+      "comment": "Column altitude_acclimation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "approval_phase",
+      "comment": "Column approval_phase."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "artist_display_name",
+      "comment": "Column artist_display_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ascent_m",
+      "comment": "Column ascent_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "attempt_label",
+      "comment": "Column attempt_label."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_balance",
+      "comment": "Column avg_balance."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_balance",
+      "comment": "Column avg_balance."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_balance",
+      "comment": "Column avg_balance."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_cadence",
+      "comment": "Column avg_cadence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_cadence",
+      "comment": "Column avg_cadence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_cadence",
+      "comment": "Column avg_cadence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_cadence",
+      "comment": "Column avg_cadence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_elevation",
+      "comment": "Column avg_elevation."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_gct",
+      "comment": "Column avg_gct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_gct",
+      "comment": "Column avg_gct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_gct",
+      "comment": "Column avg_gct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_gct",
+      "comment": "Column avg_gct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_hr",
+      "comment": "Column avg_hr."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_hr",
+      "comment": "Column avg_hr."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_hr",
+      "comment": "Column avg_hr."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_perf",
+      "comment": "Column avg_perf."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_perf",
+      "comment": "Column avg_perf."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_perf",
+      "comment": "Column avg_perf."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_sleep_hours",
+      "comment": "Column avg_sleep_hours."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_stride_length",
+      "comment": "Column avg_stride_length."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_stride_length",
+      "comment": "Column avg_stride_length."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_stride_length",
+      "comment": "Column avg_stride_length."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_stride_length",
+      "comment": "Column avg_stride_length."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_temp",
+      "comment": "Column avg_temp."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_temp",
+      "comment": "Column avg_temp."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_temp",
+      "comment": "Column avg_temp."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_vert_osc",
+      "comment": "Column avg_vert_osc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_vert_osc",
+      "comment": "Column avg_vert_osc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_vert_osc",
+      "comment": "Column avg_vert_osc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_vert_ratio",
+      "comment": "Column avg_vert_ratio."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_vert_ratio",
+      "comment": "Column avg_vert_ratio."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_vert_ratio",
+      "comment": "Column avg_vert_ratio."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "avg_vert_ratio",
+      "comment": "Column avg_vert_ratio."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "awake_hours",
+      "comment": "Column awake_hours."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "awake_hours_prior",
+      "comment": "Column awake_hours_prior."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "awake_s_before_activity",
+      "comment": "Column awake_s_before_activity."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "awake_sleep_s",
+      "comment": "Column awake_sleep_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "awake_sleep_s",
+      "comment": "Column awake_sleep_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_delta_s",
+      "comment": "Column best_delta_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_delta_s",
+      "comment": "Column best_delta_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_end_dist",
+      "comment": "Column best_end_dist."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_end_dist",
+      "comment": "Column best_end_dist."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_end_dist",
+      "comment": "Column best_end_dist."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_end_dist",
+      "comment": "Column best_end_dist."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_end_dist",
+      "comment": "Column best_end_dist."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_start_dist",
+      "comment": "Column best_start_dist."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_start_dist",
+      "comment": "Column best_start_dist."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_start_dist",
+      "comment": "Column best_start_dist."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_start_dist",
+      "comment": "Column best_start_dist."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_start_dist",
+      "comment": "Column best_start_dist."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_time_excl_s",
+      "comment": "Column best_time_excl_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "best_time_s",
+      "comment": "Column best_time_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "cadence_double_spm_max",
+      "comment": "Column cadence_double_spm_max."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "cadence_running_spm_avg",
+      "comment": "Column cadence_running_spm_avg."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "cadence_running_spm_max",
+      "comment": "Column cadence_running_spm_max."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "cadence_spm",
+      "comment": "Column cadence_spm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "cadence_spm",
+      "comment": "Column cadence_spm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "cadence_spm",
+      "comment": "Column cadence_spm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "calories",
+      "comment": "Column calories."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "calories_bmr",
+      "comment": "Column calories_bmr."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "child_courses",
+      "comment": "Column child_courses."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "child_segments",
+      "comment": "Column child_segments."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "confidence",
+      "comment": "Column confidence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "confidence",
+      "comment": "Column confidence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "confidence",
+      "comment": "Column confidence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "confidence_score",
+      "comment": "Column confidence_score."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "confirmed",
+      "comment": "Column confirmed."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "course_distance_m",
+      "comment": "Column course_distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "course_elevation_gain_m",
+      "comment": "Column course_elevation_gain_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "course_id",
+      "comment": "Column course_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "course_idx",
+      "comment": "Column course_idx."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "course_name",
+      "comment": "Column course_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "course_path",
+      "comment": "Column course_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "created_at",
+      "comment": "Column created_at."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "created_at",
+      "comment": "Column created_at."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "created_at_utc",
+      "comment": "Column created_at_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "current_cycle_rank",
+      "comment": "Column current_cycle_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "current_cycle_rank",
+      "comment": "Column current_cycle_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "cycle_name",
+      "comment": "Column cycle_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "cycle_name",
+      "comment": "Column cycle_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "cycle_name",
+      "comment": "Column cycle_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "cycle_start_utc",
+      "comment": "Column cycle_start_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "deep_sleep_s",
+      "comment": "Column deep_sleep_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "deep_sleep_s",
+      "comment": "Column deep_sleep_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "descent_m",
+      "comment": "Column descent_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "dist_deviation",
+      "comment": "Column dist_deviation."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "dist_deviation",
+      "comment": "Column dist_deviation."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "dist_deviation",
+      "comment": "Column dist_deviation."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "dist_deviation",
+      "comment": "Column dist_deviation."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "dist_deviation",
+      "comment": "Column dist_deviation."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_m",
+      "comment": "Column distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_mi",
+      "comment": "Column distance_mi."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_mi",
+      "comment": "Column distance_mi."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_mi",
+      "comment": "Column distance_mi."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_mi",
+      "comment": "Column distance_mi."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_mi",
+      "comment": "Column distance_mi."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_mi",
+      "comment": "Column distance_mi."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_mi",
+      "comment": "Column distance_mi."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_mi",
+      "comment": "Column distance_mi."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "distance_mm",
+      "comment": "Column distance_mm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "duration_display",
+      "comment": "Column duration_display."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "duration_elapsed_s",
+      "comment": "Column duration_elapsed_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "duration_moving_s",
+      "comment": "Column duration_moving_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "duration_ms",
+      "comment": "Column duration_ms."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "duration_s",
+      "comment": "Column duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "duration_s",
+      "comment": "Column duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "effort_count",
+      "comment": "Column effort_count."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "effort_date",
+      "comment": "Column effort_date."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "effort_label",
+      "comment": "Column effort_label."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "effort_label",
+      "comment": "Column effort_label."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "effort_label",
+      "comment": "Column effort_label."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_duration_ms",
+      "comment": "Column elapsed_duration_ms."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_duration_s",
+      "comment": "Column elapsed_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_duration_s",
+      "comment": "Column elapsed_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_duration_s",
+      "comment": "Column elapsed_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_duration_s",
+      "comment": "Column elapsed_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_duration_s",
+      "comment": "Column elapsed_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_duration_s",
+      "comment": "Column elapsed_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_duration_s",
+      "comment": "Column elapsed_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_duration_s",
+      "comment": "Column elapsed_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_ms",
+      "comment": "Column elapsed_ms."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elapsed_ms_delta",
+      "comment": "Column elapsed_ms_delta."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elev_stddev",
+      "comment": "Column elev_stddev."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_delta",
+      "comment": "Column elevation_delta."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_delta",
+      "comment": "Column elevation_delta."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_gain",
+      "comment": "Column elevation_gain."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_gain",
+      "comment": "Column elevation_gain."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_gain",
+      "comment": "Column elevation_gain."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_gain",
+      "comment": "Column elevation_gain."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_gain",
+      "comment": "Column elevation_gain."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_hammered",
+      "comment": "Column elevation_hammered."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_loss",
+      "comment": "Column elevation_loss."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_loss",
+      "comment": "Column elevation_loss."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_loss",
+      "comment": "Column elevation_loss."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_loss",
+      "comment": "Column elevation_loss."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m",
+      "comment": "Column elevation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m",
+      "comment": "Column elevation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m",
+      "comment": "Column elevation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m",
+      "comment": "Column elevation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m",
+      "comment": "Column elevation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m_gain",
+      "comment": "Column elevation_m_gain."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m_loss",
+      "comment": "Column elevation_m_loss."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m_max",
+      "comment": "Column elevation_m_max."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m_min",
+      "comment": "Column elevation_m_min."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m_smooth",
+      "comment": "Column elevation_m_smooth."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m_smooth",
+      "comment": "Column elevation_m_smooth."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_m_smooth",
+      "comment": "Column elevation_m_smooth."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_raw",
+      "comment": "Column elevation_raw."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_reference",
+      "comment": "Column elevation_reference."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_reference",
+      "comment": "Column elevation_reference."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "elevation_sanded",
+      "comment": "Column elevation_sanded."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "end_cumulative_ms",
+      "comment": "Column end_cumulative_ms."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "end_point",
+      "comment": "Column end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "end_point",
+      "comment": "Column end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "end_point",
+      "comment": "Column end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "end_point",
+      "comment": "Column end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "end_point",
+      "comment": "Column end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "end_time_utc",
+      "comment": "Column end_time_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "estimated_pace",
+      "comment": "Column estimated_pace."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "fat_lb",
+      "comment": "Column fat_lb."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "fat_pct",
+      "comment": "Column fat_pct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "freschet_deviation_m",
+      "comment": "Column freschet_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "freschet_deviation_m",
+      "comment": "Column freschet_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "freschet_deviation_m",
+      "comment": "Column freschet_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "freschet_deviation_m",
+      "comment": "Column freschet_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "full_path",
+      "comment": "Column full_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "full_path_transformed",
+      "comment": "Column full_path_transformed."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "geog",
+      "comment": "Column geog."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "grid_5m_00_id",
+      "comment": "Column grid_5m_00_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "grid_5m_00_id",
+      "comment": "Column grid_5m_00_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "grid_5m_00_id",
+      "comment": "Column grid_5m_00_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ground_contact_balance_left",
+      "comment": "Column ground_contact_balance_left."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ground_contact_balance_left",
+      "comment": "Column ground_contact_balance_left."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ground_contact_balance_left",
+      "comment": "Column ground_contact_balance_left."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ground_contact_time_ms",
+      "comment": "Column ground_contact_time_ms."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ground_contact_time_ms",
+      "comment": "Column ground_contact_time_ms."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ground_contact_time_ms",
+      "comment": "Column ground_contact_time_ms."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "hausdorff_deviation_m",
+      "comment": "Column hausdorff_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "hausdorff_deviation_m",
+      "comment": "Column hausdorff_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "hausdorff_deviation_m",
+      "comment": "Column hausdorff_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "hausdorff_deviation_m",
+      "comment": "Column hausdorff_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "heading_deviation",
+      "comment": "Column heading_deviation."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "heartrate_avg",
+      "comment": "Column heartrate_avg."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "heartrate_bpm",
+      "comment": "Column heartrate_bpm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "heartrate_bpm",
+      "comment": "Column heartrate_bpm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "heartrate_bpm",
+      "comment": "Column heartrate_bpm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "heartrate_bpm_delta",
+      "comment": "Column heartrate_bpm_delta."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "heartrate_max",
+      "comment": "Column heartrate_max."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "heat_acclimation_pct",
+      "comment": "Column heat_acclimation_pct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "heat_acclimation_pct",
+      "comment": "Column heat_acclimation_pct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "hr_maximum",
+      "comment": "Column hr_maximum."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "hr_median",
+      "comment": "Column hr_median."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "id_val",
+      "comment": "Column id_val."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "id_val",
+      "comment": "Column id_val."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "intensity_minutes_moderate",
+      "comment": "Column intensity_minutes_moderate."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "intensity_minutes_vigorous",
+      "comment": "Column intensity_minutes_vigorous."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_course",
+      "comment": "Column is_course."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_course",
+      "comment": "Column is_course."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_course",
+      "comment": "Column is_course."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_course",
+      "comment": "Column is_course."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_course",
+      "comment": "Column is_course."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_course",
+      "comment": "Column is_course."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_course",
+      "comment": "Column is_course."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_course",
+      "comment": "Column is_course."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_course",
+      "comment": "Column is_course."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_course",
+      "comment": "Column is_course."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "is_downloaded",
+      "comment": "Column is_downloaded."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "isrc",
+      "comment": "Column isrc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "last_365_rank",
+      "comment": "Column last_365_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "last_365_rank",
+      "comment": "Column last_365_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "last_effort",
+      "comment": "Column last_effort."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "last_effort",
+      "comment": "Column last_effort."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "last_event_utc",
+      "comment": "Column last_event_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "last_seen_utc",
+      "comment": "Column last_seen_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "last_updated",
+      "comment": "Column last_updated."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "lat5",
+      "comment": "Column lat5."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "latitude",
+      "comment": "Column latitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "latitude",
+      "comment": "Column latitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "latitude",
+      "comment": "Column latitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "latitude",
+      "comment": "Column latitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "latitude",
+      "comment": "Column latitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "latitude",
+      "comment": "Column latitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "latitude_end",
+      "comment": "Column latitude_end."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "latitude_start",
+      "comment": "Column latitude_start."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "light_sleep_s",
+      "comment": "Column light_sleep_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "light_sleep_s",
+      "comment": "Column light_sleep_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "load_max_delta",
+      "comment": "Column load_max_delta."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "loc_point",
+      "comment": "Column loc_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "loc_point",
+      "comment": "Column loc_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "long5",
+      "comment": "Column long5."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "longitude",
+      "comment": "Column longitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "longitude",
+      "comment": "Column longitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "longitude",
+      "comment": "Column longitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "longitude",
+      "comment": "Column longitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "longitude",
+      "comment": "Column longitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "longitude",
+      "comment": "Column longitude."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "longitude_end",
+      "comment": "Column longitude_end."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "longitude_start",
+      "comment": "Column longitude_start."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "map_timestamps",
+      "comment": "Column map_timestamps."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_confidence",
+      "comment": "Column match_confidence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_confidence",
+      "comment": "Column match_confidence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_confidence",
+      "comment": "Column match_confidence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_confidence",
+      "comment": "Column match_confidence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_confidence",
+      "comment": "Column match_confidence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_confirmed",
+      "comment": "Column match_confirmed."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_confirmed",
+      "comment": "Column match_confirmed."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_rank",
+      "comment": "Column match_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_rank",
+      "comment": "Column match_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_seg_id",
+      "comment": "Column match_seg_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_ts_utc",
+      "comment": "Column match_ts_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "match_ts_utc",
+      "comment": "Column match_ts_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "matched_activities",
+      "comment": "Column matched_activities."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "matched_activities",
+      "comment": "Column matched_activities."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "matched_activity_count",
+      "comment": "Column matched_activity_count."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "matched_courses",
+      "comment": "Column matched_courses."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "matched_segments",
+      "comment": "Column matched_segments."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "max_course_idx",
+      "comment": "Column max_course_idx."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "max_hr",
+      "comment": "Column max_hr."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "max_hr",
+      "comment": "Column max_hr."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "max_hr",
+      "comment": "Column max_hr."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "max_points",
+      "comment": "Column max_points."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "meta_rank",
+      "comment": "Column meta_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "meta_rank",
+      "comment": "Column meta_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "metric_name",
+      "comment": "Column metric_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "metric_unit",
+      "comment": "Column metric_unit."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "moving_duration_s",
+      "comment": "Column moving_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "muscle_lb",
+      "comment": "Column muscle_lb."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "muscle_pct",
+      "comment": "Column muscle_pct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "music_duration_ms",
+      "comment": "Column music_duration_ms."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "music_end",
+      "comment": "Column music_end."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "music_start",
+      "comment": "Column music_start."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "music_start",
+      "comment": "Column music_start."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "new_count",
+      "comment": "Column new_count."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "obs_count",
+      "comment": "Column obs_count."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "one_day_sleep_hours",
+      "comment": "Column one_day_sleep_hours."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "pace_display",
+      "comment": "Column pace_display."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "pace_str",
+      "comment": "Column pace_str."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "path_coords",
+      "comment": "Column path_coords."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "pct_listened",
+      "comment": "Column pct_listened."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "performance_condition",
+      "comment": "Column performance_condition."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "performance_condition",
+      "comment": "Column performance_condition."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "performance_condition",
+      "comment": "Column performance_condition."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "played_at_utc",
+      "comment": "Column played_at_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "playlist_id",
+      "comment": "Column playlist_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "playlist_name",
+      "comment": "Column playlist_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "polygon_deviation_m",
+      "comment": "Column polygon_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "polygon_deviation_m",
+      "comment": "Column polygon_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "polygon_deviation_m",
+      "comment": "Column polygon_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "polygon_deviation_m",
+      "comment": "Column polygon_deviation_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "predicted_time_s",
+      "comment": "Column predicted_time_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prediction_10k_s",
+      "comment": "Column prediction_10k_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prediction_5k_s",
+      "comment": "Column prediction_5k_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prediction_half_marathon_s",
+      "comment": "Column prediction_half_marathon_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prediction_marathon_s",
+      "comment": "Column prediction_marathon_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prestige_score",
+      "comment": "Column prestige_score."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prior10_avg_cadence",
+      "comment": "Column prior10_avg_cadence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prior10_avg_gct",
+      "comment": "Column prior10_avg_gct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prior10_avg_stride_length",
+      "comment": "Column prior10_avg_stride_length."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prior10_avg_vert_ratio",
+      "comment": "Column prior10_avg_vert_ratio."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prior_delta_s",
+      "comment": "Column prior_delta_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prior_delta_s",
+      "comment": "Column prior_delta_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prior_time_s",
+      "comment": "Column prior_time_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "prior_time_s",
+      "comment": "Column prior_time_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "queue_id",
+      "comment": "Column queue_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "recency_rank",
+      "comment": "Column recency_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "recency_rank",
+      "comment": "Column recency_rank."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "reference_end_point",
+      "comment": "Column reference_end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "reference_end_point",
+      "comment": "Column reference_end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "reference_end_point",
+      "comment": "Column reference_end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "reference_end_point",
+      "comment": "Column reference_end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "reference_end_point",
+      "comment": "Column reference_end_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "reference_start_point",
+      "comment": "Column reference_start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "reference_start_point",
+      "comment": "Column reference_start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "reference_start_point",
+      "comment": "Column reference_start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "reference_start_point",
+      "comment": "Column reference_start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "reference_start_point",
+      "comment": "Column reference_start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "rem_sleep_s",
+      "comment": "Column rem_sleep_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "rem_sleep_s",
+      "comment": "Column rem_sleep_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "resting_hr_asleep",
+      "comment": "Column resting_hr_asleep."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "resting_hr_asleep",
+      "comment": "Column resting_hr_asleep."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "resting_hr_awake",
+      "comment": "Column resting_hr_awake."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "resting_hr_awake",
+      "comment": "Column resting_hr_awake."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "row_asc",
+      "comment": "Column row_asc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "row_desc",
+      "comment": "Column row_desc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ruggedness",
+      "comment": "Column ruggedness."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ruggedness",
+      "comment": "Column ruggedness."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ruggedness",
+      "comment": "Column ruggedness."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "run_age",
+      "comment": "Column run_age."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_distance_mi",
+      "comment": "Column segment_distance_mi."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id",
+      "comment": "Column segment_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id_a",
+      "comment": "Column segment_id_a."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_id_b",
+      "comment": "Column segment_id_b."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_name",
+      "comment": "Column segment_name."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_pace",
+      "comment": "Column segment_pace."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_path",
+      "comment": "Column segment_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_path",
+      "comment": "Column segment_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_path",
+      "comment": "Column segment_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_path",
+      "comment": "Column segment_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_path",
+      "comment": "Column segment_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_path",
+      "comment": "Column segment_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "segment_path_transformed",
+      "comment": "Column segment_path_transformed."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "short_path",
+      "comment": "Column short_path."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "sleep_duration_s",
+      "comment": "Column sleep_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "sleep_duration_s",
+      "comment": "Column sleep_duration_s."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "sleep_end_date",
+      "comment": "Column sleep_end_date."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "sleep_end_utc",
+      "comment": "Column sleep_end_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "sleep_hours",
+      "comment": "Column sleep_hours."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "sleep_score",
+      "comment": "Column sleep_score."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "sleep_score",
+      "comment": "Column sleep_score."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "sleep_score",
+      "comment": "Column sleep_score."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "speed_mmps",
+      "comment": "Column speed_mmps."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "speed_mmps",
+      "comment": "Column speed_mmps."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "speed_mmps",
+      "comment": "Column speed_mmps."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "speed_mps_avg",
+      "comment": "Column speed_mps_avg."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "speed_mps_max",
+      "comment": "Column speed_mps_max."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_cumulative_ms",
+      "comment": "Column start_cumulative_ms."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_point",
+      "comment": "Column start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_point",
+      "comment": "Column start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_point",
+      "comment": "Column start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_point",
+      "comment": "Column start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_point",
+      "comment": "Column start_point."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_time_utc",
+      "comment": "Column start_time_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_time_utc",
+      "comment": "Column start_time_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_time_utc",
+      "comment": "Column start_time_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_time_utc",
+      "comment": "Column start_time_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_time_utc",
+      "comment": "Column start_time_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_time_utc",
+      "comment": "Column start_time_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_time_utc",
+      "comment": "Column start_time_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_time_utc",
+      "comment": "Column start_time_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "start_timestamp_utc",
+      "comment": "Column start_timestamp_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "step_goal",
+      "comment": "Column step_goal."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "steps",
+      "comment": "Column steps."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "stride_length_cm",
+      "comment": "Column stride_length_cm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "stride_length_cm",
+      "comment": "Column stride_length_cm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "stride_length_cm",
+      "comment": "Column stride_length_cm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "stride_length_cm_avg",
+      "comment": "Column stride_length_cm_avg."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "temperature_c_max",
+      "comment": "Column temperature_c_max."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "temperature_c_min",
+      "comment": "Column temperature_c_min."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "total_attempts",
+      "comment": "Column total_attempts."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "total_attempts",
+      "comment": "Column total_attempts."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "total_distance_m",
+      "comment": "Column total_distance_m."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "total_listen_ms",
+      "comment": "Column total_listen_ms."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "total_steps",
+      "comment": "Column total_steps."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "track_id",
+      "comment": "Column track_id."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "track_name_clean",
+      "comment": "Column track_name_clean."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "track_order",
+      "comment": "Column track_order."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_effect_aerobic",
+      "comment": "Column training_effect_aerobic."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_effect_anerobic",
+      "comment": "Column training_effect_anerobic."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load",
+      "comment": "Column training_load."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load_acute",
+      "comment": "Column training_load_acute."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load_acute",
+      "comment": "Column training_load_acute."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load_max",
+      "comment": "Column training_load_max."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load_max",
+      "comment": "Column training_load_max."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load_mid",
+      "comment": "Column training_load_mid."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load_mid",
+      "comment": "Column training_load_mid."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load_min",
+      "comment": "Column training_load_min."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load_min",
+      "comment": "Column training_load_min."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load_pct",
+      "comment": "Column training_load_pct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_load_pct",
+      "comment": "Column training_load_pct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_readiness",
+      "comment": "Column training_readiness."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "training_readiness",
+      "comment": "Column training_readiness."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ts_utc",
+      "comment": "Column ts_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ts_utc",
+      "comment": "Column ts_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "ts_utc",
+      "comment": "Column ts_utc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "utm_srid",
+      "comment": "Column utm_srid."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "utm_srid",
+      "comment": "Column utm_srid."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vert_oscillation_cm",
+      "comment": "Column vert_oscillation_cm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vert_oscillation_cm",
+      "comment": "Column vert_oscillation_cm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vert_oscillation_cm",
+      "comment": "Column vert_oscillation_cm."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vert_ratio",
+      "comment": "Column vert_ratio."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vert_ratio",
+      "comment": "Column vert_ratio."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vert_ratio",
+      "comment": "Column vert_ratio."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vertical_speed_mps",
+      "comment": "Column vertical_speed_mps."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vertical_speed_mps",
+      "comment": "Column vertical_speed_mps."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vo2_delta",
+      "comment": "Column vo2_delta."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vo2_max_value",
+      "comment": "Column vo2_max_value."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vo2_max_value",
+      "comment": "Column vo2_max_value."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vs_date",
+      "comment": "Column vs_date."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "vs_pace",
+      "comment": "Column vs_pace."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "water_ml_estimated",
+      "comment": "Column water_ml_estimated."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "weight_delta",
+      "comment": "Column weight_delta."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "weight_lb",
+      "comment": "Column weight_lb."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "weight_lb",
+      "comment": "Column weight_lb."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "x_distance",
+      "comment": "Column x_distance."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "x_time",
+      "comment": "Column x_time."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_balance",
+      "comment": "Column y_balance."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_cadence",
+      "comment": "Column y_cadence."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_elevation",
+      "comment": "Column y_elevation."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_gct",
+      "comment": "Column y_gct."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_hr",
+      "comment": "Column y_hr."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_hr_delta",
+      "comment": "Column y_hr_delta."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_osc",
+      "comment": "Column y_osc."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_performance",
+      "comment": "Column y_performance."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_speed",
+      "comment": "Column y_speed."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_stride",
+      "comment": "Column y_stride."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_temp",
+      "comment": "Column y_temp."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_time",
+      "comment": "Column y_time."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_time_delta",
+      "comment": "Column y_time_delta."
+    },
+    {
+      "kind": "column",
+      "schema": null,
+      "table": null,
+      "column": "y_vert_ratio",
+      "comment": "Column y_vert_ratio."
+    }
+  ],
+  "views": [
+    {
+      "schema": "activities",
+      "name": "vw_activity_elevation_deltas",
+      "definition": " SELECT activity_id,\n    elapsed_duration_s,\n    round((elevation_m_smooth + COALESCE(lag(elevation_m_smooth) OVER (PARTITION BY activity_id ORDER BY elapsed_duration_s), elevation_m_smooth) + COALESCE(lead(elevation_m_smooth) OVER (PARTITION BY activity_id ORDER BY elapsed_duration_s), elevation_m_smooth)) / 3::numeric - COALESCE(lag(elevation_m_smooth) OVER (PARTITION BY activity_id ORDER BY elapsed_duration_s), elevation_m_smooth), 1) AS elevation_delta\n   FROM activities.activity_details;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_activity_header_stats",
+      "definition": " WITH most_recent AS (\n         SELECT max(activities.activity_id) AS activity_id,\n                CASE\n                    WHEN lower(activities.activity_type_name) ~~ '%run%'::text AND activities.distance_m > 1000::numeric THEN 'run'::text\n                    WHEN (lower(activities.activity_type_name) ~~ '%walk%'::text OR lower(activities.activity_type_name) ~~ 'hik%'::text) AND activities.distance_m > 1000::numeric THEN 'walk'::text\n                    ELSE 'other'::text\n                END AS activity_type_basic\n           FROM activities.activities\n          WHERE (lower(activities.activity_type_name) ~~ '%walk%'::text OR lower(activities.activity_type_name) ~~ 'hik%'::text OR lower(activities.activity_type_name) ~~ '%run%'::text) AND activities.distance_m > 1000::numeric AND activities.activity_path IS NOT NULL\n          GROUP BY (\n                CASE\n                    WHEN lower(activities.activity_type_name) ~~ '%run%'::text AND activities.distance_m > 1000::numeric THEN 'run'::text\n                    WHEN (lower(activities.activity_type_name) ~~ '%walk%'::text OR lower(activities.activity_type_name) ~~ 'hik%'::text) AND activities.distance_m > 1000::numeric THEN 'walk'::text\n                    ELSE 'other'::text\n                END)\n        ), hr_values AS (\n         SELECT ad.activity_id,\n            mr.activity_type_basic,\n            max(ad.heartrate_bpm) AS hr_maximum,\n            percentile_disc(0.5::double precision) WITHIN GROUP (ORDER BY ad.heartrate_bpm) AS hr_median\n           FROM most_recent mr\n             JOIN activities.activity_details ad ON ad.activity_id = mr.activity_id\n          GROUP BY ad.activity_id, mr.activity_type_basic\n        ), final AS (\n         SELECT mr.activity_id,\n            mr.activity_type_basic,\n            m2mi(a.distance_m)::text || ' mi'::text AS distance_mi,\n            a.duration_elapsed_s / m2mi(a.distance_m) AS pace_spm,\n                CASE\n                    WHEN a.duration_elapsed_s IS NULL THEN NULL::text\n                    WHEN round(a.duration_elapsed_s::numeric, 1) >= 3600::numeric THEN (((floor(round(a.duration_elapsed_s::numeric, 1) / 3600::numeric)::text || ':'::text) || lpad(floor(round(a.duration_elapsed_s::numeric, 1) % 3600::numeric / 60::numeric)::text, 2, '0'::text)) || ':'::text) || to_char(round(a.duration_elapsed_s::numeric, 1) % 60::numeric, 'FM00.0'::text)\n                    WHEN round(a.duration_elapsed_s::numeric, 1) >= 600::numeric THEN (lpad(floor(round(a.duration_elapsed_s::numeric, 1) / 60::numeric)::text, 2, '0'::text) || ':'::text) || to_char(round(a.duration_elapsed_s::numeric, 1) % 60::numeric, 'FM00.0'::text)\n                    ELSE (floor(round(a.duration_elapsed_s::numeric, 1) / 60::numeric)::text || ':'::text) || to_char(round(a.duration_elapsed_s::numeric, 1) % 60::numeric, 'FM00.0'::text)\n                END AS duration_display,\n            a.elevation_m_gain,\n            a.start_time_utc,\n            a.activity_path,\n            mr.hr_median,\n            mr.hr_maximum\n           FROM hr_values mr\n             JOIN activities.activities a ON mr.activity_id = a.activity_id\n        )\n SELECT activity_id,\n    activity_type_basic,\n    distance_mi,\n    duration_display,\n        CASE\n            WHEN pace_spm IS NULL THEN NULL::text\n            WHEN round(pace_spm, 1) >= 3600::numeric THEN (((floor(round(pace_spm, 1) / 3600::numeric)::text || ':'::text) || lpad(floor(round(pace_spm, 1) % 3600::numeric / 60::numeric)::text, 2, '0'::text)) || ':'::text) || to_char(round(pace_spm, 1) % 60::numeric, 'FM00.0'::text)\n            WHEN round(pace_spm, 1) >= 600::numeric THEN (lpad(floor(round(pace_spm, 1) / 60::numeric)::text, 2, '0'::text) || ':'::text) || to_char(round(pace_spm, 1) % 60::numeric, 'FM00.0'::text)\n            ELSE (floor(round(pace_spm, 1) / 60::numeric)::text || ':'::text) || to_char(round(pace_spm, 1) % 60::numeric, 'FM00.0'::text)\n        END || '/mi'::text AS pace_display,\n    start_time_utc,\n    activity_path,\n    hr_median,\n    hr_maximum\n   FROM final;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_activity_ids_to_sync",
+      "definition": " SELECT activity_id,\n    round(duration_elapsed_s, 0) * 2::numeric AS max_points\n   FROM activities.activities\n  WHERE NOT is_downloaded AND NOT activity_type_name ~~ '%treadmill%'::text AND distance_m > 1000::numeric\n  ORDER BY (activity_type_name ~~ '%running%'::text) DESC, start_time_utc DESC\n LIMIT 15;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_activity_path_updates",
+      "definition": " SELECT a.activity_id,\n    st_setsrid(st_makeline(st_makepoint(ad.longitude::double precision, ad.latitude::double precision, ad.elevation_m_smooth::double precision, ad.elapsed_duration_s::double precision) ORDER BY ad.elapsed_duration_s), 4326) AS activity_path\n   FROM activities.activities a\n     JOIN activities.activity_details ad ON a.activity_id = ad.activity_id\n  GROUP BY a.activity_id;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_activity_segments_aggregated",
+      "definition": " WITH telemetry AS (\n         SELECT am.id_val,\n            am.meta_rank,\n            am.longitude,\n            am.latitude,\n            am.elevation_m_smooth,\n            am.distance_m,\n            floor((am.elapsed_ms / 1000)::double precision)::integer AS elapsed_duration_s,\n            am.heartrate_bpm,\n            am.heartrate_bpm_delta,\n            am.cadence_spm,\n            am.elapsed_ms,\n            am.elapsed_ms_delta,\n            am.ground_contact_balance_left,\n            am.performance_condition,\n            am.vert_ratio,\n            am.vert_oscillation_cm,\n            am.air_temp_c,\n            am.stride_length_cm,\n            am.ground_contact_time_ms,\n            am.speed_mmps\n           FROM activities.vw_segment_comps am\n        ), downsampled AS (\n         SELECT DISTINCT ON (telemetry.meta_rank, telemetry.id_val, telemetry.elapsed_duration_s) telemetry.id_val,\n            telemetry.meta_rank,\n            telemetry.elapsed_duration_s,\n            telemetry.distance_m,\n            telemetry.elapsed_ms,\n            telemetry.elapsed_ms_delta,\n            telemetry.longitude,\n            telemetry.latitude,\n            telemetry.heartrate_bpm,\n            telemetry.heartrate_bpm_delta,\n            telemetry.cadence_spm,\n            telemetry.elevation_m_smooth,\n            telemetry.ground_contact_balance_left,\n            telemetry.performance_condition,\n            telemetry.vert_ratio,\n            telemetry.vert_oscillation_cm,\n            telemetry.air_temp_c,\n            telemetry.stride_length_cm,\n            telemetry.ground_contact_time_ms,\n            telemetry.speed_mmps\n           FROM telemetry\n          ORDER BY telemetry.meta_rank, telemetry.id_val, telemetry.elapsed_duration_s, telemetry.elapsed_ms\n        )\n SELECT id_val,\n    meta_rank,\n    json_agg(json_build_array(longitude, latitude) ORDER BY elapsed_duration_s) AS path_coords,\n    json_agg(elapsed_duration_s ORDER BY elapsed_duration_s) AS map_timestamps,\n    array_agg(elapsed_duration_s ORDER BY elapsed_duration_s) AS x_time,\n    array_agg(distance_m ORDER BY elapsed_duration_s) AS x_distance,\n    array_agg(round(elapsed_ms::numeric / 1000.0, 2) ORDER BY elapsed_duration_s) AS y_time,\n    array_agg(round(elapsed_ms_delta / 1000.0, 2) ORDER BY elapsed_duration_s) AS y_time_delta,\n    array_agg(heartrate_bpm ORDER BY elapsed_duration_s) AS y_hr,\n    array_agg(heartrate_bpm_delta ORDER BY elapsed_duration_s) AS y_hr_delta,\n    array_agg(elevation_m_smooth ORDER BY elapsed_duration_s) AS y_elevation,\n    array_agg(cadence_spm ORDER BY elapsed_duration_s) AS y_cadence,\n    array_agg(ground_contact_balance_left ORDER BY elapsed_duration_s) AS y_balance,\n    array_agg(performance_condition ORDER BY elapsed_duration_s) AS y_performance,\n    array_agg(vert_ratio ORDER BY elapsed_duration_s) AS y_vert_ratio,\n    array_agg(vert_oscillation_cm ORDER BY elapsed_duration_s) AS y_osc,\n    array_agg(c2f(air_temp_c::numeric) ORDER BY elapsed_duration_s) AS y_temp,\n    array_agg(stride_length_cm ORDER BY elapsed_duration_s) AS y_stride,\n    array_agg(ground_contact_time_ms ORDER BY elapsed_duration_s) AS y_gct,\n    array_agg(speed_mmps ORDER BY elapsed_duration_s) AS y_speed\n   FROM downsampled\n  GROUP BY id_val, meta_rank\n  ORDER BY meta_rank, id_val;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_activity_sleep",
+      "definition": " WITH a AS (\n         SELECT activities.activity_id,\n            activities.start_time_utc::date AS activity_date,\n            activities.start_time_utc\n           FROM activities.activities\n        ), s AS (\n         SELECT s1.sleep_end_date,\n            s1.sleep_score,\n            s1.sleep_end_utc,\n            round(s1.sleep_duration_s::numeric / 3600.0, 1) AS one_day_sleep_hours,\n            round(avg(s2.sleep_duration_s::numeric / 3600.0), 1) AS avg_sleep_hours\n           FROM health.sleep_totals s1\n             JOIN health.sleep_totals s2 ON s1.sleep_end_date >= (s2.sleep_end_date - '3 days'::interval) AND s1.sleep_end_date <= s2.sleep_end_date\n          GROUP BY s1.sleep_end_date, s1.sleep_score, s1.sleep_end_utc, s1.sleep_duration_s\n        )\n SELECT a.activity_id,\n    round(floor(EXTRACT(epoch FROM a.start_time_utc - s.sleep_end_utc)) / 3600.0, 1) AS awake_hours_prior,\n    s.sleep_score,\n    s.avg_sleep_hours,\n    s.one_day_sleep_hours\n   FROM a\n     LEFT JOIN s ON s.sleep_end_date = a.activity_date;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_activity_summary",
+      "definition": " SELECT a.activity_id,\n    a.start_time_utc AS activity_start_utc,\n    m2mi(a.distance_m) AS distance_mi,\n    pace_as_text(m2mi(a.distance_m), a.duration_elapsed_s) AS activity_pace,\n    lrd.segment_name,\n    lrd.segment_id,\n    lrd.is_course,\n    lrd.elapsed_duration_s AS activity_time_s,\n    lrd.distance_mi AS segment_distance_mi,\n    lrd.all_time_rank,\n    best.elapsed_duration_s AS best_time_s,\n    prior.elapsed_duration_s AS prior_time_s,\n    best.elapsed_duration_s - lrd.elapsed_duration_s AS best_delta_s,\n    prior.elapsed_duration_s - lrd.elapsed_duration_s AS prior_delta_s,\n    pace_as_text(lrd.distance_mi, lrd.elapsed_duration_s) AS segment_pace\n   FROM activities.activities a\n     LEFT JOIN activities.vw_segment_leaderboard lrd ON a.activity_id = lrd.activity_id\n     LEFT JOIN activities.vw_segment_leaderboard best ON best.segment_id = lrd.segment_id AND best.all_time_rank = 1\n     LEFT JOIN activities.vw_segment_leaderboard prior ON prior.segment_id = lrd.segment_id AND prior.recency_rank = (lrd.recency_rank + 1)\n  ORDER BY lrd.is_course DESC, lrd.start_time_utc;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_activity_summary_segment_creation",
+      "definition": " WITH calcs AS (\n         SELECT a.activity_id,\n            a.activity_type_name,\n            a.start_time_utc,\n            m2mi(a.distance_m) AS distance_mi,\n            a.distance_m,\n            min(\n                CASE\n                    WHEN s.is_course THEN s.segment_id\n                    ELSE NULL::integer\n                END) AS course_id,\n            count(DISTINCT\n                CASE\n                    WHEN NOT s.is_course THEN s.segment_id\n                    ELSE NULL::integer\n                END) AS child_segments,\n            count(DISTINCT\n                CASE\n                    WHEN sm.match_confirmed AND s2.is_course THEN sm.segment_id\n                    ELSE NULL::integer\n                END) AS matched_courses,\n            count(DISTINCT\n                CASE\n                    WHEN sm.match_confirmed AND NOT s2.is_course THEN sm.segment_id\n                    ELSE NULL::integer\n                END) AS matched_segments\n           FROM activities.activities a\n             JOIN ( SELECT DISTINCT activity_details_distance.activity_id\n                   FROM activities.activity_details_distance) ad ON ad.activity_id = a.activity_id\n             LEFT JOIN activities.segments s ON s.activity_reference_id = a.activity_id\n             LEFT JOIN activities.segment_matches sm ON sm.activity_id = a.activity_id\n             LEFT JOIN activities.segments s2 ON s2.segment_id = sm.segment_id\n          GROUP BY a.activity_id, a.start_time_utc, a.distance_m\n        )\n SELECT calcs.activity_id,\n    calcs.activity_type_name,\n    calcs.start_time_utc,\n    calcs.distance_mi,\n    calcs.distance_m,\n    COALESCE(segments.segment_name, ''::text) AS child_courses,\n    calcs.child_segments,\n    calcs.matched_courses,\n    calcs.matched_segments\n   FROM calcs\n     LEFT JOIN activities.segments ON calcs.course_id = segments.segment_id\n  ORDER BY calcs.start_time_utc DESC;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_activity_training_status",
+      "definition": " SELECT a.activity_id,\n    ts.vo2_max_value,\n    ts.altitude_acclimation_m,\n    ts.heat_acclimation_pct,\n    ts.training_load_acute,\n    ts.training_load_pct,\n    ts.training_readiness,\n    ts.training_load_mid,\n    ts.training_load_max,\n    ts.training_load_min,\n    hr.resting_hr_asleep,\n    hr.resting_hr_awake,\n    st.sleep_duration_s,\n    st.sleep_score,\n    st.light_sleep_s,\n    st.deep_sleep_s,\n    st.awake_sleep_s,\n    st.rem_sleep_s,\n    EXTRACT(epoch FROM a.start_time_utc - st.sleep_end_utc) AS awake_s_before_activity,\n    a.start_time_utc,\n    st.sleep_end_utc,\n    st.sleep_end_date,\n    a.start_time_utc::date AS activity_start_date\n   FROM activities.activities a\n     LEFT JOIN health.vw_heart_rates hr ON a.start_time_utc::date = (hr.hr_date - '1 day'::interval)\n     LEFT JOIN LATERAL ( SELECT sleep_totals.sleep_end_date,\n            sleep_totals.sleep_start_utc,\n            sleep_totals.sleep_end_utc,\n            sleep_totals.sleep_score,\n            sleep_totals.heartrate_bpm,\n            sleep_totals.spo2,\n            sleep_totals.breaths_per_min,\n            sleep_totals.hrv_value,\n            sleep_totals.sleep_duration_s,\n            sleep_totals.rem_sleep_s,\n            sleep_totals.light_sleep_s,\n            sleep_totals.awake_sleep_s,\n            sleep_totals.deep_sleep_s,\n            sleep_totals.score_label\n           FROM health.sleep_totals\n          WHERE sleep_totals.sleep_end_utc < a.start_time_utc\n          ORDER BY sleep_totals.sleep_end_utc DESC\n         LIMIT 1) st ON true\n     LEFT JOIN LATERAL ( SELECT training_status_raw.ts_utc,\n            training_status_raw.vo2_max_value,\n            training_status_raw.altitude_acclimation_m,\n            training_status_raw.heat_acclimation_pct,\n            training_status_raw.training_load_acute,\n            training_status_raw.training_load_min,\n            training_status_raw.training_load_max,\n            (training_status_raw.training_load_max + training_status_raw.training_load_min) / 2.0 AS training_load_mid,\n            round((training_status_raw.training_load_min - training_status_raw.training_load_acute) / training_status_raw.training_load_min, 3) AS training_readiness,\n            round(training_status_raw.training_load_acute / training_status_raw.training_load_max, 3) AS training_load_pct\n           FROM health.training_status_raw\n          WHERE training_status_raw.ts_utc < a.start_time_utc\n          ORDER BY training_status_raw.ts_utc DESC\n         LIMIT 1) ts ON true;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_activity_weights",
+      "definition": " WITH interpolations AS (\n         SELECT a.activity_id,\n            a.start_time_utc,\n            prev.ts_utc AS prior_weigh_in_ts,\n            prev.weight_total_g AS prior_weight_g,\n            nxt.ts_utc AS next_weigh_in_ts,\n            nxt.weight_total_g AS next_weight_g,\n            COALESCE(\n                CASE\n                    WHEN prev.ts_utc IS NOT NULL AND nxt.ts_utc IS NOT NULL THEN round(prev.weight_total_g::numeric + (nxt.weight_total_g - prev.weight_total_g)::numeric * (EXTRACT(epoch FROM a.start_time_utc - prev.ts_utc) / NULLIF(EXTRACT(epoch FROM nxt.ts_utc - prev.ts_utc), 0::numeric)))\n                    WHEN prev.ts_utc IS NOT NULL THEN prev.weight_total_g::numeric\n                    WHEN nxt.ts_utc IS NOT NULL THEN nxt.weight_total_g::numeric\n                    ELSE NULL::numeric\n                END, NULL::numeric)::integer AS interpolated_weight_g,\n            COALESCE(\n                CASE\n                    WHEN prev.ts_utc IS NOT NULL AND nxt.ts_utc IS NOT NULL THEN round(prev.fat_pct::numeric + (nxt.fat_pct - prev.fat_pct) * (EXTRACT(epoch FROM a.start_time_utc - prev.ts_utc) / NULLIF(EXTRACT(epoch FROM nxt.ts_utc - prev.ts_utc), 0::numeric)), 3)\n                    WHEN prev.ts_utc IS NOT NULL THEN prev.fat_pct::numeric\n                    WHEN nxt.ts_utc IS NOT NULL THEN nxt.fat_pct::numeric\n                    ELSE NULL::numeric\n                END, NULL::numeric) AS interpolated_fat_pct,\n            COALESCE(\n                CASE\n                    WHEN prev.ts_utc IS NOT NULL AND nxt.ts_utc IS NOT NULL THEN round(prev.weight_muscle_g::numeric + (nxt.weight_muscle_g - prev.weight_muscle_g)::numeric * (EXTRACT(epoch FROM a.start_time_utc - prev.ts_utc) / NULLIF(EXTRACT(epoch FROM nxt.ts_utc - prev.ts_utc), 0::numeric)))\n                    WHEN prev.ts_utc IS NOT NULL THEN prev.weight_muscle_g::numeric\n                    WHEN nxt.ts_utc IS NOT NULL THEN nxt.weight_muscle_g::numeric\n                    ELSE NULL::numeric\n                END, NULL::numeric)::integer AS interpolated_muscle_g\n           FROM activities.activities a\n             LEFT JOIN LATERAL ( SELECT body_composition_raw.ts_utc,\n                    body_composition_raw.weight_total_g,\n                    body_composition_raw.weight_muscle_g,\n                    body_composition_raw.fat_pct\n                   FROM health.body_composition_raw\n                  WHERE body_composition_raw.ts_utc <= a.start_time_utc\n                  ORDER BY body_composition_raw.ts_utc DESC\n                 LIMIT 1) prev ON true\n             LEFT JOIN LATERAL ( SELECT body_composition_raw.ts_utc,\n                    body_composition_raw.weight_total_g,\n                    body_composition_raw.weight_muscle_g,\n                    body_composition_raw.fat_pct\n                   FROM health.body_composition_raw\n                  WHERE body_composition_raw.ts_utc > a.start_time_utc\n                  ORDER BY body_composition_raw.ts_utc\n                 LIMIT 1) nxt ON true\n        )\n SELECT activity_id,\n    g2lb(interpolated_weight_g::numeric) AS weight_lb,\n    g2lb(interpolated_muscle_g::numeric) AS muscle_lb,\n    g2lb(interpolated_weight_g::numeric * interpolated_fat_pct) AS fat_lb\n   FROM interpolations;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_course_review",
+      "definition": " SELECT s.segment_id,\n    s.segment_name,\n    s.activity_reference_id,\n    s.reference_start_point,\n    s.reference_end_point,\n        CASE\n            WHEN s.is_course THEN 'Course'::text\n            ELSE 'Segment'::text\n        END AS effort_label,\n    a.activity_type_name,\n    s.segment_path AS activity_path,\n    round(s.distance_m * 0.000621371, 1) AS distance_mi,\n    s.elevation_gain,\n    s.elevation_loss,\n    COALESCE(h.activity_count, 0::bigint) AS matched_activities,\n    h.last_event_utc,\n    row_number() OVER (ORDER BY (s.segment_name ~~ 'New%'::text) DESC, (COALESCE(h.last_event_utc::timestamp without time zone, '1980-07-18 00:00:00'::timestamp without time zone)) DESC, (COALESCE(h.activity_count, 0::bigint)) DESC) AS course_idx,\n    count(*) OVER () AS max_course_idx,\n    sum(\n        CASE\n            WHEN s.segment_name ~~ 'New%'::text THEN 1\n            ELSE 0\n        END) OVER (PARTITION BY s.is_course) AS new_count\n   FROM activities.segments s\n     LEFT JOIN ( SELECT sm.segment_id,\n            count(DISTINCT sm.activity_id) AS activity_count,\n            max(a_1.start_time_utc)::date AS last_event_utc\n           FROM activities.segment_matches sm\n             JOIN activities.activities a_1 ON a_1.activity_id = sm.activity_id\n          WHERE sm.match_confirmed\n          GROUP BY sm.segment_id) h ON h.segment_id = s.segment_id\n     LEFT JOIN activities.activities a ON a.activity_id = s.activity_reference_id\n  ORDER BY s.is_course DESC, h.last_event_utc DESC;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_elevation_smooth",
+      "definition": " WITH pass1 AS (\n         SELECT activity_details.activity_id,\n            activity_details.latitude,\n            activity_details.longitude,\n            activity_details.elapsed_duration_s,\n            activity_details.elevation_m AS elevation_raw,\n            round(avg(activity_details.elevation_m) OVER (PARTITION BY activity_details.activity_id ORDER BY activity_details.elapsed_duration_s ROWS BETWEEN 3 PRECEDING AND CURRENT ROW), 1) AS elevation_m\n           FROM activities.activity_details\n        )\n SELECT activity_id,\n    latitude,\n    longitude,\n    round(latitude, 4) AS lat5,\n    round(longitude, 4) AS long5,\n    elevation_raw,\n    elevation_m,\n    st_setsrid(st_makepoint(longitude::double precision, latitude::double precision), 4326)::geography AS geog\n   FROM pass1;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_last_activity_id_by_type",
+      "definition": " SELECT max(activities.activity_id) AS activity_id,\n    'Run'::text AS activity_type\n   FROM activities.activities\n  WHERE activities.activity_type_name ~~ '%running%'::text AND activities.distance_m > 1000::numeric\nUNION ALL\n SELECT max(activities.activity_id) AS activity_id,\n    'Walk'::text AS activity_type\n   FROM activities.activities\n  WHERE (activities.activity_type_name ~~ '%walk%'::text OR activities.activity_type_name ~~ 'hik%'::text) AND activities.distance_m > 1500::numeric;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_matched_segment_path_updates",
+      "definition": " SELECT s.segment_id,\n    s.activity_id,\n    st_setsrid(st_makeline(st_makepoint(ad.longitude::double precision, ad.latitude::double precision, ad.elevation_m_smooth::double precision, ad.elapsed_duration_s::double precision) ORDER BY ad.elapsed_duration_s), 4326) AS activity_path\n   FROM activities.segment_matches s\n     JOIN activities.activity_details ad ON s.activity_id = ad.activity_id AND s.activity_start_point <= ad.elapsed_duration_s AND s.activity_end_point >= ad.elapsed_duration_s\n  GROUP BY s.segment_id, s.activity_id;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_overlapped_segments",
+      "definition": " WITH top_pair AS (\n         SELECT q.segment_id_a,\n            q.segment_id_b,\n            q.match_confidence\n           FROM activities.overlap_queue q\n          ORDER BY q.segment_id_a, q.match_confidence DESC\n         LIMIT 1\n        ), pair_stats AS (\n         SELECT sm.segment_id,\n            count(*) FILTER (WHERE sm.match_confirmed) AS confirmed_cnt,\n            count(*) FILTER (WHERE NOT sm.match_confirmed) AS unconfirmed_cnt,\n            array_agg(sm.activity_id) AS activity_list\n           FROM activities.segment_matches sm\n             JOIN top_pair tp_1 ON sm.segment_id = tp_1.segment_id_a OR sm.segment_id = tp_1.segment_id_b\n          GROUP BY sm.segment_id\n        )\n SELECT 1 AS match_rank,\n    tp.match_confidence,\n    s.segment_id,\n    s.segment_name,\n        CASE\n            WHEN s.segment_id < s_other.segment_id THEN 'primary_segment'::text\n            ELSE 'pretender_segment'::text\n        END AS effort_label,\n    s.segment_path AS activity_path,\n    st.activity_list AS matched_activities\n   FROM top_pair tp\n     CROSS JOIN LATERAL ( VALUES (tp.segment_id_a,tp.segment_id_b), (tp.segment_id_b,tp.segment_id_a)) pairs(my_id, other_id)\n     JOIN activities.segments s ON s.segment_id = pairs.my_id\n     JOIN activities.segments s_other ON s_other.segment_id = pairs.other_id\n     LEFT JOIN pair_stats st ON st.segment_id = s.segment_id\n     LEFT JOIN pair_stats st_other ON st_other.segment_id = s_other.segment_id\n  ORDER BY s.segment_id;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_possible_segment_matches",
+      "definition": " WITH sm AS (\n         SELECT sm.activity_id,\n            sm.activity_path,\n            a.start_time_utc::date AS activity_date,\n            sm.segment_id,\n            s.segment_path,\n            s.segment_name,\n            sm.match_confidence,\n            s.is_course,\n            row_number() OVER (ORDER BY sm.match_confidence DESC) AS match_rank\n           FROM activities.segment_matches sm\n             JOIN activities.segments s ON s.segment_id = sm.segment_id\n             JOIN activities.activities a ON sm.activity_id = a.activity_id\n          WHERE NOT sm.match_confirmed\n          ORDER BY sm.activity_id DESC, sm.match_confidence\n        )\n SELECT segment_id,\n    segment_name,\n    activity_id,\n    activity_date,\n    match_confidence,\n    match_rank,\n    is_course,\n    activity_path,\n    effort_label\n   FROM ( SELECT sm.segment_id,\n            sm.segment_name,\n            sm.activity_id,\n            sm.activity_date,\n            sm.match_confidence,\n            sm.match_rank,\n            sm.is_course,\n            sm.segment_path AS activity_path,\n            'segment'::text AS effort_label\n           FROM sm\n        UNION ALL\n         SELECT sm.segment_id,\n            sm.segment_name,\n            sm.activity_id,\n            sm.activity_date,\n            sm.match_confidence,\n            sm.match_rank,\n            sm.is_course,\n            sm.activity_path,\n            'activity'::text AS effort_label\n           FROM sm) subquery\n  ORDER BY match_rank, effort_label DESC;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_pr_hunter",
+      "definition": " WITH lbc AS (\n         SELECT body_composition_raw.weight_total_g\n           FROM health.body_composition_raw\n          ORDER BY body_composition_raw.ts_utc DESC\n         LIMIT 1\n        ), lts AS (\n         SELECT r.vo2_max_value AS curr_vo2,\n            r.training_load_acute::numeric AS curr_load,\n            r.training_load_max::numeric AS curr_load_max\n           FROM health.training_status_raw r\n          ORDER BY r.ts_utc DESC\n         LIMIT 1\n        ), curr AS (\n         SELECT lts.curr_vo2,\n            lts.curr_load,\n            lts.curr_load_max,\n            ( SELECT g2lb(lbc.weight_total_g::numeric) AS g2lb\n                   FROM lbc) AS current_weight\n           FROM lts\n        ), courses AS (\n         SELECT s.segment_id,\n            s.segment_name,\n            max(s.start_time_utc)::date AS last_effort,\n            count(DISTINCT s.activity_id) AS effort_count,\n            max(\n                CASE\n                    WHEN s.recency_rank = 1 THEN s.elapsed_duration_s\n                    ELSE NULL::numeric\n                END) AS last_effort_s,\n            max(\n                CASE\n                    WHEN s.recency_rank = 1 THEN s.distance_mi\n                    ELSE NULL::numeric\n                END) AS last_effort_distance,\n            max(\n                CASE\n                    WHEN s.all_time_rank = 1 THEN s.elapsed_duration_s\n                    ELSE NULL::numeric\n                END) AS all_time_s,\n            max(\n                CASE\n                    WHEN s.last_365_rank = 1 THEN s.elapsed_duration_s\n                    ELSE NULL::numeric\n                END) AS last_365_s,\n            max(\n                CASE\n                    WHEN s.current_cycle_rank = 1 THEN s.elapsed_duration_s\n                    ELSE NULL::numeric\n                END) AS cycle_s,\n            max(\n                CASE\n                    WHEN s.all_time_rank = 1 THEN s.distance_mi\n                    ELSE NULL::numeric\n                END) AS all_time_distance_mi,\n            max(\n                CASE\n                    WHEN s.last_365_rank = 1 THEN s.distance_mi\n                    ELSE NULL::numeric\n                END) AS last_365_distance_mi,\n            max(\n                CASE\n                    WHEN s.current_cycle_rank = 1 THEN s.distance_mi\n                    ELSE NULL::numeric\n                END) AS cycle_distance_mi,\n            max(\n                CASE\n                    WHEN s.all_time_rank = 1 THEN s.start_time_utc\n                    ELSE NULL::timestamp with time zone\n                END)::date AS all_time_effort,\n            max(\n                CASE\n                    WHEN s.last_365_rank = 1 THEN s.start_time_utc\n                    ELSE NULL::timestamp with time zone\n                END)::date AS last_365_effort,\n            max(\n                CASE\n                    WHEN s.current_cycle_rank = 1 THEN s.start_time_utc\n                    ELSE NULL::timestamp with time zone\n                END)::date AS cycle_effort,\n            max(\n                CASE\n                    WHEN s.all_time_rank = 1 THEN s.weight_lb\n                    ELSE NULL::numeric\n                END) AS all_time_weight,\n            max(\n                CASE\n                    WHEN s.last_365_rank = 1 THEN s.weight_lb\n                    ELSE NULL::numeric\n                END) AS last_365_weight,\n            max(\n                CASE\n                    WHEN s.current_cycle_rank = 1 THEN s.weight_lb\n                    ELSE NULL::numeric\n                END) AS cycle_weight,\n            max(\n                CASE\n                    WHEN s.all_time_rank = 1 THEN s.vo2_max_value\n                    ELSE NULL::numeric\n                END) AS all_time_vo2,\n            max(\n                CASE\n                    WHEN s.last_365_rank = 1 THEN s.vo2_max_value\n                    ELSE NULL::numeric\n                END) AS last_365_vo2,\n            max(\n                CASE\n                    WHEN s.current_cycle_rank = 1 THEN s.vo2_max_value\n                    ELSE NULL::numeric\n                END) AS cycle_vo2,\n            max(\n                CASE\n                    WHEN s.all_time_rank = 1 THEN s.training_load_acute\n                    ELSE NULL::numeric\n                END) AS all_time_acute_load,\n            max(\n                CASE\n                    WHEN s.last_365_rank = 1 THEN s.training_load_acute\n                    ELSE NULL::numeric\n                END) AS last_365_acute_load,\n            max(\n                CASE\n                    WHEN s.current_cycle_rank = 1 THEN s.training_load_acute\n                    ELSE NULL::numeric\n                END) AS cycle_acute_load,\n            max(\n                CASE\n                    WHEN s.all_time_rank = 1 THEN s.training_load_max\n                    ELSE NULL::numeric\n                END) AS all_time_load_max,\n            max(\n                CASE\n                    WHEN s.last_365_rank = 1 THEN s.training_load_max\n                    ELSE NULL::numeric\n                END) AS last_365_load_max,\n            max(\n                CASE\n                    WHEN s.current_cycle_rank = 1 THEN s.training_load_max\n                    ELSE NULL::numeric\n                END) AS cycle_load_max\n           FROM activities.vw_segment_leaderboard s\n             JOIN activities.activities a ON s.activity_id = a.activity_id AND a.activity_type_name ~~ '%run%'::text\n          WHERE s.is_course\n          GROUP BY s.segment_id, s.segment_name\n        ), deltas AS (\n         SELECT courses.segment_id,\n            courses.segment_name,\n            m2mi(segments.distance_m) AS segment_distance_mi,\n            segments.elevation_gain AS segment_elevation_gain,\n            courses.all_time_effort,\n            courses.last_365_effort,\n            courses.last_effort,\n            courses.last_effort_s,\n            courses.last_effort_distance,\n            courses.cycle_effort,\n            courses.all_time_s,\n            courses.last_365_s,\n            courses.cycle_s,\n            courses.all_time_distance_mi,\n            courses.last_365_distance_mi,\n            courses.cycle_distance_mi,\n            courses.effort_count,\n            activities.safe_delta(curr.current_weight, courses.all_time_weight) AS wd_at,\n            activities.safe_delta(curr.current_weight, courses.last_365_weight) AS wd_365,\n            activities.safe_delta(curr.current_weight, courses.cycle_weight) AS wd_cycle,\n            activities.safe_delta(curr.curr_vo2, courses.all_time_vo2) AS vo2_at,\n            activities.safe_delta(curr.curr_vo2, courses.last_365_vo2) AS vo2_365,\n            activities.safe_delta(curr.curr_vo2, courses.cycle_vo2) AS vo2_cycle,\n            activities.safe_delta(curr.curr_load, courses.all_time_acute_load) AS acute_at,\n            activities.safe_delta(curr.curr_load, courses.last_365_acute_load) AS acute_365,\n            activities.safe_delta(curr.curr_load, courses.cycle_acute_load) AS acute_cycle,\n            activities.safe_delta(curr.curr_load_max, courses.all_time_load_max) AS load_max_at,\n            activities.safe_delta(curr.curr_load_max, courses.last_365_load_max) AS load_max_365,\n            activities.safe_delta(curr.curr_load_max, courses.cycle_load_max) AS load_max_cycle\n           FROM courses\n             CROSS JOIN curr\n             JOIN activities.segments ON segments.segment_id = courses.segment_id\n        ), comps AS (\n         SELECT deltas.segment_id,\n            deltas.segment_name,\n            deltas.segment_distance_mi,\n            deltas.segment_elevation_gain,\n            deltas.last_effort,\n            deltas.last_effort_s,\n            deltas.last_effort_distance,\n            deltas.effort_count,\n            deltas.all_time_effort,\n            deltas.last_365_effort,\n            deltas.cycle_effort,\n            deltas.all_time_s,\n            deltas.last_365_s,\n            deltas.cycle_s,\n            deltas.all_time_distance_mi,\n            deltas.last_365_distance_mi,\n            deltas.cycle_distance_mi,\n            activities.pr_potential_v1(deltas.wd_at::double precision, deltas.vo2_at::double precision, deltas.acute_at::double precision, deltas.segment_distance_mi::double precision, deltas.segment_elevation_gain::double precision, deltas.all_time_s::double precision) AS at_score_v1,\n            activities.pr_potential_v1(deltas.wd_365::double precision, deltas.vo2_365::double precision, deltas.acute_365::double precision, deltas.segment_distance_mi::double precision, deltas.segment_elevation_gain::double precision, deltas.last_365_s::double precision) AS year_score_v1,\n            activities.pr_potential_v1(deltas.wd_cycle::double precision, deltas.vo2_cycle::double precision, deltas.acute_cycle::double precision, deltas.segment_distance_mi::double precision, deltas.segment_elevation_gain::double precision, deltas.cycle_s::double precision) AS cycle_score_v1,\n            activities.pr_potential_v2(deltas.wd_at, deltas.vo2_at, deltas.acute_at, deltas.load_max_at, deltas.segment_distance_mi, deltas.segment_elevation_gain, deltas.all_time_s) AS at_score_v2,\n            activities.pr_potential_v2(deltas.wd_365, deltas.vo2_365, deltas.acute_365, deltas.load_max_365, deltas.segment_distance_mi, deltas.segment_elevation_gain, deltas.last_365_s) AS year_score_v2,\n            activities.pr_potential_v2(deltas.wd_cycle, deltas.vo2_cycle, deltas.acute_cycle, deltas.load_max_cycle, deltas.segment_distance_mi, deltas.segment_elevation_gain, deltas.cycle_s) AS cycle_score_v2,\n            activities.pr_potential_v3(deltas.wd_at::double precision, deltas.vo2_at::double precision, deltas.acute_at::double precision, deltas.segment_distance_mi::double precision, deltas.segment_elevation_gain::double precision, deltas.all_time_s::double precision) AS at_score_v3,\n            activities.pr_potential_v3(deltas.wd_365::double precision, deltas.vo2_365::double precision, deltas.acute_365::double precision, deltas.segment_distance_mi::double precision, deltas.segment_elevation_gain::double precision, deltas.last_365_s::double precision) AS year_score_v3,\n            activities.pr_potential_v3(deltas.wd_cycle::double precision, deltas.vo2_cycle::double precision, deltas.acute_cycle::double precision, deltas.segment_distance_mi::double precision, deltas.segment_elevation_gain::double precision, deltas.cycle_s::double precision) AS cycle_score_v3,\n            deltas.wd_at,\n            deltas.wd_365,\n            deltas.wd_cycle,\n            deltas.vo2_at,\n            deltas.vo2_365,\n            deltas.vo2_cycle,\n            deltas.acute_at,\n            deltas.acute_365,\n            deltas.acute_cycle,\n            deltas.load_max_at,\n            deltas.load_max_365,\n            deltas.load_max_cycle\n           FROM deltas\n        ), precomps AS (\n         SELECT comps.segment_id,\n            comps.segment_name,\n            comps.segment_distance_mi,\n            comps.segment_elevation_gain,\n            comps.effort_count AS total_attempts,\n            (comps.at_score_v1 + comps.at_score_v2::double precision + comps.at_score_v3) / 3::double precision AS at_score_agg,\n            comps.all_time_s,\n            (comps.year_score_v1 + comps.year_score_v2::double precision + comps.year_score_v3) / 3::double precision AS year_score_agg,\n            comps.last_365_s,\n            (comps.cycle_score_v1 + comps.cycle_score_v2::double precision + comps.cycle_score_v3) / 3::double precision AS cycle_score_agg,\n            comps.cycle_s,\n            comps.vo2_at,\n            comps.vo2_365,\n            comps.vo2_cycle,\n            comps.acute_at,\n            comps.acute_365,\n            comps.acute_cycle,\n            comps.load_max_at,\n            comps.load_max_365,\n            comps.load_max_cycle,\n            comps.wd_365,\n            comps.wd_at,\n            comps.wd_cycle,\n            comps.all_time_effort,\n            comps.last_365_effort,\n            comps.cycle_effort,\n            comps.last_effort\n           FROM comps\n        ), matches AS (\n         SELECT precomps.segment_id,\n            precomps.segment_name,\n            precomps.segment_distance_mi,\n            precomps.segment_elevation_gain,\n            precomps.total_attempts,\n                CASE\n                    WHEN precomps.at_score_agg < precomps.all_time_s::double precision THEN 'All-Time'::text\n                    WHEN precomps.year_score_agg < precomps.last_365_s::double precision THEN 'Year'::text\n                    WHEN precomps.cycle_score_agg < precomps.cycle_s::double precision THEN 'Cycle'::text\n                    ELSE 'Best effort'::text\n                END AS attempt_label,\n                CASE\n                    WHEN precomps.at_score_agg < precomps.all_time_s::double precision THEN precomps.all_time_effort\n                    WHEN precomps.year_score_agg < precomps.last_365_s::double precision THEN precomps.last_365_effort\n                    WHEN precomps.cycle_score_agg < precomps.cycle_s::double precision THEN precomps.cycle_effort\n                    ELSE precomps.last_effort\n                END AS vs_date,\n                CASE\n                    WHEN precomps.at_score_agg < precomps.all_time_s::double precision THEN precomps.all_time_s\n                    WHEN precomps.year_score_agg < precomps.last_365_s::double precision THEN precomps.last_365_s\n                    ELSE precomps.cycle_s\n                END AS vs_seconds,\n            round(\n                CASE\n                    WHEN precomps.at_score_agg < precomps.all_time_s::double precision THEN precomps.at_score_agg\n                    WHEN precomps.year_score_agg < precomps.last_365_s::double precision THEN precomps.year_score_agg\n                    ELSE precomps.cycle_score_agg\n                END::numeric, 3) AS predicted_time_s,\n                CASE\n                    WHEN precomps.at_score_agg < precomps.all_time_s::double precision THEN precomps.wd_at\n                    WHEN precomps.year_score_agg < precomps.last_365_s::double precision THEN precomps.wd_365\n                    ELSE precomps.wd_cycle\n                END AS weight_delta,\n                CASE\n                    WHEN precomps.at_score_agg < precomps.all_time_s::double precision THEN precomps.vo2_at\n                    WHEN precomps.year_score_agg < precomps.last_365_s::double precision THEN precomps.vo2_365\n                    ELSE precomps.vo2_cycle\n                END AS vo2_delta,\n                CASE\n                    WHEN precomps.at_score_agg < precomps.all_time_s::double precision THEN precomps.acute_at\n                    WHEN precomps.year_score_agg < precomps.last_365_s::double precision THEN precomps.acute_365\n                    ELSE precomps.acute_cycle\n                END AS acute_load_delta,\n            round(\n                CASE\n                    WHEN precomps.at_score_agg < precomps.all_time_s::double precision THEN precomps.load_max_at\n                    WHEN precomps.year_score_agg < precomps.last_365_s::double precision THEN precomps.load_max_365\n                    ELSE precomps.load_max_cycle\n                END, 3) AS load_max_delta\n           FROM precomps\n        )\n SELECT segment_id,\n    segment_name,\n    vs_date,\n    attempt_label,\n    total_attempts,\n    predicted_time_s,\n    pace_as_text(segment_distance_mi, vs_seconds) AS vs_pace,\n    pace_as_text(segment_distance_mi, predicted_time_s) AS estimated_pace,\n    (vs_seconds - predicted_time_s) *\n        CASE\n            WHEN attempt_label = 'All-Time'::text THEN 1.15\n            WHEN attempt_label = 'Year'::text THEN 1.05\n            WHEN attempt_label = 'Cycle'::text THEN 1::numeric\n            ELSE 0.75\n        END * (total_attempts % 5::bigint + 1)::numeric AS prestige_score,\n    round(weight_delta, 3) AS weight_delta,\n    round(vo2_delta, 3) AS vo2_delta,\n    round(acute_load_delta, 3) AS acute_load_delta,\n    round(load_max_delta, 3) AS load_max_delta\n   FROM matches;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_report_segment_efforts",
+      "definition": " SELECT sd.segment_id,\n    s.segment_name,\n    s.is_course,\n    sd.activity_id,\n    sd.start_time_utc,\n    sd.elapsed_duration_s,\n    NULLIF(sd.avg_cadence, '-99.0'::numeric) AS avg_cadence,\n    NULLIF(sd.avg_stride_length, '-99.0'::numeric) AS avg_stride_length,\n    NULLIF(sd.avg_gct, '-99.0'::numeric) AS avg_gct,\n    NULLIF(sd.avg_vert_ratio, '-99.0'::numeric) AS avg_vert_ratio,\n    ( SELECT 1 + count(*)\n           FROM activities.segments_details f\n          WHERE f.segment_id = sd.segment_id AND f.elapsed_duration_s < sd.elapsed_duration_s) AS all_time_rank,\n    ( SELECT count(*) AS count\n           FROM activities.segments_details c\n          WHERE c.segment_id = sd.segment_id) AS total_attempts,\n    prior.elapsed_duration_s AS prior_time_s,\n    best.elapsed_duration_s AS best_time_excl_s,\n    prior.elapsed_duration_s - sd.elapsed_duration_s AS prior_delta_s,\n    best.elapsed_duration_s - sd.elapsed_duration_s AS best_delta_s,\n    p10.avg_cadence AS prior10_avg_cadence,\n    p10.avg_stride_length AS prior10_avg_stride_length,\n    p10.avg_gct AS prior10_avg_gct,\n    p10.avg_vert_ratio AS prior10_avg_vert_ratio\n   FROM activities.segments_details sd\n     JOIN activities.segments s ON s.segment_id = sd.segment_id\n     LEFT JOIN LATERAL ( SELECT p.elapsed_duration_s\n           FROM activities.segments_details p\n          WHERE p.segment_id = sd.segment_id AND p.start_time_utc < sd.start_time_utc\n          ORDER BY p.start_time_utc DESC\n         LIMIT 1) prior ON true\n     CROSS JOIN LATERAL ( SELECT min(b.elapsed_duration_s) AS elapsed_duration_s\n           FROM activities.segments_details b\n          WHERE b.segment_id = sd.segment_id AND b.activity_id <> sd.activity_id) best\n     CROSS JOIN LATERAL ( SELECT avg(x.avg_cadence) AS avg_cadence,\n            avg(x.avg_stride_length) AS avg_stride_length,\n            avg(x.avg_gct) AS avg_gct,\n            avg(x.avg_vert_ratio) AS avg_vert_ratio\n           FROM ( SELECT NULLIF(p2.avg_cadence, '-99.0'::numeric) AS avg_cadence,\n                    NULLIF(p2.avg_stride_length, '-99.0'::numeric) AS avg_stride_length,\n                    NULLIF(p2.avg_gct, '-99.0'::numeric) AS avg_gct,\n                    NULLIF(p2.avg_vert_ratio, '-99.0'::numeric) AS avg_vert_ratio\n                   FROM activities.segments_details p2\n                  WHERE p2.segment_id = sd.segment_id AND p2.start_time_utc < sd.start_time_utc\n                  ORDER BY p2.start_time_utc DESC\n                 LIMIT 10) x) p10;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_run_timing",
+      "definition": " WITH last_run AS (\n         SELECT a.activity_id,\n            time_ago(a.start_time_utc) AS run_age,\n            a.start_time_utc AS run_time_start,\n            a.end_time_utc AS run_time_end\n           FROM activities.activities a\n          WHERE a.activity_type_name ~~ '%running%'::text\n          ORDER BY a.activity_id DESC\n         LIMIT 1\n        ), possible_warmups AS (\n         SELECT a.activity_id,\n            a.start_time_utc AS warmup_start\n           FROM activities.activities a\n             CROSS JOIN last_run l\n          WHERE a.activity_type_name = 'walking'::text AND a.end_time_utc > (l.run_time_start - '00:05:00'::interval) AND a.start_time_utc < l.run_time_start\n          ORDER BY a.start_time_utc DESC\n         LIMIT 1\n        ), possible_cooldowns AS (\n         SELECT a.activity_id,\n            a.end_time_utc AS cooldown_end\n           FROM activities.activities a\n             CROSS JOIN last_run l\n          WHERE a.activity_type_name = 'walking'::text AND a.start_time_utc < (l.run_time_end + '00:05:00'::interval) AND a.start_time_utc > l.run_time_start\n          ORDER BY a.start_time_utc\n         LIMIT 1\n        )\n SELECT activity_id,\n    run_age,\n    music_start,\n    music_end,\n    floor(EXTRACT(epoch FROM music_end - music_start)) * 1000::numeric AS music_duration_ms\n   FROM ( SELECT a.activity_id,\n            a.run_age,\n            a.run_time_start,\n            a.run_time_end,\n            COALESCE(w.warmup_start, a.run_time_start) AS music_start,\n            COALESCE(c.cooldown_end, a.run_time_end) AS music_end\n           FROM last_run a\n             LEFT JOIN possible_warmups w ON 1 = 1\n             LEFT JOIN possible_cooldowns c ON 1 = 1) sub;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_segment_comps",
+      "definition": " WITH tm AS (\n         SELECT am.activity_id,\n            a.start_time_utc::date::text AS act_date,\n            am.start_point,\n            am.end_point,\n            row_number() OVER (PARTITION BY am.activity_id ORDER BY a.start_time_utc, am.start_point) AS act_rank,\n            row_number() OVER (ORDER BY a.start_time_utc DESC, am.start_point DESC) AS meta_rank,\n            sm.distance_m\n           FROM activities.temp_activity_segment_metas am\n             JOIN activities.activities a ON am.activity_id = a.activity_id\n             JOIN activities.segments_details sm ON am.activity_id = sm.activity_id AND am.start_point = sm.activity_start_point AND am.end_point = sm.activity_end_point\n        ), ms AS (\n         SELECT tm.activity_id,\n            tm.act_date ||\n                CASE\n                    WHEN tm.act_rank > 1 THEN (' ('::text || tm.act_rank::text) || ')'::text\n                    ELSE ''::text\n                END AS id_val,\n            tm.start_point,\n            tm.end_point,\n            tm.meta_rank,\n            max(\n                CASE\n                    WHEN tm.meta_rank = 1 THEN tm.distance_m\n                    ELSE NULL::integer\n                END) OVER ()::numeric / tm.distance_m::numeric AS distance_multiplier\n           FROM tm\n        ), canon AS (\n         SELECT ms.id_val,\n            ad.elapsed_duration_ms - min(ad.elapsed_duration_ms) OVER () AS elapsed_ms,\n            ad.distance_m - ms.start_point AS distance_m,\n            ad.elevation_m_smooth,\n            ad.heartrate_bpm\n           FROM ms\n             JOIN activities.activity_details_distance ad ON ms.activity_id = ad.activity_id AND ms.start_point <= ad.distance_m AND ms.end_point >= ad.distance_m\n          WHERE ms.meta_rank = 1\n        ), d_adj AS (\n         SELECT DISTINCT ON (ms.id_val, (round((ad.distance_m - ms.start_point)::numeric * ms.distance_multiplier, 0))) ms.id_val,\n            ms.meta_rank,\n            ad.elapsed_duration_ms - min(ad.elapsed_duration_ms) OVER (PARTITION BY ad.activity_id) AS elapsed_ms,\n            round((ad.distance_m - ms.start_point)::numeric * ms.distance_multiplier, 0) AS distance_m,\n            ad.distance_m - ms.start_point AS distance_raw,\n            ad.longitude,\n            ad.latitude,\n            ad.heartrate_bpm,\n            ad.cadence_spm,\n            ad.elevation_m_smooth,\n            ad.ground_contact_balance_left,\n            ad.performance_condition,\n                CASE\n                    WHEN ad.vert_ratio < 0::numeric THEN NULL::numeric\n                    ELSE ad.vert_ratio\n                END AS vert_ratio,\n            ad.vert_oscillation_cm,\n            ad.air_temp_c,\n            ad.stride_length_cm,\n            ad.ground_contact_time_ms,\n            ad.speed_mmps\n           FROM ms\n             JOIN activities.activity_details_distance ad ON ms.activity_id = ad.activity_id AND ms.start_point <= ad.distance_m AND ms.end_point >= ad.distance_m\n          ORDER BY ms.id_val, (round((ad.distance_m - ms.start_point)::numeric * ms.distance_multiplier, 0)), (ad.elapsed_duration_ms - min(ad.elapsed_duration_ms) OVER (PARTITION BY ad.activity_id))\n        )\n SELECT nc.id_val,\n    nc.meta_rank,\n    c.elevation_m_smooth,\n    c.distance_m,\n    nc.elapsed_ms,\n    round((nc.elapsed_ms - c.elapsed_ms)::numeric, 2) AS elapsed_ms_delta,\n    nc.longitude,\n    nc.latitude,\n    nc.heartrate_bpm,\n    round((c.heartrate_bpm - nc.heartrate_bpm)::numeric, 0) AS heartrate_bpm_delta,\n    nc.cadence_spm,\n    nc.ground_contact_balance_left,\n    nc.performance_condition,\n    nc.vert_ratio,\n    nc.vert_oscillation_cm,\n    nc.air_temp_c,\n    nc.stride_length_cm,\n    nc.ground_contact_time_ms,\n    nc.speed_mmps\n   FROM canon c\n     LEFT JOIN d_adj nc ON c.distance_m::numeric = nc.distance_m\n  ORDER BY nc.meta_rank, nc.id_val, c.distance_m;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_segment_create_auto_approve",
+      "definition": " SELECT tsm.activity_id,\n    tsm.segment_id,\n    tsm.best_start_dist,\n    tsm.best_end_dist,\n    tsm.dist_deviation,\n    tsm.polygon_deviation_m,\n    tsm.hausdorff_deviation_m,\n    tsm.freschet_deviation_m,\n    tsm.confidence,\n        CASE\n            WHEN tsm.dist_deviation < 0.002 AND tsm.polygon_deviation_m < 2::numeric THEN 1\n            WHEN COALESCE(tsm.hausdorff_deviation_m, 999::numeric) < 15::numeric THEN 2\n            WHEN COALESCE(tsm.freschet_deviation_m, 999::numeric) < 15::numeric THEN 3\n            ELSE 4\n        END AS approval_phase\n   FROM activities.vw_temp_segment_matches_downselect tsm\n     JOIN activities.segments s ON s.activity_reference_id <> tsm.activity_id AND s.segment_id = tsm.segment_id;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_segment_create_from_details",
+      "definition": " SELECT activity_id AS activity_reference_id,\n    min(distance_m)::integer AS reference_start_point,\n    max(distance_m)::integer AS reference_end_point,\n    is_course,\n    segment_name,\n    st_setsrid(st_makeline(st_makepoint(longitude::double precision, latitude::double precision, elevation_m::double precision, distance_m::double precision) ORDER BY elapsed_duration_s), 4326) AS segment_path,\n    max(distance_m) - min(distance_m) AS distance_m,\n    sum(\n        CASE\n            WHEN elevation_delta > 0::numeric THEN elevation_delta\n            ELSE 0::numeric\n        END) AS elevation_gain,\n    sum(\n        CASE\n            WHEN elevation_delta < 0::numeric THEN - elevation_delta\n            ELSE 0::numeric\n        END) AS elevation_loss,\n    st_makepoint(max(\n        CASE\n            WHEN row_asc = 1 THEN longitude\n            ELSE NULL::numeric\n        END)::double precision, max(\n        CASE\n            WHEN row_asc = 1 THEN latitude\n            ELSE NULL::numeric\n        END)::double precision)::geography(Point,4326) AS start_point,\n    st_makepoint(max(\n        CASE\n            WHEN row_desc = 1 THEN longitude\n            ELSE NULL::numeric\n        END)::double precision, max(\n        CASE\n            WHEN row_desc = 1 THEN latitude\n            ELSE NULL::numeric\n        END)::double precision)::geography(Point,4326) AS end_point,\n    activity_type_id\n   FROM activities.temp_segment_details\n  GROUP BY activity_id, activity_type_id, is_course, segment_name;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_segment_leaderboard",
+      "definition": " WITH labels AS (\n         SELECT r.segment_id,\n            s.is_course,\n            s.segment_name,\n            r.activity_id,\n            r.activity_start_point,\n            r.activity_end_point,\n            r.cycle_name,\n            w.weight_lb,\n            w.muscle_lb,\n            w.fat_lb,\n            r.distance_mi,\n            r.elapsed_duration_s,\n            r.start_time_utc,\n            r.all_time_rank,\n            r.last_365_rank,\n            r.current_cycle_rank,\n            r.recency_rank,\n            ts.vo2_max_value,\n            ts.altitude_acclimation_m,\n            ts.heat_acclimation_pct,\n            ts.training_load_acute,\n            ts.training_readiness,\n            ts.training_load_pct,\n            ts.training_load_mid,\n            ts.training_load_max,\n            ts.training_load_min,\n            ts.resting_hr_asleep,\n            ts.resting_hr_awake,\n            ts.sleep_duration_s,\n            ts.sleep_score,\n            ts.light_sleep_s,\n            ts.deep_sleep_s,\n            ts.awake_sleep_s,\n            ts.rem_sleep_s,\n            ts.awake_s_before_activity,\n            r.max_hr,\n            r.avg_hr,\n            r.avg_cadence,\n            r.avg_temp,\n            r.avg_vert_osc,\n            r.avg_vert_ratio,\n            r.avg_gct,\n            r.avg_perf,\n            r.avg_balance,\n            r.avg_stride_length\n           FROM activities.vw_segments_details_ranked r\n             JOIN activities.segments s ON r.segment_id = s.segment_id\n             LEFT JOIN activities.vw_activity_weights w ON w.activity_id = r.activity_id\n             LEFT JOIN activities.vw_activity_training_status ts ON r.activity_id = ts.activity_id\n        ), final_sql AS (\n         SELECT l.segment_id,\n            l.is_course,\n            l.segment_name,\n            l.activity_id,\n            l.activity_start_point,\n            l.activity_end_point,\n            l.cycle_name,\n            l.weight_lb,\n            l.muscle_lb,\n            l.fat_lb,\n            l.distance_mi,\n            l.elapsed_duration_s,\n            pace_as_text(l.distance_mi, l.elapsed_duration_s) AS pace_str,\n            l.start_time_utc,\n            l.all_time_rank,\n            l.last_365_rank,\n            l.current_cycle_rank,\n            l.recency_rank,\n            l.vo2_max_value,\n            l.altitude_acclimation_m,\n            l.heat_acclimation_pct,\n            l.training_load_acute,\n            l.training_readiness,\n            l.training_load_pct,\n            l.training_load_mid,\n            l.training_load_max,\n            l.training_load_min,\n            l.resting_hr_asleep,\n            l.resting_hr_awake,\n            l.sleep_duration_s,\n            l.sleep_score,\n            l.light_sleep_s,\n            l.deep_sleep_s,\n            l.awake_sleep_s,\n            l.rem_sleep_s,\n            l.awake_s_before_activity,\n            l.max_hr,\n            l.avg_hr,\n            l.avg_cadence,\n            l.avg_temp,\n            l.avg_vert_osc,\n            l.avg_vert_ratio,\n            l.avg_gct,\n            l.avg_perf,\n            l.avg_balance,\n            l.avg_stride_length\n           FROM labels l\n        )\n SELECT segment_id,\n    is_course,\n    segment_name,\n    cycle_name,\n    activity_id,\n    activity_start_point,\n    activity_end_point,\n    distance_mi,\n    start_time_utc,\n    all_time_rank,\n    last_365_rank,\n    current_cycle_rank,\n    recency_rank,\n    elapsed_duration_s,\n    pace_str,\n    weight_lb,\n        CASE\n            WHEN COALESCE(weight_lb, 0::numeric) > 0::numeric THEN round(muscle_lb / weight_lb, 3)\n            ELSE NULL::numeric\n        END AS muscle_pct,\n        CASE\n            WHEN COALESCE(weight_lb, 0::numeric) > 0::numeric THEN round(fat_lb / weight_lb, 3)\n            ELSE NULL::numeric\n        END AS fat_pct,\n    vo2_max_value,\n    altitude_acclimation_m,\n    heat_acclimation_pct,\n    training_load_acute,\n    training_load_pct,\n    training_readiness,\n    training_load_mid,\n    training_load_max,\n    training_load_min,\n    resting_hr_asleep,\n    resting_hr_awake,\n    sleep_duration_s,\n    round(sleep_duration_s::numeric / 3600.0, 2) AS sleep_hours,\n    sleep_score,\n    light_sleep_s,\n    deep_sleep_s,\n    awake_sleep_s,\n    rem_sleep_s,\n    round(awake_s_before_activity / 3600.0, 2) AS awake_hours,\n    max_hr,\n    avg_hr,\n    avg_cadence,\n    avg_temp,\n    avg_vert_osc,\n    avg_vert_ratio,\n    avg_gct,\n    avg_perf,\n    avg_balance,\n    avg_stride_length\n   FROM final_sql f;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_segment_matching_downselect_confidence",
+      "definition": " WITH calcs AS (\n         SELECT temp_segment_matches_downselect.activity_id,\n            temp_segment_matches_downselect.best_start_dist,\n            temp_segment_matches_downselect.best_end_dist,\n            temp_segment_matches_downselect.dist_deviation,\n            temp_segment_matches_downselect.polygon_deviation_m,\n            temp_segment_matches_downselect.freschet_deviation_m,\n            temp_segment_matches_downselect.hausdorff_deviation_m,\n            4 +\n                CASE\n                    WHEN temp_segment_matches_downselect.dist_deviation < 0.003 THEN 1\n                    WHEN temp_segment_matches_downselect.dist_deviation > 0.005 THEN '-1'::integer\n                    ELSE 0\n                END +\n                CASE\n                    WHEN temp_segment_matches_downselect.polygon_deviation_m IS NULL THEN 0\n                    WHEN temp_segment_matches_downselect.polygon_deviation_m <= 2::numeric THEN 1\n                    WHEN temp_segment_matches_downselect.polygon_deviation_m >= 7::numeric THEN '-1'::integer\n                    ELSE 0\n                END +\n                CASE\n                    WHEN temp_segment_matches_downselect.hausdorff_deviation_m IS NULL THEN 0\n                    WHEN temp_segment_matches_downselect.hausdorff_deviation_m <= 5::numeric THEN 1\n                    WHEN temp_segment_matches_downselect.hausdorff_deviation_m >= 50::numeric THEN '-2'::integer\n                    WHEN temp_segment_matches_downselect.hausdorff_deviation_m >= 20::numeric THEN '-1'::integer\n                    ELSE 0\n                END +\n                CASE\n                    WHEN temp_segment_matches_downselect.freschet_deviation_m IS NULL THEN 0\n                    WHEN temp_segment_matches_downselect.freschet_deviation_m <= 5::numeric THEN 1\n                    WHEN temp_segment_matches_downselect.freschet_deviation_m >= 50::numeric THEN '-2'::integer\n                    WHEN temp_segment_matches_downselect.freschet_deviation_m >= 20::numeric THEN '-1'::integer\n                    ELSE 0\n                END AS confidence_score\n           FROM activities.temp_segment_matches_downselect\n        )\n SELECT confidence_score >= 6 AS confirmed,\n    activity_id,\n    best_start_dist,\n    best_end_dist,\n    dist_deviation,\n    polygon_deviation_m,\n    freschet_deviation_m,\n    hausdorff_deviation_m,\n    confidence_score\n   FROM calcs\n  ORDER BY confidence_score DESC;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_segment_matching_downselect_scores",
+      "definition": " WITH calcs AS (\n         SELECT t.activity_id,\n            t.best_start_dist,\n            t.best_end_dist,\n            round(abs(s.distance_m::numeric - (t.best_end_dist - t.best_start_dist)::numeric) / s.distance_m::numeric, 3) AS dist_deviation,\n            abs(st_zmax(t.full_path::box3d) - st_zmin(t.full_path::box3d)) AS match_range,\n            abs(st_zmax(s.segment_path::box3d) - st_zmin(s.segment_path::box3d)) AS source_range\n           FROM activities.temp_segment_matches_downselect t\n             JOIN activities.segments s ON s.segment_id = t.segment_id\n        )\n SELECT activity_id,\n    best_start_dist,\n    best_end_dist,\n    dist_deviation,\n    1::double precision - LEAST(1::double precision, abs(match_range - source_range) / NULLIF(source_range, 0::double precision)) AS ruggedness\n   FROM calcs;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_segment_path_updates",
+      "definition": " SELECT traj.segment_id,\n    traj.activity_reference_id,\n    traj.activity_type_id,\n    traj.reference_start_point,\n    traj.reference_end_point,\n    traj.segment_path,\n    round(st_length(traj.segment_path::geography, true)::numeric, 2)::numeric(8,2) AS distance_m,\n    round(COALESCE(deltas.ascent_m, 0::numeric), 2) AS ascent_m,\n    round(COALESCE(deltas.descent_m, 0::numeric), 2) AS descent_m,\n    st_startpoint(traj.segment_path) AS start_point,\n    st_endpoint(traj.segment_path) AS end_point\n   FROM ( SELECT s.segment_id,\n            a.activity_id AS activity_reference_id,\n            a.activity_type_id,\n            s.reference_start_point,\n            s.reference_end_point,\n            st_setsrid(st_makeline(st_makepoint(rd.longitude::double precision, rd.latitude::double precision, rd.elevation_m_smooth::double precision, rd.elapsed_duration_s::double precision) ORDER BY rd.elapsed_duration_s), 4326) AS segment_path\n           FROM activities.activities a\n             JOIN activities.segments s ON a.activity_id = s.activity_reference_id\n             JOIN activities.activity_details rd ON rd.activity_id = a.activity_id AND rd.elapsed_duration_s >= s.reference_start_point AND rd.elapsed_duration_s <= s.reference_end_point\n          GROUP BY s.segment_id, a.activity_id, a.activity_type_id, s.reference_start_point, s.reference_end_point) traj\n     JOIN ( SELECT aed.activity_id,\n            sum(\n                CASE\n                    WHEN aed.elevation_delta > 0::numeric THEN aed.elevation_delta\n                    ELSE 0::numeric\n                END) AS ascent_m,\n            sum(\n                CASE\n                    WHEN aed.elevation_delta < 0::numeric THEN aed.elevation_delta\n                    ELSE 0::numeric\n                END) AS descent_m\n           FROM activities.vw_activity_elevation_deltas aed\n             JOIN activities.segments s ON aed.activity_id = s.activity_reference_id\n          WHERE aed.elevation_delta <> 0::numeric AND aed.elapsed_duration_s >= s.reference_start_point AND aed.elapsed_duration_s <= s.reference_end_point\n          GROUP BY aed.activity_id) deltas ON traj.activity_reference_id = deltas.activity_id;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_segment_racing",
+      "definition": " SELECT s.segment_id,\n    s.segment_name,\n    m2mi(s.distance_m) AS distance_mi,\n    a.effort_count,\n    a.last_effort,\n    a.last_id AS activity_id,\n    s.is_course\n   FROM activities.segments s\n     JOIN ( SELECT sm.segment_id,\n            count(DISTINCT sm.activity_id) AS effort_count,\n            max(a_1.start_time_utc) AS last_effort,\n            max(sm.activity_id) AS last_id\n           FROM activities.segment_matches sm\n             JOIN activities.activities a_1 ON a_1.activity_id = sm.activity_id\n          WHERE sm.match_confirmed\n          GROUP BY sm.segment_id) a ON a.segment_id = s.segment_id AND a.effort_count > 1\n  ORDER BY a.last_effort DESC, a.effort_count DESC;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_segments_details_ranked",
+      "definition": " WITH most_recent_training_cycle AS (\n         SELECT max(training_cycle_dates.cycle_start_utc) AS mrtc\n           FROM activities.training_cycle_dates\n        )\n SELECT segment_id,\n    activity_id,\n        CASE\n            WHEN start_time_utc > (( SELECT most_recent_training_cycle.mrtc\n               FROM most_recent_training_cycle)) THEN 'Current Cycle'::text\n            WHEN start_time_utc > (CURRENT_TIMESTAMP - '365 days'::interval) THEN 'Last 365'::text\n            ELSE 'All Time'::text\n        END AS cycle_name,\n    activity_start_point,\n    activity_end_point,\n    row_number() OVER (PARTITION BY segment_id ORDER BY start_time_utc DESC) AS recency_rank,\n    row_number() OVER (PARTITION BY segment_id ORDER BY elapsed_duration_s) AS all_time_rank,\n    row_number() OVER (PARTITION BY segment_id ORDER BY (start_time_utc > (CURRENT_TIMESTAMP - '365 days'::interval)) DESC, elapsed_duration_s) AS last_365_rank,\n    row_number() OVER (PARTITION BY segment_id ORDER BY (start_time_utc > (( SELECT most_recent_training_cycle.mrtc\n           FROM most_recent_training_cycle))) DESC, elapsed_duration_s) AS current_cycle_rank,\n    start_time_utc,\n    m2mi(distance_m::numeric) AS distance_mi,\n    elapsed_duration_s,\n    max_hr,\n    avg_hr,\n    avg_cadence,\n    avg_temp,\n    avg_vert_osc,\n        CASE\n            WHEN avg_vert_ratio < 0::numeric THEN NULL::numeric\n            ELSE avg_vert_ratio\n        END AS avg_vert_ratio,\n    avg_gct,\n    avg_perf,\n    avg_balance,\n    avg_stride_length,\n    segment_path\n   FROM activities.segments_details;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_segments_effort_stats",
+      "definition": " WITH segs AS (\n         SELECT s.segment_id,\n            s.segment_name,\n            s.is_course,\n            a.activity_type_name,\n            m2mi(s.distance_m) AS distance_mi,\n            s.elevation_gain,\n            max(a.start_time_utc)::date AS last_effort,\n            count(DISTINCT sm.activity_id) AS matched_activity_count\n           FROM activities.segments s\n             LEFT JOIN activities.segment_matches sm ON sm.segment_id = s.segment_id\n             LEFT JOIN activities.activities a ON a.activity_id = sm.activity_id\n          GROUP BY s.segment_id, s.segment_name, a.activity_type_name\n        )\n SELECT segment_id,\n    segment_name,\n    is_course,\n    activity_type_name,\n    distance_mi,\n    elevation_gain,\n    last_effort,\n    matched_activity_count\n   FROM segs\n  ORDER BY is_course DESC, last_effort DESC;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_temp_segment_matches_downselect",
+      "definition": " SELECT tsm.activity_id,\n    tsm.segment_id,\n    a.start_time_utc::date AS effort_date,\n    tsm.best_start_dist,\n    tsm.best_end_dist,\n    tsm.ruggedness,\n    tsm.dist_deviation,\n    round(tsm.polygon_deviation_m, 1) AS polygon_deviation_m,\n    round(tsm.hausdorff_deviation_m, 1) AS hausdorff_deviation_m,\n    round(tsm.freschet_deviation_m, 1) AS freschet_deviation_m,\n    round(tsm.dist_deviation * 5::numeric + (1::numeric - tsm.ruggedness) + COALESCE(tsm.polygon_deviation_m, 10::numeric) / 10::numeric + COALESCE(tsm.hausdorff_deviation_m, 35::numeric) / 35::numeric * (COALESCE(tsm.freschet_deviation_m, 50::numeric) / 50::numeric), 2) AS confidence\n   FROM activities.temp_segment_matches_downselect tsm\n     JOIN activities.activities a ON a.activity_id = tsm.activity_id\n  ORDER BY (round(tsm.dist_deviation * 5::numeric + (1::numeric - tsm.ruggedness) + COALESCE(tsm.polygon_deviation_m, 10::numeric) / 10::numeric + COALESCE(tsm.hausdorff_deviation_m, 35::numeric) / 35::numeric * (COALESCE(tsm.freschet_deviation_m, 50::numeric) / 50::numeric), 2)) DESC;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_unmatched_activitites",
+      "definition": " SELECT DISTINCT a.activity_id\n   FROM activities.activities a\n     LEFT JOIN activities.segment_matches sm ON sm.activity_id = a.activity_id\n  WHERE a.is_downloaded AND sm.activity_id IS NULL\n  ORDER BY a.activity_id DESC;"
+    },
+    {
+      "schema": "activities",
+      "name": "vw_watch_music_heard",
+      "definition": " SELECT playlist_id,\n    playlist_name,\n    track_id,\n    isrc,\n    track_order,\n    track_name_clean,\n    artist_display_name,\n    duration_ms,\n    music_start,\n    start_cumulative_ms,\n    end_cumulative_ms,\n    pct_listened,\n    total_listen_ms,\n    played_at_utc\n   FROM ( SELECT unnamed_subquery.playlist_id,\n            unnamed_subquery.playlist_name,\n            unnamed_subquery.track_id,\n            unnamed_subquery.isrc,\n            unnamed_subquery.track_order,\n            unnamed_subquery.track_name_clean,\n            unnamed_subquery.artist_display_name,\n            unnamed_subquery.duration_ms,\n            unnamed_subquery.music_start,\n            unnamed_subquery.start_cumulative_ms,\n            unnamed_subquery.end_cumulative_ms,\n                CASE\n                    WHEN unnamed_subquery.music_ms > unnamed_subquery.end_cumulative_ms::numeric THEN 1.00\n                    WHEN unnamed_subquery.music_ms < unnamed_subquery.start_cumulative_ms::numeric THEN 0.00\n                    ELSE round(1::numeric - (unnamed_subquery.end_cumulative_ms::numeric - unnamed_subquery.music_ms) / unnamed_subquery.duration_ms::numeric, 2)\n                END AS pct_listened,\n            unnamed_subquery.music_ms AS total_listen_ms,\n            unnamed_subquery.music_start + (unnamed_subquery.end_cumulative_ms - unnamed_subquery.duration_ms)::double precision * '00:00:00.001'::interval AS played_at_utc\n           FROM ( SELECT pc.playlist_id,\n                    pc.playlist_name,\n                    tr.track_id,\n                    bt.isrc,\n                    pi.track_order,\n                    tr.track_name_clean,\n                    tr.artist_display_name,\n                    tr.duration_ms,\n                    rt.music_start,\n                    rt.music_duration_ms AS music_ms,\n                    sum(tr.duration_ms) OVER (PARTITION BY pi.playlist_id ORDER BY pi.track_order) - tr.duration_ms AS start_cumulative_ms,\n                    sum(tr.duration_ms) OVER (PARTITION BY pi.playlist_id ORDER BY pi.track_order) AS end_cumulative_ms\n                   FROM music.playlist_config pc\n                     JOIN music.playlist_relationships pr ON pr.parent_playlist_id = pc.playlist_id AND pr.child_playlist_type = 'manual'::text\n                     JOIN music.playlist_isrcs pi ON pi.playlist_id = pr.child_playlist_id\n                     JOIN music.vw_best_track_id bt ON bt.isrc = pi.isrc\n                     JOIN music.all_tracks tr ON bt.best_track_id = tr.track_id\n                     CROSS JOIN activities.vw_run_timing rt\n                  WHERE pc.manual_shuffle) unnamed_subquery) subquery_two\n  WHERE pct_listened > 0.20;"
+    }
+  ],
+  "constraints": [
+    {
+      "schema": "activities",
+      "table": "activities",
+      "name": "activities_activity_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL activity_id"
+    },
+    {
+      "schema": "activities",
+      "table": "activities",
+      "name": "activities_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (activity_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "activity_details",
+      "name": "activity_details_activity_id_not_null1",
+      "type": "n",
+      "definition": "NOT NULL activity_id"
+    },
+    {
+      "schema": "activities",
+      "table": "activity_details",
+      "name": "activity_details_ts_utc_not_null",
+      "type": "n",
+      "definition": "NOT NULL ts_utc"
+    },
+    {
+      "schema": "activities",
+      "table": "activity_details",
+      "name": "activity_details_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (activity_id, ts_utc)"
+    },
+    {
+      "schema": "activities",
+      "table": "activity_details_distance",
+      "name": "activity_details_distance_activity_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL activity_id"
+    },
+    {
+      "schema": "activities",
+      "table": "activity_details_distance",
+      "name": "activity_details_distance_distance_m_not_null",
+      "type": "n",
+      "definition": "NOT NULL distance_m"
+    },
+    {
+      "schema": "activities",
+      "table": "activity_details_distance",
+      "name": "activity_details_distance_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (activity_id, distance_m)"
+    },
+    {
+      "schema": "activities",
+      "table": "activity_processing_queue",
+      "name": "activity_processing_queue_activity_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL activity_id"
+    },
+    {
+      "schema": "activities",
+      "table": "activity_processing_queue",
+      "name": "activity_processing_queue_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (activity_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "courses",
+      "name": "courses_course_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL course_id"
+    },
+    {
+      "schema": "activities",
+      "table": "courses",
+      "name": "courses_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (course_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "distinct_segments",
+      "name": "distinct_segments_match_seg_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL match_seg_id"
+    },
+    {
+      "schema": "activities",
+      "table": "distinct_segments",
+      "name": "distinct_segments_segment_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL segment_id"
+    },
+    {
+      "schema": "activities",
+      "table": "distinct_segments",
+      "name": "distinct_segments_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (segment_id, match_seg_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "elevation_reference",
+      "name": "elevation_reference_avg_elevation_not_null",
+      "type": "n",
+      "definition": "NOT NULL avg_elevation"
+    },
+    {
+      "schema": "activities",
+      "table": "elevation_reference",
+      "name": "elevation_reference_grid_5m_00_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL grid_5m_00_id"
+    },
+    {
+      "schema": "activities",
+      "table": "elevation_reference",
+      "name": "elevation_reference_obs_count_not_null",
+      "type": "n",
+      "definition": "NOT NULL obs_count"
+    },
+    {
+      "schema": "activities",
+      "table": "elevation_reference",
+      "name": "elevation_reference_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (grid_5m_00_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "metric_list",
+      "name": "metric_list_activity_type_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL activity_type_id"
+    },
+    {
+      "schema": "activities",
+      "table": "metric_list",
+      "name": "metric_list_metric_name_not_null",
+      "type": "n",
+      "definition": "NOT NULL metric_name"
+    },
+    {
+      "schema": "activities",
+      "table": "metric_list",
+      "name": "metric_list_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (activity_type_id, metric_name)"
+    },
+    {
+      "schema": "activities",
+      "table": "overlap_queue",
+      "name": "overlap_queue_queue_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL queue_id"
+    },
+    {
+      "schema": "activities",
+      "table": "overlap_queue",
+      "name": "overlap_queue_segment_id_a_not_null",
+      "type": "n",
+      "definition": "NOT NULL segment_id_a"
+    },
+    {
+      "schema": "activities",
+      "table": "overlap_queue",
+      "name": "overlap_queue_segment_id_b_not_null",
+      "type": "n",
+      "definition": "NOT NULL segment_id_b"
+    },
+    {
+      "schema": "activities",
+      "table": "overlap_queue",
+      "name": "overlap_queue_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (queue_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "overlap_queue",
+      "name": "unique_overlap_pair",
+      "type": "u",
+      "definition": "UNIQUE (segment_id_a, segment_id_b)"
+    },
+    {
+      "schema": "activities",
+      "table": "race_predictions_raw",
+      "name": "race_predictions_raw_ts_utc_not_null",
+      "type": "n",
+      "definition": "NOT NULL ts_utc"
+    },
+    {
+      "schema": "activities",
+      "table": "race_predictions_raw",
+      "name": "race_predictions_raw_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (ts_utc)"
+    },
+    {
+      "schema": "activities",
+      "table": "segment_match_exclusions",
+      "name": "segment_match_exclusions_activity_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (activity_id) REFERENCES activities.activities(activity_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "segment_match_exclusions",
+      "name": "segment_match_exclusions_segment_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (segment_id) REFERENCES activities.segments(segment_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "segment_matches",
+      "name": "segment_matches_activity_id_fkey",
+      "type": "f",
+      "definition": "FOREIGN KEY (activity_id) REFERENCES activities.activities(activity_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "segment_matches",
+      "name": "segment_matches_activity_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL activity_id"
+    },
+    {
+      "schema": "activities",
+      "table": "segment_matches",
+      "name": "segment_matches_segment_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL segment_id"
+    },
+    {
+      "schema": "activities",
+      "table": "segment_matches",
+      "name": "segment_matches_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (segment_id, activity_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "segment_matches",
+      "name": "uc_segment_match_act_seg_ids",
+      "type": "u",
+      "definition": "UNIQUE (segment_id, activity_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "segments",
+      "name": "segments_segment_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL segment_id"
+    },
+    {
+      "schema": "activities",
+      "table": "segments",
+      "name": "segments_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (segment_id)"
+    },
+    {
+      "schema": "activities",
+      "table": "segments_details",
+      "name": "segments_details_activity_end_point_not_null",
+      "type": "n",
+      "definition": "NOT NULL activity_end_point"
+    },
+    {
+      "schema": "activities",
+      "table": "segments_details",
+      "name": "segments_details_activity_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL activity_id"
+    },
+    {
+      "schema": "activities",
+      "table": "segments_details",
+      "name": "segments_details_activity_start_point_not_null",
+      "type": "n",
+      "definition": "NOT NULL activity_start_point"
+    },
+    {
+      "schema": "activities",
+      "table": "segments_details",
+      "name": "segments_details_segment_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL segment_id"
+    },
+    {
+      "schema": "activities",
+      "table": "segments_details",
+      "name": "segments_details_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (segment_id, activity_id, activity_start_point, activity_end_point)"
+    },
+    {
+      "schema": "activities",
+      "table": "steps_raw",
+      "name": "steps_raw_ts_utc_not_null",
+      "type": "n",
+      "definition": "NOT NULL ts_utc"
+    },
+    {
+      "schema": "activities",
+      "table": "steps_raw",
+      "name": "steps_raw_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (ts_utc)"
+    },
+    {
+      "schema": "activities",
+      "table": "temp_segment_matching_activities",
+      "name": "temp_segment_matching_activities_activity_id_not_null",
+      "type": "n",
+      "definition": "NOT NULL activity_id"
+    },
+    {
+      "schema": "activities",
+      "table": "training_cycle_dates",
+      "name": "training_cycle_dates_cycle_start_utc_not_null",
+      "type": "n",
+      "definition": "NOT NULL cycle_start_utc"
+    },
+    {
+      "schema": "activities",
+      "table": "training_cycle_dates",
+      "name": "training_cycle_dates_pkey",
+      "type": "p",
+      "definition": "PRIMARY KEY (cycle_start_utc)"
+    }
+  ],
+  "fks": [
+    {
+      "schema": "activities",
+      "table": "segment_match_exclusions",
+      "column": "activity_id",
+      "ref_table": "activities",
+      "ref_column": "activity_id",
+      "fk_name": "segment_match_exclusions_activity_id_fkey"
+    },
+    {
+      "schema": "activities",
+      "table": "segment_match_exclusions",
+      "column": "segment_id",
+      "ref_table": "segments",
+      "ref_column": "segment_id",
+      "fk_name": "segment_match_exclusions_segment_id_fkey"
+    },
+    {
+      "schema": "activities",
+      "table": "segment_matches",
+      "column": "activity_id",
+      "ref_table": "activities",
+      "ref_column": "activity_id",
+      "fk_name": "segment_matches_activity_id_fkey"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "coverage": {
+    "schema_object_count": 222,
+    "schema_column_count": 1817,
+    "dictionary_heading_count": 222,
+    "dictionary_unique_heading_count": 222,
+    "schema_only": [],
+    "dictionary_only": [],
+    "duplicate_dictionary_headings": {},
+    "placeholder_count": 0,
+    "replacement_character_count": 0,
+    "schema_duplicates": []
+  },
+  "column_coverage": {
+    "documented_column_count": 1817,
+    "expected_column_count": 1817,
+    "objects_with_missing_columns": 0,
+    "missing_columns": {}
+  },
+  "sql_comments": {
+    "table_comments": [],
+    "column_comments": [],
+    "table_comment_statement_count": 0,
+    "table_comment_null_count": 0,
+    "column_comment_statement_count": 0,
+    "column_comment_null_count": 0,
+    "generic_count": 0,
+    "line_count": 0
+  },
+  "dictionary_line_count": 24461,
+  "ready_for_completion": true
+}

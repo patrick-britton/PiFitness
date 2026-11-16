@@ -1,0 +1,2 @@
+def qux():
+    return "qux"

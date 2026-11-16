@@ -16,8 +16,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { maplibregl } from '@/lib/maplibre';
 import {
   Chart as ChartJS,
   LinearScale,

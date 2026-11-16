@@ -1,87 +1,101 @@
-<#
-.SYNOPSIS
-    Lists SQL files in deploy/sql for pre-deployment review.
+# Review helper for deploy/migrations/. Lists files and checks forward/rollback pairing.
+# Forward files may declare a policy marker "-- NO ROLLBACK: <reason>" in their
+# first 20 lines. Marked forwards are treated as policy-accepted: shown as paired
+# in green with the reason, and not counted by -Strict.
+# Usage: .\deploy\list-sql.ps1 [-Since YYYY-MM-DD] [-Strict]
+#   -Since:  only files modified on/after date
+#   -Strict: exit 1 on unpaired forward without marker, or unpaired rollback
+[CmdletBinding()]
+param([string]$Since, [switch]$Strict)
 
-.DESCRIPTION
-    Prints every .sql file in the target directory, split into forward and
-    rollback lists and sorted by filename so NNN-MMM ordering is preserved.
-    Flags forward migrations that have no matching rollback by prefix.
-
-.PARAMETER Path
-    Directory containing .sql files. Defaults to sql/ next to this script.
-
-.PARAMETER Since
-    Only list files modified on or after this date.
-
-.EXAMPLE
-    .\deploy\list-sql.ps1
-
-.EXAMPLE
-    .\deploy\list-sql.ps1 -Since '2026-10-01'
-#>
-param(
-    [string]$Path = (Join-Path $PSScriptRoot 'sql'),
-    [datetime]$Since
-)
-
-$ErrorActionPreference = 'Stop'
-
-if (-not (Test-Path -LiteralPath $Path)) {
-    Write-Error "Directory not found: $Path"
-    exit 1
+$ErrorActionPreference = "Stop"
+$dir = Join-Path $PSScriptRoot "migrations"
+if (-not (Test-Path -LiteralPath $dir)) {
+    Write-Host "ERROR: $dir not found" -ForegroundColor Red
+    exit 2
 }
 
-$files = Get-ChildItem -LiteralPath $Path -Filter '*.sql' -File
-
+$files = @(Get-ChildItem -LiteralPath $dir -Filter "*.sql" -File)
 if ($Since) {
-    $files = $files | Where-Object { $_.LastWriteTime -ge $Since }
+    try { $cut = [datetime]::Parse($Since) }
+    catch { Write-Host "ERROR: bad date: $Since" -ForegroundColor Red; exit 2 }
+    $files = @($files | Where-Object { $_.LastWriteTime -ge $cut })
+}
+if ($files.Count -eq 0) { Write-Host "No .sql files found"; exit 0 }
+
+function Get-PairKey([string]$n) {
+    $b = $n -replace "\.sql`$",""
+    $b = $b -replace "[_\\-]?rollback[_\\-]?",""
+    return ($b -replace "[_\\-]`$","")
 }
 
-if (-not $files) {
-    $suffix = if ($Since) { " modified since $($Since.ToString('yyyy-MM-dd'))" } else { '' }
-    Write-Host "No .sql files found in $Path$suffix"
-    exit 0
+function Get-NoRollbackMarker([string]$path) {
+    $lines = Get-Content -LiteralPath $path -TotalCount 20 -ErrorAction SilentlyContinue
+    foreach ($line in $lines) {
+        if ($line -match "^\s*--\s*NO ROLLBACK:\s*(.+)$") {
+            return $Matches[1].Trim()
+        }
+    }
+    return $null
 }
 
-$forward  = @($files | Where-Object { $_.Name -notmatch 'rollback' } | Sort-Object Name)
-$rollback = @($files | Where-Object { $_.Name -match 'rollback' }    | Sort-Object Name)
+$fwd = @($files | Where-Object { $_.Name -notmatch "rollback" })
+$rbk = @($files | Where-Object { $_.Name -match "rollback" })
+$fKeys = @{}; $rKeys = @{}
+foreach ($f in $fwd) { $fKeys[(Get-PairKey $f.Name)] = $f.Name }
+foreach ($r in $rbk) { $rKeys[(Get-PairKey $r.Name)] = $r.Name }
 
-function Write-Row($file) {
-    '{0,-72} {1,10:N0}  {2:yyyy-MM-dd HH:mm}' -f $file.Name, $file.Length, $file.LastWriteTime
+Write-Host ""
+Write-Host "=== Forwards ($($fwd.Count)) ==="
+foreach ($f in ($fwd | Sort-Object Name)) {
+    $k = Get-PairKey $f.Name
+    if ($rKeys.ContainsKey($k)) {
+        $tag = "paired"
+        $col = "Green"
+    } else {
+        $marker = Get-NoRollbackMarker $f.FullName
+        if ($marker) {
+            $tag = "NO ROLLBACK (policy): $marker"
+            $col = "Green"
+        } else {
+            $tag = "NO ROLLBACK"
+            $col = "Yellow"
+        }
+    }
+    Write-Host ("  {0,-60}  {1}" -f $f.Name, $tag) -ForegroundColor $col
 }
 
-Write-Host ''
-Write-Host "Forward migrations ($($forward.Count))" -ForegroundColor Cyan
-Write-Host ('-' * 100)
-if ($forward) {
-    $forward | ForEach-Object { Write-Row $_ }
-} else {
-    Write-Host '  (none)'
+Write-Host ""
+Write-Host "=== Rollbacks ($($rbk.Count)) ==="
+foreach ($r in ($rbk | Sort-Object Name)) {
+    $k = Get-PairKey $r.Name
+    $paired = $fKeys.ContainsKey($k)
+    $tag = if ($paired) { "paired" } else { "NO FORWARD" }
+    $col = if ($paired) { "Green" } else { "Yellow" }
+    Write-Host ("  {0,-60}  {1}" -f $r.Name, $tag) -ForegroundColor $col
 }
 
-Write-Host ''
-Write-Host "Rollback scripts ($($rollback.Count))" -ForegroundColor Yellow
-Write-Host ('-' * 100)
-if ($rollback) {
-    $rollback | ForEach-Object { Write-Row $_ }
-} else {
-    Write-Host '  (none)'
-}
+$uF = @($fwd | Where-Object {
+    $k = Get-PairKey $_.Name
+    if ($rKeys.ContainsKey($k)) { return $false }
+    $marker = Get-NoRollbackMarker $_.FullName
+    return (-not $marker)
+})
+$policyF = @($fwd | Where-Object {
+    $k = Get-PairKey $_.Name
+    if ($rKeys.ContainsKey($k)) { return $false }
+    $marker = Get-NoRollbackMarker $_.FullName
+    return [bool]$marker
+})
+$uR = @($rbk | Where-Object { -not $fKeys.ContainsKey((Get-PairKey $_.Name)) })
 
-Write-Host ''
-Write-Host 'Pair check' -ForegroundColor Green
-Write-Host ('-' * 100)
-
-$unpaired = @()
-foreach ($f in $forward) {
-    $prefix = $f.Name.Split('_')[0]
-    $hasRollback = $rollback | Where-Object { $_.Name.StartsWith($prefix) }
-    if (-not $hasRollback) { $unpaired += $f.Name }
-}
-
-if ($unpaired) {
-    Write-Host '  Forward migrations without a paired rollback (review whether each is reversible):' -ForegroundColor Yellow
-    $unpaired | ForEach-Object { Write-Host "    - $_" }
-} else {
-    Write-Host '  Every forward migration has a matching rollback.' -ForegroundColor Green
-}
+Write-Host ""
+Write-Host "=== Summary ==="
+Write-Host "  Forwards without rollback (strict failures): $($uF.Count)"
+$uF | ForEach-Object { Write-Host "    - $($_.Name)" -ForegroundColor Yellow }
+Write-Host "  Forwards without rollback (policy-accepted via marker): $($policyF.Count)"
+$policyF | ForEach-Object { Write-Host "    - $($_.Name)" -ForegroundColor Green }
+Write-Host "  Rollbacks without forward: $($uR.Count)"
+$uR | ForEach-Object { Write-Host "    - $($_.Name)" -ForegroundColor Yellow }
+if ($Strict -and ($uF.Count + $uR.Count) -gt 0) { exit 1 }
+exit 0

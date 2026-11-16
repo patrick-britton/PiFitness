@@ -32,24 +32,29 @@ beforeEach(() => {
 });
 
 describe('mergeMapStyles', () => {
+  // VERIFIED: Unit — mergeMapStyles filters out token-gated styles when token is unavailable
   it('drops token-gated styles when the token is unavailable', () => {
     const merged = mergeMapStyles('positron', CATALOGUE, false);
     expect(merged.options.map((s) => s.id)).toEqual(['positron', 'darkmatter']);
   });
 
+  // VERIFIED: Unit — mergeMapStyles includes token-gated styles when satellite is available
   it('offers satellite styles once the server reports them available', () => {
     const merged = mergeMapStyles('positron', CATALOGUE, true);
     expect(merged.options.map((s) => s.id)).toEqual(['positron', 'darkmatter', 'mb-dark', 'mb-satellite']);
   });
 
+  // VERIFIED: Unit — mergeMapStyles falls back to first available style when current selection is disallowed
   it('re-points an unavailable selection at the first offered style', () => {
     expect(mergeMapStyles('mb-satellite', CATALOGUE, false).value).toBe('positron');
   });
 
+  // VERIFIED: Unit — mergeMapStyles preserves valid current style selection
   it('keeps a selection the catalogue still allows', () => {
     expect(mergeMapStyles('mb-satellite', CATALOGUE, true).value).toBe('mb-satellite');
   });
 
+  // VERIFIED: Unit — mergeMapStyles retains style value when catalogue is empty
   it('leaves the value alone when no style is offered at all', () => {
     const merged = mergeMapStyles('positron', [], false);
     expect(merged.options).toEqual([]);
@@ -58,6 +63,7 @@ describe('mergeMapStyles', () => {
 });
 
 describe('MapStyleSelector', () => {
+  // VERIFIED: Behavior — MapStyleSelector limits options to tokenless styles and falls back when token absent
   it('shows only free styles when no token is configured, and re-points a Mapbox selection', async () => {
     getMapStyles.mockResolvedValue({ data: CATALOGUE, satellite_available: false });
     const onChange = vi.fn();
@@ -73,6 +79,7 @@ describe('MapStyleSelector', () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('positron'));
   });
 
+  // VERIFIED: Behavior — MapStyleSelector displays satellite options when satellite capability is reported
   it('offers satellite styles when the token is available', async () => {
     getMapStyles.mockResolvedValue({ data: CATALOGUE, satellite_available: true });
     render(<MapStyleSelector id="style" value="positron" onChange={vi.fn()} />);
@@ -81,6 +88,7 @@ describe('MapStyleSelector', () => {
     expect(screen.getByRole('option', { name: 'Satellite' })).toBeInTheDocument();
   });
 
+  // VERIFIED: Behavior — MapStyleSelector disables select control and shows error message on fetch failure
   it('disables the selector and reports an error when the catalogue fails', async () => {
     getMapStyles.mockRejectedValue(new Error('nope'));
     render(<MapStyleSelector id="style" value="positron" onChange={vi.fn()} />);

@@ -50,7 +50,7 @@ export interface DraftStep {
 }
 
 export const EMPTY_DRAFT: DraftStep = {
-  instruction: '', timerEnabled: true, minutes: '1', seconds: '0', portions: [],
+  instruction: '', timerEnabled: false, minutes: '1', seconds: '0', portions: [],
 };
 
 let portionKey = 1;
