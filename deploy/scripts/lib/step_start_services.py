@@ -26,10 +26,11 @@ Identical for TEST and PRD.  Installs the commit's units and brings them up.
 Exit: 0 pass, 1 fail.  Python 3 standard library only.
 """
 import os
+import shutil
 import sys
 
 from common import (HelperError, evidence, info, load_context, register_undo,
-                    startable_units, step_main, words)
+                    run_cmd, startable_units, step_main, words)
 from unitctl import (UnitEnv, manifest_load, manifest_save, parse_args, start_and_wait)
 
 
@@ -97,6 +98,17 @@ def main():
         evidence("enabled_" + name, state)
 
     # ---- 5. start (standalone services first, then timers)
+    if "pifitness-frontend.service" in to_start:
+        frontend_dir = os.path.join(ctx.env_value("APP_DIR"), "frontend", "pifitness")
+        next_dir = os.path.join(frontend_dir, ".next")
+        if not os.path.isdir(next_dir):
+            info("frontend .next missing in %s; running npm run build ..." % frontend_dir)
+            npm = shutil.which("npm") or "/usr/bin/npm"
+            res = run_cmd([npm, "run", "build"], cwd=frontend_dir, timeout=600)
+            if not res.ok:
+                raise HelperError("npm run build failed: %s" % res.first_error_line(), frontend_dir)
+            evidence("frontend_build", "ok, %s" % next_dir)
+
     info("starting: %s" % " ".join(to_start))
     for name in to_start:
         evidence("started_" + name, start_and_wait(ue, name))

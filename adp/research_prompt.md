@@ -5,7 +5,15 @@ I only ever test by running the pi shell script and relying on the reported outp
 This is a personal-use, and single-developer application, so don't over engineer.
 
 # Your Task
-- Smoke testing seems complete with the bootstrapper. Read through the `deploy/bootstrap.log` and plan how best to deliver `step_manual_gate.py`
+- The full bootstrapping script seems to be active, but the full test deployment did not meet expected criteria and was rolled back.
+- Specifically, there is a known change where two buttons ("coffee" and "smoothie") should exist on the home page.
+    - These changes do appear locally
+    - When deployed to test and tested through a Chrome Browser on a smartphone connected to https://pifitness.duckdns.org, no buttons appeared.
+    - While waiting for the "go" or "no go" determination, the polling script kept interfering with the output -- so, while polling can continue, it should cease outputting the poll message when on the final step.
+    - Read through the evidence log `deploy/bootstrap.log` in full.
+    - Ensure the step where all the registrations are properly updated is being included, so that the app is fully reachable outside of the local network.
+    - There is a low-but-not-nonexistent chance the user was encountering browser cache issues.
+- Prepare a full rootcause analysis and present the summary to the user. If everything checks out as expected and you believe its a caching issue, provide instructions for the user how to try a second deployment with the cache cleared.
 
 # Ground rules:
 1. autodeploy_objectives.md is the specification. Stay as true to it as possible. Change course only when something critical is discovered, and say so explicitly when you do.

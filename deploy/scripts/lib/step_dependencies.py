@@ -403,6 +403,17 @@ class Dependencies:
             raise HelperError("npm ci exited 0 but node_modules does not exist", modules)
         evidence("npm_ci", "ok, %s" % modules)
 
+        info("npm run build  (in %s)" % self.frontend_dir)
+        build_result = run_cmd([npm, "run", "build"],
+                               cwd=self.frontend_dir, timeout=LONG_TIMEOUT, echo_prefix="    ", heartbeat=30)
+        if not build_result.ok:
+            raise HelperError("npm run build failed: %s" % reason_from_output(build_result),
+                              "cd %s && %s" % (self.frontend_dir, build_result.command()))
+        next_dir = os.path.join(self.frontend_dir, ".next")
+        if not os.path.isdir(next_dir):
+            raise HelperError("npm run build exited 0 but .next does not exist", next_dir)
+        evidence("npm_build", "ok, %s" % next_dir)
+
     # ------------------------------------------------------- 5. playwright
     def stage_playwright(self):
         if not self.browsers:

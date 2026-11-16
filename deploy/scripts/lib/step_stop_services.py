@@ -32,7 +32,9 @@ import sys
 
 from common import (HelperError, evidence, info, load_context, register_undo,
                     standalone_services, step_main, update_state, warn)
-from unitctl import (UnitEnv, manifest_save, parse_args, stop_order, stop_unit)
+from unitctl import (UnitEnv, check_legacy_pm2_process, find_pm2,
+                     is_port_in_use, manifest_save, parse_args,
+                     stop_legacy_pm2_process, stop_order, stop_unit)
 
 
 def main():
@@ -45,6 +47,12 @@ def main():
     matching, active_services, active_timers = ue.poll()
     displaced = ue.plan_displaced()
     file_names = {e["name"] for e in displaced}
+
+    # Check for legacy PM2 process (pre-systemd migration)
+    pm2 = find_pm2()
+    legacy_pm2_active = bool(pm2 and check_legacy_pm2_process(pm2, "pifitness-next"))
+    if legacy_pm2_active:
+        info("detected active legacy PM2 process 'pifitness-next'")
 
     unmanaged = [u for u, _l, _a in matching
                  if u not in file_names and (u in active_services or u in active_timers)]
@@ -65,6 +73,7 @@ def main():
     record = {
         "active_services": active_services, "active_timers": active_timers,
         "restore_units": restore, "displaced": displaced, "was_enabled": was_enabled,
+        "legacy_pm2_stopped": legacy_pm2_active,
         "backup_dir": ue.backup_dir, "install_dir": ue.install_dir,
         "installed": [], "enabled_new": [], "started": []}
     manifest_save(ue, record)
@@ -75,6 +84,7 @@ def main():
     evidence("active_services", " ".join(active_services) or "none")
     evidence("active_timers", " ".join(active_timers) or "none")
     evidence("restore_units", " ".join(restore) or "none")
+    evidence("legacy_pm2_active", "yes" if legacy_pm2_active else "none")
     evidence("unit_files_to_move_aside", " ".join(sorted(file_names)) or "none")
     evidence("enabled_before", " ".join(was_enabled) or "none")
     evidence("unit_record", ue.manifest_path)
@@ -84,6 +94,11 @@ def main():
         before = "active" if unit in active_services or unit in active_timers else "inactive"
         after = stop_unit(ue, unit)
         evidence("stopped_" + unit, "%s -> %s" % (before, after))
+
+    if legacy_pm2_active:
+        info("stopping legacy PM2 process 'pifitness-next' to free port 3000 ...")
+        stop_legacy_pm2_process(pm2, "pifitness-next")
+        evidence("stopped_legacy_pm2", "pifitness-next")
 
     # ---- 5. disable, then move aside
     for name in was_enabled:
@@ -106,6 +121,14 @@ def main():
                           % " ".join(still_timers + still_services), "systemctl list-units")
     evidence("active_pifitness_units_after", "none")
     evidence("backup_dir", ue.backup_dir)
+
+    # ---- 7. verify application ports (8000, 3000) are free
+    for port in (8000, 3000):
+        if is_port_in_use(port):
+            warn("port %d is still in use after stop: a non-systemd process may be listening" % port)
+            evidence("port_%d_free" % port, "no")
+        else:
+            evidence("port_%d_free" % port, "yes")
 
 
 if __name__ == "__main__":

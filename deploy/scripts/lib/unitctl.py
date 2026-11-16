@@ -42,6 +42,8 @@ import fnmatch
 import json
 import os
 import re
+import shutil
+import socket
 import time
 
 from common import (ACTIVE_UNIT_STATES, UNIT_FILE_RE, HelperError, Parser,
@@ -333,3 +335,50 @@ def start_and_wait(ue, unit):
                               % (unit, ue.start_timeout, state or "unknown"),
                               "systemctl status " + unit)
         time.sleep(1)
+
+
+# ----------------------------------------------------------------------------
+# Port checking and legacy process helpers
+# ----------------------------------------------------------------------------
+def is_port_in_use(port, host="127.0.0.1"):
+    """Check if TCP port is currently open/listening on host."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex((host, port)) == 0
+
+
+def find_pm2():
+    """Look for pm2 executable in standard locations."""
+    for p in [shutil.which("pm2"), "/usr/local/bin/pm2", "/usr/bin/pm2", "/home/god/.npm-global/bin/pm2"]:
+        if p and os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return None
+
+
+def check_legacy_pm2_process(pm2_cmd, name="pifitness-next"):
+    """Returns True if the legacy PM2 process is currently online."""
+    res = run_cmd([pm2_cmd, "jlist"], timeout=15)
+    if not res.ok:
+        return False
+    try:
+        data = json.loads(res.stdout)
+        for proc in data:
+            if proc.get("name") == name and proc.get("pm2_env", {}).get("status") == "online":
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def stop_legacy_pm2_process(pm2_cmd, name="pifitness-next"):
+    run_cmd([pm2_cmd, "stop", name], timeout=30)
+
+
+def restart_legacy_pm2_process(pm2_cmd, name="pifitness-next"):
+    run_cmd([pm2_cmd, "restart", name], timeout=30)
+
+
+def delete_legacy_pm2_process(pm2_cmd, name="pifitness-next"):
+    run_cmd([pm2_cmd, "delete", name], timeout=30)
+    run_cmd([pm2_cmd, "save", "--force"], timeout=30)
+

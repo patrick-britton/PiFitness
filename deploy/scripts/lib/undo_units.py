@@ -31,8 +31,10 @@ import os
 import sys
 
 from common import (HelperError, SkipStep, evidence, info, load_context, step_main)
-from unitctl import (Failures, UnitEnv, manifest_load, manifest_save, parse_args,
-                     start_and_wait, stop_order, stop_unit)
+from unitctl import (Failures, UnitEnv, delete_legacy_pm2_process, find_pm2,
+                     manifest_load, manifest_save, parse_args,
+                     restart_legacy_pm2_process, start_and_wait, stop_order,
+                     stop_unit)
 
 
 def keep_new_units(ue, record):
@@ -52,6 +54,12 @@ def keep_new_units(ue, record):
             removed += 1
     evidence("old_unit_files_deleted", removed)
     evidence("new_units_kept", " ".join(record.get("installed", [])) or "none")
+    if record.get("legacy_pm2_stopped"):
+        pm2 = find_pm2()
+        if pm2:
+            info("decommissioning legacy PM2 process 'pifitness-next' now that systemd unit is active ...")
+            failures.attempt("delete legacy pm2", lambda: delete_legacy_pm2_process(pm2, "pifitness-next"))
+            evidence("legacy_pm2_decommissioned", "yes")
     if failures.items:
         raise HelperError("could not delete old unit backup(s): %s" % "; ".join(failures.items),
                           ue.backup_dir)
@@ -121,6 +129,14 @@ def revert(ue, record):
             evidence("restored_" + unit, result)
     if not restore:
         evidence("restored_units", "none (no unit was active when the run began)")
+
+    # 6. restore legacy PM2 if it was stopped
+    if record.get("legacy_pm2_stopped"):
+        pm2 = find_pm2()
+        if pm2:
+            info("restoring legacy PM2 process 'pifitness-next' ...")
+            failures.attempt("restart legacy pm2", lambda: restart_legacy_pm2_process(pm2, "pifitness-next"))
+            evidence("legacy_pm2_restored", "yes")
 
     if failures.items:
         raise HelperError("unit rollback incomplete, the Pi may NOT be in its pre-run state: %s"

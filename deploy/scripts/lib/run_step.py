@@ -184,6 +184,8 @@ def run_helper(helper, run_dir, step):
                 result["tail"].append(line)
 
     def on_quiet():
+        if step == "manual_gate":
+            return
         console("  ... still running: %s (elapsed %ds)"
                 % (step, int(time.monotonic() - started)))
 
