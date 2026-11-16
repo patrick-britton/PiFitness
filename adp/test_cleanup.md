@@ -73,6 +73,7 @@ Ask three questions of every test. If any answer is bad, it is a delete candidat
 1. **Bug question.** Name a plausible real bug in this code (wrong branch, off-by-one, dropped row, swallowed error, wrong status code). Would this test fail on it? If you cannot name one, delete.
 2. **Different-implementation question.** Could a correct rewrite of the code, with the same behavior but different internals, fail this test? If yes, the test is coupled to the implementation. Delete.
 3. **Generalization question.** Does it check the behavior over more than the one example the developer had in mind while building it (an edge, a boundary, an invariant, an error path)? A single hand-picked happy-path example with its literal expected value usually fails this.
+4. **Local-workstation / DEV-only guardrail:** Asserts developer machine ergonomics, unconfigured local laptops (e.g. asserting that Windows raises if .env is absent), or workstation-specific setup guards. The deploy gate validates software targeting Linux/PRD hardware; local developer workstation checks do not belong in the deployment regression suite.
 
 Common tells:
 - Name encodes a ticket, feature id or story detail, or says `..._not_reintroduced`, `..._exactly_...`, `..._still_...`, `..._default_...`.

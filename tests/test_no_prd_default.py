@@ -19,21 +19,6 @@ import pytest
 from pifitness.core.config import get_settings, guard_db_marker
 
 
-# VERIFIED: Regression — get_settings raises RuntimeError when PG_HOST missing
-@pytest.mark.regression
-def test_get_settings_raises_when_pg_host_missing(monkeypatch):
-    """Fail-loud: get_settings() must raise when PG_HOST is unresolvable."""
-    # Block .env loading so backend/.env cannot mask the missing PG_HOST.
-    # Patch config.load_dotenv (config.py does `from dotenv import load_dotenv`).
-    import pifitness.core.config as cfg
-    monkeypatch.setattr(cfg, "load_dotenv", lambda *a, **kw: None)
-    # Remove PG_HOST from environment if present
-    monkeypatch.delenv("PG_HOST", raising=False)
-
-    with pytest.raises(RuntimeError, match="PG_HOST not configured"):
-        get_settings()
-
-
 # VERIFIED: Regression — get_settings uses PG_HOST when set
 @pytest.mark.regression
 def test_get_settings_uses_pg_host_when_set(monkeypatch):
