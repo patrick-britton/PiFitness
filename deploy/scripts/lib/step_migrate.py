@@ -47,10 +47,10 @@ import sys
 import time
 from urllib.parse import quote
 
-from common import (HelperError, Parser, evidence, info, is_inside, load_context, norm_host,
-                    psql_rows, read_db_marker, register_undo, run_cmd, step_main, update_db_marker,
-                    warn)
-from step_db_prepare import STATE_KEY, UNDO_NAME, TestDatabase, elapsed, reason_from
+from common import (HelperError, Parser, PgTarget, evidence, expected_app_env, info,
+                    is_inside, load_context, norm_host, psql_rows, read_db_marker,
+                    register_undo, run_cmd, step_main, update_db_marker, warn)
+from step_db_prepare import STATE_KEY, TestDatabase, elapsed, reason_from
 
 MIGRATION_FILE_RE = re.compile(r"^(\d+).*\.sql$")      # dbmate's own rule: version = leading digits
 APPLYING_RE = re.compile(r"Applying:\s*(\S+)")
@@ -102,13 +102,22 @@ def database_url(target):
 class Migrate:
     def __init__(self, ctx):
         self.ctx = ctx
-        if ctx.environment != "test":
-            raise HelperError("step_migrate is only built for TEST so far: PRD needs its own "
-                              "baseline undo action (not designed yet)", "step_migrate.py")
         ctx.require(conf=["MIGRATIONS_DIR", "MIGRATIONS_TABLE", "MIGRATIONS_SCHEMA"],
-                    env=["APP_DIR"])
-        self.db = TestDatabase(ctx)
+                    env=["APP_DIR", "STATE_FILE"])
+        self.state_file = ctx.env_value("STATE_FILE")
         self.fqn = "%s.%s" % (ctx.conf_value("MIGRATIONS_SCHEMA"), ctx.conf_value("MIGRATIONS_TABLE"))
+
+        if ctx.is_test:
+            self.db = TestDatabase(ctx)
+            self.target = self.db.test
+            self.undo_name = "test_db"
+        else:
+            ctx.require(env=["APP_ENV", "PG_HOST", "PG_PORT", "PG_USER", "PG_DB"],
+                        env_may_be_empty=["PG_PASSWORD"])
+            self.db = None
+            self.target = PgTarget.from_values("PRD", ctx.envvals, ctx.env_path)
+            self.undo_name = "prd_db"
+
         self.started = time.monotonic()
         self.files = []
         self.pending = []
@@ -123,7 +132,10 @@ class Migrate:
                                                   elapsed(time.monotonic() - self.started)))
             if function() == "done":
                 break
-        evidence("prd_database", "PRD database was not modified")
+        if self.ctx.is_test:
+            evidence("prd_database", "PRD database was not modified")
+        else:
+            evidence("prd_database", "PRD database migrated to current schema")
 
     # ------------------------------------------------------------- 1. checks
     def stage_checks(self):
@@ -145,28 +157,40 @@ class Migrate:
             raise HelperError("no <digits>_*.sql migration files in %s" % self.directory,
                               self.directory)
 
-        run_state = c.state.get(STATE_KEY, "")
-        if run_state == "running":
-            raise HelperError("run.state says the TEST database step did not finish "
-                              "(%s=running); refusing to migrate" % STATE_KEY,
-                              os.path.join(c.run_dir, "run.state"))
-        db.verify_not_prd()
-        evidence("write_target_is_prd", "no (APP_ENV, database name, server and role checked)")
-        evidence("test_database", db.test.describe())
-        marker, _values = read_db_marker(db.state_file)
-        evidence("test_state_marker", marker)
-        if marker != "clean":
-            raise HelperError("the TEST state marker is %r, not 'clean': migrating now would not "
-                              "have a trustworthy rollback baseline (a run restores the database "
-                              "first when TEST is not clean)" % marker, db.state_file)
+        if self.db is not None:
+            run_state = c.state.get(STATE_KEY, "")
+            if run_state == "running":
+                raise HelperError("run.state says the TEST database step did not finish "
+                                  "(%s=running); refusing to migrate" % STATE_KEY,
+                                  os.path.join(c.run_dir, "run.state"))
+            self.db.verify_not_prd()
+            evidence("write_target_is_prd", "no (APP_ENV, database name, server and role checked)")
+            evidence("test_database", self.target.describe())
+            marker, _values = read_db_marker(self.state_file)
+            evidence("test_state_marker", marker)
+            if marker != "clean":
+                raise HelperError("the TEST state marker is %r, not 'clean': migrating now would not "
+                                  "have a trustworthy rollback baseline (a run restores the database "
+                                  "first when TEST is not clean)" % marker, self.state_file)
+        else:
+            expected = expected_app_env(c.conf, c.conf_path, "prd")
+            if c.env_value("APP_ENV") != expected:
+                raise HelperError("APP_ENV is %r but PRD must carry %r; refusing to migrate"
+                                  % (c.env_value("APP_ENV"), expected), c.env_path)
+            evidence("write_target_is_prd", "yes (confirmed APP_ENV=%s, target=%s)" % (expected, self.target.describe()))
+            evidence("prd_database_target", self.target.describe())
+            marker, _values = read_db_marker(self.state_file)
+            evidence("prd_state_marker", marker)
+            if marker not in ("clean", "dirty"):
+                raise HelperError("the PRD state marker is %r, not 'clean' or 'dirty'" % marker, self.state_file)
 
     # ---------------------------------------------------------- 2. pending
     def stage_pending(self):
-        test = self.db.test
-        exists = psql_rows(test, "SELECT to_regclass('%s') IS NOT NULL" % self.fqn)[0][0] == "t"
+        target = self.target
+        exists = psql_rows(target, "SELECT to_regclass('%s') IS NOT NULL" % self.fqn)[0][0] == "t"
         applied = []
         if exists:
-            applied = [r[0] for r in psql_rows(test, "SELECT version FROM %s ORDER BY version"
+            applied = [r[0] for r in psql_rows(target, "SELECT version FROM %s ORDER BY version"
                                                 % self.fqn)]
         else:
             evidence("migrations_table", "%s absent (first dbmate run: every migration is pending)"
@@ -174,8 +198,8 @@ class Migrate:
         known = {v for v, _n in self.files}
         unknown = sorted(set(applied) - known)
         if unknown:
-            warn("applied in TEST but not in this commit's migrations directory: %s"
-                 % ", ".join(unknown[:10]))
+            warn("applied in %s but not in this commit's migrations directory: %s"
+                 % (self.ctx.environment.upper(), ", ".join(unknown[:10])))
         self.pending = [(v, n) for v, n in self.files if v not in set(applied)]
         evidence("applied_before", "%d (latest %s)" % (len(applied), applied[-1] if applied else "none"))
         evidence("pending_before", len(self.pending))
@@ -184,32 +208,34 @@ class Migrate:
         if len(self.pending) > LIST_LIMIT:
             info("    ... and %d more" % (len(self.pending) - LIST_LIMIT))
         if not self.pending:
-            evidence("migrate", "nothing pending: the TEST database was not touched")
+            evidence("migrate", "nothing pending: the %s database was not touched"
+                     % self.ctx.environment.upper())
             return "done"
 
     # ------------------------------------------------------------- 3. apply
     def dbmate(self, *command, echo=True):
         argv = ["dbmate", "--no-dump-schema", "--migrations-dir", self.directory,
                 "--migrations-table", self.fqn] + list(command)
-        env = dict(self.db.test.env(), DATABASE_URL=database_url(self.db.test))
+        env = dict(self.target.env(), DATABASE_URL=database_url(self.target))
         return run_cmd(argv, extra_env=env, timeout=LONG_TIMEOUT,
                        echo_prefix="    " if echo else None, heartbeat=HEARTBEAT)
 
     def stage_apply(self):
-        db, run_dir = self.db, self.ctx.run_dir
-        db.verify_not_prd()                                       # again, right before the write
-        register_undo(run_dir, UNDO_NAME)                         # BEFORE changing anything
-        update_db_marker(db.state_file, "dirty")                  # BEFORE dbmate up
-        evidence("undo_registered", UNDO_NAME)
-        evidence("test_state_marker", "dirty (set before dbmate up)")
+        run_dir = self.ctx.run_dir
+        if self.db is not None:
+            self.db.verify_not_prd()                              # again, right before the write
+        register_undo(run_dir, self.undo_name)                    # BEFORE changing anything
+        update_db_marker(self.state_file, "dirty")                # BEFORE dbmate up
+        evidence("undo_registered", self.undo_name)
+        evidence("state_marker", "dirty (set before dbmate up)")
         result = self.dbmate("up")
         applying = APPLYING_RE.findall(result.stdout)
         if not result.ok:
             failing = applying[-1] if applying else "(unknown: dbmate printed no 'Applying:' line)"
             evidence("migration_failed", failing)
             evidence("error", reason_from(result))
-            warn("the TEST state marker is left 'dirty': the exit handler restores the clean "
-                 "baseline recorded in %s (see 'rolled_back_to' in the undo output)" % db.state_file)
+            warn("the state marker is left 'dirty': the exit handler restores the "
+                 "baseline recorded in %s (see 'rolled_back_to' in the undo output)" % self.state_file)
             raise HelperError("dbmate up failed on %s: %s" % (failing, reason_from(result)),
                               result.command())
         evidence("migrations_applied", "%d (%s)" % (len(applying), ", ".join(applying[:LIST_LIMIT])))
@@ -220,7 +246,7 @@ class Migrate:
         status = self.dbmate("status")
         if not status.ok:
             raise HelperError("dbmate status failed: %s" % reason_from(status), status.command())
-        rows = psql_rows(self.db.test, "SELECT version FROM %s ORDER BY version" % self.fqn)
+        rows = psql_rows(self.target, "SELECT version FROM %s ORDER BY version" % self.fqn)
         applied = {r[0] for r in rows}
         still = [n for v, n in self.files if v not in applied]
         evidence("applied_after", "%d (latest %s)" % (len(rows), rows[-1][0] if rows else "none"))

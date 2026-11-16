@@ -87,7 +87,7 @@ For any `/lineage` request or question involving database tables, views, ETL pip
 
 ## 6. Git Safety & Commit Discipline
 
-* Stage only, never commit.
+* Never stage, never commit. All changes must be clearly visible to the user after work is complete.
 
 ---
 

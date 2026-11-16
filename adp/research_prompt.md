@@ -5,7 +5,7 @@ I only ever test by running the pi shell script and relying on the reported outp
 This is a personal-use, and single-developer application, so don't over engineer.
 
 # Your Task
-- Regression testing seems complete with the bootstrapper. Read through the `deploy/bootstrap.log` and identify the next step needed to build out (likely step_smoke.py) -- but alert if anything from the log file or the pre-existing files seems suspicious.
+- Smoke testing seems complete with the bootstrapper. Read through the `deploy/bootstrap.log` and plan how best to deliver `step_manual_gate.py`
 
 # Ground rules:
 1. autodeploy_objectives.md is the specification. Stay as true to it as possible. Change course only when something critical is discovered, and say so explicitly when you do.
