@@ -87,20 +87,7 @@ For any `/lineage` request or question involving database tables, views, ETL pip
 
 ## 6. Git Safety & Commit Discipline
 
-### Git Allowed List
-* **Read-only:** `git branch --show-current`, `git status --short`, `git diff`, `git log`, `git show`, `git grep`, `git ls-files`, `git check-ignore`.
-* **Explicit mutations:** `git add <explicit paths>`, `git commit -m "<message>"`, `git rm <explicit paths>`, `git rm --cached <explicit paths>`.
-
-### Git Prohibited List
-* **Never run:** `git push`, `git tag`, `git switch`, `git checkout`, `git merge`, `git rebase`, `git reset`, `git restore`, `git stash`, `git commit --amend`, `git cherry-pick`.
-* **Never use bulk staging:** `git add .`, `git add -A`, or globbed patterns. Stage explicit file paths only.
-* **Never modify `main`:** Work only on designated `agent/phase-*` branches when executing tasks.
-
-### Commit Rules
-* A task invocation may create **at most one commit**.
-* Stage and commit in separate steps.
-* Always inspect `git diff --cached -- <paths>` before committing to verify that only intended changes and no credentials/artifacts are staged.
-* Record task completion in `docs/workflow/PROGRESS.md` before staging and committing.
+* Stage only, never commit.
 
 ---
 
@@ -113,10 +100,3 @@ For any `/lineage` request or question involving database tables, views, ETL pip
    * TypeScript: `npx tsc --noEmit` from `frontend\pifitness`.
 4. **No Shell Source Generation:** Do not use `Set-Content`, `Add-Content`, or redirections to generate source code. Use dedicated file tools.
 
----
-
-## 8. Workflow References
-
-* **Task Planning:** `docs/workflow/PLAN.md` (active plan), `docs/workflow/PROGRESS.md` (progress log), `docs/workflow/BACKLOG.md` (out-of-scope issues).
-* **Data Dictionary Rebuild:** Prompts in `docs/workflow/prompts/evergreen_data_dictionary_prompt.md`.
-* **Human Testing Pack:** Scripted manual verification instructions for Pi recovery and deployment in `docs/workflow/human_tasks.html`.

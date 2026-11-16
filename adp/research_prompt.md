@@ -5,7 +5,7 @@ I only ever test by running the pi shell script and relying on the reported outp
 This is a personal-use, and single-developer application, so don't over engineer.
 
 # Your Task
-- Review the latest shell output (at the bottom of this prompt) -- determine the next step required to advance this project.
+- Review the latest shell output (at the bottom of this prompt) -- I believe we're currently in regression testing and need to identify the causes of these test errors. Do not assume the tests are valid -- read through `adp/test_cleanup.md` and delete any tests you think are invalid. If you believe the bug/test failure points to a true application flaw, raise it to the user to discuss the implications and options to fix it.
 
 # Ground rules:
 1. autodeploy_objectives.md is the specification. Stay as true to it as possible. Change course only when something critical is discovered, and say so explicitly when you do.

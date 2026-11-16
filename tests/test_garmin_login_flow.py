@@ -193,7 +193,6 @@ def test_get_garmin_client_returns_well_formed_token_without_relogin():
 # Bug 1 fix — get_status uses correct service name
 # ---------------------------------------------------------------------------
 
-# VERIFIED: Contract — GarminProvider.get_status queries DB with service Garmin and returns authenticated True
 
 def test_get_status_authenticated_when_db_token_present():
     """get_status queries the DB with 'Garmin' (capital G) and reports authenticated=True."""
@@ -222,9 +221,3 @@ def test_is_configured_false_when_creds_missing():
 
     with patch("pifitness.integrations.garmin.provider.garmin_creds", return_value=(None, None)):
         assert provider.is_configured() is False
-
-
-# ---------------------------------------------------------------------------
-# Live test — proves login produces a usable API response (deferred to Rick)
-# ---------------------------------------------------------------------------
-
