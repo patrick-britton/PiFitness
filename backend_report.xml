@@ -1,1 +1,849 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="0" time="10.265" timestamp="2026-11-16T09:28:33.730828-08:00" hostname="Rick_PC_2025" /></testsuites>
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="38" skipped="2" tests="333" time="261.404" timestamp="2026-11-16T10:00:52.939822-08:00" hostname="Rick_PC_2025"><testcase classname="tests.test_activities" name="test_activity_report_contract_shape" time="0.026" /><testcase classname="tests.test_activities" name="test_activity_report_invalid_type" time="0.003" /><testcase classname="tests.test_activities" name="test_leaderboard_segments_contract_shape" time="0.003" /><testcase classname="tests.test_activities" name="test_leaderboard_segments_invalid_params" time="0.007" /><testcase classname="tests.test_activities" name="test_segment_bulk_reject_failure_rolls_back" time="0.035" /><testcase classname="tests.test_activities" name="test_segment_bulk_reject_empty_404_422" time="0.008" /><testcase classname="tests.test_activities" name="test_activity_route_elapsed_s" time="8.079"><failure message="assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">@pytest.mark.integration
+    @pytest.mark.live
+    def test_activity_route_elapsed_s():
+        """GET /api/segments/{id}/route returns integer, non-decreasing elapsed_s values
+        aligned one-to-one with path_coords, also for a trimmed window, with 404 for an
+        unknown id and 422 for a negative start_m.
+        """
+        from backend_functions.database_functions import sql_to_dict
+    
+        list_response = client.get("/api/activities")
+&gt;       assert list_response.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_activities.py:278: AssertionError</failure></testcase><testcase classname="tests.test_activities" name="test_leaderboard_contract_shape" time="0.016" /><testcase classname="tests.test_activities" name="test_leaderboard_not_found" time="0.029" /><testcase classname="tests.test_activities" name="test_leaderboard_visuals_contract_shape" time="0.005" /><testcase classname="tests.test_activities" name="test_leaderboard_visuals_not_found" time="0.003" /><testcase classname="tests.test_activities" name="test_activity_report_walk_no_placeholder" time="0.004" /><testcase classname="tests.test_admin" name="test_admin_logs_data_all_tables[api_logins]" time="8.132"><failure message="AssertionError: BUG 005.001: api_logins returned 500, expected 200&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">table_name = 'api_logins'
+
+    @pytest.mark.regression
+    @pytest.mark.live
+    @pytest.mark.parametrize("table_name", [
+        "api_logins",
+        "application_events",
+        "task_executions",
+        "db_size_log",
+        "db_stats",
+    ])
+    def test_admin_logs_data_all_tables(table_name: str):
+        """GET /api/admin/logs/data/{table} answers 200 with the data and count envelope for
+        every logging-schema table instead of a 500.
+        """
+        response = client.get(f"/api/admin/logs/data/{table_name}?limit=5")
+&gt;       assert response.status_code == 200, (
+            f"BUG 005.001: {table_name} returned {response.status_code}, expected 200"
+        )
+E       AssertionError: BUG 005.001: api_logins returned 500, expected 200
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_admin.py:30: AssertionError</failure></testcase><testcase classname="tests.test_admin" name="test_admin_logs_data_all_tables[application_events]" time="8.130"><failure message="AssertionError: BUG 005.001: application_events returned 500, expected 200&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">table_name = 'application_events'
+
+    @pytest.mark.regression
+    @pytest.mark.live
+    @pytest.mark.parametrize("table_name", [
+        "api_logins",
+        "application_events",
+        "task_executions",
+        "db_size_log",
+        "db_stats",
+    ])
+    def test_admin_logs_data_all_tables(table_name: str):
+        """GET /api/admin/logs/data/{table} answers 200 with the data and count envelope for
+        every logging-schema table instead of a 500.
+        """
+        response = client.get(f"/api/admin/logs/data/{table_name}?limit=5")
+&gt;       assert response.status_code == 200, (
+            f"BUG 005.001: {table_name} returned {response.status_code}, expected 200"
+        )
+E       AssertionError: BUG 005.001: application_events returned 500, expected 200
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_admin.py:30: AssertionError</failure></testcase><testcase classname="tests.test_admin" name="test_admin_logs_data_all_tables[task_executions]" time="8.169"><failure message="AssertionError: BUG 005.001: task_executions returned 500, expected 200&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">table_name = 'task_executions'
+
+    @pytest.mark.regression
+    @pytest.mark.live
+    @pytest.mark.parametrize("table_name", [
+        "api_logins",
+        "application_events",
+        "task_executions",
+        "db_size_log",
+        "db_stats",
+    ])
+    def test_admin_logs_data_all_tables(table_name: str):
+        """GET /api/admin/logs/data/{table} answers 200 with the data and count envelope for
+        every logging-schema table instead of a 500.
+        """
+        response = client.get(f"/api/admin/logs/data/{table_name}?limit=5")
+&gt;       assert response.status_code == 200, (
+            f"BUG 005.001: {table_name} returned {response.status_code}, expected 200"
+        )
+E       AssertionError: BUG 005.001: task_executions returned 500, expected 200
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_admin.py:30: AssertionError</failure></testcase><testcase classname="tests.test_admin" name="test_admin_logs_data_all_tables[db_size_log]" time="8.118"><failure message="AssertionError: BUG 005.001: db_size_log returned 500, expected 200&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">table_name = 'db_size_log'
+
+    @pytest.mark.regression
+    @pytest.mark.live
+    @pytest.mark.parametrize("table_name", [
+        "api_logins",
+        "application_events",
+        "task_executions",
+        "db_size_log",
+        "db_stats",
+    ])
+    def test_admin_logs_data_all_tables(table_name: str):
+        """GET /api/admin/logs/data/{table} answers 200 with the data and count envelope for
+        every logging-schema table instead of a 500.
+        """
+        response = client.get(f"/api/admin/logs/data/{table_name}?limit=5")
+&gt;       assert response.status_code == 200, (
+            f"BUG 005.001: {table_name} returned {response.status_code}, expected 200"
+        )
+E       AssertionError: BUG 005.001: db_size_log returned 500, expected 200
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_admin.py:30: AssertionError</failure></testcase><testcase classname="tests.test_admin" name="test_admin_logs_data_all_tables[db_stats]" time="8.149"><failure message="AssertionError: BUG 005.001: db_stats returned 500, expected 200&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">table_name = 'db_stats'
+
+    @pytest.mark.regression
+    @pytest.mark.live
+    @pytest.mark.parametrize("table_name", [
+        "api_logins",
+        "application_events",
+        "task_executions",
+        "db_size_log",
+        "db_stats",
+    ])
+    def test_admin_logs_data_all_tables(table_name: str):
+        """GET /api/admin/logs/data/{table} answers 200 with the data and count envelope for
+        every logging-schema table instead of a 500.
+        """
+        response = client.get(f"/api/admin/logs/data/{table_name}?limit=5")
+&gt;       assert response.status_code == 200, (
+            f"BUG 005.001: {table_name} returned {response.status_code}, expected 200"
+        )
+E       AssertionError: BUG 005.001: db_stats returned 500, expected 200
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_admin.py:30: AssertionError</failure></testcase><testcase classname="tests.test_admin_failure_message" name="test_failed_run_message_carries_underlying_error" time="0.001" /><testcase classname="tests.test_admin_failure_message" name="test_failed_run_message_aggregates_multiple" time="0.000" /><testcase classname="tests.test_api_endpoint_contract" name="test_api_endpoints_exist_on_backend" time="0.038" /><testcase classname="tests.test_auth_status" name="test_get_auth_status_returns_services_key" time="0.001" /><testcase classname="tests.test_auth_status" name="test_spotify_ok_when_credentials_present" time="0.001" /><testcase classname="tests.test_auth_status" name="test_spotify_missing_credentials" time="0.001" /><testcase classname="tests.test_auth_status" name="test_spotify_rate_limited" time="0.001" /><testcase classname="tests.test_auth_status" name="test_garmin_last_error_surfaced" time="0.001" /><testcase classname="tests.test_auth_status_contract" name="test_returns_expected_structure" time="0.000" /><testcase classname="tests.test_auth_status_contract" name="test_missing_credentials_reports_missing" time="0.000" /><testcase classname="tests.test_auth_status_contract" name="test_ok_when_credentials_present" time="0.000" /><testcase classname="tests.test_auth_status_contract" name="test_spotify_rate_limited_reports_rate_limited" time="0.001" /><testcase classname="tests.test_auto_shuffle_pandas_free" name="test_auto_shuffle_parity_target_id_and_ordered_track_list" time="0.001" /><testcase classname="tests.test_config" name="test_map_config_with_token" time="0.005" /><testcase classname="tests.test_config" name="test_map_config_without_token" time="0.003" /><testcase classname="tests.test_config" name="test_map_config_token_resolution_error" time="0.002" /><testcase classname="tests.test_create_segment_details_write" name="test_create_segment_details_failure_maps_to_value_error" time="0.001" /><testcase classname="tests.test_create_segment_details_write" name="test_create_segment_finalize_failure_skips_details_write" time="0.001" /><testcase classname="tests.test_empty_queue_noop" name="test_empty_iterator_raises_no_work" time="0.000" /><testcase classname="tests.test_empty_queue_noop" name="test_executioner_reconciles_no_work_as_success" time="0.010" /><testcase classname="tests.test_empty_queue_noop" name="test_nonempty_all_failed_still_fails" time="1.555" /><testcase classname="tests.test_env_helpers" name="test_load_env_file_basic_key_value" time="0.024" /><testcase classname="tests.test_env_helpers" name="test_load_env_file_quoted_values" time="0.018" /><testcase classname="tests.test_env_helpers" name="test_load_env_file_strips_comments_and_blank_lines" time="0.013" /><testcase classname="tests.test_env_helpers" name="test_load_env_file_ignores_lines_without_equals" time="0.013" /><testcase classname="tests.test_env_helpers" name="test_load_env_file_empty_file" time="0.001" /><testcase classname="tests.test_env_helpers" name="test_conn_params_defaults" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_conn_params_overrides_defaults" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_conn_params_invalid_port_falls_back_to_default" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_resolve_db_name_default" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_resolve_db_name_explicit" time="0.001" /><testcase classname="tests.test_env_helpers" name="test_normalize_server_address_plain" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_normalize_server_address_strips_cidr_v4" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_normalize_server_address_strips_cidr_v6" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_is_loopback_true" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_is_loopback_false" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_guard_marker_dev_ok" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_guard_marker_test_ok" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_guard_marker_prod_unmarked_ok" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_guard_marker_dev_wrong_marker" time="0.001" /><testcase classname="tests.test_env_helpers" name="test_guard_marker_test_wrong_marker" time="0.001" /><testcase classname="tests.test_env_helpers" name="test_guard_marker_prod_marked" time="0.000" /><testcase classname="tests.test_env_helpers" name="test_guard_marker_unsupported_env" time="0.000" /><testcase classname="tests.test_failure_propagation" name="test_post_processing_processes_all_then_raises_aggregate" time="0.001" /><testcase classname="tests.test_failure_propagation" name="test_post_processing_success_returns_true" time="0.001" /><testcase classname="tests.test_failure_propagation" name="test_post_processing_empty_queue_returns_true" time="0.000" /><testcase classname="tests.test_failure_propagation" name="test_execute_python_returns_failure_message_without_reconciling" time="0.000" /><testcase classname="tests.test_failure_propagation" name="test_executioner_reconciles_failed_with_ids_in_message" time="0.001" /><testcase classname="tests.test_failure_propagation" name="test_executioner_reports_success_when_all_pass" time="0.001" /><testcase classname="tests.test_failure_propagation" name="test_run_step_marks_error_on_failed_results" time="0.000" /><testcase classname="tests.test_failure_propagation" name="test_run_step_complete_on_all_success_results" time="0.000" /><testcase classname="tests.test_failure_propagation" name="test_run_step_complete_on_non_task_return_shapes" time="0.000" /><testcase classname="tests.test_failure_propagation" name="test_run_step_error_on_exception_unchanged" time="0.000" /><testcase classname="tests.test_failure_propagation" name="test_task_failure_message_is_conservative" time="0.000" /><testcase classname="tests.test_failure_propagation" name="test_executioner_single_reconcile_on_extract_failure" time="0.001" /><testcase classname="tests.test_failure_propagation" name="test_extract_load_flatten_does_not_reconcile" time="0.000" /><testcase classname="tests.test_failure_propagation" name="test_execute_sproc_does_not_reconcile" time="0.001" /><testcase classname="tests.test_food_api_contract" name="test_route_table_matches_contract_exactly" time="0.000" /><testcase classname="tests.test_food_api_contract" name="test_get_usuals_returns_usual_food_shapes" time="0.015" /><testcase classname="tests.test_food_api_contract" name="test_get_diary_returns_day_entry_array" time="0.013" /><testcase classname="tests.test_food_api_contract" name="test_get_recipes_returns_recipe_summaries_only" time="0.014" /><testcase classname="tests.test_food_api_contract" name="test_get_foods_returns_food_list_response" time="0.013" /><testcase classname="tests.test_food_api_contract" name="test_post_diary_returns_day_entry" time="0.014" /><testcase classname="tests.test_food_api_contract" name="test_post_recipes_returns_recipe_summary" time="0.013" /><testcase classname="tests.test_food_api_contract" name="test_post_diary_rejects_deleted_food" time="0.016" /><testcase classname="tests.test_food_api_contract" name="test_diary_stats_shape" time="0.013" /><testcase classname="tests.test_food_api_contract" name="test_patch_entry_moves_day" time="0.015" /><testcase classname="tests.test_food_api_contract" name="test_patch_entry_empty_rejected" time="0.014" /><testcase classname="tests.test_food_api_contract" name="test_delete_entry" time="0.014" /><testcase classname="tests.test_food_api_contract" name="test_kcal_for_fda_label_table" time="0.000" /><testcase classname="tests.test_food_api_contract" name="test_food_by_id_returns_row_or_404" time="0.016" /><testcase classname="tests.test_food_api_contract" name="test_kcal_for_dynamic_recipe_serving_unit" time="0.000" /><testcase classname="tests.test_food_api_contract" name="test_combine_ingredients_gram_weighted_math" time="0.001" /><testcase classname="tests.test_food_api_contract" name="test_combine_ingredients_recipe_as_ingredient" time="0.001" /><testcase classname="tests.test_food_api_contract" name="test_save_recipe_rejects_step_food_outside_ingredient_list" time="0.000" /><testcase classname="tests.test_food_api_contract" name="test_get_recipe_detail_contract_shape" time="0.017" /><testcase classname="tests.test_food_api_contract" name="test_put_recipe_passes_payload_and_404s" time="0.018" /><testcase classname="tests.test_food_api_contract" name="test_delete_recipe_route_soft_delete_payload" time="0.016" /><testcase classname="tests.test_food_api_contract" name="test_complete_recipe_route_increments" time="0.016" /><testcase classname="tests.test_food_api_contract" name="test_cook_routes_round_trip_and_validation" time="0.022" /><testcase classname="tests.test_food_api_contract" name="test_delete_cook_route_clears_session" time="0.014" /><testcase classname="tests.test_food_api_contract" name="test_get_cook_route_empty_session_shape" time="0.013" /><testcase classname="tests.test_food_api_contract" name="test_persist_route_returns_food_id_and_never_writes_diary" time="0.012" /><testcase classname="tests.test_food_api_contract" name="test_persist_route_off_payload_carries_serving_and_dedupe_id" time="0.014" /><testcase classname="tests.test_food_api_contract" name="test_persist_route_requires_payload" time="0.014" /><testcase classname="tests.test_food_search_backend" name="test_rank_sinks_partial_and_orders_by_relevance_tier" time="0.001" /><testcase classname="tests.test_food_search_backend" name="test_quality_label_thresholds" time="0.000" /><testcase classname="tests.test_food_search_backend" name="test_name_bonus_orders_exact_first" time="0.001" /><testcase classname="tests.test_food_search_backend" name="test_fetch_budget_and_cache" time="0.089" /><testcase classname="tests.test_food_search_backend" name="test_search_returns_trimmed_saved_first_results" time="0.017" /><testcase classname="tests.test_food_search_backend" name="test_search_suppresses_usda_hit_when_fdcid_saved" time="0.012" /><testcase classname="tests.test_food_search_backend" name="test_match_pct_anchors_then_overlap" time="0.000" /><testcase classname="tests.test_food_search_backend" name="test_kcal_gate_hard_filter_with_floor_and_alcohol" time="0.000" /><testcase classname="tests.test_food_search_backend" name="test_quality_percent_presence_and_single_ingredient" time="0.000" /><testcase classname="tests.test_food_search_backend" name="test_rank_coffee_single_ingredient_first_mismatch_dropped" time="0.000" /><testcase classname="tests.test_food_search_backend" name="test_rename_persisted_then_duplicate_routes_to_existing" time="0.015" /><testcase classname="tests.test_food_search_backend" name="test_persist_on_log_creates_food_then_entry" time="0.014" /><testcase classname="tests.test_food_search_backend" name="test_persist_clears_review_on_insert" time="0.000" /><testcase classname="tests.test_food_search_backend" name="test_log_api_entry_persists_feed_serving" time="0.019" /><testcase classname="tests.test_food_search_backend" name="test_persist_on_log_requires_payload" time="0.015" /><testcase classname="tests.test_food_search_backend" name="test_confirm_logs_picked_rank" time="0.015" /><testcase classname="tests.test_food_search_backend" name="test_confirm_without_pick_does_not_log" time="0.013" /><testcase classname="tests.test_food_search_backend" name="test_normalize_usda_branded_passes_through_per_100g" time="0.000" /><testcase classname="tests.test_food_search_backend" name="test_normalize_usda_branded_keeps_nutrients_on_bad_serving" time="0.000" /><testcase classname="tests.test_food_search_backend" name="test_normalize_off_maps_100g_fields" time="0.000" /><testcase classname="tests.test_garmin_auth" name="test_refresh_di_token_slot_success" time="0.008" /><testcase classname="tests.test_garmin_auth" name="test_refresh_it_token_slot_success" time="0.002" /><testcase classname="tests.test_garmin_auth" name="test_refresh_it_token_slot_raises_when_refresh_token_expired" time="0.002" /><testcase classname="tests.test_garmin_auth" name="test_refresh_it_token_slot_raises_on_http_error" time="0.003" /><testcase classname="tests.test_garmin_auth" name="test_extract_client_id_from_non_jwt_returns_none" time="0.001" /><testcase classname="tests.test_garmin_auth" name="test_refresh_di_token_slot_raises_when_refresh_token_expired" time="0.004" /><testcase classname="tests.test_garmin_auth" name="test_refresh_di_token_slot_raises_on_http_error" time="0.005" /><testcase classname="tests.test_garmin_login_flow" name="test_garmin_login_reuses_db_session_without_playwright" time="0.005" /><testcase classname="tests.test_garmin_login_flow" name="test_garmin_login_saves_session_to_db_after_auth" time="0.003" /><testcase classname="tests.test_garmin_login_flow" name="test_create_browser_session_invokes_playwright_login" time="0.014" /><testcase classname="tests.test_garmin_login_flow" name="test_get_garmin_client_returns_well_formed_token_without_relogin" time="0.002" /><testcase classname="tests.test_garmin_login_flow" name="test_get_status_authenticated_when_db_token_present" time="0.000" /><testcase classname="tests.test_garmin_login_flow" name="test_is_configured_false_when_creds_missing" time="0.000" /><testcase classname="tests.test_health" name="test_health" time="8.130" /><testcase classname="tests.test_inspect_test_db" name="test_missing_test_database_selects_create_from_prd_without_comparison" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_missing_or_wrong_test_marker_selects_refresh_without_comparison[None]" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_missing_or_wrong_test_marker_selects_refresh_without_comparison[]" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_missing_or_wrong_test_marker_selects_refresh_without_comparison[dev]" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_missing_or_wrong_test_marker_selects_refresh_without_comparison[prod]" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_missing_or_wrong_test_marker_selects_refresh_without_comparison[unexpected]" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_identical_schema_reuses_test_and_offers_refresh" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_bad_test_permissions_select_refresh_without_schema_comparison" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_different_schema_selects_refresh" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_explicit_refresh_is_reflected_in_decision" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_schema_comparator_exception_fails_closed" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_malformed_comparator_result_fails_closed" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_test_database_on_different_server_fails_closed" time="0.010"><failure message="assert 'different PostgreSQL server endpoint' in &quot;PostgreSQL server address '127.0.0.2' is not loopback; expected localhost, 127.0.0.1, or ::1.&quot;">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8F35FD0&gt;
+
+    def test_test_database_on_different_server_fails_closed(monkeypatch):
+        _install_connections(monkeypatch, test_address="127.0.0.2")
+        compare_calls = []
+    
+        report = inspect_test_db.inspect_test_database(
+            *_configs(), compare_fn=lambda *a, **k: compare_calls.append((a, k))
+        )
+    
+        assert report["ok"] is False
+        assert report["decision"]["action"] == "abort"
+&gt;       assert "different PostgreSQL server endpoint" in report["error"]
+E       assert 'different PostgreSQL server endpoint' in "PostgreSQL server address '127.0.0.2' is not loopback; expected localhost, 127.0.0.1, or ::1."
+
+tests\test_inspect_test_db.py:297: AssertionError</failure></testcase><testcase classname="tests.test_inspect_test_db" name="test_ipv6_loopback_inet_prefix_is_accepted_and_normalized" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_failure_report_includes_stage_code_and_actionable_next_step" time="0.000" /><testcase classname="tests.test_inspect_test_db" name="test_test_database_port_mismatch_fails_closed" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_test_database_connection_error_is_not_treated_as_bad_marker" time="0.000" /><testcase classname="tests.test_inspect_test_db" name="test_test_database_catalog_disallow_connections_fails_closed" time="0.000" /><testcase classname="tests.test_inspect_test_db" name="test_test_database_catalog_template_flag_fails_closed" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_prd_must_remain_unmarked" time="0.000" /><testcase classname="tests.test_inspect_test_db" name="test_same_test_and_prd_database_is_rejected" time="0.000" /><testcase classname="tests.test_inspect_test_db" name="test_wrong_app_env_is_rejected" time="0.000" /><testcase classname="tests.test_inspect_test_db" name="test_nonlocal_host_is_rejected_before_connecting" time="0.000" /><testcase classname="tests.test_inspect_test_db" name="test_diff_file_is_forwarded_to_comparator" time="0.003" /><testcase classname="tests.test_inspect_test_db" name="test_cli_requires_explicit_prd_authorization" time="0.001" /><testcase classname="tests.test_inspect_test_db" name="test_verified_baseline_with_checksum_valid_migrations_is_reused_without_schema_compare" time="0.020" /><testcase classname="tests.test_inspect_test_db" name="test_baseline_journal_oid_mismatch_does_not_bypass_schema_comparison" time="0.015" /><testcase classname="tests.test_inspect_test_db" name="test_corrupt_migration_ledger_fails_closed_instead_of_recloning" time="0.004" /><testcase classname="tests.test_inspect_test_db" name="test_verified_baseline_with_no_applied_migrations_is_reused_without_schema_compare" time="0.003" /><testcase classname="tests.test_integration_protocol" name="test_garmin_provider_conforms" time="16.273" /><testcase classname="tests.test_integration_protocol" name="test_spotify_provider_conforms" time="16.259" /><testcase classname="tests.test_isrc_dupe_endpoints" name="test_count_returns_pair_count" time="0.005" /><testcase classname="tests.test_isrc_dupe_endpoints" name="test_match_shapes_row_to_camel_case" time="0.005" /><testcase classname="tests.test_isrc_dupe_endpoints" name="test_match_empty_queue_returns_null" time="0.007" /><testcase classname="tests.test_isrc_dupe_endpoints" name="test_decision_accept_calls_helper_and_confirms" time="0.004" /><testcase classname="tests.test_isrc_dupe_endpoints" name="test_decision_reject_calls_helper_and_confirms" time="0.004" /><testcase classname="tests.test_isrc_dupe_endpoints" name="test_decision_missing_field_returns_422" time="0.007" /><testcase classname="tests.test_isrc_dupe_endpoints" name="test_rescan_runs_finder_and_reports_count" time="0.005" /><testcase classname="tests.test_isrc_dupe_endpoints" name="test_rescan_empty_reports_no_dupes" time="0.038" /><testcase classname="tests.test_isrc_dupe_endpoints" name="test_decision_write_failure_returns_500" time="0.004" /><testcase classname="tests.test_isrc_dupe_endpoints" name="test_rescan_failure_returns_500" time="0.004" /><testcase classname="tests.test_isrc_dupes" name="test_dupe_count_halves_rows_to_pairs" time="0.001" /><testcase classname="tests.test_isrc_dupes" name="test_dupe_count_empty_is_zero" time="0.001" /><testcase classname="tests.test_isrc_dupes" name="test_accept_writes_swaps_and_deletes_pair_in_one_transaction" time="0.001" /><testcase classname="tests.test_isrc_dupes" name="test_reject_writes_non_swaps_and_deletes_pair_in_one_transaction" time="0.001" /><testcase classname="tests.test_isrc_dupes" name="test_decision_insert_failure_rolls_back_and_raises" time="0.001" /><testcase classname="tests.test_isrc_dupes" name="test_decision_delete_failure_rolls_back_and_raises" time="0.001" /><testcase classname="tests.test_isrc_dupes" name="test_rescan_issues_call_in_one_transaction" time="0.005" /><testcase classname="tests.test_isrc_dupes" name="test_rescan_failure_rolls_back_and_raises" time="0.001" /><testcase classname="tests.test_json_extractors_garmin_data" name="test_get_garmin_data_happy_path" time="0.001" /><testcase classname="tests.test_json_extractors_garmin_data" name="test_get_garmin_data_invalid_endpoint_returns_error" time="0.000" /><testcase classname="tests.test_json_extractors_garmin_data" name="test_get_garmin_data_client_exception_returns_error" time="0.001" /><testcase classname="tests.test_music_actions" name="test_now_playing_skip_route_exists" time="0.004" /><testcase classname="tests.test_music_actions" name="test_now_playing_promote_wrong_context" time="0.004" /><testcase classname="tests.test_music_actions" name="test_now_playing_remove_family_miss" time="0.004" /><testcase classname="tests.test_music_actions" name="test_now_playing_remove_full_flow" time="0.004" /><testcase classname="tests.test_music_actions" name="test_now_playing_rank_up_wrong_context" time="0.003" /><testcase classname="tests.test_music_actions" name="test_now_playing_add_targets_no_track" time="0.004" /><testcase classname="tests.test_music_actions" name="test_now_playing_add_targets_with_track" time="0.004" /><testcase classname="tests.test_music_actions" name="test_recent_plays_default_limit" time="0.004" /><testcase classname="tests.test_music_actions" name="test_recent_plays_empty" time="0.004" /><testcase classname="tests.test_music_actions" name="test_service_status_not_limited" time="0.004" /><testcase classname="tests.test_music_actions" name="test_service_status_limited" time="0.003" /><testcase classname="tests.test_music_actions" name="test_album_art_cached" time="0.018" /><testcase classname="tests.test_music_actions" name="test_album_art_not_found" time="0.004" /><testcase classname="tests.test_music_actions" name="test_album_image_retrieval_no_client" time="0.001" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_empty_aborts" time="0.001" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_incomplete_paging_aborts" time="0.001" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_truncated_chain_before_next_playlist_aborts" time="0.001" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_complete_paged_chain_passes" time="0.000" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_malformed_href_id_aborts" time="0.001" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_detail_missing_href_aborts" time="0.001" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_detail_item_ids_are_not_playlist_ids" time="0.000" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_unnormalized_items_href_aborts" time="0.001" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_malformed_item_id_aborts" time="0.001" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_valid_header_payload_passes" time="0.000" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_all_pages_empty_aborts" time="0.001" /><testcase classname="tests.test_music_actions" name="test_validate_playlist_payload_unexpected_type_aborts" time="0.000" /><testcase classname="tests.test_music_actions" name="test_playlist_details_extractor_normalizes_hrefs_and_passes_guard" time="0.001" /><testcase classname="tests.test_music_actions" name="test_playlist_details_extractor_no_client_aborts_loudly" time="0.001" /><testcase classname="tests.test_music_actions" name="test_now_playing_actions_report_not_ok_when_nothing_is_playing[/api/music/now-playing/promote]" time="0.005" /><testcase classname="tests.test_music_actions" name="test_now_playing_actions_report_not_ok_when_nothing_is_playing[/api/music/now-playing/soft-reject]" time="0.004" /><testcase classname="tests.test_music_actions" name="test_now_playing_actions_report_not_ok_when_nothing_is_playing[/api/music/now-playing/hard-reject]" time="0.003" /><testcase classname="tests.test_music_actions" name="test_now_playing_actions_report_not_ok_when_nothing_is_playing[/api/music/now-playing/remove]" time="0.003" /><testcase classname="tests.test_music_actions" name="test_now_playing_actions_report_not_ok_when_nothing_is_playing[/api/music/now-playing/rank-down]" time="0.004" /><testcase classname="tests.test_music_actions" name="test_now_playing_actions_report_not_ok_when_nothing_is_playing[/api/music/now-playing/add-to-playlist?playlist_id=pl123]" time="0.004" /><testcase classname="tests.test_music_actions" name="test_recent_plays_rejects_invalid_limit[5]" time="0.003" /><testcase classname="tests.test_music_actions" name="test_recent_plays_rejects_invalid_limit[105]" time="0.003" /><testcase classname="tests.test_music_actions" name="test_recent_plays_rejects_invalid_limit[15]" time="0.003" /><testcase classname="tests.test_no_prd_default" name="test_get_settings_raises_when_pg_host_missing" time="0.001" /><testcase classname="tests.test_no_prd_default" name="test_get_settings_uses_pg_host_when_set" time="2.692" /><testcase classname="tests.test_no_prd_default" name="test_guard_dev_env_with_dev_marker_ok" time="0.001" /><testcase classname="tests.test_no_prd_default" name="test_guard_dev_env_with_wrong_marker_raises" time="0.001" /><testcase classname="tests.test_no_prd_default" name="test_guard_dev_env_unknown_marker_ok" time="0.000" /><testcase classname="tests.test_no_prd_default" name="test_guard_unset_env_with_dev_marker_raises" time="0.000" /><testcase classname="tests.test_no_prd_default" name="test_guard_prod_env_with_dev_marker_raises" time="0.000" /><testcase classname="tests.test_no_prd_default" name="test_guard_test_env_with_test_marker_ok" time="0.000" /><testcase classname="tests.test_no_prd_default" name="test_guard_test_env_with_dev_marker_raises" time="0.001" /><testcase classname="tests.test_no_prd_default" name="test_get_settings_dev_env_with_dev_marker" time="0.001" /><testcase classname="tests.test_no_prd_default" name="test_get_settings_unset_env_with_dev_marker_raises" time="0.001" /><testcase classname="tests.test_playlist_details_href" name="test_all_pages_normalized_before_json_loading" time="0.001" /><testcase classname="tests.test_playlist_relationships" name="test_ensure_playlist_relationships_no_delete_on_empty" time="0.001" /><testcase classname="tests.test_playlist_relationships" name="test_ensure_playlist_relationships_no_delete_on_rows" time="0.001" /><testcase classname="tests.test_process_generator_events" name="test_post_processing_steps_yields_marker_before_execution" time="8.159" /><testcase classname="tests.test_ratchet" name="test_compare_no_new_violations_exits_0" time="0.123" /><testcase classname="tests.test_ratchet" name="test_compare_planted_new_key_fails" time="0.109" /><testcase classname="tests.test_ratchet" name="test_compare_removed_key_warns_prune" time="0.101" /><testcase classname="tests.test_ratchet" name="test_compare_stdin_keys" time="0.107" /><testcase classname="tests.test_ratchet" name="test_prune_removes_stale_keys" time="0.101" /><testcase classname="tests.test_ratchet" name="test_update_baseline_removes_stale_only" time="0.097" /><testcase classname="tests.test_ratchet" name="test_update_baseline_with_allow_grow_adds_new_keys" time="0.105" /><testcase classname="tests.test_restore_test_db" name="test_latest_backup_selects_newest_matching_custom_archive" time="0.012" /><testcase classname="tests.test_restore_test_db" name="test_latest_backup_refuses_wrong_source_database" time="0.004" /><testcase classname="tests.test_restore_test_db" name="test_latest_backup_refuses_older_than_24_hours" time="0.002" /><testcase classname="tests.test_restore_test_db" name="test_latest_backup_does_not_fall_back_if_newest_archive_is_invalid" time="0.002" /><testcase classname="tests.test_restore_test_db" name="test_latest_backup_rejects_symlinked_directory_and_path_glob" time="0.002"><failure message="OSError: [WinError 1314] A required privilege is not held by the client: 'C:\\Users\\rickb\\AppData\\Local\\Temp\\pytest-of-rickb\\pytest-200\\test_latest_backup_rejects_sym0\\real' -&gt; 'C:\\Users\\rickb\\AppData\\Local\\Temp\\pytest-of-rickb\\pytest-200\\test_latest_backup_rejects_sym0\\link'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_latest_backup_rejects_sym0')
+
+    @pytest.mark.unit
+    def test_latest_backup_rejects_symlinked_directory_and_path_glob(tmp_path):
+        real = tmp_path / "real"
+        real.mkdir()
+        link = tmp_path / "link"
+&gt;       link.symlink_to(real, target_is_directory=True)
+
+tests\test_restore_test_db.py:136: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_latest_backup_rejects_sym0/link')
+target = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_latest_backup_rejects_sym0/real')
+target_is_directory = True
+
+    def symlink_to(self, target, target_is_directory=False):
+        """
+        Make this path a symlink pointing to the target path.
+        Note the order of arguments (link, target) is the reverse of os.symlink.
+        """
+&gt;       os.symlink(target, self, target_is_directory)
+E       OSError: [WinError 1314] A required privilege is not held by the client: 'C:\\Users\\rickb\\AppData\\Local\\Temp\\pytest-of-rickb\\pytest-200\\test_latest_backup_rejects_sym0\\real' -&gt; 'C:\\Users\\rickb\\AppData\\Local\\Temp\\pytest-of-rickb\\pytest-200\\test_latest_backup_rejects_sym0\\link'
+
+..\..\AppData\Local\Python\pythoncore-3.14-64\Lib\pathlib\__init__.py:1213: OSError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_backup_filename_timestamp_uses_host_local_timezone" time="0.000"><skipped type="pytest.skip" message="Host timezone cannot be changed in this test runtime.">C:\users\rickb\vsprojects\pifitness\tests\test_restore_test_db.py:203: Host timezone cannot be changed in this test runtime.</skipped></testcase><testcase classname="tests.test_restore_test_db" name="test_all_prd_extension_versions_must_be_available_before_destructive_restore" time="0.001" /><testcase classname="tests.test_restore_test_db" name="test_pg_restore_uses_admin_and_ownership_transfer_avoids_cluster_wide_reassign" time="0.002"><failure message="TypeError: _restore_archive() got an unexpected keyword argument 'timescaledb_version'">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8F7A3C0&gt;
+tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_pg_restore_uses_admin_and0')
+
+    @pytest.mark.unit
+    def test_pg_restore_uses_admin_and_ownership_transfer_avoids_cluster_wide_reassign(monkeypatch, tmp_path):
+        captured = {}
+        class Cursor:
+            def execute(self, query, params=None):
+                captured.setdefault("sql", []).append(query)
+            def close(self):
+                pass
+        class Connection:
+            autocommit = False
+            def cursor(self):
+                return Cursor()
+            def close(self):
+                pass
+        monkeypatch.setattr(recovery.shutil, "which", lambda name: "/usr/bin/pg_restore")
+        monkeypatch.setattr(recovery, "_make_pgpass", lambda directory, config: directory / "pgpass")
+        monkeypatch.setattr(recovery, "_connect", lambda *a, **k: Connection())
+        monkeypatch.setattr(recovery, "_safe_run", lambda args, **kwargs: captured.update(args=args, env=kwargs["env"]))
+&gt;       recovery._restore_archive(
+            Path("/tmp/prd.dump"), "personal_fitness_test",
+            _config("prod", "personal_fitness", "devuser"), temp_dir=tmp_path,
+            timescaledb_version=None,
+        )
+E       TypeError: _restore_archive() got an unexpected keyword argument 'timescaledb_version'
+
+tests\test_restore_test_db.py:264: TypeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_ownership_provisioning_is_database_scoped_and_never_reassigns_shared_objects" time="0.000" /><testcase classname="tests.test_restore_test_db" name="test_old_incomplete_journal_never_drops_a_newer_completed_baseline" time="0.002"><failure message="AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_old_incomplete_journal_ne0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8F35FD0&gt;
+
+    @pytest.mark.unit
+    def test_old_incomplete_journal_never_drops_a_newer_completed_baseline(tmp_path, monkeypatch):
+&gt;       dbs, conn = _install_fake_recovery(monkeypatch, original_exists=False)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_restore_test_db.py:309: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8F35FD0&gt;, original_exists = False, restore_fails = False
+schema_status = 'identical'
+
+    def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=False, schema_status="identical"):
+        test_db = "personal_fitness_test"
+        prd_db = "personal_fitness"
+        dbs = {prd_db: {"oid": 1, "owner": "devuser", "is_template": False}}
+        if original_exists:
+            dbs[test_db] = {"oid": 2, "owner": "pifitness_test_app", "is_template": False}
+        conn = FakeConnection()
+        monkeypatch.setattr(recovery, "_admin_connection", lambda config: conn)
+        monkeypatch.setattr(recovery, "_server_identity", lambda conn, port: {"server_address": "::1", "server_port": port})
+        monkeypatch.setattr(recovery, "_catalog_role_is_superuser", lambda cur, role: role == "devuser")
+        monkeypatch.setattr(recovery, "_role_attributes", lambda cur, role: {
+            "can_login": True, "is_superuser": False,
+        } if role == "pifitness_test_app" else None)
+        monkeypatch.setattr(recovery, "_test_role_login_preflight", lambda *a, **k: {"checked": True})
+        monkeypatch.setattr(recovery, "_catalog_db", lambda cur, name: dbs.get(name))
+        monkeypatch.setattr(recovery, "_latest_backup", lambda *a, **k: (Path(__file__).resolve(), "2026-11-11T00:00:00+00:00", "a" * 64))
+        extension_specs = [
+            {"name": "plpgsql", "version": "1.0", "schema": "pg_catalog"},
+            {"name": "timescaledb", "version": "2.20.0", "schema": "public"},
+        ]
+        monkeypatch.setattr(recovery, "_load_extension_specs", lambda *a, **k: extension_specs)
+&gt;       monkeypatch.setattr(recovery, "_install_timescaledb", lambda *a, **k: None)
+E       AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'
+
+tests\test_restore_test_db.py:164: AttributeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_recovery_replaces_bad_test_and_keeps_only_verified_prd_baseline" time="0.002"><failure message="AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_recovery_replaces_bad_tes0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C941C670&gt;
+
+    @pytest.mark.unit
+    def test_recovery_replaces_bad_test_and_keeps_only_verified_prd_baseline(tmp_path, monkeypatch):
+&gt;       dbs, conn = _install_fake_recovery(monkeypatch)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_restore_test_db.py:338: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C941C670&gt;, original_exists = True, restore_fails = False
+schema_status = 'identical'
+
+    def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=False, schema_status="identical"):
+        test_db = "personal_fitness_test"
+        prd_db = "personal_fitness"
+        dbs = {prd_db: {"oid": 1, "owner": "devuser", "is_template": False}}
+        if original_exists:
+            dbs[test_db] = {"oid": 2, "owner": "pifitness_test_app", "is_template": False}
+        conn = FakeConnection()
+        monkeypatch.setattr(recovery, "_admin_connection", lambda config: conn)
+        monkeypatch.setattr(recovery, "_server_identity", lambda conn, port: {"server_address": "::1", "server_port": port})
+        monkeypatch.setattr(recovery, "_catalog_role_is_superuser", lambda cur, role: role == "devuser")
+        monkeypatch.setattr(recovery, "_role_attributes", lambda cur, role: {
+            "can_login": True, "is_superuser": False,
+        } if role == "pifitness_test_app" else None)
+        monkeypatch.setattr(recovery, "_test_role_login_preflight", lambda *a, **k: {"checked": True})
+        monkeypatch.setattr(recovery, "_catalog_db", lambda cur, name: dbs.get(name))
+        monkeypatch.setattr(recovery, "_latest_backup", lambda *a, **k: (Path(__file__).resolve(), "2026-11-11T00:00:00+00:00", "a" * 64))
+        extension_specs = [
+            {"name": "plpgsql", "version": "1.0", "schema": "pg_catalog"},
+            {"name": "timescaledb", "version": "2.20.0", "schema": "public"},
+        ]
+        monkeypatch.setattr(recovery, "_load_extension_specs", lambda *a, **k: extension_specs)
+&gt;       monkeypatch.setattr(recovery, "_install_timescaledb", lambda *a, **k: None)
+E       AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'
+
+tests\test_restore_test_db.py:164: AttributeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_missing_test_database_is_created_directly_without_snapshot" time="0.002"><failure message="AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_missing_test_database_is_0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C941CC20&gt;
+
+    @pytest.mark.unit
+    def test_missing_test_database_is_created_directly_without_snapshot(tmp_path, monkeypatch):
+&gt;       dbs, _ = _install_fake_recovery(monkeypatch, original_exists=False)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_restore_test_db.py:364: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C941CC20&gt;, original_exists = False, restore_fails = False
+schema_status = 'identical'
+
+    def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=False, schema_status="identical"):
+        test_db = "personal_fitness_test"
+        prd_db = "personal_fitness"
+        dbs = {prd_db: {"oid": 1, "owner": "devuser", "is_template": False}}
+        if original_exists:
+            dbs[test_db] = {"oid": 2, "owner": "pifitness_test_app", "is_template": False}
+        conn = FakeConnection()
+        monkeypatch.setattr(recovery, "_admin_connection", lambda config: conn)
+        monkeypatch.setattr(recovery, "_server_identity", lambda conn, port: {"server_address": "::1", "server_port": port})
+        monkeypatch.setattr(recovery, "_catalog_role_is_superuser", lambda cur, role: role == "devuser")
+        monkeypatch.setattr(recovery, "_role_attributes", lambda cur, role: {
+            "can_login": True, "is_superuser": False,
+        } if role == "pifitness_test_app" else None)
+        monkeypatch.setattr(recovery, "_test_role_login_preflight", lambda *a, **k: {"checked": True})
+        monkeypatch.setattr(recovery, "_catalog_db", lambda cur, name: dbs.get(name))
+        monkeypatch.setattr(recovery, "_latest_backup", lambda *a, **k: (Path(__file__).resolve(), "2026-11-11T00:00:00+00:00", "a" * 64))
+        extension_specs = [
+            {"name": "plpgsql", "version": "1.0", "schema": "pg_catalog"},
+            {"name": "timescaledb", "version": "2.20.0", "schema": "public"},
+        ]
+        monkeypatch.setattr(recovery, "_load_extension_specs", lambda *a, **k: extension_specs)
+&gt;       monkeypatch.setattr(recovery, "_install_timescaledb", lambda *a, **k: None)
+E       AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'
+
+tests\test_restore_test_db.py:164: AttributeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_restore_failure_removes_partial_test_database_and_records_failure" time="0.002"><failure message="AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_restore_failure_removes_p0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8D78210&gt;
+
+    @pytest.mark.unit
+    def test_restore_failure_removes_partial_test_database_and_records_failure(tmp_path, monkeypatch):
+&gt;       dbs, _ = _install_fake_recovery(monkeypatch, restore_fails=True)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_restore_test_db.py:378: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8D78210&gt;, original_exists = True, restore_fails = True
+schema_status = 'identical'
+
+    def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=False, schema_status="identical"):
+        test_db = "personal_fitness_test"
+        prd_db = "personal_fitness"
+        dbs = {prd_db: {"oid": 1, "owner": "devuser", "is_template": False}}
+        if original_exists:
+            dbs[test_db] = {"oid": 2, "owner": "pifitness_test_app", "is_template": False}
+        conn = FakeConnection()
+        monkeypatch.setattr(recovery, "_admin_connection", lambda config: conn)
+        monkeypatch.setattr(recovery, "_server_identity", lambda conn, port: {"server_address": "::1", "server_port": port})
+        monkeypatch.setattr(recovery, "_catalog_role_is_superuser", lambda cur, role: role == "devuser")
+        monkeypatch.setattr(recovery, "_role_attributes", lambda cur, role: {
+            "can_login": True, "is_superuser": False,
+        } if role == "pifitness_test_app" else None)
+        monkeypatch.setattr(recovery, "_test_role_login_preflight", lambda *a, **k: {"checked": True})
+        monkeypatch.setattr(recovery, "_catalog_db", lambda cur, name: dbs.get(name))
+        monkeypatch.setattr(recovery, "_latest_backup", lambda *a, **k: (Path(__file__).resolve(), "2026-11-11T00:00:00+00:00", "a" * 64))
+        extension_specs = [
+            {"name": "plpgsql", "version": "1.0", "schema": "pg_catalog"},
+            {"name": "timescaledb", "version": "2.20.0", "schema": "public"},
+        ]
+        monkeypatch.setattr(recovery, "_load_extension_specs", lambda *a, **k: extension_specs)
+&gt;       monkeypatch.setattr(recovery, "_install_timescaledb", lambda *a, **k: None)
+E       AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'
+
+tests\test_restore_test_db.py:164: AttributeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_live_prd_schema_change_after_nightly_backup_does_not_discard_restored_baseline" time="0.002"><failure message="AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_live_prd_schema_change_af0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C9375EF0&gt;
+
+    @pytest.mark.unit
+    def test_live_prd_schema_change_after_nightly_backup_does_not_discard_restored_baseline(tmp_path, monkeypatch):
+&gt;       dbs, _ = _install_fake_recovery(monkeypatch, schema_status="different")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_restore_test_db.py:395: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C9375EF0&gt;, original_exists = True, restore_fails = False
+schema_status = 'different'
+
+    def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=False, schema_status="identical"):
+        test_db = "personal_fitness_test"
+        prd_db = "personal_fitness"
+        dbs = {prd_db: {"oid": 1, "owner": "devuser", "is_template": False}}
+        if original_exists:
+            dbs[test_db] = {"oid": 2, "owner": "pifitness_test_app", "is_template": False}
+        conn = FakeConnection()
+        monkeypatch.setattr(recovery, "_admin_connection", lambda config: conn)
+        monkeypatch.setattr(recovery, "_server_identity", lambda conn, port: {"server_address": "::1", "server_port": port})
+        monkeypatch.setattr(recovery, "_catalog_role_is_superuser", lambda cur, role: role == "devuser")
+        monkeypatch.setattr(recovery, "_role_attributes", lambda cur, role: {
+            "can_login": True, "is_superuser": False,
+        } if role == "pifitness_test_app" else None)
+        monkeypatch.setattr(recovery, "_test_role_login_preflight", lambda *a, **k: {"checked": True})
+        monkeypatch.setattr(recovery, "_catalog_db", lambda cur, name: dbs.get(name))
+        monkeypatch.setattr(recovery, "_latest_backup", lambda *a, **k: (Path(__file__).resolve(), "2026-11-11T00:00:00+00:00", "a" * 64))
+        extension_specs = [
+            {"name": "plpgsql", "version": "1.0", "schema": "pg_catalog"},
+            {"name": "timescaledb", "version": "2.20.0", "schema": "public"},
+        ]
+        monkeypatch.setattr(recovery, "_load_extension_specs", lambda *a, **k: extension_specs)
+&gt;       monkeypatch.setattr(recovery, "_install_timescaledb", lambda *a, **k: None)
+E       AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'
+
+tests\test_restore_test_db.py:164: AttributeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_recovery_reconciler_keeps_a_completed_prd_baseline" time="0.002"><failure message="AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_recovery_reconciler_keeps0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8D784B0&gt;
+
+    @pytest.mark.unit
+    def test_recovery_reconciler_keeps_a_completed_prd_baseline(tmp_path, monkeypatch):
+&gt;       dbs, _ = _install_fake_recovery(monkeypatch, original_exists=False)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_restore_test_db.py:412: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8D784B0&gt;, original_exists = False, restore_fails = False
+schema_status = 'identical'
+
+    def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=False, schema_status="identical"):
+        test_db = "personal_fitness_test"
+        prd_db = "personal_fitness"
+        dbs = {prd_db: {"oid": 1, "owner": "devuser", "is_template": False}}
+        if original_exists:
+            dbs[test_db] = {"oid": 2, "owner": "pifitness_test_app", "is_template": False}
+        conn = FakeConnection()
+        monkeypatch.setattr(recovery, "_admin_connection", lambda config: conn)
+        monkeypatch.setattr(recovery, "_server_identity", lambda conn, port: {"server_address": "::1", "server_port": port})
+        monkeypatch.setattr(recovery, "_catalog_role_is_superuser", lambda cur, role: role == "devuser")
+        monkeypatch.setattr(recovery, "_role_attributes", lambda cur, role: {
+            "can_login": True, "is_superuser": False,
+        } if role == "pifitness_test_app" else None)
+        monkeypatch.setattr(recovery, "_test_role_login_preflight", lambda *a, **k: {"checked": True})
+        monkeypatch.setattr(recovery, "_catalog_db", lambda cur, name: dbs.get(name))
+        monkeypatch.setattr(recovery, "_latest_backup", lambda *a, **k: (Path(__file__).resolve(), "2026-11-11T00:00:00+00:00", "a" * 64))
+        extension_specs = [
+            {"name": "plpgsql", "version": "1.0", "schema": "pg_catalog"},
+            {"name": "timescaledb", "version": "2.20.0", "schema": "public"},
+        ]
+        monkeypatch.setattr(recovery, "_load_extension_specs", lambda *a, **k: extension_specs)
+&gt;       monkeypatch.setattr(recovery, "_install_timescaledb", lambda *a, **k: None)
+E       AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'
+
+tests\test_restore_test_db.py:164: AttributeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_admin_preflight_failure_does_not_drop_existing_test" time="0.002"><failure message="AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_admin_preflight_failure_d0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C941CF30&gt;
+
+    @pytest.mark.unit
+    def test_admin_preflight_failure_does_not_drop_existing_test(tmp_path, monkeypatch):
+&gt;       dbs, _ = _install_fake_recovery(monkeypatch)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_restore_test_db.py:432: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C941CF30&gt;, original_exists = True, restore_fails = False
+schema_status = 'identical'
+
+    def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=False, schema_status="identical"):
+        test_db = "personal_fitness_test"
+        prd_db = "personal_fitness"
+        dbs = {prd_db: {"oid": 1, "owner": "devuser", "is_template": False}}
+        if original_exists:
+            dbs[test_db] = {"oid": 2, "owner": "pifitness_test_app", "is_template": False}
+        conn = FakeConnection()
+        monkeypatch.setattr(recovery, "_admin_connection", lambda config: conn)
+        monkeypatch.setattr(recovery, "_server_identity", lambda conn, port: {"server_address": "::1", "server_port": port})
+        monkeypatch.setattr(recovery, "_catalog_role_is_superuser", lambda cur, role: role == "devuser")
+        monkeypatch.setattr(recovery, "_role_attributes", lambda cur, role: {
+            "can_login": True, "is_superuser": False,
+        } if role == "pifitness_test_app" else None)
+        monkeypatch.setattr(recovery, "_test_role_login_preflight", lambda *a, **k: {"checked": True})
+        monkeypatch.setattr(recovery, "_catalog_db", lambda cur, name: dbs.get(name))
+        monkeypatch.setattr(recovery, "_latest_backup", lambda *a, **k: (Path(__file__).resolve(), "2026-11-11T00:00:00+00:00", "a" * 64))
+        extension_specs = [
+            {"name": "plpgsql", "version": "1.0", "schema": "pg_catalog"},
+            {"name": "timescaledb", "version": "2.20.0", "schema": "public"},
+        ]
+        monkeypatch.setattr(recovery, "_load_extension_specs", lambda *a, **k: extension_specs)
+&gt;       monkeypatch.setattr(recovery, "_install_timescaledb", lambda *a, **k: None)
+E       AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'
+
+tests\test_restore_test_db.py:164: AttributeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_test_role_must_be_login_enabled_and_non_superuser_before_drop" time="0.002"><failure message="AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_test_role_must_be_login_e0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8F373F0&gt;
+
+    @pytest.mark.unit
+    def test_test_role_must_be_login_enabled_and_non_superuser_before_drop(tmp_path, monkeypatch):
+&gt;       dbs, _ = _install_fake_recovery(monkeypatch)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_restore_test_db.py:448: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8F373F0&gt;, original_exists = True, restore_fails = False
+schema_status = 'identical'
+
+    def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=False, schema_status="identical"):
+        test_db = "personal_fitness_test"
+        prd_db = "personal_fitness"
+        dbs = {prd_db: {"oid": 1, "owner": "devuser", "is_template": False}}
+        if original_exists:
+            dbs[test_db] = {"oid": 2, "owner": "pifitness_test_app", "is_template": False}
+        conn = FakeConnection()
+        monkeypatch.setattr(recovery, "_admin_connection", lambda config: conn)
+        monkeypatch.setattr(recovery, "_server_identity", lambda conn, port: {"server_address": "::1", "server_port": port})
+        monkeypatch.setattr(recovery, "_catalog_role_is_superuser", lambda cur, role: role == "devuser")
+        monkeypatch.setattr(recovery, "_role_attributes", lambda cur, role: {
+            "can_login": True, "is_superuser": False,
+        } if role == "pifitness_test_app" else None)
+        monkeypatch.setattr(recovery, "_test_role_login_preflight", lambda *a, **k: {"checked": True})
+        monkeypatch.setattr(recovery, "_catalog_db", lambda cur, name: dbs.get(name))
+        monkeypatch.setattr(recovery, "_latest_backup", lambda *a, **k: (Path(__file__).resolve(), "2026-11-11T00:00:00+00:00", "a" * 64))
+        extension_specs = [
+            {"name": "plpgsql", "version": "1.0", "schema": "pg_catalog"},
+            {"name": "timescaledb", "version": "2.20.0", "schema": "public"},
+        ]
+        monkeypatch.setattr(recovery, "_load_extension_specs", lambda *a, **k: extension_specs)
+&gt;       monkeypatch.setattr(recovery, "_install_timescaledb", lambda *a, **k: None)
+E       AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'
+
+tests\test_restore_test_db.py:164: AttributeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_test_role_must_be_login_enabled_before_drop" time="0.002"><failure message="AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_test_role_must_be_login_e1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8D7BC40&gt;
+
+    @pytest.mark.unit
+    def test_test_role_must_be_login_enabled_before_drop(tmp_path, monkeypatch):
+&gt;       dbs, _ = _install_fake_recovery(monkeypatch)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_restore_test_db.py:466: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C8D7BC40&gt;, original_exists = True, restore_fails = False
+schema_status = 'identical'
+
+    def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=False, schema_status="identical"):
+        test_db = "personal_fitness_test"
+        prd_db = "personal_fitness"
+        dbs = {prd_db: {"oid": 1, "owner": "devuser", "is_template": False}}
+        if original_exists:
+            dbs[test_db] = {"oid": 2, "owner": "pifitness_test_app", "is_template": False}
+        conn = FakeConnection()
+        monkeypatch.setattr(recovery, "_admin_connection", lambda config: conn)
+        monkeypatch.setattr(recovery, "_server_identity", lambda conn, port: {"server_address": "::1", "server_port": port})
+        monkeypatch.setattr(recovery, "_catalog_role_is_superuser", lambda cur, role: role == "devuser")
+        monkeypatch.setattr(recovery, "_role_attributes", lambda cur, role: {
+            "can_login": True, "is_superuser": False,
+        } if role == "pifitness_test_app" else None)
+        monkeypatch.setattr(recovery, "_test_role_login_preflight", lambda *a, **k: {"checked": True})
+        monkeypatch.setattr(recovery, "_catalog_db", lambda cur, name: dbs.get(name))
+        monkeypatch.setattr(recovery, "_latest_backup", lambda *a, **k: (Path(__file__).resolve(), "2026-11-11T00:00:00+00:00", "a" * 64))
+        extension_specs = [
+            {"name": "plpgsql", "version": "1.0", "schema": "pg_catalog"},
+            {"name": "timescaledb", "version": "2.20.0", "schema": "public"},
+        ]
+        monkeypatch.setattr(recovery, "_load_extension_specs", lambda *a, **k: extension_specs)
+&gt;       monkeypatch.setattr(recovery, "_install_timescaledb", lambda *a, **k: None)
+E       AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'
+
+tests\test_restore_test_db.py:164: AttributeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_bad_test_password_is_detected_before_dropping_existing_database" time="0.002"><failure message="AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'">tmp_path = WindowsPath('C:/Users/rickb/AppData/Local/Temp/pytest-of-rickb/pytest-200/test_bad_test_password_is_dete0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C941C9F0&gt;
+
+    @pytest.mark.unit
+    def test_bad_test_password_is_detected_before_dropping_existing_database(tmp_path, monkeypatch):
+&gt;       dbs, _ = _install_fake_recovery(monkeypatch)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_restore_test_db.py:484: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001C9C941C9F0&gt;, original_exists = True, restore_fails = False
+schema_status = 'identical'
+
+    def _install_fake_recovery(monkeypatch, *, original_exists=True, restore_fails=False, schema_status="identical"):
+        test_db = "personal_fitness_test"
+        prd_db = "personal_fitness"
+        dbs = {prd_db: {"oid": 1, "owner": "devuser", "is_template": False}}
+        if original_exists:
+            dbs[test_db] = {"oid": 2, "owner": "pifitness_test_app", "is_template": False}
+        conn = FakeConnection()
+        monkeypatch.setattr(recovery, "_admin_connection", lambda config: conn)
+        monkeypatch.setattr(recovery, "_server_identity", lambda conn, port: {"server_address": "::1", "server_port": port})
+        monkeypatch.setattr(recovery, "_catalog_role_is_superuser", lambda cur, role: role == "devuser")
+        monkeypatch.setattr(recovery, "_role_attributes", lambda cur, role: {
+            "can_login": True, "is_superuser": False,
+        } if role == "pifitness_test_app" else None)
+        monkeypatch.setattr(recovery, "_test_role_login_preflight", lambda *a, **k: {"checked": True})
+        monkeypatch.setattr(recovery, "_catalog_db", lambda cur, name: dbs.get(name))
+        monkeypatch.setattr(recovery, "_latest_backup", lambda *a, **k: (Path(__file__).resolve(), "2026-11-11T00:00:00+00:00", "a" * 64))
+        extension_specs = [
+            {"name": "plpgsql", "version": "1.0", "schema": "pg_catalog"},
+            {"name": "timescaledb", "version": "2.20.0", "schema": "public"},
+        ]
+        monkeypatch.setattr(recovery, "_load_extension_specs", lambda *a, **k: extension_specs)
+&gt;       monkeypatch.setattr(recovery, "_install_timescaledb", lambda *a, **k: None)
+E       AttributeError: &lt;module 'tools.db.restore_test_db' from 'C:\\Users\\rickb\\vsProjects\\PiFitness\\tools\\db\\restore_test_db.py'&gt; has no attribute '_install_timescaledb'
+
+tests\test_restore_test_db.py:164: AttributeError</failure></testcase><testcase classname="tests.test_restore_test_db" name="test_test_role_credential_probe_checks_database_user_and_same_loopback_endpoint" time="0.000" /><testcase classname="tests.test_restore_test_db" name="test_test_role_credential_probe_skips_if_role_cannot_connect_to_postgres" time="0.000" /><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/activities]" time="8.136"><failure message="AssertionError: /api/activities returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/activities'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/activities returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/tasks]" time="8.149"><failure message="AssertionError: /api/admin/tasks returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/tasks'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/tasks returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/tasks/schedule]" time="8.104"><failure message="AssertionError: /api/admin/tasks/schedule returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/tasks/schedule'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/tasks/schedule returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/tasks/names]" time="8.138"><failure message="AssertionError: /api/admin/tasks/names returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/tasks/names'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/tasks/names returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/events]" time="8.206"><failure message="AssertionError: /api/admin/events returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/events'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/events returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/events?search=test&amp;errors_only=true&amp;ignore_skips=true&amp;event_type=INFO&amp;limit=50]" time="8.113"><failure message="AssertionError: /api/admin/events?search=test&amp;errors_only=true&amp;ignore_skips=true&amp;event_type=INFO&amp;limit=50 returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/events?search=test&amp;errors_only=true&amp;ignore_skips=true&amp;event_type=INFO&amp;limit=50'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/events?search=test&amp;errors_only=true&amp;ignore_skips=true&amp;event_type=INFO&amp;limit=50 returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/db-info/task-summary]" time="8.087"><failure message="AssertionError: /api/admin/db-info/task-summary returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/db-info/task-summary'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/db-info/task-summary returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/db-info/db-size-chart]" time="8.195"><failure message="AssertionError: /api/admin/db-info/db-size-chart returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/db-info/db-size-chart'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/db-info/db-size-chart returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/db-info/db-size-breakdown]" time="8.136"><failure message="AssertionError: /api/admin/db-info/db-size-breakdown returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/db-info/db-size-breakdown'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/db-info/db-size-breakdown returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/logs/tables]" time="8.111"><failure message="AssertionError: /api/admin/logs/tables returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/logs/tables'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/logs/tables returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/db-sessions]" time="8.156"><failure message="AssertionError: /api/admin/db-sessions returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/db-sessions'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/db-sessions returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/services]" time="8.144"><failure message="AssertionError: /api/admin/services returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/services'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/services returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/functions]" time="8.108"><failure message="AssertionError: /api/admin/functions returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/functions'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/functions returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_get_route_returns_data_envelope[/api/admin/credentials/requirements]" time="8.140"><failure message="AssertionError: /api/admin/credentials/requirements returned 500&#10;assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">path = '/api/admin/credentials/requirements'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("path", ENVELOPE_ROUTES)
+    def test_get_route_returns_data_envelope(path):
+        """Each read-only API route in the list answers 200 with a data field and an integer
+        count against the live database.
+        """
+        response = client.get(path)
+&gt;       assert response.status_code == 200, f"{path} returned {response.status_code}"
+E       AssertionError: /api/admin/credentials/requirements returned 500
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:39: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_admin_events_limit_is_respected" time="8.117"><failure message="assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">@pytest.mark.smoke
+    @pytest.mark.live
+    def test_admin_events_limit_is_respected():
+        """GET /api/admin/events with filters returns no more rows than the requested limit.
+        """
+        response = client.get("/api/admin/events?search=test&amp;errors_only=true&amp;ignore_skips=true&amp;event_type=INFO&amp;limit=50")
+&gt;       assert response.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:52: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_activity_detail_routes_respond_for_latest_activity[]" time="8.145"><failure message="assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">suffix = ''
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("suffix", ["", "/telemetry", "/segments"])
+    def test_activity_detail_routes_respond_for_latest_activity(suffix):
+        """The by-id, telemetry and segments routes answer 200 with a data field for the
+        most recent activity, skipping explicitly when none exist.
+        """
+        listing = client.get("/api/activities")
+&gt;       assert listing.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:65: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_activity_detail_routes_respond_for_latest_activity[/telemetry]" time="8.124"><failure message="assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">suffix = '/telemetry'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("suffix", ["", "/telemetry", "/segments"])
+    def test_activity_detail_routes_respond_for_latest_activity(suffix):
+        """The by-id, telemetry and segments routes answer 200 with a data field for the
+        most recent activity, skipping explicitly when none exist.
+        """
+        listing = client.get("/api/activities")
+&gt;       assert listing.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:65: AssertionError</failure></testcase><testcase classname="tests.test_route_smoke" name="test_activity_detail_routes_respond_for_latest_activity[/segments]" time="8.168"><failure message="assert 500 == 200&#10; +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code">suffix = '/segments'
+
+    @pytest.mark.smoke
+    @pytest.mark.live
+    @pytest.mark.parametrize("suffix", ["", "/telemetry", "/segments"])
+    def test_activity_detail_routes_respond_for_latest_activity(suffix):
+        """The by-id, telemetry and segments routes answer 200 with a data field for the
+        most recent activity, skipping explicitly when none exist.
+        """
+        listing = client.get("/api/activities")
+&gt;       assert listing.status_code == 200
+E       assert 500 == 200
+E        +  where 500 = &lt;Response [500 Internal Server Error]&gt;.status_code
+
+tests\test_route_smoke.py:65: AssertionError</failure></testcase><testcase classname="tests.test_schema_compare" name="test_validate_pair_requires_test_and_prod_envs_and_distinct_databases" time="0.001" /><testcase classname="tests.test_schema_compare" name="test_validate_pair_rejects_wrong_or_missing_markers" time="0.001" /><testcase classname="tests.test_schema_compare" name="test_validate_pair_requires_same_configured_and_actual_endpoint" time="0.001" /><testcase classname="tests.test_schema_compare" name="test_validate_pair_treats_ipv6_inet_prefix_and_bare_address_as_same_endpoint" time="0.000" /><testcase classname="tests.test_schema_compare" name="test_validate_pair_rejects_non_loopback_hosts" time="0.001"><failure message="AssertionError: Regex pattern did not match.&#10;  Expected regex: 'remote host'&#10;  Actual message: &quot;Refusing to connect to non-loopback host 'db.example.com'.&quot;">@pytest.mark.unit
+    def test_validate_pair_rejects_non_loopback_hosts():
+        test = _config("test", "fitness_test", host="db.example.com")
+        prd = _config("prod", "fitness_prd", host="db.example.com")
+&gt;       with pytest.raises(RuntimeError, match="remote host"):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'remote host'
+E         Actual message: "Refusing to connect to non-loopback host 'db.example.com'."
+
+tests\test_schema_compare.py:204: AssertionError</failure></testcase><testcase classname="tests.test_schema_compare" name="test_pgpass_escaping_and_database_url_never_include_password" time="0.000" /><testcase classname="tests.test_schema_compare" name="test_database_url_brackets_ipv6_and_includes_sslmode" time="0.000" /><testcase classname="tests.test_schema_compare" name="test_compare_identical_schemas_uses_migradiff_json_without_applying_sql" time="0.021" /><testcase classname="tests.test_schema_compare" name="test_compare_structural_change_reports_different_and_risk" time="0.003" /><testcase classname="tests.test_schema_compare" name="test_ledger_and_comments_are_excluded_from_structural_compatibility" time="0.002" /><testcase classname="tests.test_schema_compare" name="test_diff_file_is_private_json_and_never_overwritten" time="0.028" /><testcase classname="tests.test_schema_compare" name="test_migradiff_nonzero_exit_fails_closed_and_redacts_password" time="0.015" /><testcase classname="tests.test_schema_compare" name="test_invalid_migradiff_json_fails_closed" time="0.003" /><testcase classname="tests.test_schema_compare" name="test_malformed_statement_list_fails_closed" time="0.003" /><testcase classname="tests.test_schema_compare" name="test_migradiff_version_must_match_the_pinned_release" time="0.001" /><testcase classname="tests.test_schema_compare" name="test_missing_migradiff_fails_closed" time="0.001" /><testcase classname="tests.test_schema_compare" name="test_cli_requires_explicit_prd_authorization" time="0.001" /><testcase classname="tests.test_schema_compare" name="test_cli_error_output_is_machine_readable" time="0.001" /><testcase classname="tests.test_spotify_oauth_flow" name="test_force_refresh_clears_cache_and_returns_token" time="0.001" /><testcase classname="tests.test_spotify_oauth_flow" name="test_exchange_code_returns_token_dict" time="0.001" /><testcase classname="tests.test_spotify_oauth_flow" name="test_build_authorize_url_calls_show_dialog" time="0.001" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation0-False-create_from_prd-False]" time="0.001" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation1-False-refresh_from_prd-False]" time="0.001" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation2-False-refresh_from_prd-False]" time="0.001" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation3-False-refresh_from_prd-False]" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation4-False-refresh_from_prd-False]" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation5-False-refresh_from_prd-False]" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation6-False-reuse_test-True]" time="0.001" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation7-True-refresh_from_prd-False]" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation8-False-abort-False]" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation9-False-abort-False]" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_decision_matrix[observation10-False-abort-False]" time="0.001" /><testcase classname="tests.test_test_db_policy" name="test_inspection_error_aborts_even_when_refresh_was_requested" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_missing_database_does_not_require_an_old_database_snapshot" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_wrong_marker_refreshes_without_preserving_old_database" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_compatible_test_offers_freshness_but_defaults_to_reuse" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_unknown_schema_status_fails_closed" time="0.000" /><testcase classname="tests.test_test_db_policy" name="test_verified_backup_provenance_reuses_test_even_when_schema_differs_from_live_prd" time="0.000" /><testcase classname="tests.test_test_state" name="test_atomic_write_renames_temp_file_without_leftovers" time="0.016" /><testcase classname="tests.test_test_state" name="test_atomic_write_creates_restrictive_permissions" time="0.002"><skipped type="pytest.skip" message="Windows does not enforce POSIX mode bits">C:\users\rickb\vsprojects\pifitness\tests\test_test_state.py:85: Windows does not enforce POSIX mode bits</skipped></testcase><testcase classname="tests.test_test_state" name="test_state_records_all_required_fields" time="0.018" /><testcase classname="tests.test_test_state" name="test_state_sufficient_for_test_down_restore_decisions" time="0.016" /><testcase classname="tests.test_token_db_persistence" name="test_save_garmin_with_both_expires_uses_min" time="0.001" /><testcase classname="tests.test_token_db_persistence" name="test_save_garmin_no_expires_3col" time="0.001" /><testcase classname="tests.test_token_db_persistence" name="test_save_raises_on_deactivate_fail" time="0.001" /><testcase classname="tests.test_token_db_persistence" name="test_save_raises_on_insert_fail" time="0.001" /><testcase classname="tests.test_verify_spotify_isrc_refresh" name="test_verify_spotify_fails_without_client" time="0.001" /></testsuite></testsuites>

@@ -194,6 +194,8 @@ def test_get_garmin_client_returns_well_formed_token_without_relogin():
 # ---------------------------------------------------------------------------
 
 
+# VERIFIED: Contract — GarminProvider.get_status returns authenticated=True when a DB token is present
+@pytest.mark.contract
 def test_get_status_authenticated_when_db_token_present():
     """get_status queries the DB with 'Garmin' (capital G) and reports authenticated=True."""
     from pifitness.integrations.garmin.provider import GarminProvider
@@ -212,7 +214,7 @@ def test_get_status_authenticated_when_db_token_present():
 # ---------------------------------------------------------------------------
 
 # VERIFIED: Contract — GarminProvider.is_configured returns False when credentials missing
-
+@pytest.mark.contract
 def test_is_configured_false_when_creds_missing():
     """is_configured returns False when garmin_creds yields (None, None)."""
     from pifitness.integrations.garmin.provider import GarminProvider
