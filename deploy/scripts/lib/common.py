@@ -227,6 +227,15 @@ def out(text=""):
     print(text, flush=True)
 
 
+def console(text=""):
+    """Print text to both the log (stdout) and the user console (fd 3 if open)."""
+    print(text, flush=True)
+    try:
+        os.write(3, (str(text) + "\n").encode("utf-8"))
+    except OSError:
+        pass
+
+
 def dotted_line(label, status, width=60):
     """'[STEP 1/10] preflight ........ PASS (1.2s)' - same look everywhere."""
     dots = max(3, width - len(label) - 1)

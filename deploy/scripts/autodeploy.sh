@@ -156,8 +156,14 @@ LIB="$SCRIPT_DIR/lib"
 export PYTHONUNBUFFERED=1
 export PYTHONDONTWRITEBYTECODE=1
 
-note() { printf '[autodeploy] %s\n' "$*"; }
-err()  { printf '[autodeploy] ERROR: %s\n' "$*" >&2; }
+note() {
+    printf '[autodeploy] %s\n' "$*"
+    printf '[autodeploy] %s\n' "$*" >&3 2>/dev/null || true
+}
+err()  {
+    printf '[autodeploy] ERROR: %s\n' "$*" >&2
+    printf '[autodeploy] ERROR: %s\n' "$*" >&3 2>/dev/null || true
+}
 
 # Run one helper. Explains a missing helper (with directory listings) and any
 # non-zero exit (except 10, the reserved "stop cleanly" code). Returns the
@@ -195,12 +201,9 @@ if [[ $rc -ne 0 ]]; then
 fi
 RUN_DIR="${LOG_FILE%.log}.d"
 
-# --- 2. Mirror all output to the log file -------------------------------------
-TEE_PID=""
-# tee must outlive Ctrl-C / hangup: they reach the whole process group, and a dead tee
-# breaks the pipe (SIGPIPE) before the exit handler can even print or run cleanup.
-exec > >(trap '' INT HUP; exec tee -a "$LOG_FILE") 2>&1
-TEE_PID=$!
+# --- 2. Route full output to log file; keep console on fd 3 -------------------
+exec 3>&1
+exec >> "$LOG_FILE" 2>&1
 note "log file:      $LOG_FILE"
 note "run directory: $RUN_DIR"
 
@@ -215,9 +218,7 @@ on_exit() {
     run_helper cleanup.py --run-dir "$RUN_DIR" --exit-status "$status" || final=$?
     note "run finished: exit status $final (log: $LOG_FILE)"
 
-    # Close our output so tee flushes, then wait for it so no lines are lost.
-    exec >&- 2>&-
-    wait "$TEE_PID" 2>/dev/null || true
+    exec 3>&- 2>/dev/null || true
     exit "$final"
 }
 trap on_exit EXIT

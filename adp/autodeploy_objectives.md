@@ -101,25 +101,26 @@ Deploy changes developed on a Windows PC to a Raspberry Pi, first to **TEST**, t
 
 ## 3. Output Contract
 
-**Per-step format:**
+**Console Display format:**
 
 ```
 [STEP n/N] <Step name> ......................... START
-  <what it is doing>
-  EVIDENCE: <key> = <value>
-  EVIDENCE: <key> = <value>
+  ... still running: <Step name> (elapsed 15s)    (heartbeat if > 15s)
 [STEP n/N] <Step name> ......................... PASS (4.2s)
 ```
 
 - `N` = **10** for TEST, **9** for PRD.
-- Failure ends with `FAIL (4.2s)` followed by `REASON: <one-line cause>`, `WHERE: <command / file / line>`, and the last relevant lines of the failing tool's output.
+- Screen output displays clean progress banners, heartbeats every 15s, and the final summary table.
+- Evidence lines (`EVIDENCE: <key> = <value>`) and verbose tool outputs (e.g. `uv sync`, `npm ci`, `pytest`) are suppressed from the active console and routed directly to the log file.
+- Failure ends with `FAIL (4.2s)` followed by `REASON: <one-line cause>`, `WHERE: <command / file / line>`, and the last relevant lines of the failing tool's output displayed directly on both the console and the log.
 - A PRD run that reaches a step with nothing to do prints `SKIPPED (<reason>)`.
 
 **Rules:**
-- **Evidence over assertion.** A step never just says "done". It prints the facts that prove it.
-- **No silent success.** Every command whose result matters is checked, and its outcome is printed.
-- **Final summary table** at the end of every run, whatever the outcome.
-- **Full log** written to `/home/god/pifitness-logs/autodeploy-<env>-<UTC timestamp>-<short SHA>.log`, and printed at start and end. Screen output and log are identical.
+- **Evidence over assertion.** A step never just says "done". It captures the facts that prove it in the log file.
+- **No silent success.** Every command whose result matters is checked, and its outcome is recorded.
+- **Final summary table** at the end of every run, whatever the outcome, displayed on the console and recorded in the log.
+- **Full log** written to `/home/god/pifitness-logs/autodeploy-<env>-<UTC timestamp>-<short SHA>.log`, and symlinked atomically to the evergreen `/home/god/pifitness-logs/bootstrap.log`.
+- **Remote run & pull:** `deploy/run-bootstrap.ps1` runs the bootstrap launcher interactively over SSH and automatically pulls `bootstrap.log` to local `deploy/bootstrap.log` upon completion. `deploy/fetch-bootstrap-log.ps1` can pull the evergreen log on demand.
 - **Unbuilt steps** print `[STEP n/N] <name> NOT IMPLEMENTED` and the run stops cleanly there (running cleanup).
 - **Exit codes:** `0` = all built steps passed (and GO if reached for TEST), non-zero = failure, NO-GO or timeout.
 - **Re-runnable.** Safe to start again after any failure or interruption, with no manual cleanup.

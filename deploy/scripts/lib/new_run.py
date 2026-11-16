@@ -217,12 +217,23 @@ def stage_create_run(ctx):
     except OSError as exc:
         raise HelperError("cannot create run directory: %s" % exc.strerror, run_dir)
 
+    evergreen_link = os.path.join(log_dir, "bootstrap.log")
+    try:
+        tmp_link = evergreen_link + ".tmp"
+        if os.path.islink(tmp_link) or os.path.exists(tmp_link):
+            os.remove(tmp_link)
+        os.symlink(log_file, tmp_link)
+        os.replace(tmp_link, evergreen_link)
+    except OSError:
+        pass
+
     write_text_atomic(os.path.join(run_dir, "steps"), "\n".join(ctx["steps"]) + "\n")
     write_state(os.path.join(run_dir, "run.state"), {
         "ENVIRONMENT": ctx["environment"],
         "COMMIT": ctx["commit"],
         "THROUGH": ctx["through"] if ctx["through"] else "",
         "LOG_FILE": log_file,
+        "EVERGREEN_LOG": evergreen_link,
         "RUN_DIR": run_dir,
         "LOG_DIR": log_dir,
         "STARTED_UTC": now.strftime("%Y-%m-%dT%H:%M:%SZ"),

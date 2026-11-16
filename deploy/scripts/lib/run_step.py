@@ -59,8 +59,8 @@ import sys
 import time
 from collections import deque
 
-from common import (HelperError, Parser, Reporter, guarded, read_state,
-                    update_state)
+from common import (HelperError, Parser, Reporter, console, guarded,
+                    read_state, update_state)
 
 TAG = "[run_step]"
 R = Reporter(TAG)  # only for run_step.py's OWN problems, not step output
@@ -68,7 +68,7 @@ R = Reporter(TAG)  # only for run_step.py's OWN problems, not step output
 LIB_DIR = os.path.dirname(os.path.abspath(__file__))
 STEP_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
-HEARTBEAT_SECONDS = 30
+HEARTBEAT_SECONDS = 15
 TAIL_LINES = 15
 BANNER_WIDTH = 60
 
@@ -88,7 +88,7 @@ def out(text=""):
 def banner(number, total, name, status):
     label = "[STEP %d/%d] %s " % (number, total, name)
     dots = "." * max(3, BANNER_WIDTH - len(label))
-    out("%s%s %s" % (label, dots, status))
+    console("%s%s %s" % (label, dots, status))
 
 
 def parse_args(argv):
@@ -184,8 +184,8 @@ def run_helper(helper, run_dir, step):
                 result["tail"].append(line)
 
     def on_quiet():
-        out("  ... still running: %s (elapsed %ds)"
-            % (step, int(time.monotonic() - started)))
+        console("  ... still running: %s (elapsed %ds)"
+                % (step, int(time.monotonic() - started)))
 
     proc = subprocess.Popen([sys.executable, helper, "--run-dir", run_dir],
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -230,12 +230,12 @@ def failure_details(result, helper):
 
 def print_failure(result, helper):
     reason, where = failure_details(result, helper)
-    out("  REASON: %s" % reason)
-    out("  WHERE: %s" % where)
+    console("  REASON: %s" % reason)
+    console("  WHERE: %s" % where)
     if result["tail"]:
-        out("  last output:")
+        console("  last output:")
         for line in result["tail"]:
-            out("    | " + line)
+            console("    | " + line)
     return reason
 
 
@@ -252,8 +252,8 @@ def run_one_step(args):
 
     if not os.path.isfile(helper):
         banner(number, total, name, "NOT IMPLEMENTED")
-        out("  expected helper: %s" % helper)
-        out("  the run stops cleanly here; later steps are not run")
+        console("  expected helper: %s" % helper)
+        console("  the run stops cleanly here; later steps are not run")
         record_result(args.run_dir, number, name, "NOT_IMPLEMENTED", 0.0, helper)
         mark_state(args.run_dir, number, name, "NOT_IMPLEMENTED")
         return EXIT_STOP
@@ -284,7 +284,7 @@ def run_one_step(args):
     if status == "FAIL":
         return EXIT_FAIL
     if through is not None and number == through:
-        out("  --through %d reached; the run stops cleanly after this step" % through)
+        console("  --through %d reached; the run stops cleanly after this step" % through)
         return EXIT_STOP
     return EXIT_CONTINUE
 

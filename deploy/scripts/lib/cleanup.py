@@ -46,9 +46,9 @@ import os
 import signal
 import sys
 
-from common import (HelperError, Parser, Reporter, dotted_line, guarded, out,
-                    print_failure, read_results, read_state, read_steps,
-                    read_undo, run_streaming)
+from common import (HelperError, Parser, Reporter, console, dotted_line,
+                    guarded, out, print_failure, read_results, read_state,
+                    read_steps, read_undo, run_streaming)
 
 TAG = "[cleanup]"
 R = Reporter(TAG)  # only for cleanup's OWN problems
@@ -126,13 +126,13 @@ def run_one_undo(ctx, index, total, name):
     helper = os.path.join(LIB_DIR, "undo_%s.py" % name)
 
     if not os.path.isfile(helper):
-        out(dotted_line(label, "FAIL"))
-        out("  REASON: undo helper is missing, so this change could NOT be undone")
-        out("  WHERE: %s" % helper)
+        console(dotted_line(label, "FAIL"))
+        console("  REASON: undo helper is missing, so this change could NOT be undone")
+        console("  WHERE: %s" % helper)
         return {"name": name, "status": "FAIL", "seconds": 0.0,
                 "detail": "undo helper missing"}
 
-    out(dotted_line(label, "START"))
+    console(dotted_line(label, "START"))
     result = run_streaming(
         helper,
         ["--run-dir", args.run_dir, "--outcome", ctx["outcome"],
@@ -141,12 +141,12 @@ def run_one_undo(ctx, index, total, name):
     status = classify(result)
     detail = ""
     if status == "PASS":
-        out(dotted_line(label, "PASS (%.1fs)" % result["seconds"]))
+        console(dotted_line(label, "PASS (%.1fs)" % result["seconds"]))
     elif status == "SKIPPED":
         detail = result["skipped"] or "no reason given"
-        out(dotted_line(label, "SKIPPED (%s)" % detail))
+        console(dotted_line(label, "SKIPPED (%s)" % detail))
     else:
-        out(dotted_line(label, "FAIL (%.1fs)" % result["seconds"]))
+        console(dotted_line(label, "FAIL (%.1fs)" % result["seconds"]))
         detail = print_failure(result, helper, "undo helper")
     return {"name": name, "status": status, "seconds": result["seconds"],
             "detail": detail}
@@ -195,26 +195,26 @@ def print_summary(ctx):
     final = final_exit_code(ctx)
     undo_failed = [r for r in ctx["undo_results"] if r["status"] == "FAIL"]
 
-    out("(3/3) Summary")
-    out(RULE)
-    out("RUN SUMMARY   environment=%s   commit=%s"
+    console("(3/3) Summary")
+    console(RULE)
+    console("RUN SUMMARY   environment=%s   commit=%s"
         % (state.get("ENVIRONMENT", "?"), state.get("COMMIT", "?")[:12]))
-    out(RULE)
-    out("%3s  %-18s %-16s %8s  %s" % ("#", "Step", "Status", "Time", "Detail"))
+    console(RULE)
+    console("%3s  %-18s %-16s %8s  %s" % ("#", "Step", "Status", "Time", "Detail"))
     for number, name in enumerate(steps, 1):
         status, seconds, detail = step_row(ctx, number, name)
-        out("%3d  %-18s %-16s %8s  %s" % (number, name, status, seconds, detail))
-    out("")
+        console("%3d  %-18s %-16s %8s  %s" % (number, name, status, seconds, detail))
+    console("")
     if ctx["undo_results"]:
-        out("Undo actions (in the order they ran):")
+        console("Undo actions (in the order they ran):")
         for row in ctx["undo_results"]:
-            out("     %-24s %-8s %s" % (row["name"], row["status"], row["detail"]))
+            console("     %-24s %-8s %s" % (row["name"], row["status"], row["detail"]))
     else:
-        out("Undo actions: none registered")
-    out("")
-    out("Outcome : %s" % ctx["outcome"])
+        console("Undo actions: none registered")
+    console("")
+    console("Outcome : %s" % ctx["outcome"])
     if undo_failed:
-        out("CLEANUP FAILED: %d undo action(s) did not complete (%s); "
+        console("CLEANUP FAILED: %d undo action(s) did not complete (%s); "
             "the system may NOT be in its pre-run state."
             % (len(undo_failed), ", ".join(r["name"] for r in undo_failed)))
     if final == 0:
@@ -223,9 +223,11 @@ def print_summary(ctx):
                        ctx["outcome"], "PASS")
     else:
         verdict = "FAIL (exit status %d)" % final
-    out("Result  : %s" % verdict)
-    out("Log     : %s" % state.get("LOG_FILE", "?"))
-    out(RULE)
+    console("Result  : %s" % verdict)
+    console("Log     : %s" % state.get("LOG_FILE", "?"))
+    if state.get("EVERGREEN_LOG"):
+        console("Evergreen: %s" % state.get("EVERGREEN_LOG"))
+    console(RULE)
 
 
 # ----------------------------------------------------------------------------
@@ -241,8 +243,8 @@ def main():
         return 1
     exit_status = ctx["args"].exit_status
 
-    out("")
-    out("[cleanup] running cleanup; Ctrl-C is ignored until it finishes")
+    console("")
+    console("[cleanup] running cleanup; Ctrl-C is ignored until it finishes")
 
     def body():
         ctx["stage"] = "(1/3) Assess the run"
