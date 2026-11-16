@@ -2,6 +2,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Ensure ~/.local/bin is on PATH (for user-installed tools like uv)
+if [[ -d "$HOME/.local/bin" && ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
 REPO="/home/god/PiFitness"
 BOOTSTRAP_DIR="/home/god/pifitness-bootstrap"
 

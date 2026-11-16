@@ -77,19 +77,24 @@ class Parser(argparse.ArgumentParser):
 class Reporter:
     """Prints '[tag] message' lines immediately and remembers them."""
 
-    def __init__(self, tag, stream=None):
+    def __init__(self, tag, stream=None, echo_evidence=False):
         self.tag = tag
         self.stream = stream if stream is not None else sys.stdout
+        self.echo_evidence = echo_evidence
         self.lines = []
 
     def say(self, message=""):
         line = "%s %s" % (self.tag, message) if message else ""
         self.lines.append(line)
-        print(line, file=self.stream, flush=True)
+        if self.stream:
+            print(line, file=self.stream, flush=True)
 
     def evidence(self, pairs):
         for key, value in pairs:
-            self.say("    EVIDENCE: %s = %s" % (key, value))
+            line = "%s     EVIDENCE: %s = %s" % (self.tag, key, value)
+            self.lines.append(line)
+            if self.echo_evidence and self.stream:
+                print(line, file=self.stream, flush=True)
 
 
 def run_stages(reporter, stages, ctx):

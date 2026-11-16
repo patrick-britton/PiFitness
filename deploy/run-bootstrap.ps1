@@ -33,8 +33,8 @@ Write-Host "Launcher: $RemoteLauncher"
 Write-Host "Log Dest: $LocalPath"
 Write-Host "Starting SSH session with terminal allocation (-t)...`n" -ForegroundColor DarkGray
 
-# Launch interactive SSH session with -t (pseudo-terminal allocation) so prompts and menus work seamlessly
-ssh -t "$target" "bash $RemoteLauncher"
+# Launch interactive SSH session with -t (pseudo-terminal allocation) and -l (login shell)
+ssh -t "$target" "bash -l $RemoteLauncher"
 $sessionExitCode = $LASTEXITCODE
 
 Write-Host "`n=== Bootstrap Session Finished (Exit Code: $sessionExitCode) ===" -ForegroundColor Cyan

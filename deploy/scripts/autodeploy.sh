@@ -149,6 +149,11 @@
 
 set -euo pipefail
 
+# Ensure ~/.local/bin is on PATH (for user-installed tools like uv)
+if [[ -d "$HOME/.local/bin" && ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
 PYTHON="/usr/bin/python3"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB="$SCRIPT_DIR/lib"
