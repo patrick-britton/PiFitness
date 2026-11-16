@@ -448,8 +448,9 @@ def run_cmd(argv, extra_env=None, timeout=None, cwd=None, echo_prefix=None,
     lines_q = queue.Queue()
 
     def pump():
-        for line in proc.stdout:
-            lines_q.put(line.rstrip("\n"))
+        if proc.stdout is not None:
+            for line in proc.stdout:
+                lines_q.put(line.rstrip("\n"))
         lines_q.put(None)
 
     threading.Thread(target=pump, daemon=True).start()
@@ -895,7 +896,11 @@ def writable_dir(path):
     try:
         if not os.path.isdir(path) or not os.access(path, os.W_OK | os.X_OK):
             return False
-        return not (os.statvfs(path).f_flag & os.ST_RDONLY)
+        statvfs = getattr(os, "statvfs", None)
+        st_rdonly = getattr(os, "ST_RDONLY", 1)
+        if statvfs is not None:
+            return not (statvfs(path).f_flag & st_rdonly)
+        return True
     except OSError:
         return False
 
