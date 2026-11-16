@@ -25,6 +25,7 @@ function northPath(n: number): number[][] {
 }
 
 describe('headingBetween', () => {
+  // VERIFIED: Unit — headingBetween reports cardinal headings clockwise from north
   it('reports cardinal headings clockwise from north', () => {
     expect(headingBetween([0, 0], [0, 1])).toBeCloseTo(0, 5);
     expect(headingBetween([0, 0], [1, 0])).toBeCloseTo(90, 5);
@@ -32,12 +33,14 @@ describe('headingBetween', () => {
     expect(headingBetween([0, 0], [-1, 0])).toBeCloseTo(270, 5);
   });
 
+  // VERIFIED: Unit — headingBetween wraps a just-west-of-north heading near 360, not near 0
   it('wraps a just-west-of-north heading near 360, not near 0', () => {
     const b = headingBetween([0, 0], [-0.0001, 1]);
     expect(b).toBeGreaterThan(359);
     expect(b).toBeLessThanOrEqual(360);
   });
 
+  // VERIFIED: Unit — headingBetween returns 0 for degenerate input instead of NaN
   it('returns 0 for degenerate input instead of NaN', () => {
     expect(headingBetween([0, 0], [0, 0])).toBe(0);
     expect(headingBetween([0, 0], [Number.NaN, 0])).toBe(0);
@@ -46,6 +49,7 @@ describe('headingBetween', () => {
 });
 
 describe('directionArrows', () => {
+  // VERIFIED: Unit — directionArrows honours spacing within tolerance on a straight path (11 glyphs, monotonic)
   it('honours spacing within tolerance on a straight path', () => {
     // 6 points ≈ 556 m → arrows at 25/75/…/525 m: 11 glyphs.
     const arrows = directionArrows(northPath(6), 50);
@@ -60,6 +64,7 @@ describe('directionArrows', () => {
     }
   });
 
+  // VERIFIED: Unit — directionArrows tracks a right-angle turn: north bearings then east bearings
   it('tracks a right-angle turn: north bearings then east bearings', () => {
     const coords = [
       [0, 0],
@@ -74,6 +79,7 @@ describe('directionArrows', () => {
     expect(arrows[arrows.length - 1].bearing).toBeCloseTo(90, 0);
   });
 
+  // VERIFIED: Unit — directionArrows yields nothing for degenerate input
   it('yields nothing for degenerate input', () => {
     expect(directionArrows([], 50)).toEqual([]);
     expect(directionArrows([[0, 0]], 50)).toEqual([]);
@@ -90,6 +96,7 @@ describe('directionArrows', () => {
 });
 
 describe('arrowIconMask', () => {
+  // VERIFIED: Unit — arrowIconMask builds symmetric masks with an opaque centre and transparent corners
   it('builds symmetric masks with an opaque centre and transparent corners', () => {
     for (const shape of ['triangle', 'chevron'] as const) {
       const mask = arrowIconMask(24, { r: 0, g: 114, b: 178, a: 255 }, shape);
@@ -114,6 +121,7 @@ describe('arrowIconMask', () => {
     }
   });
 
+  // VERIFIED: Unit — arrowIconMask honours the requested RGBA channels
   it('honours the requested RGBA channels', () => {
     const mask = arrowIconMask(16, { r: 213, g: 94, b: 0, a: 200 }, 'triangle');
     // Centre pixel carries the colour with full-coverage alpha.
@@ -124,6 +132,7 @@ describe('arrowIconMask', () => {
     expect(mask.data[idx + 3]).toBe(200);
   });
 
+  // VERIFIED: Unit — arrowIconMask differs by shape: chevron stroked open, triangle filled
   it('differs by shape: the chevron is stroked open, the triangle filled', () => {
     const tri = arrowIconMask(24, { r: 0, g: 0, b: 0, a: 255 }, 'triangle');
     const chev = arrowIconMask(24, { r: 0, g: 0, b: 0, a: 255 }, 'chevron');
@@ -138,16 +147,19 @@ describe('arrowIconMask', () => {
   });
 });
 describe('cssColorToRgba', () => {
+  // VERIFIED: Unit — cssColorToRgba parses space-separated token channels and comma rgb
   it('parses space-separated token channels and comma rgb', () => {
     expect(cssColorToRgba('rgb(0 114 178)')).toMatchObject({ r: 0, g: 114, b: 178 });
     expect(cssColorToRgba('rgb(0, 114, 178)')).toMatchObject({ r: 0, g: 114, b: 178 });
   });
 
+  // VERIFIED: Unit — cssColorToRgba parses hex colours
   it('parses hex colours', () => {
     expect(cssColorToRgba('#0072b2')).toMatchObject({ r: 0, g: 114, b: 178 });
     expect(cssColorToRgba('#07b')).toMatchObject({ r: 0, g: 119, b: 187 });
   });
 
+  // VERIFIED: Unit — cssColorToRgba falls back rather than yielding NaN channels
   it('falls back rather than yielding NaN channels', () => {
     expect(cssColorToRgba('not-a-color')).toMatchObject({ r: 0, g: 0, b: 0 });
     expect(cssColorToRgba('')).toMatchObject({ r: 0, g: 0, b: 0 });
@@ -181,6 +193,7 @@ describe('arrowIconMask halo (009-010 T11, AC-6b)', () => {
     return false;
   };
 
+  // VERIFIED: Unit — arrowIconMask halo wraps the glyph in a halo of its own colour without recolouring the glyph
   it('wraps the glyph in a halo of its own colour without recolouring the glyph', () => {
     for (const shape of ['triangle', 'chevron'] as const) {
       const bare = arrowIconMask(24, GLYPH, shape);
@@ -216,6 +229,7 @@ describe('arrowIconMask halo (009-010 T11, AC-6b)', () => {
     }
   });
 
+  // VERIFIED: Unit — arrowIconMask halo keeps the chevron legible: real painted area, still hollow in the middle
   it('keeps the chevron legible — real painted area, still hollow in the middle', () => {
     const chev = arrowIconMask(24, GLYPH, 'chevron', HALO);
     // ≥ ~100 of 576 pixels: far above the hairline a 24 px icon can lose.
@@ -234,6 +248,7 @@ describe('dedupeArrows (009-010 T11, AC-6b)', () => {
   const seriesOf = (a: { series: string }): string => a.series;
   const SEP = DEFAULT_ARROW_MIN_SEPARATION_M;
 
+  // VERIFIED: Unit — dedupeArrows collapses any two glyphs closer than the separation, across series (first listed wins)
   it('collapses any two glyphs closer than the separation, across series', () => {
     // ~2.2 m apart at the equator — one glyph survives, the first listed.
     const route = glyph('route', [0, 0], 0);
@@ -245,6 +260,7 @@ describe('dedupeArrows (009-010 T11, AC-6b)', () => {
     expect(dedupeArrows([overlay, route], SEP, seriesOf)).toEqual([overlay]);
   });
 
+  // VERIFIED: Unit — dedupeArrows keeps glyphs at the nominal spacing, in order, untouched
   it('keeps glyphs at the nominal spacing, in order, untouched', () => {
     const list = [
       glyph('route', [0, 0], 0),
@@ -254,6 +270,7 @@ describe('dedupeArrows (009-010 T11, AC-6b)', () => {
     expect(dedupeArrows(list, SEP, seriesOf)).toEqual(list);
   });
 
+  // VERIFIED: Unit — dedupeArrows measures separation in meters, not degrees (latitude-aware)
   it('measures separation in meters, not degrees', () => {
     // At latitude 60 a degree of longitude is half as long: ~2.8 m here.
     const a = glyph('route', [0, 60], 0);
@@ -261,6 +278,7 @@ describe('dedupeArrows (009-010 T11, AC-6b)', () => {
     expect(dedupeArrows([a, b], SEP, seriesOf)).toHaveLength(1);
   });
 
+  // VERIFIED: Unit — dedupeArrows leaves a fully coincident series its first glyph
   it('leaves a fully coincident series its first glyph', () => {
     const route = [glyph('route', [0, 0], 0), glyph('route', [0, 0.0009], 0)];
     const overlay = [
@@ -272,6 +290,7 @@ describe('dedupeArrows (009-010 T11, AC-6b)', () => {
     expect(out.filter((a) => a.series === 'route-overlay')).toEqual([overlay[0]]);
   });
 
+  // VERIFIED: Unit — dedupeArrows honours a custom separation and drops unusable coordinates
   it('honours a custom separation and drops unusable coordinates', () => {
     const a = glyph('route', [0, 0], 0);
     const b = glyph('route-overlay', [0.00002, 0], 180);
@@ -279,6 +298,7 @@ describe('dedupeArrows (009-010 T11, AC-6b)', () => {
     expect(dedupeArrows([glyph('route', [Number.NaN, 0], 0), a], SEP, seriesOf)).toEqual([a]);
   });
 
+  // VERIFIED: Unit — dedupeArrows returns an empty list for no glyphs and a copy for a single glyph
   it('returns an empty list for no glyphs and a copy for a single glyph', () => {
     expect(dedupeArrows([], SEP, seriesOf)).toEqual([]);
     const one = [glyph('route', [0, 0], 0)];

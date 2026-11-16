@@ -28,12 +28,14 @@ function straightPath(n: number): number[][] {
 }
 
 describe('clampGate', () => {
+  // VERIFIED: Unit — clampGate clamps into 0..maxM and rounds to whole meters
   it('clamps into 0..maxM and rounds to whole meters', () => {
     expect(clampGate(-50, 1000)).toBe(0);
     expect(clampGate(1500, 1000)).toBe(1000);
     expect(clampGate(12.6, 1000)).toBe(13);
   });
 
+  // VERIFIED: Unit — clampGate returns 0 for non-finite values or an unusable max
   it('returns 0 for non-finite values or an unusable max', () => {
     expect(clampGate(Number.NaN, 1000)).toBe(0);
     expect(clampGate(100, 0)).toBe(0);
@@ -42,20 +44,24 @@ describe('clampGate', () => {
 });
 
 describe('normalizeGates', () => {
+  // VERIFIED: Unit — normalizeGates keeps an in-range pair unchanged
   it('keeps an in-range pair unchanged', () => {
     expect(normalizeGates(100, 900, 1000)).toEqual({ startM: 100, endM: 900 });
   });
 
+  // VERIFIED: Unit — normalizeGates collapses an inverted pair to start === end rather than swapping
   it('collapses an inverted pair to start === end rather than swapping', () => {
     expect(normalizeGates(800, 200, 1000)).toEqual({ startM: 800, endM: 800 });
   });
 
+  // VERIFIED: Unit — normalizeGates clamps both gates to the activity distance
   it('clamps both gates to the activity distance', () => {
     expect(normalizeGates(-10, 5000, 1052)).toEqual({ startM: 0, endM: 1052 });
   });
 });
 
 describe('trimmedMeters', () => {
+  // VERIFIED: Unit — trimmedMeters measures the selected range
   it('measures the selected range', () => {
     expect(trimmedMeters({ startM: 200, endM: 1200 })).toBe(1000);
     expect(trimmedMeters({ startM: 500, endM: 500 })).toBe(0);
@@ -63,18 +69,21 @@ describe('trimmedMeters', () => {
 });
 
 describe('gateBound', () => {
+  // VERIFIED: Unit — gateBound prefers the activity's reported distance over a longer derived path (Bug 009-003-08-1)
   it("prefers the activity's reported distance over a longer derived path", () => {
     // The creation procedure rejects end_m above the reported distance, so a
     // longer haversine path must not raise the gate ceiling (Bug 009-003-08-1).
     expect(gateBound(1111, 1111.95)).toBe(1111);
   });
 
+  // VERIFIED: Unit — gateBound uses the derived path length when no distance was reported
   it('uses the derived path length when no distance was reported', () => {
     expect(gateBound(null, 1111.95)).toBe(1112);
     expect(gateBound(0, 1111.95)).toBe(1112);
     expect(gateBound(Number.NaN, 500.4)).toBe(500);
   });
 
+  // VERIFIED: Unit — gateBound returns 0 when neither value is usable
   it('returns 0 when neither value is usable', () => {
     expect(gateBound(null, 0)).toBe(0);
     expect(gateBound(undefined, Number.NaN)).toBe(0);
@@ -82,12 +91,14 @@ describe('gateBound', () => {
 });
 
 describe('gateFocusWindow', () => {
+  // VERIFIED: Unit — gateFocusWindow uses a 150 m window at each end for a long range
   it('uses a 150 m window at each end for a long range', () => {
     const gates = { startM: 100, endM: 2000 };
     expect(gateFocusWindow(gates, 'start')).toEqual([100, 100 + GATE_WINDOW_M]);
     expect(gateFocusWindow(gates, 'end')).toEqual([2000 - GATE_WINDOW_M, 2000]);
   });
 
+  // VERIFIED: Unit — gateFocusWindow widens to the whole range when it is shorter than the window
   it('widens to the whole range when it is shorter than the window', () => {
     const gates = { startM: 40, endM: 90 };
     expect(gateFocusWindow(gates, 'start')).toEqual([40, 90]);
@@ -96,6 +107,7 @@ describe('gateFocusWindow', () => {
 });
 
 describe('cumulativeMeters', () => {
+  // VERIFIED: Unit — cumulativeMeters starts at 0 and is 1:1 with the coordinate list
   it('starts at 0 and is 1:1 with the coordinate list', () => {
     const coords = straightPath(5);
     const dists = cumulativeMeters(coords);
@@ -103,6 +115,7 @@ describe('cumulativeMeters', () => {
     expect(dists[0]).toBe(0);
   });
 
+  // VERIFIED: Unit — cumulativeMeters accumulates roughly 111 m per 0.001 degrees of latitude
   it('accumulates roughly 111 m per 0.001 degrees of latitude', () => {
     const dists = cumulativeMeters(straightPath(3));
     expect(dists[1]).toBeGreaterThan(110);
@@ -110,27 +123,32 @@ describe('cumulativeMeters', () => {
     expect(dists[2]).toBeCloseTo(dists[1] * 2, 0);
   });
 
+  // VERIFIED: Unit — cumulativeMeters ignores a non-finite coordinate instead of producing NaN
   it('ignores a non-finite coordinate instead of producing NaN', () => {
     const dists = cumulativeMeters([[0, 0], [Number.NaN, 0], [0, STEP]]);
     expect(dists.every((d) => Number.isFinite(d))).toBe(true);
   });
 
+  // VERIFIED: Unit — cumulativeMeters returns an empty list for no coordinates
   it('returns an empty list for no coordinates', () => {
     expect(cumulativeMeters([])).toEqual([]);
   });
 });
 
 describe('indexWindow', () => {
+  // VERIFIED: Unit — indexWindow returns the inclusive index range inside the distance window
   it('returns the inclusive index range inside the distance window', () => {
     const coords = straightPath(5); // 0, ~111, ~222, ~333, ~445 m
     const window = indexWindow(coords, 100, 250);
     expect(window).toEqual([1, 2]);
   });
 
+  // VERIFIED: Unit — indexWindow returns null when no point falls in the window
   it('returns null when no point falls in the window', () => {
     expect(indexWindow(straightPath(5), 5000, 6000)).toBeNull();
   });
 
+  // VERIFIED: Unit — indexWindow includes boundary points exactly at the window edges
   it('includes boundary points exactly at the window edges', () => {
     const coords = straightPath(3);
     const dists = cumulativeMeters(coords);
@@ -139,12 +157,14 @@ describe('indexWindow', () => {
 });
 
 describe('nearestPointAtDistance', () => {
+  // VERIFIED: Unit — nearestPointAtDistance returns that index for a distance that lands exactly on a point
   it('returns that index for a distance that lands exactly on a point', () => {
     const coords = straightPath(5);
     const dists = cumulativeMeters(coords);
     expect(nearestPointAtDistance(coords, dists[3])).toEqual({ index: 3, distanceM: dists[3] });
   });
 
+  // VERIFIED: Unit — nearestPointAtDistance returns the nearer of the two points surrounding an in-between distance
   it('returns the nearer of the two points surrounding an in-between distance', () => {
     const coords = straightPath(5); // 0, ~111, ~222, ~333, ~445 m
     // 150 m is 39 m past point 1 (~111) but 72 m short of point 2 (~222).
@@ -156,6 +176,7 @@ describe('nearestPointAtDistance', () => {
     expect(nearestPointAtDistance(coords, 190)?.index).toBe(2);
   });
 
+  // VERIFIED: Unit — nearestPointAtDistance clamps a target before the first point to index 0 and past the last to the final index
   it('clamps a target before the first point to index 0 and past the last to the final index', () => {
     const coords = straightPath(4); // last point ~333 m
     expect(nearestPointAtDistance(coords, -100)).toEqual({ index: 0, distanceM: 0 });
@@ -165,10 +186,12 @@ describe('nearestPointAtDistance', () => {
     });
   });
 
+  // VERIFIED: Unit — nearestPointAtDistance returns null for empty coords
   it('returns null for empty coords', () => {
     expect(nearestPointAtDistance([], 100)).toBeNull();
   });
 
+  // VERIFIED: Unit — nearestPointAtDistance resolves a 3,228 m fixture to the ElevationProfile axis max (AC-18 convention)
   it('resolves a 3,228 m fixture to the distance ElevationProfile ends its axis at (AC-18 convention)', () => {
     // Same fixture builder as ElevationProfile.test.tsx: a route whose last
     // plotted point rounds to exactly 3,228 m, so the axis max is 3,228.
@@ -182,6 +205,7 @@ describe('nearestPointAtDistance', () => {
     expect(Math.round(pick!.distanceM)).toBe(3228);
   });
 
+  // VERIFIED: Unit — nearestPointAtDistance uses a caller-supplied cumulative array and ignores one whose length disagrees with coords
   it('uses a caller-supplied cumulative array and ignores one whose length disagrees with coords', () => {
     const coords = straightPath(5);
     const dists = cumulativeMeters(coords);

@@ -14,6 +14,7 @@ import {
 } from '../ean13';
 
 describe('ean13CheckDigit', () => {
+  // VERIFIED: Unit — ean13CheckDigit computes the EAN-13 check digit for valid 12-digit inputs
   it('computes the check digit for the bundled test symbol', () => {
     // 4006381333931 — the last digit must agree with the first twelve.
     expect(ean13CheckDigit('400638133393')).toBe(1);
@@ -21,6 +22,7 @@ describe('ean13CheckDigit', () => {
     expect(ean13CheckDigit('000000000000')).toBe(0);
   });
 
+  // VERIFIED: Unit — ean13CheckDigit rejects a non-12-digit input
   it('rejects a non-12-digit input', () => {
     expect(() => ean13CheckDigit('123')).toThrow(/12 digits/);
     expect(() => ean13CheckDigit('40063813339X')).toThrow(/12 digits/);
@@ -28,6 +30,7 @@ describe('ean13CheckDigit', () => {
 });
 
 describe('ean13Modules', () => {
+  // VERIFIED: Unit — ean13Modules builds a 95-module symbol with start/centre/end guards
   it('builds a 95-module symbol with the three guard patterns', () => {
     const modules = ean13Modules(EAN13_TEST_CODE);
     expect(modules).toHaveLength(EAN13_SYMBOL_MODULES);
@@ -37,6 +40,7 @@ describe('ean13Modules', () => {
     expect(modules.slice(92)).toBe('101'); // end guard
   });
 
+  // VERIFIED: Unit — ean13Modules uses the L/G parity selected by the leading digit
   it('uses the L/G parity selected by the leading digit', () => {
     // Digits: 4 0 0 6 3 8 | 1 3 3 3 9 3 | 1. Leading 4 → "LGLLGG", so the 2nd and 5th
     // left blocks are even-parity (G) and the rest are odd-parity (L).
@@ -49,6 +53,7 @@ describe('ean13Modules', () => {
     expect(modules.slice(38, 45)).toBe('0110011'); // G(1)
   });
 
+  // VERIFIED: Unit — ean13Modules encodes the right half in R (complement of L)
   it('encodes the right half in R (the complement of L)', () => {
     // Right digits are 3 3 3 9 3 1.
     const modules = ean13Modules(EAN13_TEST_CODE);
@@ -58,6 +63,7 @@ describe('ean13Modules', () => {
     expect(modules.slice(85, 92)).toBe('1100110'); // R(1)
   });
 
+  // VERIFIED: Unit — ean13Modules throws on a malformed or check-digit-invalid code
   it('throws on a malformed or check-digit-invalid code', () => {
     expect(() => ean13Modules('400638133393')).toThrow(/13 digits/);
     expect(() => ean13Modules('4006381333930')).toThrow(/check digit/);
@@ -65,6 +71,7 @@ describe('ean13Modules', () => {
 });
 
 describe('ean13Canvas', () => {
+  // VERIFIED: Unit — ean13Canvas degrades (returns falsy) where the browser has no 2D context
   it('degrades instead of throwing where the browser has no 2D context (jsdom)', () => {
     // jsdom provides no 2D context: the self-test must report "unavailable", not crash.
     expect(() => ean13Canvas(EAN13_TEST_CODE)).not.toThrow();

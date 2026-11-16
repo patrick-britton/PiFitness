@@ -78,6 +78,7 @@ beforeEach(() => {
 });
 
 describe('IsrcReviewView — matchup rendering', () => {
+  // VERIFIED: Component — renders pair count, one matchup with ✓ for identical values, scores, and both values
   it('shows the pair count and one pair: ✓ for identical values, score + both values otherwise', async () => {
     getCount.mockResolvedValue({ count: 3 });
     getMatch.mockResolvedValue({ match: MATCH });
@@ -101,6 +102,7 @@ describe('IsrcReviewView — matchup rendering', () => {
     expect(text).toContain('ISRC-A vs ISRC-B');
   });
 
+  // VERIFIED: Component — labels the preferred ISRC as (second) when it is isrc2
   it('labels the preferred ISRC as (second) when it is isrc2', async () => {
     getCount.mockResolvedValue({ count: 1 });
     getMatch.mockResolvedValue({ match: { ...MATCH, preferredIsrc: 'ISRC-B' } });
@@ -111,6 +113,7 @@ describe('IsrcReviewView — matchup rendering', () => {
     expect(container.textContent ?? '').toContain('(second)');
   });
 
+  // VERIFIED: Component — renders the matchup in all three layout variants (desktop/portrait/landscape)
   it('renders the matchup in all three layout variants', async () => {
     getCount.mockResolvedValue({ count: 2 });
     getMatch.mockResolvedValue({ match: MATCH });
@@ -125,6 +128,7 @@ describe('IsrcReviewView — matchup rendering', () => {
 });
 
 describe('IsrcReviewView — decisions', () => {
+  // VERIFIED: Component — ACCEPT sends both ISRCs + preferred target, toasts, and advances to the next pair
   it('ACCEPT sends both ISRCs + the preferred target, toasts, and advances to the next pair', async () => {
     getCount.mockResolvedValue({ count: 2 });
     getMatch
@@ -149,6 +153,7 @@ describe('IsrcReviewView — decisions', () => {
     expect(await screen.findByText('Next Song')).toBeInTheDocument();
   });
 
+  // VERIFIED: Component — REJECT sends accept: false and toasts the rejection
   it('REJECT sends accept: false and toasts the rejection', async () => {
     getCount.mockResolvedValue({ count: 2 });
     getMatch.mockResolvedValue({ match: MATCH });
@@ -166,6 +171,7 @@ describe('IsrcReviewView — decisions', () => {
     expect(await screen.findByText('Match rejected')).toBeInTheDocument();
   });
 
+  // VERIFIED: Component — surfaces a failed decision instead of confirming it (fail-loud on 500)
   it('surfaces a failed decision instead of confirming it (T08 contract)', async () => {
     getCount.mockResolvedValue({ count: 2 });
     getMatch.mockResolvedValue({ match: MATCH });
@@ -185,6 +191,7 @@ describe('IsrcReviewView — decisions', () => {
 });
 
 describe('IsrcReviewView — empty queue and errors', () => {
+  // VERIFIED: Component — empty queue shows empty state, skips matchup fetch, re-scans with disabled ~25 s indicator
   it('shows the empty state, skips the matchup fetch, and re-scans with a ~25 s indicator', async () => {
     getCount.mockResolvedValue({ count: 0 });
     rescan.mockImplementation(() => new Promise(() => {})); // stays pending
@@ -206,6 +213,7 @@ describe('IsrcReviewView — empty queue and errors', () => {
     ).toBeDisabled();
   });
 
+  // VERIFIED: Component — surfaces a count failure
   it('surfaces a count failure', async () => {
     getCount.mockRejectedValue(new Error('boom'));
 

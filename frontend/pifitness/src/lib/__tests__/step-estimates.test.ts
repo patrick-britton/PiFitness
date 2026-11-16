@@ -25,6 +25,7 @@ const PLAYLIST_IDS = new Set([
 ]);
 
 describe('estimateStepMs (T03 verify cases)', () => {
+  // VERIFIED: Unit — estimateStepMs returns a finite positive estimate for every STEP_ORDER id at short/medium/long distances
   it('covers every STEP_ORDER id with a finite positive estimate', () => {
     for (const step of STEP_ORDER) {
       for (const d of [SHORT_M, MEDIUM_M, LONG_M]) {
@@ -35,6 +36,7 @@ describe('estimateStepMs (T03 verify cases)', () => {
     }
   });
 
+  // VERIFIED: Unit — every playlist step returns exactly PLAYLIST_STEP_MS (250 ms) regardless of distance
   it('returns exactly 250 ms for every playlist step', () => {
     for (const step of STEP_ORDER) {
       if (!PLAYLIST_IDS.has(step)) continue;
@@ -43,6 +45,7 @@ describe('estimateStepMs (T03 verify cases)', () => {
     }
   });
 
+  // VERIFIED: Unit — sync steps return distance-independent constant estimates
   it('keeps sync steps distance-independent (OQ-6 static constants)', () => {
     expect(estimateStepMs('sync_activities', SHORT_M)).toBe(
       estimateStepMs('sync_activities', LONG_M),
@@ -52,6 +55,7 @@ describe('estimateStepMs (T03 verify cases)', () => {
     );
   });
 
+  // VERIFIED: Unit — estimateStepMs tracks the time_estimator.py per-activity means at the three calibration distances within ±25%
   it('tracks the CSV means at the three calibration distances (±25%)', () => {
     // Spot checks against time_estimator.py per-activity means (ms).
     const cases: Array<[string, number, number]> = [

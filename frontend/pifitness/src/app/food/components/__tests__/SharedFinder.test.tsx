@@ -32,6 +32,7 @@ beforeEach(() => {
   byBarcode.mockResolvedValue({ found: false, barcode: '737628064502', name: '' });
 });
 describe('shared finder/amount', () => {
+  // VERIFIED: Component — searches the combined index and picks a USDA hit
   it('searches the combined index and picks a USDA hit', async () => {
     const user = userEvent.setup();
     const onPick = vi.fn();
@@ -53,6 +54,7 @@ describe('shared finder/amount', () => {
       payload: expect.objectContaining({ provider: 'usda', fdcId: 1169 }),
     }));
   });
+  // VERIFIED: Component — scans a barcode → DB miss → OFF lookup and emits an OFF pick
   it('scans a barcode → DB miss → OFF lookup and emits an OFF pick', async () => {
     const user = userEvent.setup();
     const onPick = vi.fn();
@@ -67,6 +69,7 @@ describe('shared finder/amount', () => {
       payload: expect.objectContaining({ provider: 'off', barcode: '737628064502' }),
     }));
   });
+  // VERIFIED: Component — amount picker emits qty+unit
   it('amount picker emits qty+unit', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -76,6 +79,7 @@ describe('shared finder/amount', () => {
     await user.selectOptions(screen.getByLabelText(/Unit/i), 'cup');
     expect(onChange).toHaveBeenLastCalledWith({ qty: 250, unit: 'cup' });
   });
+  // VERIFIED: Component — extraUnit offers a recipe serving label beside the closed unit set
   it('010-005 T10: extraUnit offers a recipe serving label beside the closed set', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

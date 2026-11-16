@@ -15,6 +15,7 @@ import {
 } from '../map-styles';
 
 describe('requiresMapboxToken', () => {
+  // VERIFIED: Unit — requiresMapboxToken flags Mapbox styles and leaves the free styles alone
   it('flags Mapbox styles and leaves the free styles alone', () => {
     expect(requiresMapboxToken('mb-satellite')).toBe(true);
     expect(requiresMapboxToken('mb-dark')).toBe(true);
@@ -25,43 +26,51 @@ describe('requiresMapboxToken', () => {
 });
 
 describe('buildStyleUrl', () => {
+  // VERIFIED: Unit — buildStyleUrl returns token-free URLs for the OSM/Carto styles
   it('returns token-free URLs for the OSM/Carto styles', () => {
     expect(buildStyleUrl('positron', null)).toContain('cartocdn.com/light_all');
     expect(buildStyleUrl('darkmatter', null)).toContain('cartocdn.com/dark_all');
     expect(buildStyleUrl('osm', null)).toContain('tile.openstreetmap.org');
   });
 
+  // VERIFIED: Unit — buildStyleUrl returns null for a token-gated style when no token is configured
   it('returns null for a token-gated style when no token is configured', () => {
     expect(buildStyleUrl('mb-satellite', null)).toBeNull();
     expect(buildStyleUrl('mb-basic', null)).toBeNull();
   });
 
+  // VERIFIED: Unit — buildStyleUrl returns null for the blank vector style (no basemap by design)
   it('returns null for the blank vector style (no basemap by design)', () => {
     expect(buildStyleUrl('blank', 'tok')).toBeNull();
   });
 
+  // VERIFIED: Unit — buildStyleUrl builds a Mapbox raster URL and URL-encodes the token
   it('builds a Mapbox raster URL and URL-encodes the token', () => {
     const url = buildStyleUrl('mb-outdoors', 'pk.a/b+c');
     expect(url).toContain('/styles/v1/mapbox/outdoors-v11/tiles/256/{z}/{x}/{y}');
     expect(url).toContain('access_token=pk.a%2Fb%2Bc');
   });
 
+  // VERIFIED: Unit — buildStyleUrl pins Mapbox Satellite to v9 (the only version that serves tiles; Bug 009-009-T09-1)
   it('pins Mapbox Satellite to v9, the only version that serves tiles', () => {
     const url = buildStyleUrl('mb-satellite', 'tok');
     expect(url).toContain('/mapbox/satellite-v9/');
     expect(url).not.toContain('satellite-v11');
   });
 
+  // VERIFIED: Unit — buildStyleUrl uses v11 for the satellite-streets style
   it('uses v11 for the satellite-streets style', () => {
     expect(buildStyleUrl('mb-sat-streets', 'tok')).toContain('satellite-streets-v11');
   });
 
+  // VERIFIED: Unit — buildStyleUrl returns null for an unknown style id
   it('returns null for an unknown style id', () => {
     expect(buildStyleUrl('nope', 'tok')).toBeNull();
   });
 });
 
 describe('isDarkBasemap', () => {
+  // VERIFIED: Unit — isDarkBasemap reports the polarities the UI needs to contrast overlays
   it('reports the polarities the UI needs to contrast overlays', () => {
     expect(isDarkBasemap('positron')).toBe(false);
     expect(isDarkBasemap('darkmatter')).toBe(true);
@@ -72,11 +81,13 @@ describe('isDarkBasemap', () => {
 });
 
 describe('defaultStyleForTheme', () => {
+  // VERIFIED: Unit — defaultStyleForTheme defaults to Satellite whenever a token exists (009-003 T17)
   it('defaults to Satellite whenever a token exists (009-003 T17)', () => {
     expect(defaultStyleForTheme(false, 'tok')).toBe('mb-satellite');
     expect(defaultStyleForTheme(true, 'tok')).toBe('mb-satellite');
   });
 
+  // VERIFIED: Unit — defaultStyleForTheme falls back to a free style with the same polarity without a token
   it('falls back to a free style with the same polarity without a token', () => {
     expect(defaultStyleForTheme(false, null)).toBe('positron');
     expect(defaultStyleForTheme(true, null)).toBe('darkmatter');

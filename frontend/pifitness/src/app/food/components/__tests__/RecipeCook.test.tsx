@@ -80,10 +80,12 @@ async function renderCook(props?: Partial<{ onBack: () => void }>) {
   return view;
 }
 describe('RecipeCook helpers', () => {
+  // VERIFIED: Unit — foodCheckKey inverts CookFoodCheck exactly (step|foodId|unit key)
   it('foodCheckKey inverts CookFoodCheck exactly', () => {
     expect(foodCheckKey({ step_no: 2, food_id: 11, unit: 'g' })).toBe('2|11|g');
   });
 
+  // VERIFIED: Unit — remainingSeconds derives from the absolute deadline, clamped at 0
   it('remainingSeconds derives from the absolute deadline (clamped at 0)', () => {
     const endsAt = new Date('2026-10-07T12:02:00.000Z').toISOString();
     expect(remainingSeconds(endsAt, Date.parse('2026-10-07T12:00:30.000Z'))).toBe(90);
@@ -91,6 +93,7 @@ describe('RecipeCook helpers', () => {
     expect(remainingSeconds('not-a-time', Date.now())).toBe(0);
   });
 
+  // VERIFIED: Unit — formatCountdown renders m:ss and never negatives
   it('formatCountdown renders m:ss and never negatives', () => {
     expect(formatCountdown(150)).toBe('2:30');
     expect(formatCountdown(60)).toBe('1:00');
@@ -100,6 +103,7 @@ describe('RecipeCook helpers', () => {
 });
 
 describe('RecipeCook', () => {
+  // VERIFIED: Component — renders all steps + timers at once in all three layouts
   it('renders all steps + timers at once in all three layouts', async () => {
     for (const v of ['desktop', 'portrait', 'landscape'] as const) {
       useViewportStore.setState({ layoutVariant: v });
@@ -112,6 +116,7 @@ describe('RecipeCook', () => {
     }
   });
 
+  // VERIFIED: Component — checking a step sinks it to the bottom; unchecking restores position
   it('checking a step sinks it to the bottom; unchecking restores position', async () => {
     await renderCook();
     expect(screen.getByRole('list', { name: 'Cook steps' }).children[0])
@@ -125,6 +130,7 @@ describe('RecipeCook', () => {
       .toHaveAttribute('data-testid', 'cook-step-1');
   });
 
+  // VERIFIED: Component — per-ingredient checkboxes persist via the cook-state endpoint
   it('per-ingredient checkboxes persist via the cook-state endpoint', async () => {
     await renderCook();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Step 1 ingredient Oats 100 g' }));
@@ -134,6 +140,7 @@ describe('RecipeCook', () => {
     const last = saveCookState.mock.calls[saveCookState.mock.calls.length - 1][1];
     expect(last.checked_foods).toEqual([{ step_no: 1, food_id: 11, unit: 'g' }]);
   });
+  // VERIFIED: Component — two timers count down independently from server deadlines
   it('two timers count down independently from server deadlines', async () => {
     await renderCook();
     fireEvent.click(screen.getByRole('button', { name: 'Start step 1 timer' }));
@@ -145,6 +152,7 @@ describe('RecipeCook', () => {
     expect(screen.getByTestId('cook-timer-2')).toHaveTextContent('0:30');
   });
 
+  // VERIFIED: Component — expiry flash shows until Done clears it (and only Done)
   it('expiry flash shows until Done clears it (and only Done)', async () => {
     mockHydrate(DETAIL, {
       recipe_id: 7, checked_steps: [], checked_foods: [],
@@ -163,6 +171,7 @@ describe('RecipeCook', () => {
     expect(screen.getByRole('button', { name: 'Start step 2 timer' })).toBeInTheDocument();
   });
 
+  // VERIFIED: Component — restores persisted checks + deadlines after unmount/remount
   it('restores persisted checks + deadlines after unmount/remount', async () => {
     const { unmount } = await renderCook();
     expect(screen.getByRole('checkbox', { name: 'Step 1 done' })).not.toBeChecked();
@@ -183,6 +192,7 @@ describe('RecipeCook', () => {
     expect(screen.getByTestId('cook-timer-2')).toHaveTextContent('5:00');
   });
 
+  // VERIFIED: Component — Complete asks for confirmation (no-undo), then calls the endpoint
   it('Complete asks for confirmation (no-undo), then calls the endpoint', async () => {
     const onCompleted = vi.fn();
     render(<RecipeCook recipeId={7} onBack={vi.fn()} onCompleted={onCompleted} onEdit={vi.fn()} />);
