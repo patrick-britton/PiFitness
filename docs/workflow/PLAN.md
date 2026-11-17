@@ -12,6 +12,7 @@ This document defines the roadmap from our current Phase 6 workflow hardening th
 4. **No Git Branching by Agents:** Work on the assigned `agent/*` branch. Never switch branches, create branches, push, merge, or touch `main`.
 5. **No Git Commits**: Do not stage or commit changes you make, human must review all changes.
 6. **Flag Out of Scope:** Any discovered issues outside the assigned task must be appended to `docs/workflow/BACKLOG.md` via `python tools/workflow/fd.py backlog add`. Never fix out-of-scope defects within the current task.
+7. **No permanent tests** You may test your feature, but after it passes, ensure that you've deleted any test files you've created. 
 
 ---
 

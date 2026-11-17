@@ -115,3 +115,10 @@ date | task | model | event | evidence
     PASS | GUI smoke test: window renders and auto-closes (GUI_SMOKE_OK)
     SMOKE_EXIT=0
     One-step save: filedialog pre-targeted to .features/descriptions/<id>.md
+
+2026-11-17 | 6.3 | cline | START | Added `uat build <id>` and `uat import <id>` commands to tools/workflow/fd.py: `uat build` parses `## Acceptance` criteria from a design file and renders a self-contained, mobile-responsive `<id>_uat.html` with [Pass]/[Fail] buttons, per-item note fields, and an "Export Feedback Markdown" button; `uat import` reads a feedback Markdown table and summarizes per-AC results. Added tests/test_fd.py (7 unit tests).
+2026-11-17 | 6.3 | cline | DONE | done-when criteria met: `python tools/workflow/fd.py uat build fx6` generated valid .features/designs_active/fx6_uat.html (exit 0); pytest tests/test_fd.py: 7 passed (exit 0).
+    Command: .venv\Scripts\python.exe tools/workflow/fd.py uat build fx6
+    uat build: 4 acceptance criteria -> .features\designs_active\fx6_uat.html
+    Command: .venv\Scripts\python.exe -m pytest tests/test_fd.py -q
+    7 passed in 0.07s

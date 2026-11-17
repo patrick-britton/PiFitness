@@ -48,6 +48,8 @@ Exit code: 0 = ok, 1 = error / structural problem (details on stderr or in outpu
 """
 import argparse
 import datetime
+import html
+import json
 import os
 import re
 import subprocess
@@ -901,6 +903,230 @@ def cmd_brief(c):
     return 0
 
 
+# --------------------------------------------------------------------------- uat
+
+AC_RE = re.compile(r"^\s*-\s*\[([ xX])\]\s*(AC-\d+)\b[:.\-]?\s*(.*)$", re.I)
+
+
+def parse_acceptance(doc):
+    """Return [{id, text, done}] from the design's ## Acceptance section."""
+    sec = doc.section("acceptance")
+    if not sec:
+        return []
+    out, seen = [], set()
+    for i in range(sec[1] + 1, sec[2]):
+        if not doc.mask[i]:
+            continue
+        m = AC_RE.match(doc.lines[i])
+        if not m:
+            continue
+        ac_id = m.group(2).upper()
+        if ac_id in seen:
+            continue
+        seen.add(ac_id)
+        out.append({
+            "id": ac_id,
+            "text": m.group(3).strip(),
+            "done": m.group(1).lower() in ("x", "X"),
+        })
+    return out
+
+
+def uat_html(fid, title, acs):
+    """Self-contained mobile-responsive UAT checklist HTML (no external assets)."""
+    data = json.dumps(acs, ensure_ascii=False)
+    et = html.escape(title, quote=True)
+    return ("""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UAT Checklist - %s</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 8px; background: #f5f5f5; color: #111; font-size: 16px; }
+  header { background: #1a1a1a; color: #fff; padding: 12px 16px; border-radius: 8px 8px 0 0; margin-bottom: 12px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; font-size: 14px; opacity: 0.9; }
+  main { max-width: 640px; margin: 0 auto 24px; background: #fff; border: 1px solid #ccc; border-radius: 0 0 8px 8px; padding: 12px 16px 20px; }
+  ul.ac-list { list-style: none; padding: 0; margin: 0; }
+  li.ac-item { border: 1px solid #ccc; border-radius: 8px; padding: 12px 14px; margin: 8px 0; background: #fff; }
+  li.ac-item.done { background: #eef7ee; border-color: #6fbf6f; }
+  .ac-id { display: inline-block; min-width: 32px; font-weight: bold; font-size: 14px; color: #444; }
+  .ac-text { margin-left: 8px; font-size: 16px; line-height: 1.4; }
+  .done-tag { float: right; font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #d4edda; color: #1e5a1e; border: 1px solid #9cc; }
+  .controls { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  button { font-size: 15px; padding: 10px 16px; border-radius: 8px; border: 1px solid #555; background: #fff; cursor: pointer; min-width: 88px; min-height: 44px; }
+  button.pass.ok { background: #2e7d2e; color: #fff; border-color: #1a5a1a; }
+  button.fail.ok { background: #b00020; color: #fff; border-color: #7a0018; }
+  button.export { background: #1a5a9e; color: #fff; border-color: #12407a; margin-top: 16px; min-width: 150px; }
+  button:active { opacity: 0.8; }
+  textarea.note { width: 100%%; font-size: 14px; padding: 8px; border: 1px solid #999; border-radius: 6px; margin-top: 6px; resize: vertical; min-height: 44px; }
+  textarea.note:disabled { background: #eee; color: #666; }
+  .counter { margin: 12px 0 0; font-size: 14px; color: #444; }
+  .hint { font-size: 13px; color: #666; margin-top: 12px; }
+  @media (max-width: 480px) {
+    body { padding: 6px; font-size: 15px; }
+    header h1 { font-size: 18px; }
+    li.ac-item { padding: 10px 12px; }
+  }
+</style>
+</head>
+<body>
+<header>
+<h1>UAT Checklist</h1>
+<p>Feature: %s  |  %d acceptance criteria</p>
+</header>
+<main>
+<div class="counter" id="counter">Status: <b>0</b> of <b>%d</b> checked</div>
+<ul class="ac-list" id="list"></ul>
+<button class="export" id="btnExport">Export Feedback Markdown</button>
+<p class="hint">Tap Pass or Fail per item, add notes, then export. The export downloads as Markdown.</p>
+</main>
+<script>
+const ACS = %s;
+const list = document.getElementById('list');
+const counter = document.getElementById('counter');
+function htmlEscape(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function render() {
+  list.innerHTML = '';
+  ACS.forEach(function (ac) {
+    var li = document.createElement('li');
+    li.className = 'ac-item';
+    li.id = 'ac-' + ac.id;
+    var doneTag = ac.done ? '<span class="done-tag">done in design</span>' : '';
+    li.innerHTML =
+      '<span class="ac-id">' + htmlEscape(ac.id) + '</span>' + doneTag +
+      '<span class="ac-text">' + htmlEscape(ac.text) + '</span>' +
+      '<div class="controls">' +
+      '<button type="button" class="pass" data-result="Pass">Pass</button>' +
+      '<button type="button" class="fail" data-result="Fail">Fail</button>' +
+      '</div>' +
+      '<textarea class="note" placeholder="Notes..."></textarea>';
+    list.appendChild(li);
+    var p = li.querySelector('.pass');
+    var f = li.querySelector('.fail');
+    var n = li.querySelector('textarea');
+    function refresh() {
+      var ok = p.classList.contains('ok') || f.classList.contains('ok');
+      li.classList.toggle('done', ok);
+      n.disabled = !ok;
+      update();
+    }
+    function pick(btn) {
+      p.classList.remove('ok');
+      f.classList.remove('ok');
+      btn.classList.add('ok');
+      refresh();
+    }
+    p.addEventListener('click', function () { pick(p); });
+    f.addEventListener('click', function () { pick(f); });
+  });
+  update();
+}
+function update() {
+  var pass = 0, fail = 0;
+  document.querySelectorAll('.ac-item').forEach(function (li) {
+    var p = li.querySelector('.pass');
+    var f = li.querySelector('.fail');
+    if (p.classList.contains('ok')) pass++;
+    else if (f.classList.contains('ok')) fail++;
+  });
+  counter.textContent = 'Status: ' + (pass + fail) + ' of ' + ACS.length + ' checked (' + pass + ' pass, ' + fail + ' fail)';
+}
+function exportFeedback() {
+  var rows = [], npass = 0, nfail = 0, npend = 0;
+  ACS.forEach(function (ac) {
+    var li = document.getElementById('ac-' + ac.id);
+    var p = li.querySelector('.pass');
+    var f = li.querySelector('.fail');
+    var note = li.querySelector('textarea').value.replace(/\\n/g, ' ').replace(/\\r/g, '').replace(/[|]/g, '');
+    var result = 'Pending';
+    if (p.classList.contains('ok')) { result = 'Pass'; npass++; }
+    else if (f.classList.contains('ok')) { result = 'Fail'; nfail++; }
+    else { npend++; }
+    rows.push('| ' + ac.id + ' | ' + result + ' | ' + note + ' |');
+  });
+  var md = [
+    '# UAT Feedback',
+    '',
+    '**Feature:** ' + %r,
+    '',
+    '| AC | Result | Notes |',
+    '|---|---|---|'
+  ].concat(rows).concat([
+    '',
+    'Summary: ' + (npass + nfail) + ' of ' + ACS.length + ' checked (' + npass + ' pass, ' + nfail + ' fail, ' + npend + ' pending)',
+    ''
+  ]).join('\\n');
+  var blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = %r + '_feedback.md';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+document.getElementById('btnExport').addEventListener('click', exportFeedback);
+render();
+</script>
+</body>
+</html>""") % (et, et, len(acs), len(acs), data, repr(fid), repr(fid))
+
+
+def cmd_uat_build(c):
+    """Compile the design's Acceptance Criteria into a self-contained <id>_uat.html."""
+    d = c.doc()
+    acs = parse_acceptance(d)
+    if not acs:
+        raise FdError("%s: no Acceptance Criteria found in the '## Acceptance' section" % c.a.id)
+    out = c.design.parent / ("%s_uat.html" % c.a.id)
+    out.write_text(uat_html(c.a.id, d.fmv("title") or c.a.id, acs), encoding="utf-8")
+    print("uat build: %d acceptance criteria -> %s" % (len(acs), out))
+    return 0
+
+
+def cmd_uat_import(c):
+    """Import a UAT feedback Markdown file and summarize per-AC results."""
+    d = c.doc()
+    acs = parse_acceptance(d)
+    known = {a["id"] for a in acs}
+    path = Path(c.a.path) if c.a.path else c.design.parent / ("%s_feedback.md" % c.a.id)
+    if not path.exists():
+        raise FdError("feedback file not found: %s" % path)
+    results = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^\s*\|\s*(AC-\d+)\s*\|\s*(Pass|Fail|Pending)\s*\|", line, re.I)
+        if not m:
+            continue
+        ac_id = m.group(1).upper()
+        if ac_id not in known:
+            raise FdError("unknown AC in feedback: %s" % ac_id)
+        results[ac_id] = m.group(2).capitalize()
+    if not results:
+        raise FdError("no AC result rows found in %s" % path)
+    print("uat import: %s (%d rows)" % (path, len(results)))
+    npass = nfail = 0
+    for a in acs:
+        r = results.get(a["id"])
+        if not r:
+            print("  %s: pending" % a["id"])
+        else:
+            print("  %s: %s" % (a["id"], r))
+            if r == "Pass":
+                npass += 1
+            elif r == "Fail":
+                nfail += 1
+    npend = len(acs) - npass - nfail
+    print("summary: %d pass, %d fail, %d pending of %d" % (npass, nfail, npend, len(acs)))
+    return 0
+
+
 def cmd_resume(c):
     """Resume the next executable task (interrupted first), with full context."""
     d = c.doc()
@@ -1155,6 +1381,15 @@ def build_parser():
     p.add_argument("value", nargs="?")
     p.add_argument("--force", action="store_true")
     add("migrate", cmd_migrate, "move inline log/bugs into sidecars")
+    p = sub.add_parser("uat", help="UAT checklist build/import")
+    usub = p.add_subparsers(dest="uat_cmd", required=True)
+    pb = usub.add_parser("build", help="compile Acceptance Criteria into <id>_uat.html beside the design")
+    pb.add_argument("id", help="feature id")
+    pb.set_defaults(fn=cmd_uat_build)
+    pi = usub.add_parser("import", help="import a UAT feedback Markdown file and summarize per-AC results")
+    pi.add_argument("id", help="feature id")
+    pi.add_argument("path", nargs="?", help="feedback markdown path (default <id>_feedback.md beside the design)")
+    pi.set_defaults(fn=cmd_uat_import)
     p = sub.add_parser("backlog", help="backlog file operations")
     bsub = p.add_subparsers(dest="backlog_cmd", required=True)
     pa = bsub.add_parser("add", help="append one item to the backlog")
