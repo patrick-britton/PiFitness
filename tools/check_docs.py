@@ -143,7 +143,7 @@ def check_headings(files, baseline, update=False, grow=False):
         text = Path(f).read_text(encoding="utf-8", errors="replace")
         seen = {}
         for m in re.finditer(r"^\s*#{1,6}\s+(.*?)\s*#*\s*$", text, re.M):
-            heading = m.group(2).strip()
+            heading = m.group(1).strip()
             norm = re.sub(r"\s+", " ", heading).strip().lower()
             if norm in seen:
                 violations.append((violation_key("headings", f, "duplicate-heading", norm), f"duplicate heading: {heading} (in {f})"))

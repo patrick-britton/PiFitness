@@ -71,18 +71,17 @@ Folder purposes live here. How the folders work together lives in `docs/ARCHITEC
 | backend/pifitness/tri_tip/ | Tri-tip prediction routes (backend/pifitness/tri_tip/router.py) | human+agent | shared utility functions | backend/backend_functions/ |
 | backend/pifitness/volleyball/ | Volleyball API routes (backend/pifitness/volleyball/router.py) | human+agent | shared utility functions | backend/backend_functions/ |
 | backend/pifitness/worker/ | Background task execution engine (backend/pifitness/worker/task_execution.py) | human+agent | route handlers or shared utilities | backend/backend_functions/, backend/pifitness/integrations/garmin/, backend/pifitness/integrations/spotify/ |
-| deploy/ | Deployment configuration and scripts for the Pi (deploy/scripts/bootstrap.sh) | human+agent | application source code | - |
-| deploy/migrations/ | Single home of numbered DDL migration files; applied to DEV by the tool and to PRD by the human only (deploy/migrations/INT19b__move_tokens_to_api_services.sql) | human+agent | application code, configuration, or DDL applied outside a numbered file | - |
+| deploy/ | Deployment configuration and scripts for the Pi (deploy/scripts/autodeploy.sh) | human+agent | application source code | - |
+| deploy/migrations/ | Single home of numbered DDL migration files; applied to DEV by the tool and to PRD by the human only (deploy/migrations/20261108000000_int19b_move_tokens_to_api_services.sql) | human+agent | application code, configuration, or DDL applied outside a numbered file | - |
 | deploy/nginx/ | Nginx configuration (deploy/nginx/nginx-react.conf) | human+agent | application code or database files | - |
-| deploy/scripts/ | Deployment shell and Python scripts (deploy/scripts/bootstrap.sh) | human+agent | application source code | - |
+| deploy/scripts/ | Deployment shell and Python scripts (deploy/scripts/autodeploy.sh) | human+agent | application source code | - |
+| deploy/scripts/lib/ | Modular deployment step handlers for autodeploy (deploy/scripts/lib/common.py) | human+agent | application source code | - |
 | deploy/systemd/ | Systemd service unit files (deploy/systemd/pifitness-fastapi.service) | human+agent | application code or scripts | - |
 | docs/ | Project documentation (docs/architecture/dynamic-targets.md) | human+agent | application code or test files | - |
 | docs/architecture/ | Architecture decision documents (docs/architecture/dynamic-targets.md) | human+agent | application code or workflow rules | - |
-| docs/archive/ | Archived project documents (empty today; kept only if the doc index uses it) | human | current active documentation | - |
-| docs/reorg/ | Reorganization plan status and scratch notes (docs/reorg/STATUS.md) | human | application source code or anything the app imports | - |
-| docs/reorg/archive/ | Archived reorganization plans, blockers and handoff notes (docs/reorg/archive/README.md) | human | active project documentation or application code | - |
-| docs/sample_json_food_payloads/ | Reference JSON payloads for the food diary module; reference material only, not test fixtures (docs/sample_json_food_payloads/almond_responses.json) | human | application code or test fixtures | - |
 | docs/data/ | Generated schema map (docs/data/schema.generated.md) | generated | application source code | - |
+| docs/lineage/ | Lineage graph and documentation (docs/lineage/README.md) | generated+agent | application source code | - |
+| docs/lineage/defs/ | Extracted SQL definitions for lineage (docs/lineage/defs/function.public.utc_now.sql) | generated | application source code | - |
 | docs/workflow/ | Workflow contract and target state (docs/workflow/TARGET_STATE.md) | human | application code or architecture docs | - |
 | frontend/ | Next.js frontend project root (frontend/pifitness/package.json) | human+agent | backend code or database files | - |
 | frontend/pifitness/ | Next.js application source and configuration (frontend/pifitness/next.config.ts) | human+agent | backend code, database dumps or build output | - |
@@ -137,17 +136,11 @@ Folder purposes live here. How the folders work together lives in `docs/ARCHITEC
 | tests/ | Backend test suite (tests/test_no_prd_default.py) | human+agent | application source code | backend/** |
 | tests/integration/ | Integration tests against DEV (tests/integration/conftest.py) | human+agent | unit tests or application code | backend/** |
 | tools/ | Developer and maintenance tooling (tools/db/sync-prod-to-dev.ps1) | human+agent | application source code or stored credentials | backend/** |
-| tools/audit/ | Repo audit and fact-extraction tooling used by the restructuring plan (tools/audit/p1_facts.py) | human+agent | application source code | - |
 | tools/baselines/ | Ratchet baseline files, one per check (tools/baselines/cites.txt) | generated+agent | non-baseline files | - |
+| tools/data_dictionary/ | Data dictionary, catalog, and data lineage tooling (tools/data_dictionary/lineage.py) | human+agent | application source code | - |
+| tools/data_dictionary/tests/ | Unit tests for data dictionary tooling (tools/data_dictionary/tests/test_common_and_audit.py) | human+agent | application source code | - |
 | tools/db/ | Database maintenance scripts; the PRD-to-DEV refresh is run by the human only (tools/db/sync-prod-to-dev.ps1) | human | application source code or stored PRD credentials | backend/** |
-| tools/diagnostics/ | Diagnostic and analysis scripts (tools/diagnostics/schema_cache.py) | human+agent | application source code | backend/** |
-| tools/probe/ | Capability probes for DEV identity, write round trip and headless browser (tools/probe/probe_db.py) | human+agent | application source code | backend/** |
 | tools/workflow/ | Workflow helper scripts (tools/workflow/append_progress.ps1) | human+agent | application source code | - |
-| tools/refactor/ | Code refactoring utilities (tools/refactor/tests/fixture/manifest.json) | human+agent | application source code | - |
-| tools/refactor/tests/ | Refactor tool tests (tools/refactor/tests/fixture/manifest.json) | human+agent | application source code | - |
-| tools/refactor/tests/fixture/ | Refactor tool fixtures (tools/refactor/tests/fixture/manifest.json) | human+agent | application source code | - |
-| tools/refactor/tests/fixture/pkg_a/ | Fixture package A for refactor tool tests (tools/refactor/tests/fixture/pkg_a/foo.py) | human+agent | application source code | - |
-| tools/refactor/tests/fixture/pkg_b/ | Fixture package B for refactor tool tests (tools/refactor/tests/fixture/pkg_b/__init__.py) | human+agent | application source code | - |
 
 ## Known deviations
 
@@ -156,5 +149,5 @@ Each deviation names the backlog item in `docs/workflow/BACKLOG.md` that fixes i
 - **K1 (B1).** `backend/backend_functions/` imports `backend/pifitness/integrations/`, `backend/pifitness/integrations/spotify/` and `backend/pifitness/worker/`, while those folders import it back. This breaks G6 and creates three mutual dependencies.
 - **K2 (B1).** `pifitness/` importing `backend_functions/` is allowed only as a transition. It ends when the fold-in is done.
 - **K3 (B3, B4, B8).** Four folders look redundant or vestigial and need a keep-or-delete decision: `scripts/` (legacy), `agents/` (duplicates what `worker/` does), `backend/api/` (marker only), and `.features/descriptions/` (old home).
-- **K4 (B7).** `.features/designs_active/` and `docs/archive/` are empty and will not exist in a fresh clone unless they hold a placeholder file.
-- **K5 (B11).** The generated observed-dependency list shows no imports for `backend/`, although `backend/main.py` imports `pifitness.*`. The generator likely misses package-root imports, so repo_health must not trust it until that is checked.
+- **K4 (B7).** `.features/designs_active/` is empty and will not exist in a fresh clone unless it holds a placeholder file.
+- **K5 (B11).** The generated observed-dependency list shows no imports for `backend/`, although `backend/main.py` imports `pifitness.*`. The generator likely misses package-root imports, so verification checks must not trust it until that is checked.
