@@ -54,7 +54,7 @@ from step_db_prepare import STATE_KEY, TestDatabase, elapsed, reason_from
 
 MIGRATION_FILE_RE = re.compile(r"^(\d+).*\.sql$")      # dbmate's own rule: version = leading digits
 APPLYING_RE = re.compile(r"Applying:\s*(\S+)")
-LONG_TIMEOUT = 3600
+LONG_TIMEOUT = 300
 HEARTBEAT = 30
 LIST_LIMIT = 40
 

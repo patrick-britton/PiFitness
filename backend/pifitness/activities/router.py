@@ -1175,6 +1175,8 @@ async def get_activity(activity_id: int):
         if not activity:
             raise HTTPException(status_code=404, detail="Activity not found")
         return {"data": activity}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -1194,10 +1196,13 @@ async def get_activity_telemetry_data(activity_id: int):
         Telemetry data points
     """
     try:
+        activity = get_activity_by_id(activity_id)
+        if not activity:
+            raise HTTPException(status_code=404, detail="Activity not found")
         telemetry = get_activity_telemetry(activity_id)
-        if not telemetry:
-            raise HTTPException(status_code=404, detail="Telemetry not found")
-        return {"data": telemetry}
+        return {"data": telemetry if telemetry else []}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -1217,8 +1222,13 @@ async def get_activity_segment_matches(activity_id: int):
         List of segment match records
     """
     try:
+        activity = get_activity_by_id(activity_id)
+        if not activity:
+            raise HTTPException(status_code=404, detail="Activity not found")
         segments = get_segment_matches(activity_id)
-        return {"data": segments, "count": len(segments)}
+        return {"data": segments if segments else [], "count": len(segments if segments else [])}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,

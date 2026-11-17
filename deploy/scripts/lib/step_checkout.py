@@ -342,11 +342,11 @@ class Checkout:
         # refused, retry the same SHA without --depth (still one commit's worth, locally).
         method = "shallow fetch of the exact SHA from the local repo"
         shallow = self.git(["fetch", "--no-tags", "--depth", "1", source, self.sha],
-                           timeout=900, echo=True)
+                           timeout=300, echo=True)
         if not shallow.ok:
             warn("shallow fetch failed (%s); retrying without --depth"
                  % mask_url(shallow.first_error_line()))
-            full = self.git(["fetch", "--no-tags", source, self.sha], timeout=900, echo=True)
+            full = self.git(["fetch", "--no-tags", source, self.sha], timeout=300, echo=True)
             if not full.ok:
                 self.git_fail("cannot fetch the commit from the local repo %s" % source, full)
             method = "fetch of the exact SHA from the local repo (no --depth)"
@@ -355,7 +355,7 @@ class Checkout:
             raise HelperError("commit %s is not available after fetching from %s"
                               % (self.sha, source), mask_url(source))
         checkout = self.git(["-c", "advice.detachedHead=false", "checkout", "-q", "--detach",
-                             "--force", self.sha], timeout=600)
+                             "--force", self.sha], timeout=300)
         if not checkout.ok:
             self.git_fail("git checkout of the commit failed", checkout)
         if os.path.exists(os.path.join(self.stage, ".gitmodules")):
