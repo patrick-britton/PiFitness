@@ -193,9 +193,11 @@ class Regression:
         if c.is_test:
             register_undo(c.run_dir, "test_db")
             evidence("undo_registered", "test_db")
-        if marker != "dirty":
-            update_db_marker(state_file, "dirty")
-        evidence("state_marker", "dirty (the tests may write to the database)")
+            if marker != "dirty":
+                update_db_marker(state_file, "dirty")
+            evidence("state_marker", "dirty (the tests may write to the database)")
+        else:
+            evidence("state_marker", marker)
 
     def stage_suites(self):
         c = self.ctx
