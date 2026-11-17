@@ -1,58 +1,100 @@
-### Principles
+# PiFitness Target State
+
+This document defines the architectural target state and operational invariants of PiFitness. Tools enforce these principles; prose advises developers and agents.
+
+---
+
+## 1. Core Principles
 
 1. **Tools enforce; prose advises.** If a rule matters, a script checks it.
-2. **Evidence before done.** Nothing closes without recorded command output. Humans confirm only what humans can judge.
-3. **Design for the weakest model you might get mid-task.** Tasks are session-sized, and state lives in files, never in a chat.
-4. **One home per fact.** Every piece of information lives in exactly one place; everything else points to it.
-5. **Agents flag; the human decides scope.** Extra findings go to a backlog, not into the current feature.
-6. **Generate where possible.** Schema map, UAT page, task briefs and folder health are produced by scripts, not written by hand.
+2. **Evidence before done.** No task or feature closes without recorded command output. Humans confirm only what requires human judgment.
+3. **Design for the weakest model.** Tasks are small and bounded; state lives in files and sidecars, never in conversation history.
+4. **One home per fact.** Every concept, requirement, and data definition lives in exactly one place; everything else links to it.
+5. **Agents flag; human scopes.** Discovered out-of-scope defects go to the backlog; agents never expand scope unilaterally.
+6. **Generate where possible.** Task briefs, schema maps, UAT checklists, and request templates are produced by deterministic tools, not written by hand.
+7. **Single-feature serial flow.** Exactly one feature is in development at a time across the entire codebase by a single human developer.
+8. **Lineage-first discovery.** Before inspecting source or schema, agents consult the data dictionary and lineage graph to bound context.
+9. **Unattended Pi Deployment:** No manual workflows run on the Raspberry Pi. The launcher is the sole entry point, orchestrating deployments through `deploy/scripts/autodeploy.sh` with modular step helpers in `deploy/scripts/lib/`.
 
-### Verifiable statements
+---
 
-**Repo and docs**
+## 2. Verifiable Statements
 
-- **R1.** Every folder is listed in `REPO_MAP.md` with its purpose, who writes there, what must not be there, and allowed dependencies. *Check: repo\_health fails on any unmapped folder.*
-- **R2.** `ARCHITECTURE.md` covers layers, request flow, deployment topology and Pi performance constraints, and every claim cites a path. *Check: claims without a path are flagged.*
-- **R3.** `docs/INDEX.md` lists each doc, what it owns and what it must not repeat. *Check: human review plus a duplicate-heading scan.*
-- **R4.** `UI_PRINCIPLES.md` exists, and each rule names how it is checked (auto or human).
+### Repo & Documentation
 
-**Data layer**
+- **R1. Mapped Repository.** Every folder is documented in `docs/REPO_MAP.md` with its purpose, allowed dependencies, and prohibited contents. *Check: `tools/check_docs.py` / folder health check flags unmapped folders.*
+- **R2. Evidenced Architecture.** `docs/ARCHITECTURE.md` defines system layers, request flow, and deployment topology; all architectural claims cite file paths. *Check: `python tools/check_docs.py cites` passes with zero unresolved citations.*
+- **R3. Canonical Index.** `docs/INDEX.md` indexes all documentation and rules, establishing explicit ownership to prevent duplication. *Check: duplicate-heading and index scan passes.*
+- **R4. Documented UI Principles.** `docs/UI_PRINCIPLES.md` defines mobile-first interaction rules, tap targets (≥44px), back-gesture behavior, and bottom-sheet conventions, each with an automated or human check method.
 
-- **D1.** `schema.generated.md` matches the live DEV catalog. *Check: regeneration produces no diff.*
-- **D2.** Every table and column has a database COMMENT, and `dictionary.md` covers each domain with the grain of key tables, the canonical source of each concept, and business rules marked enforced or convention.
-- **D3.** DDL changes only through numbered migration files. The tool applies them to DEV, the human applies them to PRD, and the DEV refresh replays pending migrations.
-- **D4.** A design that adds a table or column includes a `dd.py find` result showing nothing equivalent exists.
+### Data & Lineage Layer
 
-**Verification**
+- **D1. Generated Schema Map.** `docs/data/schema.generated.md` matches the live DEV database catalog. *Check: regeneration against DEV produces zero git diff.*
+- **D2. Catalog & Comments.** Every table and column carries a PostgreSQL `COMMENT`. `docs/data/dictionary.md` defines domain grains, canonical sources, and business rules.
+- **D3. Numbered Additive Migrations.** DDL changes occur solely through numbered migration files in `deploy/migrations/`. Migrations are additive and backward-compatible with deployed PRD code. DEV applies via tool; PRD is applied automatically during `autodeploy.sh` via `dbmate up` after taking a rollback baseline.
+- **D4. Lineage Precedence.** For any database, ETL, API, or UI data flow investigation, the lineage CLI is invoked first (`python tools/data_dictionary/lineage.py describe <target>`). No broad repository searches occur before the lineage graph is queried.
 
-- **V1.** One `verify` command runs the full gate and exits 0 on a clean baseline.
-- **V2.** Every test has a purpose docstring and a class (invariant, contract, smoke or journey). No test mocks the unit under test, and none cites a bug or feature ID. A Keep/Quarantine/Delete manifest exists.
-- **V3.** Comment lint passes: no feature, bug or task IDs, and no change-history comments.
-- **V4.** `repo_health` checks structure against the map, duplicate definitions, import direction, dead files and performance smells (unbounded queries, SELECT \*, N+1, pandas in the production path).
-- **V5.** Mobile checks run at 448x875 and 360x740: no horizontal scroll, tap targets of at least 44px, correct input types, clean console.
+### Verification & Quality Gates
 
-**Workflow**
+- **V1. Single Verification Gate.** `python tools/verify.py --scope all` runs the full verification pipeline (compilation, typecheck, linting, tests, smoke) and exits 0 against recorded baselines.
+- **V2. Classified Tests.** Every test carries a docstring and an explicit marker registered in `pytest.ini`:
+  - `@pytest.mark.invariant`: Mathematical and business logic invariants.
+  - `@pytest.mark.contract`: API and schema shape agreements.
+  - `@pytest.mark.smoke`: Fast critical-path sanity checks.
+  - `@pytest.mark.journey`: End-to-end user workflows.
+  Tests never mock the unit under test.
+- **V3. Clean Comment Hygiene.** `python tools/lint_comments.py` exits 0. Source code contains no task IDs, bug IDs, or change-history comments.
+- **V4. Structural Health.** Import linter contracts prevent reverse dependencies between layers (e.g. backend functions calling domain routers). Unbounded queries (`SELECT *` without limit) and performance smells are prohibited.
+- **V5. Mobile Viewport Standards.** All UI screens are verified at 360×740 and 448×875: no horizontal scroll, tap targets ≥44px, appropriate virtual keyboard types, and clean console logs.
 
-- **W1.** The workflow tool refuses to close a task without recorded verify output and a prior start entry. Force is human-only.
-- **W2.** A task is one concern, at most three files and one verify command. Anything larger is split.
-- **W3.** A generated brief exists per task, and `resume` restores an interrupted session with no human re-explanation.
-- **W4.** Every problem statement in a feature brief maps to at least one AC or an explicit out-of-scope line. *Check: tool at review time.*
-- **W5.** Each AC has an `auto` line, a `human` line, or an explicit auto-only mark. A tool generates the UAT HTML page, and human results are imported back.
-- **W6.** A feature closes only with both an agent pass and a human pass. Failures are logged against AC IDs.
-- **W7.** Out-of-scope findings go to a backlog file. Agents do not expand scope.
-- **W8.** At feature end, a retro converts each recurring lesson into a check or a rule line.
-- **W9.** A module-by-module walkthrough checklist exists and has been run on the phone, and every finding is in the backlog.
+### Workflow & Lifecycle
 
-**Environment**
+- **W1. Interactive Request Form.** Feature requests originate from an interactive local HTML form (`tools/workflow/request_form.html`) that exports structured Markdown into `.features/descriptions/<id>.md`.
+- **W2. Automated UAT Generation.** Every feature design contains testable Acceptance Criteria (ACs) with explicit `auto:` and `human:` lines. `python tools/workflow/fd.py uat build <id>` compiles these into an interactive, mobile-responsive `uat.html` checklist.
+- **W3. Strict Micro-Task Sizing.** A task represents one concern, touches at most 3 files, has exactly one verify command, and is sized at **1, 2, or 3 story points**:
+  - `1 pt`: Single-file edit or test tweak.
+  - `2 pt`: Standard paired edit (route + query, or component + helper).
+  - `3 pt`: Maximum complexity (route + model + migration, or component + hook + test).
+  Tasks estimated >3 points are rejected and must be split during planning.
+- **W4. Anchored Planning.** Every task in the feature plan defines verified file/symbol anchors (`modify`, `create`, `delete`, `pattern`, `read`). No speculative or unverified file paths exist in the plan.
+- **W5. Evidence-Gated Execution.** `tools/workflow/fd.py` refuses to close a task without recorded verify command output (`fd.py done <id> T##`) and a prior start entry (`fd.py start <id> T##`).
+- **W6. Budgeted Execution Sessions.** Agents execute against a story point budget, completing one task per commit, and cleanly checkpointing state (`fd.py resume <id>`) when the budget is reached.
+- **W7. UAT Feedback Loop.** Human mobile testing results are exported directly from `uat.html` into `.features/designs_active/<id>_feedback.md`, driving a dedicated polish cycle before code review.
+- **W8. Pre-Deploy Code & Test Review.** Prior to deployment, automated tests are verified, comments linted, and repository structure audited to ensure zero technical debt or stray files.
+- **W9. Out-of-Scope Backlog.** Findings outside the active feature are appended to `docs/workflow/BACKLOG.md` via `tools/workflow/fd.py backlog add`. Agents never expand active feature scope.
 
-- **E1.** DEV runs locally. The agent environment holds no PRD credentials, and the backend refuses writes when the DB host is not local.
-- **E2.** A baseline template database allows a DEV reset in seconds.
-- **E3.** Bootstrap fetches the latest deployment scripts and requirements from the deployment branch, and offers a choice of `main` (PRD) or `react-ui` (test on Pi).
-- **E4.** A Pi post-deploy checklist exists and is run.
-- **E5.** The app installs from Chrome as a PWA over HTTPS.
+### Environments & Deployment
 
-**Agents**
+- **E1. Isolated Local DEV.** DEV runs locally. The local agent environment contains no PRD credentials. The DEV database runs on `localhost:15432` (`pifitness_dev`) and carries a database-level marker (`pifitness.env = 'dev'`). Tools and backend refuse to run without this marker.
+- **E2. Fast DEV Reset.** A clean template database enables DEV resets in seconds via `python tools/db/dev_reset.py`, automatically replaying pending migrations and re-stamping the dev marker.
+- **E3. Git Trunk Discipline.** `main` is the deployable trunk. Feature work occurs on `agent/feature-<id>` branches. Agents never push, tag, switch branches, or merge. The human performs merges to `main` and pushes.
+- **E4. Pi Autodeploy Engine (`autodeploy.sh`).** All deployment to the Raspberry Pi is orchestrated by `deploy/scripts/autodeploy.sh` driven by modular Python step handlers in `deploy/scripts/lib/`:
+  - **TEST Deployment (10 steps):**
+    1. Read-only preflight and DB comparison (`step_preflight.py`).
+    2. Clean TEST app checkout into `/home/god/PiFitness-test` (`step_checkout.py`).
+    3. Reconcile dependencies via `uv sync` and `npm ci` (`step_dependencies.py`).
+    4. Database clone / restore with clean baseline capture (`step_db_prepare.py`).
+    5. Apply pending migrations via `dbmate up` (`step_migrate.py`).
+    6. In-process regression tests (`step_regression.py` running pytest and vitest while PRD is still up).
+    7. Stop PRD services and record pre-existing state (`step_stop_services.py`).
+    8. Start TEST services on normal ports (`step_start_services.py`).
+    9. Automated smoke tests against running TEST stack (`step_smoke.py`).
+    10. Human manual test gate (GO / NO-GO) with 30-minute timeout (`step_manual_gate.py`). On failure or NO-GO, the exit handler automatically halts TEST and restores PRD.
+  - **PRD Deployment (9 steps, zero prompt):**
+    1. Read-only preflight (`step_preflight.py`).
+    2. Stop PRD services and record active set (`step_stop_services.py`).
+    3. Atomic swap of clean PRD application checkout in `/home/god/PiFitness` (`step_checkout.py`).
+    4. Reconcile PRD dependencies outside app dir (`step_dependencies.py`).
+    5. Capture pinned PRD rollback baseline dump if migrations pending (`step_db_baseline.py`).
+    6. Apply pending migrations via `dbmate up` (`step_migrate.py`).
+    7. Start PRD services and verify public URL (`step_start_services.py`).
+    8. Run regression tests against PRD (`step_regression.py`).
+    9. Run live smoke tests against public HTTPS URL (`step_smoke.py`).
+- **E5. Complete Automatic Rollback.** The `autodeploy.sh` exit handler (`deploy/scripts/lib/cleanup.py`) restores code, units, and database automatically on any error. Rollback restores from the exact pinned baseline dump recorded in the run state, never an ambiguous latest dump.
+- **E6. Immutable PRD Releases.** Every production deployment is stamped with a git tag `prd-YYYYMMDD`. Rollback to an earlier release deploys that tag's specific commit.
 
-- **A1.** The always-on rules file is about 2 KB or less. There are at most four skills, each holding only project-specific facts and each surviving an ablation test.
-- **A2.** `model-notes.md` lists each model, what it is usable for, its quirks and the date last verified.
-- **A3.** A three-task benchmark and the capability probe are re-run whenever the active model changes.
+### Agent Ergonomics
+
+- **A1. Lean Always-On Rules.** Core global rules in `.clinerules/` are modular, concise, and enforce tool constraints without consuming excessive context tokens.
+- **A2. Specialized Workflow Prompts.** Distinct workflows (`.clinerules/workflows/`) guide specific lifecycle phases (design, plan, execute, polish, test, review), preventing model confusion.
+- **A3. Native Tool Priority.** Agents prioritize dedicated project tools (`fd.py`, `lineage.py`, `verify.py`) over manual discovery or broad shell commands.
