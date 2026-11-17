@@ -19,3 +19,99 @@ date | task | model | event | evidence
     Command: python tools/verify.py --scope all
     VERIFY all exit=0
     FORCED=3
+2026-11-17 | 6.2 | cline | DONE | Verify: node headless validation of tools/workflow/request_form.html -> NODE_EXIT=0; structural, validation, Blob export, and markdown frontmatter checks all passed.
+    Command: node headless validation of tools/workflow/request_form.html
+    PASS | client-side Blob export
+    PASS | download filename targets .features/descriptions/<id>.md
+    PASS | JS slug pattern validation
+    PASS | required-field validation logic present
+    PASS | slug pattern validation logic present
+    PASS | no external script dependencies
+    PASS | frontmatter opens with ---
+    PASS | frontmatter closes with ---
+    PASS | feature-id present
+    PASS | title present
+    PASS | category present
+    PASS | created present
+    PASS | section Problem / Motivation
+    PASS | section Desired Behavior
+    PASS | section Surfaces
+    PASS | section Non-Goals
+    ALL CHECKS PASSED
+    NODE_EXIT=0
+2026-11-17 | 6.2 | cline | DONE | Re-verify after adding save-picker export: node headless validation of tools/workflow/request_form.html -> NODE_EXIT=0; all structural, validation, showSaveFilePicker export, fallback download, clipboard, and markdown frontmatter/section checks passed.
+    Command: node headless validation of tools/workflow/request_form.html
+    PASS | DOCTYPE
+    PASS | ends with </html>
+    PASS | form id="form"
+    PASS | featureId input
+    PASS | title input
+    PASS | category radios
+    PASS | problems/desired/surfaces/nongoals textareas
+    PASS | export button btnExport
+    PASS | copy button btnCopy
+    PASS | buildMd defined
+    PASS | saveFile defined with showSaveFilePicker
+    PASS | download fallback dl defined
+    PASS | submit calls saveFile(id,md)
+    PASS | clipboard listener on btnCopy
+    PASS | no external script deps
+    PASS | note tells user to pick .features/descriptions/
+    PASS | frontmatter opens/closes
+    PASS | feature-id
+    PASS | title
+    PASS | category
+    PASS | created
+    PASS | all 5 sections
+    ALL CHECKS PASSED
+    NODE_EXIT=0
+2026-11-17 | 6.2 | cline | DONE | Re-verify after fixing copy-listener bug and honest save behavior: node headless validation of tools/workflow/request_form.html -> NODE_EXIT=0; all 20 structural, validation, saveFile/showSaveFilePicker+fallback, copy-listener-at-top-level, no-external-deps, honest-file://-note, and markdown frontmatter/section checks passed.
+    Command: node headless validation of tools/workflow/request_form.html
+    PASS | DOCTYPE
+    PASS | ends with </html>
+    PASS | form id="form"
+    PASS | featureId input
+    PASS | title input
+    PASS | category radios
+    PASS | four textareas
+    PASS | export button btnExport
+    PASS | copy button btnCopy
+    PASS | buildMd defined
+    PASS | saveFile defined
+    PASS | dl fallback defined
+    PASS | submit calls saveFile(id,md)
+    PASS | copy listener at top level
+    PASS | copy listener NOT inside submit
+    PASS | no external script deps
+    PASS | honest note about file://
+    PASS | frontmatter opens/closes
+    PASS | all 5 sections
+    ALL CHECKS PASSED
+    NODE_EXIT=0
+2026-11-17 | 6.2 | cline | DONE | Final: removed the Where does it go note section from tools/workflow/request_form.html. Confirmed a standalone browser HTML file cannot activate a local Python script due to the browser sandbox; it would need a separate server extension or protocol handler. Added standalone helper tools/workflow/move_feature_requests.py stdlib-only that sweeps slug-named id dot md from Downloads into .features/descriptions/. py_compile exit 0. Functional test moved 2 matching files and ignored a non-matching README dot md. HTML node validation NODE_EXIT=0 all checks passed including note removed validation showSaveFilePicker plus fallback clipboard and markdown frontmatter plus 5 sections.
+    Command: py_compile tools/workflow/move_feature_requests.py + node headless validation of tools/workflow/request_form.html
+    PY_COMPILE_EXIT=0 (move_feature_requests.py compiles)
+    PASS | note section removed
+    PASS | form id="form"
+    PASS | export button btnExport
+    PASS | copy button btnCopy
+    PASS | buildMd defined
+    PASS | saveFile defined
+    PASS | dl fallback defined
+    PASS | submit calls saveFile(id,md)
+    PASS | copy listener at top level
+    PASS | no external script deps
+    PASS | frontmatter opens/closes
+    PASS | all 5 sections
+    Functional test: 2 slug-named .md moved from Downloads to target, non-matching README.md ignored
+    NODE_EXIT=0
+    Python cannot be activated by standalone HTML (browser sandbox) - helper run manually
+2026-11-17 | 6.2 | cline | DONE | Built tkinter desktop app tools/workflow/request_form.py replacing the HTML for the primary save-to-folder workflow. py_compile exit 0; headless logic tests (validate/build_markdown valid + invalid cases + defaults) all PASS; GUI smoke test (window renders, auto-closes) GUI_SMOKE_OK SMOKE_EXIT=0. App saves .features/descriptions/<id>.md in one step via save dialog pre-targeted to that folder; includes Copy to Clipboard and Clear. HTML request_form.html kept as a secondary option; move_feature_requests.py remains as Downloads fallback.
+    Command: py_compile tools/workflow/request_form.py + headless validate/build_markdown tests + GUI smoke test
+    PY_COMPILE_EXIT=0
+    PASS | valid case (validate None + markdown frontmatter + 5 sections)
+    PASS | invalid cases (missing ID / bad slug / missing title / missing problems / missing desired)
+    PASS | default surfaces/nongoals render as "-"
+    PASS | GUI smoke test: window renders and auto-closes (GUI_SMOKE_OK)
+    SMOKE_EXIT=0
+    One-step save: filedialog pre-targeted to .features/descriptions/<id>.md
