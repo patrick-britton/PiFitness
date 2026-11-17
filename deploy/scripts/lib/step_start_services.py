@@ -104,7 +104,7 @@ def main():
         if not os.path.isdir(next_dir):
             info("frontend .next missing in %s; running npm run build ..." % frontend_dir)
             npm = shutil.which("npm") or "/usr/bin/npm"
-            res = run_cmd([npm, "run", "build"], cwd=frontend_dir, timeout=600)
+            res = run_cmd([npm, "run", "build"], cwd=frontend_dir, timeout=300)
             if not res.ok:
                 raise HelperError("npm run build failed: %s" % res.first_error_line(), frontend_dir)
             evidence("frontend_build", "ok, %s" % next_dir)

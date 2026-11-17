@@ -42,7 +42,7 @@ from common import (HelperError, Parser, PgTarget, evidence, info, load_context,
 PREFIX = "REGRESSION_"
 TESTS_CONF = os.path.join("deploy", "tests.conf")      # relative to APP_DIR (constant)
 BACKEND_ENV = os.path.join("backend", ".env")          # the checkout step links it to this run's env file
-SUITE_TIMEOUT = 1800
+SUITE_TIMEOUT = 300
 HEARTBEAT = 30
 FAIL_NAMES_SHOWN = 20
 TAIL_LINES = 15

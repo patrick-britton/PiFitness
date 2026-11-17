@@ -46,6 +46,7 @@ import os
 import queue
 import re
 import shlex
+import signal
 import subprocess
 import sys
 import threading
@@ -409,6 +410,20 @@ class CmdResult:
         return lines[-count:]
 
 
+def _kill_proc_tree(proc):
+    """Terminate a process and all of its descendants (process group on POSIX)."""
+    try:
+        if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                return
+            except OSError:
+                pass
+        proc.kill()
+    except OSError:
+        pass
+
+
 def run_cmd(argv, extra_env=None, timeout=None, cwd=None, echo_prefix=None,
             heartbeat=None):
     """Run a command; never raises for a non-zero exit.
@@ -424,11 +439,14 @@ def run_cmd(argv, extra_env=None, timeout=None, cwd=None, echo_prefix=None,
     env.update(extra_env or {})
     started = time.monotonic()
     merge = echo_prefix is not None
+    popen_kwargs = {}
+    if hasattr(os, "setsid"):
+        popen_kwargs["start_new_session"] = True
     try:
         proc = subprocess.Popen(
             argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT if merge else subprocess.PIPE,
-            text=True, errors="replace", env=env, cwd=cwd)
+            text=True, errors="replace", env=env, cwd=cwd, **popen_kwargs)
     except FileNotFoundError:
         return CmdResult(argv, 127, "", "command not found: %s" % argv[0], 0.0)
     except OSError as exc:
@@ -440,8 +458,11 @@ def run_cmd(argv, extra_env=None, timeout=None, cwd=None, echo_prefix=None,
             return CmdResult(argv, proc.returncode, stdout, stderr,
                              time.monotonic() - started)
         except subprocess.TimeoutExpired:
-            proc.kill()
-            stdout, stderr = proc.communicate()
+            _kill_proc_tree(proc)
+            try:
+                stdout, stderr = proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                stdout, stderr = "", ""
             return CmdResult(argv, 124, stdout or "", stderr or "",
                              time.monotonic() - started, timed_out=True)
 
@@ -449,8 +470,11 @@ def run_cmd(argv, extra_env=None, timeout=None, cwd=None, echo_prefix=None,
 
     def pump():
         if proc.stdout is not None:
-            for line in proc.stdout:
-                lines_q.put(line.rstrip("\n"))
+            try:
+                for line in proc.stdout:
+                    lines_q.put(line.rstrip("\n"))
+            except (OSError, ValueError):
+                pass
         lines_q.put(None)
 
     threading.Thread(target=pump, daemon=True).start()
@@ -461,9 +485,17 @@ def run_cmd(argv, extra_env=None, timeout=None, cwd=None, echo_prefix=None,
             item = lines_q.get(timeout=1.0)
         except queue.Empty:
             now = time.monotonic()
-            if timeout and now - started > timeout and not timed_out:
-                timed_out = True
-                proc.kill()
+            if timeout and now - started > timeout:
+                if not timed_out:
+                    timed_out = True
+                    _kill_proc_tree(proc)
+                elif now - started > timeout + 5:
+                    try:
+                        if proc.stdout is not None:
+                            proc.stdout.close()
+                    except (OSError, ValueError):
+                        pass
+                    break
             elif heartbeat and now - last_output >= heartbeat:
                 out("%s... still running (%ds)" % (echo_prefix, now - started))
                 last_output = now
@@ -473,7 +505,11 @@ def run_cmd(argv, extra_env=None, timeout=None, cwd=None, echo_prefix=None,
         captured.append(item)
         out(echo_prefix + item)
         last_output = time.monotonic()
-    rc = proc.wait()
+    try:
+        rc = proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        _kill_proc_tree(proc)
+        rc = 124
     return CmdResult(argv, 124 if timed_out else rc, "\n".join(captured), "",
                      time.monotonic() - started, timed_out)
 
