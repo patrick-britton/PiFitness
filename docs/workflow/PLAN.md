@@ -10,7 +10,8 @@ This document defines the roadmap from our current Phase 6 workflow hardening th
 2. **Strict Scope:** Touch only the files explicitly listed in the task row's **Files** column (maximum 3 files).
 3. **Evidence Gate:** Every task specifies exactly one verify command. A task is complete only when the verify command is executed and its command line and last 20 output lines are appended to `docs/workflow/PROGRESS.md`.
 4. **No Git Branching by Agents:** Work on the assigned `agent/*` branch. Never switch branches, create branches, push, merge, or touch `main`.
-5. **Flag Out of Scope:** Any discovered issues outside the assigned task must be appended to `docs/workflow/BACKLOG.md` via `python tools/workflow/fd.py backlog add`. Never fix out-of-scope defects within the current task.
+5. **No Git Commits**: Do not stage or commit changes you make, human must review all changes.
+6. **Flag Out of Scope:** Any discovered issues outside the assigned task must be appended to `docs/workflow/BACKLOG.md` via `python tools/workflow/fd.py backlog add`. Never fix out-of-scope defects within the current task.
 
 ---
 
