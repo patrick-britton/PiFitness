@@ -11,3 +11,5 @@ Out-of-scope findings and deferred enhancements (Statement W9). Agents append ne
 | **B25** | Android back-gesture handling is absent in Next.js frontend (`useBackHandler` / `popstate`). | UI Principles R7 | Phase 8 | Small | Open |
 | **B26** | PWA manifest (`manifest.json`) and service worker offline caching absent. | UI Principles R10 | Phase 8 | Small | Open |
 | **B40** | Full fast-lane pytest collection raises `RuntimeError: APP_ENV=unset` when run outside explicit dev environment wrapper. | Test suite | Phase 6 | Small | Open |
+| **B41** | GIT_MODEL.md still documents retired test-up/test-down legacy deploy flow (D3/D16); update to reference autodeploy.sh after legacy scripts retired in task 6.1 | task 6.1 | Phase 6 | Small | Open |
+
