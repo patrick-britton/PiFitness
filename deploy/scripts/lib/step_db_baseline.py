@@ -183,7 +183,9 @@ class Baseline:
         register_undo(run_dir, "prd_db")
         evidence("undo_registered", "prd_db")
 
-        backup_dir = writable_dir(self.backup_dir, "PG_BACKUP_LOCATION")
+        if not writable_dir(self.backup_dir):
+            raise HelperError("backup directory is missing or not writable", self.backup_dir)
+        backup_dir = self.backup_dir
         prefix = self.ctx.conf_value("PRD_BASELINE_PREFIX") or PRD_BASELINE_PREFIX
         filename = "%s%s.dump" % (prefix, utc_stamp())
         final_dump = os.path.join(backup_dir, filename)
