@@ -231,8 +231,10 @@ __marimo__/
 *.svg
 *.png
 
+# Plugins
+.cline/plugins/
+
 memory-bank/
-.clinerules
 node_modules/
 .next/
 # .features/ retained as legacy feature-management workspace (Phase 2.3 rejected).
@@ -281,4 +283,4 @@ docs/reorg/blocks/*-report.md
 
 # INT-21: untrack reorg audit artifacts and stale tree dumps
 repo-tree.txt
-.cline/
+
