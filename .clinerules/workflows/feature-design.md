@@ -1,3 +1,7 @@
+---
+description: Turn the feature request into a design and record open questions
+---
+
 # /feature-design
 
 Turn the feature request into a design. Record everything you are unsure about as open questions (OQs) in the design file, then stop so the human can answer them in that file. Design only: no code edits, no planning.
