@@ -226,6 +226,7 @@ __marimo__/
 # Local storage
 /local_storage/
 /.idea/
+zz_feature_archive/
 
 # Pictures
 *.svg

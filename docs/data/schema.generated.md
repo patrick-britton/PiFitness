@@ -2031,15 +2031,6 @@ Do not edit by hand. Regenerate with python tools/db/schema_map.py.
 
 ## Schema public
 
-### public.dev_reset_replay_sentinel (TABLE)
-| column | type | nullable |
-|---|---|---|
-| id | integer | NO |
-| created_at | timestamp with time zone | NO |
-
-**Indexes:**
-- `dev_reset_replay_sentinel_pkey`: CREATE UNIQUE INDEX dev_reset_replay_sentinel_pkey ON public.dev_reset_replay_sentinel USING btree (id)
-
 ### public.dim_date (TABLE)
 | column | type | nullable |
 |---|---|---|
@@ -2195,8 +2186,7 @@ Do not edit by hand. Regenerate with python tools/db/schema_map.py.
 ### public.schema_migrations (TABLE)
 | column | type | nullable |
 |---|---|---|
-| version | bigint | NO |
-| applied_at | timestamp with time zone | NO |
+| version | character varying | NO |
 
 **Indexes:**
 - `schema_migrations_pkey`: CREATE UNIQUE INDEX schema_migrations_pkey ON public.schema_migrations USING btree (version)
