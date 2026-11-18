@@ -233,11 +233,11 @@ Each step lists what it **expects** on entry and what it **leaves** on exit. Age
 - **Actor:** Agent. `<budget>` is a number of story points.
 - **Expects:** branch `feature-test`; status `reviewed` or `in-progress`; `fd.py next <id>` shows `blocked-by: none`.
 - **Procedure (per task):**
-  1. `fd.py next <id>`. If the task is `interrupted`, run `fd.py brief <id> T##` first. If it prints `ACTION: stop`, stop.
+  1. `fd.py next <id>`. If it prints `next: none`, all tasks are done: stop. If it prints `ACTION: stop`, stop. If the task is `interrupted`, or the log shows a `start` for it with no `done`, run `fd.py brief <id> T##` first. If the task's points exceed the budget left, do not start it.
   2. `fd.py start <id> T##`.
   3. Make the change, within the task's anchors and `.clinerules/00-tool-constraints.md` (≤200-line reads, targeted edits). Create test files only as section 7 allows.
   4. `fd.py done <id> T##`. It runs the Verify command and records the result.
-  5. If `done` exits 0, run `fd.py set <id> T## complete`. If not, fix and re-run `done`. If blocked, run `fd.py set <id> T## interrupted`, record why with `fd.py log <id> "..."`, and stop.
+  5. If `done` exits 0, run `fd.py set <id> T## complete`. If not, fix and re-run `done`; after three failed runs, treat the task as blocked. If blocked, run `fd.py set <id> T## interrupted`, record why with `fd.py log <id> "T## blocked: ..."`, and stop. A task that cannot be done inside its anchors is a plan problem for the human; the agent never edits the plan or touches unanchored files.
   6. Subtract the task's points from the budget. If points remain, take the next task. Otherwise stop.
   7. If the work needs a decision, add an open OQ to the design file, run `fd.py set <id> resume` (any open OQ blocks `next`), and stop. The human answers in the file and runs `/feature-design`, which resolves it and tells them to re-run `/feature-execute`.
 - **No git writes.** At the end of the session the agent prints `git status --porcelain` and the line "Next: `fd.py resume <id>`".

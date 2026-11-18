@@ -1274,7 +1274,7 @@ def cmd_set(c):
     d.save()
     print("; ".join(msgs + ["resume: %s | next=%s | blocked-by=%s | points=%d" % (vals["progress"], vals["next"], vals["blocked-by"], d.points_total())]))
     if all(d.task_status(t) == "complete" for t in d.tasks) and d.tasks and first_word(d.fmv("status")) != "complete":
-        print("All tasks complete. Tick acceptance criteria, then: fd.py set %s feature complete" % c.a.id)
+        print("All tasks complete. Next: human UAT (%s_uat.html); the feature is completed after PRD deploy." % c.a.id)
     return 0
 
 
