@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PiFitness UAT</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --surface: #ffffff;
+    --ink: #1c2530;
+    --muted: #5d6874;
+    --rule: #d0d6dd;
+    --accent: #0f6a6a;
+    --accent-fg: #ffffff;
+    --pass: #1a6e35;
+    --pass-bg: #e8f5ed;
+    --pass-border: #6fba8c;
+    --fail: #b3261e;
+    --fail-bg: #fdecea;
+    --fail-border: #e57373;
+    --pending-bg: #f9f9f9;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161b;
+      --surface: #1c2229;
+      --ink: #e4e9ee;
+      --muted: #8a97a5;
+      --rule: #2e3740;
+      --accent: #4dbdb9;
+      --accent-fg: #0a1a1a;
+      --pass: #5cb87a;
+      --pass-bg: #0d2016;
+      --pass-border: #2e6b44;
+      --fail: #ff8a80;
+      --fail-bg: #200d0c;
+      --fail-border: #7a2a26;
+      --pending-bg: #1a1f26;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 var(--sans);
+    padding-bottom: 48px;
+  }
+
+  /* ── header ── */
+  .page-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    padding: 16px 24px;
+  }
+  .page-header h1 { margin: 0; font-size: 20px; }
+  .page-header .meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  /* ── layout ── */
+  .container { max-width: 760px; margin: 0 auto; padding: 20px 16px; }
+
+  /* ── progress bar ── */
+  .progress-bar-wrap {
+    background: var(--rule);
+    border-radius: 4px;
+    height: 6px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  #progressBar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.25s;
+  }
+  .progress-label {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── AC card ── */
+  .ac-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .ac-card.verdict-pass { border-color: var(--pass-border); background: var(--pass-bg); }
+  .ac-card.verdict-fail { border-color: var(--fail-border); background: var(--fail-bg); }
+  .ac-card.verdict-pending { background: var(--pending-bg); }
+
+  /* card header row */
+  .ac-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ac-id {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    flex-shrink: 0;
+    min-width: 38px;
+  }
+  .ac-summary {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .ac-verdict-pill {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    min-width: 56px;
+    text-align: center;
+  }
+  .pill-pass  { background: var(--pass-bg);  color: var(--pass);  border-color: var(--pass-border); }
+  .pill-fail  { background: var(--fail-bg);  color: var(--fail);  border-color: var(--fail-border); }
+  .pill-pend  { background: var(--bg);       color: var(--muted); border-color: var(--rule); }
+
+  .chevron {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    color: var(--muted);
+    transition: transform 0.2s;
+  }
+  .ac-card.open .chevron { transform: rotate(180deg); }
+
+  /* collapsible body */
+  .ac-body {
+    display: none;
+    padding: 0 16px 16px;
+    border-top: 1px solid var(--rule);
+  }
+  .ac-card.open .ac-body { display: block; }
+
+  .instructions-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 14px 0 4px;
+  }
+  .instructions {
+    font-size: 14px;
+    line-height: 1.6;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 10px 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .auto-line {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-top: 6px;
+    padding: 4px 8px;
+    background: var(--bg);
+    border-radius: 4px;
+    border: 1px solid var(--rule);
+    overflow-wrap: anywhere;
+  }
+  .auto-line span { font-weight: 700; }
+
+  /* verdict buttons */
+  .verdict-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .btn-verdict {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: 2px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink);
+    font: 600 14px var(--sans);
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+  }
+  .btn-verdict:hover { opacity: 0.85; }
+  .btn-verdict.selected-pass {
+    background: var(--pass-bg);
+    border-color: var(--pass-border);
+    color: var(--pass);
+  }
+  .btn-verdict.selected-fail {
+    background: var(--fail-bg);
+    border-color: var(--fail-border);
+    color: var(--fail);
+  }
+
+  /* notes */
+  .notes-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 14px 0 4px;
+  }
+  .notes-field {
+    width: 100%;
+    font: 14px/1.5 var(--sans);
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 8px 10px;
+    resize: vertical;
+    min-height: 72px;
+  }
+  .notes-field:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ── generate section ── */
+  .generate-section {
+    margin-top: 28px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .generate-section h2 { margin: 0 0 8px; font-size: 16px; }
+  .generate-section p { margin: 0 0 14px; font-size: 14px; color: var(--muted); }
+  .btn-generate {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: none;
+    border-radius: 8px;
+    font: 600 15px var(--sans);
+    padding: 11px 24px;
+    cursor: pointer;
+    min-width: 180px;
+  }
+  .btn-generate:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-generate:hover:not(:disabled) { opacity: 0.9; }
+
+  /* ── result / summary ── */
+  .result-box {
+    display: none;
+    margin-top: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--rule);
+    padding: 14px 16px;
+    font-size: 14px;
+    background: var(--bg);
+  }
+  .result-box.visible { display: block; }
+  .result-box.ok { border-color: var(--pass-border); }
+  .result-box.err { border-color: var(--fail-border); }
+  .result-box pre {
+    margin: 8px 0 0;
+    white-space: pre-wrap;
+    font: 13px/1.5 var(--mono);
+    color: var(--muted);
+    word-break: break-word;
+  }
+
+  /* ── loading / error splash ── */
+  #splash {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+    font-size: 15px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1 id="pageTitle">PiFitness UAT</h1>
+  <div class="meta" id="pageMeta">Loading…</div>
+</div>
+
+<div class="container">
+  <div id="splash">Loading acceptance criteria…</div>
+  <div id="main" style="display:none">
+    <div class="progress-label">
+      <span id="progressText">0 of 0 checked</span>
+      <span id="progressCounts"></span>
+    </div>
+    <div class="progress-bar-wrap"><div id="progressBar"></div></div>
+
+    <div id="acList"></div>
+
+    <div class="generate-section">
+      <h2>Save &amp; import feedback</h2>
+      <p>
+        Saves <code>&lt;id&gt;_feedback.md</code> directly to
+        <code>.features/designs_active/</code>, then runs
+        <code>fd.py uat import &lt;id&gt; --apply</code> and shows the summary below.
+        You do not need to do anything after clicking.
+      </p>
+      <button class="btn-generate" id="btnGenerate">Save &amp; import feedback</button>
+      <div class="result-box" id="resultBox">
+        <strong id="resultHeading"></strong>
+        <pre id="resultPre"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  let uatData = null;   // the /api/data payload
+  const state = {};     // ac.id -> { verdict: 'Pass'|'Fail'|'Pending', notes: '' }
+
+  // ── helpers ──────────────────────────────────────────────────────────────
+  function e(tag, cls, text) {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text !== undefined) el.textContent = text;
+    return el;
+  }
+  function q(id) { return document.getElementById(id); }
+
+  // ── progress ─────────────────────────────────────────────────────────────
+  function updateProgress() {
+    if (!uatData) return;
+    const total = uatData.acceptance_criteria.length;
+    let npass = 0, nfail = 0;
+    for (const ac of uatData.acceptance_criteria) {
+      const v = state[ac.id] && state[ac.id].verdict;
+      if (v === 'Pass') npass++;
+      else if (v === 'Fail') nfail++;
+    }
+    const checked = npass + nfail;
+    q('progressText').textContent = `${checked} of ${total} checked`;
+    q('progressCounts').textContent = `${npass} pass · ${nfail} fail · ${total - checked} pending`;
+    q('progressBar').style.width = total ? `${(checked / total) * 100}%` : '0%';
+  }
+
+  // ── card ──────────────────────────────────────────────────────────────────
+  function buildCard(ac) {
+    state[ac.id] = { verdict: 'Pending', notes: '' };
+
+    const card = e('div', 'ac-card verdict-pending');
+    card.id = 'card-' + ac.id;
+
+    // header
+    const header = e('div', 'ac-header');
+    header.setAttribute('role', 'button');
+    header.setAttribute('aria-expanded', 'false');
+    header.setAttribute('tabindex', '0');
+
+    const idSpan  = e('span', 'ac-id', ac.id);
+    const sumSpan = e('span', 'ac-summary', ac.text);
+    const pill    = e('span', 'ac-verdict-pill pill-pend', 'Pending');
+    pill.id = 'pill-' + ac.id;
+
+    // chevron SVG
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 20 20');
+    svg.setAttribute('fill', 'currentColor');
+    svg.classList.add('chevron');
+    svg.innerHTML = '<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>';
+
+    header.append(idSpan, sumSpan, pill, svg);
+
+    // body
+    const body = e('div', 'ac-body');
+
+    // instructions
+    const instrLabel = e('div', 'instructions-label', 'Test instructions');
+    const instrBox   = e('div', 'instructions');
+
+    // Build a richer instruction string from AC text
+    // Format: "What to do -> What you should see"
+    const rawText = ac.text;
+    const arrowIdx = rawText.indexOf('->');
+    if (arrowIdx !== -1) {
+      const doText  = rawText.slice(0, arrowIdx).trim();
+      const seeText = rawText.slice(arrowIdx + 2).trim();
+      instrBox.innerHTML =
+        '<strong>Do:</strong> ' + esc(doText) +
+        '\n\n<strong>Expect:</strong> ' + esc(seeText);
+    } else {
+      instrBox.textContent = rawText;
+    }
+
+    body.append(instrLabel, instrBox);
+
+    // auto: line (verify command)
+    if (ac.auto && ac.auto.trim()) {
+      const autoEl = e('div', 'auto-line');
+      autoEl.innerHTML = '<span>auto:</span> ' + esc(ac.auto);
+      body.appendChild(autoEl);
+    }
+
+    // verdict buttons
+    const verdictRow = e('div', 'verdict-row');
+    const btnPass = e('button', 'btn-verdict', '✓  Pass');
+    const btnFail = e('button', 'btn-verdict', '✗  Fail');
+    btnPass.type = btnFail.type = 'button';
+    btnPass.setAttribute('aria-label', `${ac.id}: Pass`);
+    btnFail.setAttribute('aria-label', `${ac.id}: Fail`);
+
+    function setVerdict(v) {
+      state[ac.id].verdict = v;
+      btnPass.classList.toggle('selected-pass', v === 'Pass');
+      btnFail.classList.toggle('selected-fail', v === 'Fail');
+      card.className = 'ac-card verdict-' + v.toLowerCase();
+      const p = q('pill-' + ac.id);
+      if (v === 'Pass') {
+        p.className = 'ac-verdict-pill pill-pass';
+        p.textContent = 'Pass';
+      } else if (v === 'Fail') {
+        p.className = 'ac-verdict-pill pill-fail';
+        p.textContent = 'Fail';
+      } else {
+        p.className = 'ac-verdict-pill pill-pend';
+        p.textContent = 'Pending';
+      }
+      updateProgress();
+    }
+
+    btnPass.addEventListener('click', () => {
+      setVerdict(state[ac.id].verdict === 'Pass' ? 'Pending' : 'Pass');
+    });
+    btnFail.addEventListener('click', () => {
+      setVerdict(state[ac.id].verdict === 'Fail' ? 'Pending' : 'Fail');
+    });
+    verdictRow.append(btnPass, btnFail);
+    body.appendChild(verdictRow);
+
+    // notes
+    const notesLabel = e('div', 'notes-label', 'Observed behaviour / notes');
+    const notesField = e('textarea', 'notes-field');
+    notesField.placeholder = 'What did you actually see? Leave blank if the result speaks for itself.';
+    notesField.setAttribute('aria-label', `${ac.id} notes`);
+    notesField.addEventListener('input', () => { state[ac.id].notes = notesField.value; });
+    body.append(notesLabel, notesField);
+
+    // collapse toggle
+    function toggleOpen() {
+      const isOpen = card.classList.toggle('open');
+      header.setAttribute('aria-expanded', String(isOpen));
+    }
+    header.addEventListener('click', toggleOpen);
+    header.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleOpen(); } });
+
+    card.append(header, body);
+    return card;
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── render ────────────────────────────────────────────────────────────────
+  function render(data) {
+    uatData = data;
+    q('pageTitle').textContent = `UAT — ${data.title || data.feature_id}`;
+    q('pageMeta').textContent =
+      `${data.feature_id}  ·  ${data.acceptance_criteria.length} acceptance criteria  ·  built ${data.generated_at}`;
+
+    const list = q('acList');
+    list.textContent = '';
+    for (const ac of data.acceptance_criteria) {
+      list.appendChild(buildCard(ac));
+    }
+    // Open first card automatically
+    if (data.acceptance_criteria.length > 0) {
+      const first = document.querySelector('.ac-card');
+      if (first) {
+        first.classList.add('open');
+        const hdr = first.querySelector('.ac-header');
+        if (hdr) hdr.setAttribute('aria-expanded', 'true');
+      }
+    }
+    updateProgress();
+    q('splash').style.display = 'none';
+    q('main').style.display = '';
+  }
+
+  // ── load ──────────────────────────────────────────────────────────────────
+  async function loadData() {
+    try {
+      const res = await fetch('/api/data');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        q('splash').textContent = 'Error: ' + (err.error || res.status);
+        return;
+      }
+      render(await res.json());
+    } catch (ex) {
+      q('splash').textContent = 'Cannot reach uat_launcher.py. Restart it.';
+    }
+  }
+
+  // ── save & import ─────────────────────────────────────────────────────────
+  async function saveAndImport(overwrite) {
+    if (!uatData) return;
+    const verdicts = uatData.acceptance_criteria.map(ac => ({
+      id: ac.id,
+      result: state[ac.id] ? state[ac.id].verdict : 'Pending',
+      notes: state[ac.id] ? state[ac.id].notes : '',
+    }));
+
+    const btn = q('btnGenerate');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    try {
+      const res = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verdicts, overwrite: !!overwrite }),
+      });
+      const data = await res.json();
+
+      const box = q('resultBox');
+      const heading = q('resultHeading');
+      const pre = q('resultPre');
+
+      if (res.status === 409 && data.exists) {
+        btn.disabled = false;
+        btn.textContent = 'Save & import feedback';
+        if (confirm(`${data.path} already exists. Overwrite it?`)) {
+          saveAndImport(true);
+        }
+        return;
+      }
+
+      box.classList.add('visible');
+      if (res.ok && data.saved) {
+        box.classList.add('ok');
+        box.classList.remove('err');
+        heading.textContent = `✓ Saved to ${data.path}`;
+        pre.textContent = data.import_summary || '';
+      } else {
+        box.classList.add('err');
+        box.classList.remove('ok');
+        heading.textContent = 'Save failed.';
+        pre.textContent = data.error || JSON.stringify(data);
+      }
+    } catch (ex) {
+      q('resultBox').classList.add('visible', 'err');
+      q('resultHeading').textContent = 'Network error — is uat_launcher.py still running?';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save & import feedback';
+    }
+  }
+
+  q('btnGenerate').addEventListener('click', () => saveAndImport(false));
+
+  loadData();
+})();
+</script>
+</body>
+</html>

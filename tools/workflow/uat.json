@@ -1,0 +1,31 @@
+{
+  "feature_id": "fx6",
+  "title": "Scripted fake feature run (phase 4 exit check)",
+  "generated_at": "2026-11-18",
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "text": "start entry recorded for T01 before the done gate",
+      "auto": "",
+      "done": true
+    },
+    {
+      "id": "AC-2",
+      "text": "done gate ran verify and recorded exit code plus output tail",
+      "auto": "",
+      "done": true
+    },
+    {
+      "id": "AC-3",
+      "text": "interrupted task is auto-selected by resume",
+      "auto": "",
+      "done": true
+    },
+    {
+      "id": "AC-4",
+      "text": "brief printed status/log/git/verify with no human input",
+      "auto": "",
+      "done": true
+    }
+  ]
+}
