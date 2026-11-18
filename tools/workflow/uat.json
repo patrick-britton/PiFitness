@@ -1,31 +1,19 @@
 {
-  "feature_id": "fx6",
-  "title": "Scripted fake feature run (phase 4 exit check)",
+  "feature_id": "fix-the-target-running-playlist",
+  "title": "Fix the target running playlist",
   "generated_at": "2026-11-18",
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "text": "start entry recorded for T01 before the done gate",
-      "auto": "",
-      "done": true
+      "text": "Process an activity with Run mode and Running music -> the shuffle step sends only the duration-capped track list (~20 to 35 tracks, <= 150 minutes) to the child playlist ('Running (a)') on Spotify rather than all 400+ tracks from the parent playlist (covers B1) (pending OQ-2, OQ-3, OQ-5)",
+      "auto": "none (pending OQ-6)",
+      "done": false
     },
     {
       "id": "AC-2",
-      "text": "done gate ran verify and recorded exit code plus output tail",
-      "auto": "",
-      "done": true
-    },
-    {
-      "id": "AC-3",
-      "text": "interrupted task is auto-selected by resume",
-      "auto": "",
-      "done": true
-    },
-    {
-      "id": "AC-4",
-      "text": "brief printed status/log/git/verify with no human input",
-      "auto": "",
-      "done": true
+      "text": "Run `auto_shuffle_playlists` for a playlist with a configured `minutes_to_sync` duration cap -> tracks sent to the target child playlist are limited to the duration cap rather than all tracks from the parent playlist (covers B2) (pending OQ-4)",
+      "auto": "& 'C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe' -m pytest tests/test_auto_shuffle_pandas_free.py -q",
+      "done": false
     }
   ]
 }
