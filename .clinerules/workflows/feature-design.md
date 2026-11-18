@@ -48,6 +48,11 @@ Do this only when no OQ other than OQ-1 is open.
 1. Fill `surfaces` in the frontmatter. Set `last-updated` to today.
 2. **Architecture**, at most 250 words total:
    - Surfaces: each target with its lineage result in one line.
+   - Principles alignment: ensure the approach honors the governing principle documents in `docs/`:
+     - Frontend -> `docs/UI_PRINCIPLES.md` (touch targets >= 44px, bottom sheets, full state design)
+     - Database -> `docs/DATABASE_PRINCIPLES.md` (keyset pagination, parameterization, domain schemas)
+     - Integrations/Workers -> `docs/INTEGRATION_PRINCIPLES.md` (token defenses, idempotent ingestion)
+     - Topology -> `docs/ARCHITECTURE.md` (layering, import direction) and `docs/PI_SPECS.md`
    - Approach: how the change works, in plain steps.
    - Data and migrations: additive only, or `None`.
    - API changes: or `None`.

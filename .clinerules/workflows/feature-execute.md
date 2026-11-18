@@ -35,6 +35,7 @@ Common rules: `.clinerules/20-feature-common.md`.
 1. Run `python tools/workflow/fd.py start <id> T##`.
 2. Read only what the task needs: its `pattern` and `read` anchors, and the parts of its `modify` files you will change. For a `planned` anchor, use the `Interface:` lines of the task that creates the file; do not read ahead in the plan or guess.
 3. Make the change described in `Detail`, in the anchored files only.
+   - Follow the task's surface principle document in `docs/` (`UI_PRINCIPLES.md` for frontend, `DATABASE_PRINCIPLES.md` for database/queries, `INTEGRATION_PRINCIPLES.md` for external sync/workers).
    - A file with `Interface:` lines must match them exactly (path, symbols, signatures).
    - A migration is additive only and adds a `COMMENT` for every new table and column.
    - Match the naming and style of the task's `pattern` anchor.

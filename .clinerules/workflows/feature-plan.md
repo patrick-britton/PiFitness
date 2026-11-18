@@ -63,7 +63,12 @@ Order tasks by dependency: database, then backend, then frontend.
 
 Replace everything under `## Task Plan` with task blocks in the format of the template's commented example.
 
-- `Surface`: one of frontend, backend, database, deployment, integration.
+- `Surface`: one of frontend, backend, database, deployment, integration. The surface dictates which principle document in `docs/` governs the task:
+  - `frontend` -> `docs/UI_PRINCIPLES.md`
+  - `database` -> `docs/DATABASE_PRINCIPLES.md`
+  - `integration` -> `docs/INTEGRATION_PRINCIPLES.md`
+  - `backend` -> `docs/ARCHITECTURE.md`
+  - `deployment` -> `docs/PI_SPECS.md`
 - `Skill`: the expertise needed, one or two words (react, fastapi, postgres).
 - `Points`: `1`, `2`, or `3`.
 - `Depends-on`: task ids, or `none`.

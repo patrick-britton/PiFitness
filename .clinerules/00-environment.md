@@ -38,8 +38,20 @@ This applies to `fd.py`, `lineage.py`, `lint_comments.py`, `check_docs.py`, and 
 | Review: comment lint | `& PY tools/lint_comments.py` |
 | Review: doc citations | `& PY tools/check_docs.py cites` |
 | Lineage | `& PY tools/data_dictionary/lineage.py describe\|search\|trace <target>` |
+| Fast DEV DB reset | `& PY tools/db/dev_reset.py` |
+| Refresh DEV context (human) | `powershell -ExecutionPolicy Bypass -File tools/refresh_dev.ps1 [-SyncPrd]` |
 
-`lineage.py build` is run by the human only. Tests live under `tests/`.
+`lineage.py build` is run by the human only (or automated via `tools/refresh_dev.ps1`). Tests live under `tests/`.
+
+## Architectural Principles ("Holy Grail" Documents)
+
+Reference these documents according to the surface being designed, planned, or executed:
+
+- **System Architecture & Flow:** [`docs/ARCHITECTURE.md`](file:///C:/users/rickb/vsprojects/pifitness/docs/ARCHITECTURE.md) — layers, FastAPI routers, Next.js components, and import boundaries.
+- **Hardware & Performance:** [`docs/PI_SPECS.md`](file:///C:/users/rickb/vsprojects/pifitness/docs/PI_SPECS.md) — Raspberry Pi 5 hardware profile, NVMe SSD bandwidth, and compute constraints.
+- **Frontend & UI:** [`docs/UI_PRINCIPLES.md`](file:///C:/users/rickb/vsprojects/pifitness/docs/UI_PRINCIPLES.md) — mobile-first ergonomics, thumb zones, 44px touch targets, safe area insets, loading/error states.
+- **Database & Schemas:** [`docs/DATABASE_PRINCIPLES.md`](file:///C:/users/rickb/vsprojects/pifitness/docs/DATABASE_PRINCIPLES.md) — DEV vs PRD isolation, domain schemas, keyset pagination, parameterization.
+- **APIs & Workers:** [`docs/INTEGRATION_PRINCIPLES.md`](file:///C:/users/rickb/vsprojects/pifitness/docs/INTEGRATION_PRINCIPLES.md) — Garmin 3-layer anti-429 token defense, Spotify OAuth, and worker execution queues.
 
 ## Known issues (from the snapshot; verify before relying on them)
 

@@ -101,7 +101,13 @@ PiFitness/
 │       └── _FEATURE_DESIGN_TEMPLATE.md
 │
 ├── docs/
-│   ├── lineage/graph.json              # Built by the human; queried by agents
+│   ├── ARCHITECTURE.md                 # System layers, request flow, and import boundaries
+│   ├── PI_SPECS.md                     # Raspberry Pi 5 hardware & thermal constraints
+│   ├── UI_PRINCIPLES.md                # Mobile ergonomics, 44px touch targets, safe areas
+│   ├── DATABASE_PRINCIPLES.md          # PostgreSQL schemas, keyset pagination, parameterization
+│   ├── INTEGRATION_PRINCIPLES.md       # Garmin 3-layer anti-429 token defense, Spotify, workers
+│   ├── data/schema.generated.md        # Physical schema inventory (via schema_map.py)
+│   ├── lineage/graph.json              # Lineage graph (via lineage.py build)
 │   └── workflow/BACKLOG.md             # Out-of-scope findings (fd.py backlog add)
 │
 ├── .clinerules/
@@ -117,12 +123,20 @@ PiFitness/
 │       └── feature-review.md           # Step 9
 │
 └── tools/
+    ├── refresh_dev.ps1                 # Unified session startup runner (PRD sync + schema + lineage)
     ├── data_dictionary/lineage.py      # Lineage graph build and query
+    ├── db/schema_map.py                # Schema markdown generator
+    ├── db/dev_reset.py                 # Fast local DEV database reset from template
+    ├── check_docs.py                   # Documentation citation & heading gate
+    ├── lint_comments.py                # Comment & ID lint gate
+    ├── ratchet.py                      # Baseline comparison engine
+    ├── verify.py                       # Verification runner
     └── workflow/
         ├── request_form.py             # Serves the request form and writes the request file
         ├── request_form.html           # The request form UI
         ├── fd.py                       # Feature design, lifecycle, and UAT engine
         ├── uat_launcher.py             # Serves the UAT form and writes <id>_feedback.md
+        └── uat_launcher.html           # The UAT form UI
         ├── uat_launcher.html           # The UAT form UI (generic; reads /api/data at runtime)
         ├── uat.json                    # Evergreen AC data written by fd.py uat build; read by uat_launcher.py
         ├── run_long.ps1                # Long-running command launcher
@@ -187,17 +201,17 @@ flowchart TD
 
 Each step lists what it **expects** on entry and what it **leaves** on exit. Agent workflows take no id argument: they find it from the single file in the folder.
 
-### Step 1: Human Prepares Workspace and Syncs DEV Database
+### Step 1: Human Prepares Workspace and Refreshes DEV Context
 - **Actor:** Human.
 - **Action:**
   1. Check out `feature-test` and bring it up to date with `main`.
-  2. Run `tools/db/sync-prod-to-dev.ps1` from PowerShell to refresh local Docker PostgreSQL (`pifitness-dev-db`) from PRD.
+  2. Run `powershell -ExecutionPolicy Bypass -File tools/refresh_dev.ps1 -SyncPrd` to clone production down to the local DEV container (`pifitness-dev-db`), update `docs/data/schema.generated.md`, and rebuild `docs/lineage/graph.json` in one automated step (or run `tools/refresh_dev.ps1` without `-SyncPrd` to regenerate schema and lineage against the existing DEV database).
   3. Confirm `ALTER DATABASE pifitness_dev SET pifitness.env = 'dev'` is active (or run `python tools/db/dev_reset.py`).
-- **Leaves:** `git branch --show-current` prints `feature-test`; DEV database marked `dev`.
+- **Leaves:** `git branch --show-current` prints `feature-test`; DEV database marked `dev`; schema and lineage documents fully updated.
 
-### Step 2: Human Refreshes Lineage Graph
+### Step 2: Lineage Graph Verification
 - **Actor:** Human.
-- **Action:** Runs `python tools/data_dictionary/lineage.py build`, then `lineage.py check`, so `docs/lineage/graph.json` matches current code and database views.
+- **Action:** Runs `python tools/data_dictionary/lineage.py check` to verify there are no unmapped drift issues between code and database views.
 - **Leaves:** a fresh graph.
 
 ### Step 3: Human Fills Feature Request via the Form
