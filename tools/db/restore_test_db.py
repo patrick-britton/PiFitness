@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Replace TEST directly from the latest validated PRD nightly backup.
 
+Role in Feature Development Lifecycle:
+- Why it exists: Provides an automated, robust mechanism to tear down and rebuild an exact replica of
+  production in TEST using the latest validated PRD backup, including ownership, grants, and environment markers.
+- When it is used: During pre-deployment rehearsals and CI migration validation when the existing TEST
+  database is corrupted, out-of-date, or flagged for a clean rebuild by policy.
+- Why it is important: Ensures that schema migrations and feature deployments are tested against an authentic,
+  production-scale database state prior to any production rollout, eliminating surprises caused by data volume
+  or unexpected legacy rows.
+
 This is a destructive rebuild, not a rollback transaction: TEST is already
 known to be unsuitable when this command is invoked. The PRD archive is
 validated before TEST is dropped. The helper then recreates the configured

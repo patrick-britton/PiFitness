@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """Read-only inspection and decision report for PiFitness TEST vs PRD.
 
+Role in Feature Development Lifecycle:
+- Why it exists: Provides an automated, read-only audit of the TEST database environment against PRD
+  to determine whether TEST is valid and safe for migration rehearsals.
+- When it is used: In the pre-deployment and release verification stages of feature rollout.
+- Why it is important: Ensures the test database has correct permissions, ownership, environment markers,
+  and schema parity before any migration execution is attempted, preventing false test results or accidental
+  operations on the wrong database.
+
 This module performs no DDL and never refreshes, renames, drops, or modifies a
  database. It:
 - validates the explicitly supplied TEST and PRD migration configurations;

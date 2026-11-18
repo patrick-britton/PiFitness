@@ -1,9 +1,13 @@
-"""
-Query Validation Script
-========================
+#!/usr/bin/env python3
+"""tools/db/validate_queries.py - Query Validation Script.
 
-Validate all query functions against the actual database schema.
-This script checks if tables and columns referenced in queries actually exist.
+Role in Feature Development Lifecycle:
+- Why it exists: Statically validates backend SQL query functions against the actual database schema
+  to verify that all referenced tables and columns exist in the database.
+- When it is used: During feature execution and testing after modifying backend queries or database schema,
+  and during code review.
+- Why it is important: Catches misspelled table/column names, obsolete schema references, or schema drift
+  statically before queries fail at runtime in production.
 """
 
 import re

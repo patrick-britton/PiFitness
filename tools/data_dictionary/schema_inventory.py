@@ -1,4 +1,13 @@
-"""Parse schema.generated.md and compare exact object/column coverage with dictionary.md."""
+#!/usr/bin/env python3
+"""Parse schema.generated.md and compare exact object/column coverage with dictionary.md.
+
+Role in Feature Development Lifecycle:
+- Why it exists: Parses the generated schema markdown (`docs/data/schema.generated.md`) into a structured
+  JSON inventory and compares documented data dictionary objects against actual schema relations.
+- When it is used: During data documentation audits or following database schema changes.
+- Why it is important: Ensures that documentation accurately matches physical schema reality and detects
+  renamed, missing, or undocumented database objects.
+"""
 from __future__ import annotations
 import argparse, json, re
 from collections import Counter

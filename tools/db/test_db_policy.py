@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """Pure decision policy for reusing or rebuilding PiFitness TEST.
 
+Role in Feature Development Lifecycle:
+- Why it exists: Encapsulates pure, deterministic decision logic that evaluates observations about
+  the TEST database (existence, role ownership, environment markers, schema comparison) and determines
+  whether TEST should be reused, refreshed from PRD backup, or aborted.
+- When it is used: In automated CI/CD and pre-deployment pipelines prior to applying database migrations.
+- Why it is important: Removes manual guesswork and prevents operator error by codifying database safety
+  rules into a testable decision engine.
+
 A TEST database that fails identity, permissions, or schema checks is replaced
 from the latest validated PRD backup. The old TEST database is not retained
 as a rollback copy. An identical compatible database is reused by default,

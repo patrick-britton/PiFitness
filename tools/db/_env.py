@@ -1,4 +1,12 @@
+#!/usr/bin/env python3
 """Shared environment-file helpers for PiFitness database tools.
+
+Role in Feature Development Lifecycle:
+- Why it exists: Provides shared configuration parsing, connection-parameter resolution, and safety guards
+  for all database management tools.
+- When it is used: Imported internally by `tools/db/` modules whenever connecting to or inspecting databases.
+- Why it is important: Enforces critical security boundaries—such as preventing accidental connections to
+  production, validating `APP_ENV` markers, and ensuring commands default to the safe local container environment.
 
 This module replaces the non-migration-specific helpers that previously lived
 in migrate.py (env-file parsing, connection-parameter building, database name

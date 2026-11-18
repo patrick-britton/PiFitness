@@ -1,4 +1,13 @@
-"""Audit dictionary coverage, placeholders, and SQL COMMENT metadata quality."""
+#!/usr/bin/env python3
+"""Audit dictionary coverage, placeholders, and SQL COMMENT metadata quality.
+
+Role in Feature Development Lifecycle:
+- Why it exists: Audits data documentation files for completeness, placeholder text (e.g. TODO, TBD),
+  and consistency with PostgreSQL `COMMENT ON` metadata in migrations.
+- When it is used: During documentation verification and quality reviews of schema changes.
+- Why it is important: Enforces rigorous documentation quality and prevents stale or incomplete
+  schema descriptions from lingering in the repo.
+"""
 from __future__ import annotations
 import argparse,json,re
 from collections import Counter

@@ -1,4 +1,14 @@
-"""Aggregate-only profile of safe low-cardinality category values; never emits records."""
+#!/usr/bin/env python3
+"""Aggregate-only profile of safe low-cardinality category values; never emits records.
+
+Role in Feature Development Lifecycle:
+- Why it exists: Inspects database tables using aggregate-only sampling (`TABLESAMPLE BERNOULLI`)
+  to profile column cardinality and discover enum-like discrete values.
+- When it is used: During feature discovery and design when understanding valid categorical states,
+  status codes, or event types in the database is necessary.
+- Why it is important: Strictly prevents data leakage by refusing to emit raw rows or sample sensitive
+  columns (PII, credentials, health metrics, coordinates).
+"""
 from __future__ import annotations
 import argparse
 from pathlib import Path

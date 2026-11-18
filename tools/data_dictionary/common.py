@@ -1,4 +1,14 @@
-"""Shared helpers for read-only PostgreSQL data-dictionary tooling."""
+#!/usr/bin/env python3
+"""Shared helpers for read-only PostgreSQL data-dictionary tooling.
+
+Role in Feature Development Lifecycle:
+- Why it exists: Provides shared utility functions, connection parameter parsing, and strict
+  security boundary enforcements for data dictionary and database catalog extraction tools.
+- When it is used: Imported internally by `db_catalog.py`, `profile_data.py`, `schema_inventory.py`,
+  and `audit.py`.
+- Why it is important: Strictly enforces safety guardrails by whitelisting only `localhost:15432 / pifitness_dev / dev`,
+  blocking any connection attempts against remote hosts or production environments, and masking sensitive columns.
+"""
 from __future__ import annotations
 import json
 import os

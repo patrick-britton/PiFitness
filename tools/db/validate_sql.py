@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
-"""
-Validate a SQL query against the local schema cache.
-Usage: python validate_sql.py --sql "SELECT * FROM activities.activity_summary"
+"""tools/db/validate_sql.py - Ad-Hoc SQL Query Validator.
+
+Role in Feature Development Lifecycle:
+- Why it exists: Validates individual SQL query strings against a cached schema inventory.
+- When it is used: During ad-hoc query development or task execution to quickly check SQL snippet syntax
+  and relation names.
+- Why it is important: Provides immediate CLI feedback on SQL validity without opening an interactive database session.
+  Note: This tool historically targeted a local cache (`scripts/schema_cache.json`). In modern workflows,
+  prefer `tools/data_dictionary/lineage.py describe <table/view>` and `tools/db/validate_queries.py`.
+
+Usage: python tools/db/validate_sql.py --sql "SELECT * FROM activities.activity_summary"
 """
 
 import argparse
 import json
 import re
 import sys
-from pathlib import Path
 from pathlib import Path
 from dotenv import load_dotenv
 

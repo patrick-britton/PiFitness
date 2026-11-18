@@ -1,4 +1,14 @@
-"""Find repository file/line references to database objects from schema.generated.md."""
+#!/usr/bin/env python3
+"""Find repository file/line references to database objects from schema.generated.md.
+
+Role in Feature Development Lifecycle:
+- Why it exists: Performs a repository-wide static scan across Python, TypeScript, SQL, and configuration
+  files to find candidate references to known database tables and views.
+- When it is used: During feature design and schema refactoring when assessing the blast radius of
+  table changes or discovering implicit dependencies.
+- Why it is important: Supplements AST analysis in `lineage.py` by capturing dynamic SQL or string references
+  that AST parsers might miss.
+"""
 from __future__ import annotations
 import argparse
 import re

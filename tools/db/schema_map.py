@@ -1,3 +1,17 @@
+#!/usr/bin/env python3
+"""tools/db/schema_map.py - Database Schema Markdown Generator.
+
+Role in Feature Development Lifecycle:
+- Why it exists: Generates the up-to-date markdown catalog `docs/data/schema.generated.md`
+  directly from the local PostgreSQL DEV database (`information_schema`).
+- When it is used: At the start of a feature development session immediately after cloning
+  the latest production backup to DEV (`tools/db/sync-prod-to-dev.ps1`), or whenever new database
+  migrations are added or altered during feature design and execution.
+- Why it is important: Provides human developers and AI agents with a comprehensive, verified,
+  and offline-readable inventory of all application schemas, tables, views, and columns without
+  requiring repeated live SQL queries during planning or code authoring.
+"""
+
 import os
 from pathlib import Path
 from dotenv import load_dotenv

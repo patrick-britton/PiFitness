@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Read-only TEST/PRD PostgreSQL schema comparison using MigraDiff.
 
+Role in Feature Development Lifecycle:
+- Why it exists: Compares database schemas between target environments (e.g. TEST vs PRD) using
+  MigraDiff, ensuring that proposed database migrations match production expectations and that
+  no untracked schema differences exist.
+- When it is used: During release preparation, migration authoring, and pre-deployment validation
+  before promoting features to production.
+- Why it is important: Serves as a vital safety gate against deployment failures caused by schema
+  drift, missing indexes, altered column types, or out-of-order migration application.
+
 This wrapper owns only PiFitness-specific safety and policy boundaries:
 - explicit TEST/PRD migration env files;
 - local endpoint, database identity, and marker verification;

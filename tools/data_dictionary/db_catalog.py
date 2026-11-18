@@ -1,4 +1,14 @@
-"""Capture PostgreSQL catalog metadata and view/routine/trigger definitions (read-only)."""
+#!/usr/bin/env python3
+"""Capture PostgreSQL catalog metadata and view/routine/trigger definitions (read-only).
+
+Role in Feature Development Lifecycle:
+- Why it exists: Extracts complete relational catalog metadata (relations, columns, constraints,
+  indexes, views, stored procedures, triggers, enums) from the local PostgreSQL DEV database.
+- When it is used: During database schema audits, deep architecture reviews, or offline schema analysis
+  when comprehensive catalog metadata and SQL definitions are required.
+- Why it is important: Produces structured JSON catalog snapshots and raw SQL definitions without altering
+  database state or exposing sensitive row data.
+"""
 from __future__ import annotations
 import argparse, json, os, shutil, subprocess
 from pathlib import Path

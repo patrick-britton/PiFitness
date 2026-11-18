@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # dbmate_guard.sh - Thin guard wrapper around dbmate for PiFitness.
 #
-# Re-implements migrate.py's safety gates on top of dbmate (dbmate itself has
-# no PRD guard, localhost-only check, or APP_ENV marker validation).
+# Role in Feature Development Lifecycle:
+# - Why it exists: Wraps the `dbmate` migration binary with PiFitness-specific safety gates
+#   (localhost-only check, explicit `--allow-prd` requirement, and APP_ENV marker verification).
+# - When it is used: During migration application, rollbacks, and status checks in test and production.
+# - Why it is important: Prevents running accidental or unverified migrations directly against
+#   production databases by requiring explicit flags and environment marker confirmation.
 #
 # Usage:
 #   dbmate_guard.sh status --env-file PATH [--allow-prd]
