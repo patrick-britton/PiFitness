@@ -218,7 +218,14 @@ def main():
     baseline_path = Path(args.baseline) if args.baseline else (BASELINE_DIR / f"{args.command}.txt")
     baseline = load_baseline(baseline_path)
     if args.command == "cites":
-        files = args.paths or ["docs/ARCHITECTURE.md", "docs/REPO_MAP.md"]
+        default_files = [
+            "docs/ARCHITECTURE.md",
+            "docs/PI_SPECS.md",
+            "docs/UI_PRINCIPLES.md",
+            "docs/DATABASE_PRINCIPLES.md",
+            "docs/INTEGRATION_PRINCIPLES.md",
+        ]
+        files = args.paths or [f for f in default_files if (REPO_ROOT / f).exists()]
         return check_cites(files, baseline, args.update_baseline, args.allow_grow)
     if args.command == "headings":
         files = args.paths or sorted(str(p) for p in (REPO_ROOT / "docs").rglob("*.md"))

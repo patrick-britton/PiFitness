@@ -1,36 +1,68 @@
-# UI_PRINCIPLES
+# UI Principles & Mobile Ergonomics (`UI_PRINCIPLES.md`)
 
-Audience: frontend engineers and reviewers; anyone checking the UI on a phone. Target devices: modern phones of roughly Pixel 9 Pro XL class; rules are expressed relative to viewport width and safe areas, not pinned to one device's dimensions.
-Standard test viewports (statement V5): 448x875 and 360x740.
-Each rule names how it is checked. auto = a script can check it. human = needs a person on the phone. Rules marked auto-candidate are checkable but no check exists yet.
+This document defines the core user interface, interaction, and ergonomic principles for PiFitness. PiFitness is designed primarily as a mobile-first web application accessed from modern smartphones (roughly Pixel 9 Pro XL class viewports) over HTTPS, with desktop responsiveness.
 
-## Navigation and layout
+Standard mobile reference viewports: `448x875` and `360x740`.
 
-| ID | Rule | Why (one line) | Check | How it is checked | Observed in code |
-|---|---|---|---|---|---|
-| **Navigation and layout** | | | | | |
-| R1 | Primary navigation is a bottom tab bar within thumb reach. | Thumb reach is the main ergonomic constraint on phones of any size. | auto | Headless Playwright Chromium at 448x875 and 360x740 (tools/probe/probe5.py pattern): assert the bottom nav is fixed at the bottom and its bounding box sits inside the lower third of the viewport at both viewports. | frontend/pifitness/src/app/components/Layout.tsx:98 |
-| R8 | The layout is edge-to-edge and respects safe areas (status bar, gesture bar, display cutouts). | Phone chrome and cutouts must not cover content on any device. | auto | Playwright at both viewports: assert the Next.js viewport config sets viewportFit "cover" and the bottom nav applies env(safe-area-inset-bottom) padding. | frontend/pifitness/src/app/layout.tsx:14-17 |
-| R5 | Results appear where the eye already is (near the control that triggered them), not off-screen. | Off-screen results are missed on tall, narrow phone screens. | human | On the phone, open a search or filter view, tap the control, and confirm results render beside or under that control rather than elsewhere on the screen. | not observed |
+---
 
-## Touch and feedback
+## 1. Navigation & Layout Principles
 
-| **Touch and feedback** | | | | | |
-| R2 | Touch targets are at least 44px in both dimensions, with adequate spacing between neighbors. | Fingers need >=44px targets with separation to avoid mis-taps. | auto | Playwright at both viewports: assert all buttons, links and inputs have bounding boxes >=44px in both dimensions, with gaps between neighbors. | frontend/pifitness/src/app/activities/beach/components/BeachVolleyball.tsx:413 |
-| R3 | Every tappable element shows an immediate pressed state. | Touch has no hover, so a pressed visual confirms the tap landed. | human | On the phone, tap every button and link: each must show a pressed visual before navigation or action follows. | not observed |
-| R4 | Every async action shows loading, then success or error feedback. | Users must know an action is in flight and how it ended. | human | Trigger an async action on the phone: confirm a loading indicator appears at once, then success or error replaces it. | frontend/pifitness/src/app/food/components/food-ui.tsx:17 |
-| R6 | Secondary flows use bottom sheets, not page changes. | Overlays preserve context on small screens; page changes lose it. | human | Open a secondary flow on the phone and confirm it opens as a bottom sheet rather than a new page. | not observed |
+* **R1: Bottom Navigation within Thumb Reach:**
+  * *Principle:* Primary navigation lives in a fixed bottom tab bar located within easy reach of the user's thumb.
+  * *Reasoning:* Hand ergonomics on modern tall mobile screens make top-screen navigation difficult and uncomfortable for one-handed use.
+* **R5: In-Place Contextual Results:**
+  * *Principle:* Results and filter updates appear near the control that triggered them, not off-screen.
+  * *Reasoning:* Off-screen rendering causes disorientation and missed feedback on tall, narrow mobile viewports.
+* **R8: Edge-to-Edge with Safe Area Insets:**
+  * *Principle:* The layout extends edge-to-edge while respecting device safe areas (system status bar, gesture navigation bar, hardware camera cutouts).
+  * *Reasoning:* Content must never be obscured by mobile chrome or display cutouts. Next.js viewports use `viewportFit: "cover"` with `env(safe-area-inset-*)` padding.
+* **R11: Zero Horizontal Scrolling:**
+  * *Principle:* Pages and containers must never trigger horizontal scroll at mobile viewports (`document.documentElement.scrollWidth <= viewportWidth`).
+  * *Reasoning:* Horizontal scroll breaks vertical touch navigation and masks critical information.
 
-## States and content
+---
 
-| **States and content** | | | | | |
-| R9 | Every list or view has designed loading, empty and error states. | Users must see meaningful UI in every data state. | auto-candidate | Scan each list/view for loading/skeleton, empty and error components; no view enumeration or check script exists yet — Phase 2 verify gate or Phase 8 mobile checks to build. | frontend/pifitness/src/app/food/components/RecipeBox.tsx:114-502 |
+## 2. Touch Targets & Interaction Feedback
 
-## Platform and PWA
+* **R2: Minimum 44px Touch Targets:**
+  * *Principle:* All interactive controls (buttons, links, form inputs, icon toggles) must provide a touch target of at least 44x44px, with clear visual separation from adjacent interactive elements.
+  * *Reasoning:* Prevents mis-taps and user frustration on high-DPI touchscreens.
+* **R3: Immediate Pressed Visual Feedback:**
+  * *Principle:* Every tappable element must provide an immediate visual active/pressed state upon touch down.
+  * *Reasoning:* Touchscreens lack mouse hover states. Instant visual confirmation reassures the user that the tap was registered before async operations begin.
+* **R4: Explicit Async Status & Error Feedback:**
+  * *Principle:* Every asynchronous action must display an immediate loading indicator, followed by distinct success or error feedback.
+  * *Reasoning:* Users must never be left wondering whether an action is in flight or has completed.
+* **R6: Bottom Sheets for Secondary Flows:**
+  * *Principle:* Secondary flows (quick edits, item details, filtering panels) open as sliding bottom sheets rather than navigating to full new pages.
+  * *Reasoning:* Bottom sheets preserve the user's primary context and make dismissal fast and intuitive via swipe-down gestures.
 
-| **Platform and PWA** | | | | | |
-| R7 | The Android back gesture closes the topmost overlay or sheet before navigating. | The system back gesture must dismiss overlays instead of exiting the app. | human | On the phone, open an overlay or sheet, perform the back gesture, and confirm the overlay closes before any navigation. | not observed |
-| R10 | The app is installable as a PWA over HTTPS. | Installability is the mobile distribution path (statement E5). | human | On the phone over HTTPS, install from Chrome and confirm the app icon appears on the home screen. | not observed — frontend/pifitness/public contains only wasm/ (no manifest.json or service worker) and src/app has no manifest or service-worker registration |
-| R11 | No horizontal scroll at the two test viewports (448x875, 360x740). | Horizontal scroll breaks mobile layouts and hides content. | auto | Playwright at both viewports: assert document.documentElement.scrollWidth <= viewport width after load. | not observed |
-| R12 | Correct input types (numeric, email, search, etc.) on every input. | Correct types bring the right phone keyboard and built-in validation. | auto | Playwright: assert every <input> carries a type matching its data (number, email, search, date, ...) with inputMode on numeric inputs. | frontend/pifitness/src/app/activities/beach/components/BeachVolleyball.tsx:409-413 |
-| R13 | Clean browser console (no errors) at both test viewports. | Console errors mark broken resources or failing scripts on phones. | auto | Playwright at both viewports: navigate and interact, then assert the console records no errors. | not observed |
+---
+
+## 3. UI States & Data Completeness
+
+* **R9: Comprehensive State Design:**
+  * *Principle:* Every view and list component must explicitly handle and render four distinct states:
+    1. *Loading state:* Skeleton loaders or progress spinners matching the final layout shape.
+    2. *Empty state:* Clear message with actionable guidance when zero items exist.
+    3. *Populated state:* The standard view containing user data.
+    4. *Error state:* Clear description of failure with a manual retry button.
+  * *Reasoning:* A blank or unresponsive screen during network failure or initial empty state degrades user trust.
+
+---
+
+## 4. Platform, PWA & Form Inputs
+
+* **R7: Gesture Navigation Integration:**
+  * *Principle:* The Android/system back gesture must dismiss the topmost overlay, modal, or bottom sheet before navigating backward in browser history.
+  * *Reasoning:* Prevents accidental navigation out of the app when the user simply intends to close a pop-up.
+* **R10: Installable PWA over HTTPS:**
+  * *Principle:* The frontend provides a valid web app manifest, icons, and HTTPS service configuration enabling home screen installation.
+  * *Reasoning:* PWA installation provides full-screen app-like ergonomics on mobile devices without app store overhead.
+* **R12: Semantic Input Types & Modes:**
+  * *Principle:* Form inputs must use semantic HTML input types (`number`, `email`, `date`, `search`) and `inputMode="numeric"` for numerical entry.
+  * *Reasoning:* Triggers the appropriate virtual keyboard layout on mobile devices and enables native browser validation.
+* **R13: Clean Browser Console:**
+  * *Principle:* Application pages and interactions must execute without unhandled JavaScript exceptions or console errors.
+  * *Reasoning:* Console errors indicate broken resource loading, unhandled API states, or failing scripts that degrade the mobile experience.

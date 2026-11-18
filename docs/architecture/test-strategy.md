@@ -1,42 +1,46 @@
-# Test Strategy — PiFitness
+# Test Strategy (`test-strategy.md`)
 
-## Tiers
+This document defines the test tiers, execution commands, verification policies, and authoring standards for the PiFitness test suite.
 
-| Tier | Tag | Runtime target | Run when |
+---
+
+## 1. Test Tiers & Execution Targets
+
+| Tier | Marker | Runtime Target | Run When |
 |---|---|---|---|
-| 0 — Smoke | @pytest.mark.smoke | <1s/file | Every commit |
-| 1 — Unit | (untagged) | <30s total | Default dev loop; every block |
-| 2 — Integration | @pytest.mark.integration | <60s | Merge-to-main; blocks touching DB/network paths |
-| 3 — Live | @pytest.mark.live | <5min | Nightly; manual |
+| **Tier 0 — Smoke** | `@pytest.mark.smoke` | <1s per file | Every commit / pre-push |
+| **Tier 1 — Unit** | (untagged) | <30s total | Default dev loop; task completion |
+| **Tier 2 — Integration** | `@pytest.mark.integration` | <60s | Merge to main; tasks touching database or network |
+| **Tier 3 — Live** | `@pytest.mark.live` | <5min | Nightly runs; manual verification |
 
-Cross-cutting: @pytest.mark.slow — anything >1s for reasons not yet fixed (debt tracker, INT-T4 removes).
+*Cross-cutting marker:* `@pytest.mark.slow` flags any test taking >1s, keeping the default fast loop responsive.
 
-## Commands
+---
 
-    pytest -m "not slow and not integration and not live"   # fast lane — default dev loop
-    pytest -m "not live"                                    # everything but network
-    pytest -m "slow or integration or live"                 # slow lane
-    pytest tests/test_foo.py::test_bar                      # single test
+## 2. Standard Test Commands
 
-## Block verification policy
+```bash
+# Fast dev loop (smoke + unit, excludes slow, integration, and live)
+pytest -m "not slow and not integration and not live" -q
 
-Run full pytest ONLY if the block adds/removes module-level imports in
-widely-imported files, moves code between modules, adds/deletes test files,
-or modifies pytest.ini / conftest.py / shared fixtures.
-Otherwise: fast lane + smoke import of every module the block touched.
+# Offline suite (everything except live external network calls)
+pytest -m "not live"
 
-## Introduction standard (enforced by INT-T2)
+# Single test target
+pytest tests/test_foo.py::test_bar
+```
 
-Every test function has a docstring whose first line is a contract statement —
-a complete sentence ending in a period. Every test carries a tier marker.
+---
 
-## Retirement policy (enforced by INT-T2)
+## 3. Verification & Retirement Policies
 
-When a block deletes or renames a source module, the same block deletes or
-migrates every test whose sole purpose was that module. No orphaned tests.
+### Block Verification Policy
+* Run the fast-lane test suite (`not slow and not integration and not live`) plus smoke imports of modified modules for standard task verification.
+* Run the full pytest suite only when altering module-level imports in widely-shared modules (`core/`), adding/deleting test fixtures, or modifying `conftest.py`.
 
-## Metrics (as of INT-T1)
+### Authoring Standards
+* Every test function must have a docstring whose first line is a clear contract statement (a complete sentence ending with a period).
+* Every test that interacts with real database instances or network endpoints must carry its appropriate tier marker (`@pytest.mark.integration` or `@pytest.mark.live`).
 
-- Total tests: 228 (fast lane 199, slow/integration/live 29)
-- Docstring coverage: 59% (135/228) — INT-T2 target: 100%
-- Zero-test files: 4 (test_admin_failure_message, test_backup, test_playlist_details, test_shuffle) — audit in INT-T2
+### Retirement Policy
+* When a feature refactors, renames, or deletes a source module, the modifying task is responsible for migrating or removing associated tests. Orphaned or skipped tests must not linger in the test directory.

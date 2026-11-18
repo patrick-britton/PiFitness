@@ -1,22 +1,26 @@
-# Data dictionary tooling
+# Data Lineage Tooling
 
-All scripts are read-only with respect to PostgreSQL. Run `python <script> --help` for options.
+The primary tool in this directory is `lineage.py`.
 
-| Script | Purpose | Database required |
-|---|---|---:|
-| `schema_inventory.py inventory` | Parse generated Markdown into an exact object/column inventory JSON | No |
-| `schema_inventory.py compare` | Compare dictionary object headings with the generated inventory | No |
-| `repo_refs.py` | Find candidate references to schema objects in repository files | No |
-| `audit.py` | Audit object coverage, duplicates, placeholders, column-table coverage, and SQL comments | No |
-| `db_catalog.py` | Capture local DEV relations, columns, constraints, indexes, view/routine/trigger definitions, enum labels, and optional schema-only `pg_dump` DDL | Yes |
-| `profile_data.py` | Aggregate safe low-cardinality categories from sampled blocks; never outputs raw rows | Yes |
+It statically parses the codebase (Python FastAPI, React/Next.js TypeScript/TSX, and SQL definitions) and queries the local DEV PostgreSQL catalog to build and maintain the project's data-lineage graph.
 
-Database commands require `--env-file backend/.env` and must resolve to exactly `localhost:15432`, `pifitness_dev`, user `dev`. `psycopg` or `psycopg2` must already be installed. Do not relax the allowlist for convenience.
+## Usage
 
-## Expected sequencing
+### 1. Build / Refresh Lineage Graph (Run at start of session after DB sync)
+```bash
+python tools/data_dictionary/lineage.py build
+```
+Reads the local DEV database (`localhost:15432 / pifitness_dev`), dumps definitions to `docs/lineage/defs/`, and writes `docs/lineage/graph.json` and `docs/lineage/README.md`.
 
-1. `schema_inventory.py inventory`
-2. `repo_refs.py`
-3. `db_catalog.py` (only after verifying current local DEV config)
-4. `profile_data.py` (optional; only if safe categorical evidence would materially help)
-5. `audit.py` after each dictionary batch
+### 2. Query Lineage (Run during Feature Design & Plan workflows)
+```bash
+# Describe bidirectional dependencies and consumers of an object
+python tools/data_dictionary/lineage.py describe table:activities.activities
+
+# Trace upstream (where data comes from) or downstream (where data is displayed)
+python tools/data_dictionary/lineage.py trace endpoint:GET /api/food/diary --up
+python tools/data_dictionary/lineage.py trace table:food.diary_entries --down
+
+# Search for nodes by name or column
+python tools/data_dictionary/lineage.py search <words...>
+```
