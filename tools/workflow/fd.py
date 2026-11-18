@@ -17,7 +17,7 @@ READ COMMANDS
   oq <id> [--open|--unanswered]   print open-question blocks (default: all)
   section <id> [name]       print one section by (partial) heading; no name = list them
   log <id> [-n N]           print the last N progress-log lines (default 10)
-  bugs <id> [--pending|--show BUG-ID]   list bugs from the bugs sidecar
+  bugs <id> [--unresolved|--show BUG-ID|all]   list bugs from the bugs sidecar
   check <id> [T01 ...] [--anchors]      validate structure; --anchors verifies that
                             anchored files/symbols exist in the repo
   brief <id> T##    resume context for a task: status, recent log, git status,
@@ -30,7 +30,16 @@ WRITE COMMANDS
   set <id> feature <draft|reviewed|in-progress|complete> [--force]
   set <id> resume           recompute Resume Here (progress/next/blocked-by)
   log <id> "text"           append '- YYYY-MM-DD text' to the log sidecar
-  bug <id> T03 "summary" [--symptom text] [--ac AC-1]  symptom, root cause, fix, check added; linked to Task or AC; duplicates rejected
+  bug <id> "summary" [--symptom text] [--ac AC-1] [--task T03]
+                            record a bug (status open). UAT bugs link an AC; review
+                            findings link nothing. An AC with an unresolved bug is rejected.
+  bugs <id> --update BUG-1 [--root-cause T] [--fix T] [--status S]
+                            fill diagnosis / move a bug: open|not-fixed -> in-review
+                            (needs root cause and fix), in-review -> fixed|not-fixed
+  uat import <id> [path] [--apply]
+                            summarize <id>_feedback.md; --apply also ticks/unticks the AC
+                            boxes to match it and moves in-review UAT bugs to
+                            fixed (AC passed) or not-fixed (AC failed)
   backlog add [B-ID] <item> append one item to docs/workflow/BACKLOG.md
                             (append-only; omitted id = next ID)
   start <id> T##            record a start entry for task T## in the progress log
@@ -46,7 +55,7 @@ TASK SIZING
 Files (all under <features-dir>/designs_active/, default .features):
   <id>_design.md   hot state (frontmatter, Resume Here, ACs, OQs, Task Plan)
   <id>_log.md      append-only progress log
-  <id>_bugs.md     bug entries
+  <id>_bugs.md     bug entries (status: open | in-review | not-fixed | fixed)
 
 Exit code: 0 = ok, 1 = error / structural problem (details on stderr or in output).
 """
@@ -63,6 +72,7 @@ from pathlib import Path
 FEATURE_STATUSES = ("draft", "reviewed", "in-progress", "complete")
 TASK_STATUSES = ("todo", "interrupted", "complete")
 POINTS = ("1", "2", "3")
+BUG_STATUSES = ("open", "in-review", "not-fixed", "fixed")
 TASK_FIELDS = ("surface", "skill", "points", "depends-on", "traces-to",
                "anchors", "detail", "verify", "status")
 FATAL_TASK_FIELDS = ("status", "depends-on")
@@ -526,7 +536,7 @@ def recompute_resume(doc):
     if first_word(doc.fmv("status")) == "draft" and open_all:
         nv, bv = "review", open_all
     elif nxt is None:
-        nv, bv = ("none", []) if done == total else ("review", open_all)
+        nv, bv = ("none", []) if done == total and not open_all else ("review", open_all)
     elif blk:
         nv, bv = "review", blk
     else:
@@ -594,31 +604,106 @@ def parse_bugs(path):
     if not path.exists():
         return []
     text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
-    parts = re.split(r"(?m)^(?=### Bug )", text)
+    parts = re.split(r"(?m)^(?=### BUG-\d+\b)", text)
     out = []
     for p in parts:
-        m = re.match(r"### Bug (\S+)\s*[—–-]+\s*(.*)", p)
+        m = re.match(r"### (BUG-\d+)\s*[\u2014\u2013-]+\s*(.*)", p)
         if not m:
             continue
-        task = re.search(r"\*\*Task:\*\*\s*(.*)", p)
-        ac = re.search(r"\*\*AC:\*\*\s*(.*)", p)
-        outc = re.search(r"\*\*Outcome:\*\*\s*(.*)", p)
-        sym = re.search(r"\*\*Symptom:\*\*\s*(.*)", p)
-        if ac:
-            linkkind, linkid = "AC", ac.group(1).strip()
-        else:
-            linkkind, linkid = "Task", task.group(1).strip() if task else "?"
-        symptom = sym.group(1).strip() if sym else ""
+
+        def fld(name):
+            f = re.search(r"(?m)^- \*\*%s:\*\*[ \t]*(.*)$" % re.escape(name), p)
+            return f.group(1).strip() if f else ""
         out.append({"id": m.group(1), "summary": m.group(2).strip(), "text": p.rstrip(),
-                    "linkkind": linkkind, "linkid": linkid.upper(),
-                    "symptom": symptom, "symptom-key": norm_key(symptom),
-                    "task": task.group(1).strip() if task else "?",
-                    "outcome": outc.group(1).strip() if outc else "pending"})
+                    "ac": fld("AC").upper(), "task": fld("Task").upper(),
+                    "symptom": fld("Symptom"), "symptom-key": norm_key(fld("Symptom")),
+                    "root": fld("Root cause"), "fix": fld("Fix"),
+                    "status": first_word(fld("Status")) or "open", "since": fld("Since")})
     return out
 
 
-def is_pending(b):
-    return first_word(b["outcome"]) in ("", "pending")
+def is_unresolved(b):
+    return b["status"] != "fixed"
+
+
+def now_stamp():
+    return datetime.datetime.now().isoformat(timespec="seconds")
+
+
+def parse_stamp(v):
+    try:
+        return datetime.datetime.strptime((v or "").strip()[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return None
+
+
+def one_line(v):
+    return " ".join((v or "").split())
+
+
+def update_bug(c, bid, root=None, fix=None, status=None, from_uat=False):
+    """Fill a bug's diagnosis and/or move its status, enforcing the lifecycle."""
+    bugs = parse_bugs(c.bugp)
+    b = next((x for x in bugs if x["id"].upper() == bid.upper()), None)
+    if not b:
+        raise FdError("no bug '%s' (have: %s)" % (bid, ", ".join(x["id"] for x in bugs) or "none"))
+    bid, cur = b["id"], b["status"]
+    root = one_line(root) if root is not None else None
+    fix = one_line(fix) if fix is not None else None
+    if status:
+        if status not in BUG_STATUSES:
+            raise FdError("status must be one of %s" % "|".join(BUG_STATUSES))
+        allowed = {"in-review": ("open", "not-fixed"), "fixed": ("in-review",),
+                   "not-fixed": ("in-review",), "open": ()}
+        if cur not in allowed[status]:
+            raise FdError("%s is '%s'; it cannot move to '%s'" % (bid, cur, status))
+        if status in ("fixed", "not-fixed") and b["ac"] and not from_uat:
+            raise FdError("%s is linked to %s: only the human's UAT settles it (fd.py uat import %s --apply)"
+                          % (bid, b["ac"], c.a.id))
+        if status == "in-review":
+            r = root if root is not None else b["root"]
+            f = fix if fix is not None else b["fix"]
+            if not r or r.lower() == "pending" or not f or f.lower() == "pending":
+                raise FdError("%s: give --root-cause and --fix before moving it to in-review" % bid)
+    lines = c.bugp.read_text(encoding="utf-8").replace("\r\n", "\n").split("\n")
+    s0 = next(i for i, ln in enumerate(lines) if re.match(r"### %s\b" % re.escape(bid), ln))
+    e0 = next((j for j in range(s0 + 1, len(lines)) if lines[j].startswith("### ")), len(lines))
+
+    def find(name):
+        for i in range(s0, e0):
+            if re.match(r"- \*\*%s:\*\*" % re.escape(name), lines[i]):
+                return i
+        return None
+
+    def setf(name, value, after=None):
+        i = find(name)
+        if i is not None:
+            lines[i] = "- **%s:** %s" % (name, value)
+        else:
+            j = find(after)
+            lines.insert(j + 1, "- **%s:** %s" % (name, value))
+
+    if status == "in-review" and cur == "not-fixed" and (root is not None or fix is not None):
+        n = sum(1 for i in range(s0, e0) if lines[i].startswith("- **Attempt ")) + 1
+        lines.insert(find("Root cause"), "- **Attempt %d (not fixed):** root cause: %s; fix: %s"
+                     % (n, b["root"], b["fix"]))
+        e0 += 1
+    if root is not None:
+        setf("Root cause", root)
+    if fix is not None:
+        setf("Fix", fix)
+    if status:
+        setf("Status", status)
+        if status == "in-review":
+            setf("Since", now_stamp(), after="Status")
+    c.bugp.write_text("\n".join(lines), encoding="utf-8", newline="\n")
+    if status:
+        append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
+                    "- %s bug %s %s -> %s" % (today(), bid, cur, status))
+    else:
+        append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
+                    "- %s bug %s diagnosis updated" % (today(), bid))
+    return bid, cur
 
 
 BACKLOG_ID_RE = re.compile(r"^B(\d+)$")
@@ -697,8 +782,8 @@ def cmd_hot(c):
     print("log: %d entries%s" % (len(logs), "; last 3:" if logs else ""))
     for ln in logs[-3:]:
         print("  " + ln)
-    print("bugs: %d (%d pending)%s" % (len(bugs), sum(is_pending(b) for b in bugs),
-                                       "  -> fd.py bugs %s --pending" % c.a.id if bugs else ""))
+    print("bugs: %d (%d unresolved)%s" % (len(bugs), sum(is_unresolved(b) for b in bugs),
+                                          "  -> fd.py bugs %s --unresolved" % c.a.id if bugs else ""))
     print("\n-- Sections: " + ", ".join("%s (%d lines)" % (n, e - s) for n, s, e in d.sections))
     print("   read one with: fd.py section %s \"<name>\"" % c.a.id)
     for lvl, f, m in probs:
@@ -746,6 +831,8 @@ def cmd_oq(c):
         print(d.raw(q))
     if c.a.unanswered:
         print("\nUNANSWERED: " + (", ".join(q.id for q in sel) or "none (all answered)"))
+    elif c.a.open:
+        print("\nOPEN: " + (", ".join(q.id for q in sel) or "none"))
     else:
         print("\n%d shown of %d total; %d open, %d unanswered" % (
             len(sel), len(d.oqs), sum(d.oq_open(q) for q in d.oqs), sum(not d.oq_answered(q) for q in d.oqs)))
@@ -1014,6 +1101,11 @@ function update() {
   });
   counter.textContent = 'Status: ' + (pass + fail) + ' of ' + ACS.length + ' checked (' + pass + ' pass, ' + fail + ' fail)';
 }
+function stamp() {
+  var d = new Date();
+  function p(n) { return ('0' + n).slice(-2); }
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
 function exportFeedback() {
   var rows = [], npass = 0, nfail = 0, npend = 0;
   ACS.forEach(function (ac) {
@@ -1031,6 +1123,8 @@ function exportFeedback() {
     '# UAT Feedback',
     '',
     '**Feature:** ' + %r,
+    '',
+    '**Exported:** ' + stamp(),
     '',
     '| AC | Result | Notes |',
     '|---|---|---|'
@@ -1068,23 +1162,33 @@ def cmd_uat_build(c):
     return 0
 
 
+def parse_feedback(path):
+    """-> (results {AC: Pass|Fail|Pending}, notes {AC: text}, exported stamp or '')."""
+    results, notes, exported = {}, {}, ""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^\s*\|\s*(AC-\d+)\s*\|\s*(Pass|Fail|Pending)\s*\|\s*(.*?)\s*\|?\s*$", line, re.I)
+        if m:
+            results[m.group(1).upper()] = m.group(2).capitalize()
+            notes[m.group(1).upper()] = m.group(3).strip()
+            continue
+        e = re.match(r"^\*\*Exported:\*\*\s*(\S+)", line)
+        if e:
+            exported = e.group(1)
+    return results, notes, exported
+
+
 def cmd_uat_import(c):
-    """Import a UAT feedback Markdown file and summarize per-AC results."""
+    """Summarize a UAT feedback file; with --apply, sync AC boxes and in-review bugs to it."""
     d = c.doc()
     acs = parse_acceptance(d)
     known = {a["id"] for a in acs}
     path = Path(c.a.path) if c.a.path else c.design.parent / ("%s_feedback.md" % c.a.id)
     if not path.exists():
         raise FdError("feedback file not found: %s" % path)
-    results = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        m = re.match(r"^\s*\|\s*(AC-\d+)\s*\|\s*(Pass|Fail|Pending)\s*\|", line, re.I)
-        if not m:
-            continue
-        ac_id = m.group(1).upper()
+    results, notes, exported = parse_feedback(path)
+    for ac_id in results:
         if ac_id not in known:
             raise FdError("unknown AC in feedback: %s" % ac_id)
-        results[ac_id] = m.group(2).capitalize()
     if not results:
         raise FdError("no AC result rows found in %s" % path)
     print("uat import: %s (%d rows)" % (path, len(results)))
@@ -1093,14 +1197,55 @@ def cmd_uat_import(c):
         r = results.get(a["id"])
         if not r:
             print("  %s: pending" % a["id"])
+        elif r == "Fail" and notes.get(a["id"]):
+            print("  %s: Fail - %s" % (a["id"], notes[a["id"]]))
         else:
             print("  %s: %s" % (a["id"], r))
-            if r == "Pass":
-                npass += 1
-            elif r == "Fail":
-                nfail += 1
+        if r == "Pass":
+            npass += 1
+        elif r == "Fail":
+            nfail += 1
     npend = len(acs) - npass - nfail
     print("summary: %d pass, %d fail, %d pending of %d" % (npass, nfail, npend, len(acs)))
+    if c.a.apply:
+        fb_time = parse_stamp(exported) or datetime.datetime.fromtimestamp(path.stat().st_mtime)
+        ticked = unticked = 0
+        sec = d.section("acceptance")
+        for i in range(sec[1] + 1, sec[2]):
+            m = AC_RE.match(d.lines[i]) if d.mask[i] else None
+            r = results.get(m.group(2).upper()) if m else None
+            if r is None:
+                continue
+            want = r == "Pass"
+            if (m.group(1) in "xX") != want:
+                d.lines[i] = re.sub(r"\[[ xX]\]", "[x]" if want else "[ ]", d.lines[i], count=1)
+                ticked, unticked = ticked + want, unticked + (not want)
+        if ticked or unticked:
+            if "last-updated" in d.fm:
+                d.set_fm("last-updated", today())
+            d.save()
+        print("apply: %d AC boxes ticked, %d unticked" % (ticked, unticked))
+        moved = []
+        for b in parse_bugs(c.bugp):
+            if b["status"] != "in-review" or not b["ac"]:
+                continue
+            r = results.get(b["ac"])
+            since = parse_stamp(b["since"])
+            if r not in ("Pass", "Fail"):
+                print("  %s: in-review, %s has no result yet (awaiting UAT)" % (b["id"], b["ac"]))
+            elif since is None or fb_time < since:
+                print("  %s: in-review, awaiting UAT (feedback is older than the fix)" % b["id"])
+            else:
+                new = "fixed" if r == "Pass" else "not-fixed"
+                update_bug(c, b["id"], status=new, from_uat=True)
+                moved.append("%s %s" % (b["id"], new))
+                print("  %s: %s (%s %s)" % (b["id"], new, b["ac"], r))
+        if ticked or unticked or moved:
+            append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
+                        "- %s uat import: %d ticked, %d unticked%s" % (
+                            today(), ticked, unticked, "; " + ", ".join(moved) if moved else ""))
+    bugs = parse_bugs(c.bugp)
+    print("bugs: %d unresolved of %d" % (sum(is_unresolved(b) for b in bugs), len(bugs)))
     return 0
 
 
@@ -1123,35 +1268,36 @@ def cmd_resume(c):
 
 def cmd_bug(c):
     d = c.doc()
-    t = d.by_id(c.a.task)
-    n = int(t.id[1:])
-    prefix = "%s-%d-" % (c.a.id, n)
-    existing = [int(m.group(1)) for b in parse_bugs(c.bugp)
-                for m in [re.match(re.escape(prefix) + r"(\d+)$", b["id"])] if m]
-    bid = "%s%d" % (prefix, max(existing or [0]) + 1)
-    summary = c.a.summary.strip()
-    symptom = (c.a.symptom or summary).strip()
-    if c.a.ac:
-        linkkind, linkid = "AC", c.a.ac.strip()
-    else:
-        linkkind, linkid = "Task", t.id
-    key = (linkkind, linkid.upper(), norm_key(symptom))
-    for b in parse_bugs(c.bugp):
-        if (b.get("linkkind"), b.get("linkid"), b.get("symptom-key")) == key:
-            raise FdError("duplicate bug: %s already recorded for %s %s (symptom: %s)"
-                          % (b["id"], linkkind, linkid, symptom))
-    skeleton = "\n".join([
-        "", "### Bug %s \u2014 %s" % (bid, summary),
-        "- **%s:** %s" % (linkkind, linkid),
-        "- **Symptom:** %s" % symptom,
-        "- **Root cause:** pending",
-        "- **Fix:** pending",
-        "- **Check added:** pending",
-        "- **Outcome:** pending", ""])
-    append_line(c.bugp, "# Known Issues / Bugs - %s" % c.a.id, skeleton)
+    summary = one_line(c.a.summary)
+    symptom = one_line(c.a.symptom or summary)
+    ac = (c.a.ac or "").strip().upper()
+    task = (c.a.task or "").strip().upper()
+    if ac and ac not in {a["id"] for a in parse_acceptance(d)}:
+        raise FdError("unknown AC %s" % ac)
+    if task:
+        task = d.by_id(task).id
+    bugs = parse_bugs(c.bugp)
+    for b in bugs:
+        if not is_unresolved(b):
+            continue
+        if ac and b["ac"] == ac:
+            raise FdError("duplicate bug: %s is already unresolved for %s (%s); work that bug instead"
+                          % (b["id"], ac, b["status"]))
+        if not ac and not b["ac"] and b["symptom-key"] == norm_key(symptom):
+            raise FdError("duplicate bug: %s already records this symptom (%s)" % (b["id"], b["status"]))
+    bid = "BUG-%d" % (max([int(b["id"][4:]) for b in bugs] or [0]) + 1)
+    entry = ["", "### %s \u2014 %s" % (bid, summary)]
+    if ac:
+        entry.append("- **AC:** %s" % ac)
+    if task:
+        entry.append("- **Task:** %s" % task)
+    entry += ["- **Symptom:** %s" % symptom, "- **Root cause:** pending", "- **Fix:** pending",
+              "- **Status:** open", ""]
+    append_line(c.bugp, "# Known Issues / Bugs - %s" % c.a.id, "\n".join(entry))
     append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
                 "- %s bug %s recorded: %s" % (today(), bid, summary))
-    print("bug id: %s\nfile: %s\nFill in the pending fields by editing that entry; never guess a root cause." % (bid, c.bugp))
+    print("bug id: %s\nfile: %s\nNext: diagnose it, then: fd.py bugs %s --update %s --root-cause ... --fix ... --status in-review"
+          % (bid, c.bugp, c.a.id, bid))
     return 0
 
 
@@ -1194,18 +1340,27 @@ def cmd_backlog_add(c):
 
 
 def cmd_bugs(c):
+    a = c.a
+    if (a.root_cause is not None or a.fix is not None or a.status) and not a.update:
+        raise FdError("--root-cause, --fix and --status need --update BUG-ID")
+    if a.update:
+        if a.root_cause is None and a.fix is None and not a.status:
+            raise FdError("--update needs --root-cause, --fix and/or --status")
+        bid, cur = update_bug(c, a.update, a.root_cause, a.fix, a.status)
+        print("%s: %s" % (bid, ("%s -> %s" % (cur, a.status)) if a.status else "diagnosis updated"))
+        return 0
     bugs = parse_bugs(c.bugp)
-    if c.a.show:
-        m = [b for b in bugs if c.a.show in b["id"]]
-        if not m:
-            raise FdError("no bug matching '%s'" % c.a.show)
-        for b in m:
+    if a.show:
+        sel = bugs if a.show.lower() == "all" else [b for b in bugs if b["id"].upper() == a.show.upper()]
+        if not sel:
+            raise FdError("no bug matching '%s'" % a.show)
+        for b in sel:
             print(b["text"])
         return 0
-    sel = [b for b in bugs if is_pending(b)] if c.a.pending else bugs
+    sel = [b for b in bugs if is_unresolved(b)] if a.unresolved else bugs
     for b in sel:
-        print("%s | %s | %s | %s" % (b["id"], b["task"], first_word(b["outcome"]) or "pending", b["summary"]))
-    print("(%d shown of %d)" % (len(sel), len(bugs)))
+        print("%s | %s | %s | %s" % (b["id"], b["status"], b["ac"] or b["task"] or "-", b["summary"]))
+    print("(%d shown of %d; %d unresolved)" % (len(sel), len(bugs), sum(is_unresolved(b) for b in bugs)))
     return 0
 
 
@@ -1244,6 +1399,9 @@ def cmd_set(c):
             left = [t.id for t in d.tasks if d.task_status(t) != "complete"]
             if left:
                 raise FdError("tasks not complete: %s (use --force to override)" % ", ".join(left))
+            open_bugs = [b["id"] for b in parse_bugs(c.bugp) if is_unresolved(b)]
+            if open_bugs:
+                raise FdError("unresolved bugs: %s (use --force to override)" % ", ".join(open_bugs))
             sec = d.section("acceptance")
             unticked = [i for i in range(sec[1], sec[2]) if d.mask[i] and re.match(r"^\s*- \[ \]", d.lines[i])] if sec else []
             if unticked:
@@ -1306,14 +1464,18 @@ def build_parser():
     p = add("log", cmd_log, "read or append the progress log")
     p.add_argument("text", nargs="*")
     p.add_argument("-n", type=int, default=10)
-    p = add("bug", cmd_bug, "record a bug skeleton")
-    p.add_argument("task")
+    p = add("bug", cmd_bug, "record a bug (status open)")
     p.add_argument("summary")
     p.add_argument("--symptom", default=None, help="symptom description (default: the summary)")
-    p.add_argument("--ac", default=None, help="link to an acceptance criterion (e.g. AC-1) instead of the task")
-    p = add("bugs", cmd_bugs, "list bugs")
-    p.add_argument("--pending", action="store_true")
-    p.add_argument("--show", default=None)
+    p.add_argument("--ac", default=None, help="the acceptance criterion that failed (e.g. AC-1)")
+    p.add_argument("--task", default=None, help="optional task the bug traces to (e.g. T03)")
+    p = add("bugs", cmd_bugs, "list, show or update bugs")
+    p.add_argument("--unresolved", action="store_true", help="only bugs not yet fixed")
+    p.add_argument("--show", default=None, help="print one bug (BUG-1) or 'all'")
+    p.add_argument("--update", default=None, metavar="BUG-ID", help="fill diagnosis and/or move status")
+    p.add_argument("--root-cause", default=None)
+    p.add_argument("--fix", default=None, help="what changed, ending with the files touched")
+    p.add_argument("--status", default=None, choices=BUG_STATUSES)
     p = add("start", cmd_start, "record a start entry for a task")
     p.add_argument("task", help="task id (T##)")
     p = add("done", cmd_done, "evidence gate: run a task's Verify command")
@@ -1337,6 +1499,8 @@ def build_parser():
     pi = usub.add_parser("import", help="import a UAT feedback Markdown file and summarize per-AC results")
     pi.add_argument("id", help="feature id")
     pi.add_argument("path", nargs="?", help="feedback markdown path (default <id>_feedback.md beside the design)")
+    pi.add_argument("--apply", action="store_true",
+                    help="tick/untick AC boxes to match the feedback and settle in-review UAT bugs")
     pi.set_defaults(fn=cmd_uat_import)
     p = sub.add_parser("backlog", help="backlog file operations")
     bsub = p.add_subparsers(dest="backlog_cmd", required=True)

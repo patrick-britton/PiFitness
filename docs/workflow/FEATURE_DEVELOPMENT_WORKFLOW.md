@@ -21,6 +21,8 @@ The tools (`fd.py`, `lineage.py`) are canonical. Instructions and templates foll
    - Data flows and surface impacts are discovered via `tools/data_dictionary/lineage.py`.
    - Task progress is recorded by `fd.py start`, `done`, and `set`.
 5. **Agents never stage or commit and never pass `--force`.** The human reviews and commits.
+6. **Open questions stop everything.** Any agent workflow that runs after `/feature-design` (plan, execute, polish, review) stops immediately while any open question is unresolved.
+7. **Agents do not test.** They are not asked to write tests, and they do not run the full suite. The human tests locally (Step 7), and the autodeploy bootstrap runs the regression and smoke tests (Step 10). The only tests a feature adds are the human-approved `new test` lines in the design (section 7).
 
 ---
 
@@ -46,11 +48,12 @@ Standard library only. `<id>` is the feature id; agents find it from the single 
 | `fd.py start <id> T##` | Records a start entry in `<id>_log.md`. Mandatory before editing code. | Execute |
 | `fd.py done <id> T##` | Runs the task's Verify command and records exit code and output tail. Refuses without a prior start. Does **not** change the task's status. | Execute |
 | `fd.py set <id> T## <todo\|interrupted\|complete>` | Sets task status. Refuses while the feature is `draft`. Moves the feature `reviewed` → `in-progress` automatically. | Execute |
-| `fd.py set <id> feature <draft\|reviewed\|in-progress\|complete>` | Sets feature status. `complete` requires all tasks complete and every AC box ticked. | Human, see section 5 |
+| `fd.py set <id> feature <draft\|reviewed\|in-progress\|complete>` | Sets feature status. `complete` requires all tasks complete, every AC box ticked, and no unresolved bug. | Human, see section 5 |
 | `fd.py log <id> ["text"] [-n N]` | Appends to or reads the append-only log. | All |
-| `fd.py bug <id> T## "summary" [--symptom text] [--ac AC-#]` | Records a bug skeleton in `<id>_bugs.md`. Duplicates are rejected. | Polish |
-| `fd.py bugs <id> [--pending\|--show ID]` | Lists bugs. | Polish, Test |
-| `fd.py uat import <id> [path]` | Parses `<id>_feedback.md` and prints per-AC results and a summary. Changes no files. | Polish, Test |
+| `fd.py bug <id> "summary" [--symptom text] [--ac AC-#] [--task T##]` | Records a bug (status `open`) in `<id>_bugs.md`. UAT bugs link an AC; review findings link nothing. Rejected while the same AC already has an unresolved bug. | Polish, Review |
+| `fd.py bugs <id> [--unresolved\|--show BUG-#\|all]` | Lists bugs, or prints one or all. | Polish, Review |
+| `fd.py bugs <id> --update BUG-# [--root-cause T] [--fix T] [--status S]` | Fills the diagnosis and moves a bug through its lifecycle (section 6, Bug lifecycle). `in-review` needs a root cause and a fix. A bug linked to an AC can only be settled by `uat import --apply`. | Polish, Review |
+| `fd.py uat import <id> [path] [--apply]` | Parses `<id>_feedback.md` and prints per-AC results, the human's notes, and a summary. With `--apply` it also ticks the box of every passing AC, unticks the rest, and settles `in-review` bugs linked to an AC: `fixed` if the AC passed, `not-fixed` if it failed, unchanged if the feedback is older than the fix. Safe to repeat. | Human, Polish, Review |
 | `fd.py backlog add <item>` | Appends an out-of-scope finding to `docs/workflow/BACKLOG.md`. | Any |
 
 Before `/feature-plan` adds tasks, `next`, `resume`, and `set` refuse to run and `hot` reports an error ("no `### T##` blocks"). The design workflow therefore uses only `check`, `oq`, `section`, and `uat build`, and edits Resume Here by hand.
@@ -72,9 +75,9 @@ Mandatory first action for database, ETL, API, or frontend data-flow queries. Ag
 A query prints `WARNING graph may be stale` on stderr when code changed since the build. Agents report it in their reply and carry on; they do not rebuild.
 
 ### `tools/verify.py` & Quality Tools
-- `python tools/verify.py --scope all`: Comprehensive verification gate (backend, frontend, DB, deploy, docs).
-- `python tools/lint_comments.py`: Enforces comment hygiene (no task IDs, bug IDs, or history notes).
-- `python tools/check_docs.py cites`: Validates all backticked doc paths exist.
+- `python tools/verify.py --scope all`: Comprehensive verification gate (backend, frontend, DB, deploy, docs). Run by the human, not by agents.
+- `python tools/lint_comments.py`: Enforces comment hygiene (no task IDs, bug IDs, or history notes). Run by `/feature-review`.
+- `python tools/check_docs.py cites`: Validates all backticked doc paths exist. Run by `/feature-review`.
 - `python tools/db/dev_reset.py`: Fast template-based DEV DB refresh that replays migrations and stamps `pifitness.env='dev'`.
 
 ---
@@ -86,13 +89,13 @@ PiFitness/
 ├── .features/
 │   ├── descriptions/                   # Step 3: the one active feature request
 │   │   └── <id>.md
-│   ├── designs_active/                 # Steps 4-11: the one active feature's files
+│   ├── designs_active/                 # Steps 4-10: the one active feature's files
 │   │   ├── <id>_design.md              # Design, acceptance criteria, open questions, task plan
 │   │   ├── <id>_log.md                 # Append-only progress log (via fd.py)
-│   │   ├── <id>_bugs.md                # Bug tracker sidecar (via fd.py)
+│   │   ├── <id>_bugs.md                # Bug tracker sidecar (via fd.py): open, in-review, not-fixed, fixed
 │   │   ├── <id>_uat.html               # Interactive UAT checklist (generated by fd.py uat build)
 │   │   └── <id>_feedback.md            # Human UAT results (see Step 7)
-│   ├── designs_complete/               # Step 12: archived by the human
+│   ├── designs_complete/               # Step 11: archived by the human
 │   │   └── <id>/
 │   └── templates/
 │       ├── _FEATURE_REQUEST_TEMPLATE.md
@@ -112,8 +115,7 @@ PiFitness/
 │       ├── feature-plan.md             # Step 5
 │       ├── feature-execute.md          # Step 6
 │       ├── feature-polish.md           # Step 8
-│       ├── feature-test.md             # Step 9
-│       └── feature-review.md           # Step 10
+│       └── feature-review.md           # Step 9
 │
 └── tools/
     ├── data_dictionary/lineage.py      # Lineage graph build and query
@@ -134,7 +136,7 @@ PiFitness/
 - **Agents' git access is an allowlist:** `git branch --show-current`, `git status`, `git diff`, `git log`, `git show`. Anything else, including staging, is off limits.
 - **The human commits**, at whatever cadence suits them. Recommended: review the diff and commit after each execution session, with message `feat(<id>): T01-T03 <summary>`, including `.features/designs_active/<id>_*` so the log and design status travel with the code.
 - The human pushes `feature-test` for TEST deployment, merges it into `main` with `--no-ff`, tags `main`, and pushes.
-- `main` appears in agent-facing text in one place only: the read-only baseline `git diff main --stat` in Step 10.
+- `main` appears in agent-facing text in one place only: the read-only baseline `git diff main --stat` in Step 9.
 
 ---
 
@@ -155,13 +157,14 @@ Each phase leaves markers in files; the next phase checks them before doing anyt
 | Task `start` / `done` entries | `<id>_log.md` | `fd.py start` / `fd.py done` |
 | Task `Status: complete` | design | Agent, `fd.py set <id> T## complete`, only after a `done` with exit 0 |
 | `<id>_feedback.md` | designs_active | Human UAT (Step 7) |
-| AC boxes `- [x]` | design `## Acceptance Criteria` | Agent in Step 9, from an all-pass `fd.py uat import` |
-| Phase notes (`test:`, `review:`) | `<id>_log.md` | Agent, `fd.py log <id> "..."` |
-| `status: complete` | design frontmatter | **Human**, Step 12: `fd.py set <id> feature complete` |
+| AC boxes `- [x]` | design `## Acceptance Criteria` | `fd.py uat import <id> --apply`, from the human's feedback (the human runs it after UAT; polish and review run it again) |
+| Bug status | `<id>_bugs.md` | `fd.py` only: `open` and `in-review` by polish, `fixed` and `not-fixed` from UAT feedback or a review re-check (see Bug lifecycle) |
+| Phase notes (`polish:`, `review:`) | `<id>_log.md` | Agent, `fd.py log <id> "..."` |
+| `status: complete` | design frontmatter | **Human**, Step 11: `fd.py set <id> feature complete` |
 
 ---
 
-## 6. The 12-Step Feature Lifecycle
+## 6. The 11-Step Feature Lifecycle
 
 ```mermaid
 flowchart TD
@@ -173,11 +176,12 @@ flowchart TD
     S6 --> S7["7. Local UAT (Human)"]
     S7 -->|Failures| S8["8. Polish (Agent)"]
     S8 --> S7
-    S7 -->|All pass| S9["9. Test Hardening (Agent)"]
-    S9 --> S10["10. Code Review (Agent)"]
-    S10 --> S11["11. TEST Autodeploy on Pi (Human)"]
-    S11 -->|NO-GO| S8
-    S11 -->|GO| S12["12. PRD Autodeploy + Archive (Human)"]
+    S7 -->|All pass| S9["9. Code Review (Agent)"]
+    S9 -->|Findings| S8
+    S8 -.->|Review findings only| S9
+    S9 -->|Pass| S10["10. TEST Autodeploy on Pi (Human)"]
+    S10 -->|NO-GO| S8
+    S10 -->|GO| S11["11. PRD Autodeploy + Archive (Human)"]
 ```
 
 Each step lists what it **expects** on entry and what it **leaves** on exit. Agent workflows take no id argument: they find it from the single file in the folder.
@@ -225,7 +229,7 @@ Each step lists what it **expects** on entry and what it **leaves** on exit. Age
   1. Decomposes the design into 3 to 12 micro-tasks (`T01`, `T02`, ...). Sizing rules are in section 8.
   2. Every task lists verified anchors (`modify`, `create`, `delete`, `pattern`, `read`, `planned`). No invented paths.
   3. Every task has `Points: 1|2|3` and exactly one Verify command.
-  4. Runs `fd.py set <id> resume` (writes `points:` and Resume Here) and `fd.py check <id> --anchors` (0 errors, 0 bad, 0 unresolved; the missing code-review warning is expected).
+  4. Runs `fd.py set <id> resume` (writes `points:` and Resume Here) and `fd.py check <id> --anchors` (0 errors, 0 warnings, 0 bad, 0 unresolved).
 - **Human:** reviews the plan, then runs `python tools/workflow/fd.py set <id> feature reviewed`. This is the approval marker; `fd.py set T## ...` refuses while the status is `draft`.
 - **Leaves:** `status: reviewed`.
 
@@ -258,45 +262,48 @@ Each step lists what it **expects** on entry and what it **leaves** on exit. Age
   ```
 
   `Result` is `Pass`, `Fail`, or `Pending`. Every AC id must exist in the design.
+- **Then:** the human runs `python tools/workflow/fd.py uat import <id> --apply`. It ticks the AC boxes that passed, unticks the rest, and settles any bug that was waiting on this UAT (see Bug lifecycle). The export records when it was made, so an old feedback file is never mistaken for a new one.
 - **Today (interim):** the export downloads `<id>_feedback.md` to the browser's Downloads folder, and the human moves it into `designs_active/`.
 - **To be built:** a UAT launcher (a Python script and its HTML page, modelled on `request_form.py`) that writes the file to the right place. See section 9.
 
 ### Step 8: Polish (`/feature-polish`)
-- **Actor:** Agent. Runs only after a human UAT with at least one Fail.
-- **Expects:** branch `feature-test`; `fd.py uat import <id>` reports at least one fail.
+- **Actor:** Agent. Runs after a UAT with at least one Fail, after Step 9 logs findings, or after a TEST NO-GO.
+- **Expects:** branch `feature-test`; no open OQ; status `in-progress`; every task complete; `<id>_feedback.md` exists.
 - **Procedure:**
-  1. For each failed AC, find the task whose `Traces-to` includes it, then `fd.py bug <id> T## "summary" --symptom "<feedback note>" --ac AC-#`.
-  2. Untick the failed AC's box in the design (`- [ ]`).
-  3. Fix the cause with targeted changes. Fill in the bug entry in `<id>_bugs.md` by hand: Root cause, Fix, Check added, Outcome.
-  4. "Check added" is an existing permanent test, a new test only if the design's `auto:` lines already allow it (section 7), or `none (reason)`. Never a throwaway test.
-  5. Record progress with `fd.py log <id> "..."`. No commits.
-- **Leaves:** `fd.py bugs <id> --pending` is empty; changes uncommitted. The human re-runs Step 7. This loop repeats until all ACs pass.
+  1. `fd.py uat import <id> --apply` syncs the AC boxes and settles bugs that were waiting on UAT.
+  2. For each failed AC with no unresolved bug, `fd.py bug <id> "summary" --symptom "<feedback note>" --ac AC-#`.
+  3. For each bug that is `open` or `not-fixed`: diagnose the root cause, fix it with targeted changes in whatever files it needs, then `fd.py bugs <id> --update BUG-# --root-cause "..." --fix "...; files: <paths>" --status in-review`. A bug that is `not-fixed` keeps its earlier attempt in the record, so the agent does not repeat it.
+  4. If a fix needs a decision, add an open OQ to the design file and carry on with the bugs it does not affect. The human answers in the file and runs `/feature-design`, then re-runs `/feature-polish`.
+  5. `fd.py log <id> "polish: ..."`. No commits.
+- **Polish does not prove a fix.** It writes no tests and runs no suite. The human's UAT decides whether a fix worked.
+- **Leaves:** bugs `in-review`; uncommitted changes. The human commits, re-runs UAT (Step 7), saves the feedback, and runs `fd.py uat import <id> --apply`. Bugs found by Step 9 have no AC, so Step 9 is re-run to confirm them. This loop repeats until nothing is unresolved.
 
-### Step 9: Test Hardening (`/feature-test`)
+### Step 9: Code Review (`/feature-review`)
 - **Actor:** Agent.
-- **Expects:** branch `feature-test`; `fd.py uat import <id>` reports 0 fail and 0 pending; `fd.py bugs <id> --pending` is empty.
-- **Procedure:**
-  1. Tick every AC box (`- [x]`) in the design. They are now backed by the all-pass UAT.
-  2. Add or update automated tests **only** as section 7 allows: new tests come from the AC `auto:` lines.
-  3. Every new test has a docstring and one marker (`@pytest.mark.invariant`, `contract`, `smoke`, or `journey`) and never mocks the unit under test.
-  4. Run `python tools/verify.py --scope all`; it must exit 0.
-  5. `fd.py log <id> "test: verify --scope all exit 0; new tests: <paths and names>"`.
-- **Leaves:** ticked ACs; the log line listing every new test; uncommitted changes.
-
-### Step 10: Code Review (`/feature-review`)
-- **Actor:** Agent.
-- **Expects:** branch `feature-test`; a `test:` entry in the log.
-- **Procedure:**
-  1. Run `git status --porcelain` and `git diff main --stat`. Every changed or untracked file must match `docs/REPO_MAP.md`.
+- **Expects:** branch `feature-test`; no open OQ; status `in-progress`; every task complete; `fd.py uat import <id> --apply` shows 0 fail and 0 pending; no bug linked to an AC unresolved; no bug `open` or `not-fixed`. If not, it stops and says what the human must do. That is a gate, not a finding.
+- **Procedure:** review reports and fixes nothing. It runs no tests.
+  1. Account for every changed or untracked file (`git status --porcelain`, `git diff main --stat`): each must be a task anchor, a file named in a bug's Fix, or a feature housekeeping file.
   2. Run `python tools/lint_comments.py` and `python tools/check_docs.py cites`.
-  3. **Test growth:** list new test files and functions. Each must trace to an AC `auto:` line that says `new test`. Remove or report any that do not.
-  4. **Evidence audit:** read `fd.py log <id> -n 100`. Every complete task needs a `start` and a `done` entry with `exit=0`. Report gaps; do not repair them.
-  5. Remove scratch files and build artifacts the agent created.
-  6. `fd.py log <id> "review: <result>"`.
+  3. **Test growth:** each new test file or function must trace to an AC `auto:` line that says `new test`. Do not delete it.
+  4. **Evidence audit:** read `fd.py log <id> -n 200`. Every complete task needs a `start` and a latest `done` with `exit=0`; `forced` is not a pass. Report gaps; do not repair them.
+  5. Re-check the review bugs from an earlier run that are `in-review`: gone means `fixed`, found again means `not-fixed`.
+  6. Log each finding with `fd.py bug <id> "summary" --symptom "..."`.
+  7. `fd.py log <id> "review: PASS"` or `"review: FAIL (<n> findings: ...)"`. It passes only when no bug is unresolved.
 - **Does not** set the feature `complete`.
-- **Leaves:** a short report for the human: files changed, tests added, any gaps. The tree is ready for the human to commit.
+- **Leaves:** on FAIL, the findings logged as bugs and the human told; the human runs `/feature-polish` and then `/feature-review` again. On PASS, a clean tree ready for the human to commit.
 
-### Step 11: Human Deploys to TEST via Pi Autodeploy Launcher
+#### Bug lifecycle
+
+| Status | Meaning | Set by |
+|---|---|---|
+| `open` | Recorded, not yet fixed. | `fd.py bug`: polish for a failed AC, review for a finding |
+| `in-review` | An agent diagnosed and fixed it and is waiting for verification. Needs a root cause and a fix on record. | Polish: `fd.py bugs --update --status in-review` |
+| `fixed` | Verified. | A bug linked to an AC: `fd.py uat import --apply`, when that AC passes in feedback newer than the fix. A review finding: Step 9, when it no longer reproduces. |
+| `not-fixed` | Verification failed. Polish picks it up again. | The same two routes, when the AC fails again or the finding is still there. |
+
+A bug linked to an AC is verified only by the human's UAT. No agent can mark it fixed.
+
+### Step 10: Human Deploys to TEST via Pi Autodeploy Launcher
 - **Actor:** Human.
 - **Action:**
   1. Commit everything on `feature-test` (code, tests, `.features/designs_active/<id>_*`).
@@ -305,12 +312,12 @@ Each step lists what it **expects** on entry and what it **leaves** on exit. Age
   4. The launcher invokes `autodeploy.sh --environment test --commit <SHA>`, running the 10-step sequence:
      - Steps 1–6 (while PRD is still running): Preflight check, clean TEST app checkout (`/home/god/PiFitness-test`), dependency sync via `uv sync` & `npm ci`, DB prepare / clean baseline capture, pending migrations applied via `dbmate up`, and in-process regression tests (pytest + vitest).
      - Steps 7–9 (cutover): Stops PRD units/timers, starts TEST services on normal ports (`:8000`, `:3000`), runs smoke tests against the running TEST stack.
-     - Step 10: Manual test gate.
+     - The launcher's own step 10: manual test gate.
   5. Walks the feature on a phone over HTTPS (`https://pifitness.duckdns.org`) using the AC list.
-  6. **NO-GO:** `autodeploy.sh` halts TEST and restores PRD. The human records the failures as `Fail` rows in `<id>_feedback.md` (using the UAT launcher or by hand) and runs `/feature-polish`.
+  6. **NO-GO:** `autodeploy.sh` halts TEST and restores PRD. The human records the failures as `Fail` rows in `<id>_feedback.md` (using the UAT launcher or by hand), runs `fd.py uat import <id> --apply`, and then runs `/feature-polish`.
   7. **GO:** `autodeploy.sh` halts TEST and restores PRD.
 
-### Step 12: Human Deploys to Production and Archives
+### Step 11: Human Deploys to Production and Archives
 - **Actor:** Human.
 - **Action:**
   1. Merge `feature-test` into `main` with `--no-ff`.
@@ -326,7 +333,7 @@ Each step lists what it **expects** on entry and what it **leaves** on exit. Age
      - Starts PRD services and verifies public health URL.
      - Runs regression tests and live smoke tests against the deployed production stack.
      - On any failure: automatic exit handler rolls back code, units, and database to baseline.
-  5. After PRD succeeds, run `python tools/workflow/fd.py set <id> feature complete`. It requires every task complete and every AC ticked.
+  5. After PRD succeeds, run `python tools/workflow/fd.py set <id> feature complete`. It requires every task complete, every AC ticked, and no unresolved bug.
   6. **Archive manually.** Move `.features/designs_active/<id>_*` and `.features/descriptions/<id>.md` into `.features/designs_complete/<id>/`. Both source folders must end up empty, or the next `/feature-design` stops.
   7. Bring `feature-test` back up to date with `main`.
 
@@ -338,11 +345,11 @@ Agents must not leave a pile of feature-specific tests behind for pytest to run 
 
 1. **One allowlist.** The `auto:` lines in the design's Acceptance Criteria are the complete list of new tests a feature may add. `auto:` is an existing command (preferred), `new test <path>::<name> [marker]`, or `none (reason)`. A `new test` line appears only after the human approved it in a written answer to an open question whose default is no. Delivering the feature is the priority; tests are the exception.
 2. **New tests only guard lasting rules** that other features could break: invariants, contracts, smoke paths, journeys. Not one-off implementation details, not "this task's code was written".
-3. **Where tests are created.** Step 5 plans a test file only for an AC marked `new test`; Step 6 creates it in that task; Step 9 adds nothing beyond the allowlist. Extending an existing test file beats creating one. An existing test that this change breaks may be updated.
+3. **Where tests are created.** Step 5 plans a test file only for an AC marked `new test`; Step 6 creates it in that task; no later step adds tests. Extending an existing test file beats creating one. An existing test that this change breaks may be updated.
 4. **Quality.** Each new test has a docstring and one V2 marker, is named for the behavior it guards (never the feature id, task id, or "feature_x"), does not mock the unit under test, and does not duplicate existing coverage.
 5. **No scratch.** Throwaway scripts, snapshot dumps, and temporary tests are never left in the repository.
 6. **Task Verify commands** are existing commands, or the AC's `auto:` command. A task never exists only to write tests.
-7. **Review audits it** (Step 10, item 3). Tests that trace to no `new test` AC are removed or reported.
+7. **Review audits it** (Step 9, test growth). A test that traces to no `new test` AC is logged as a bug; review does not delete it.
 
 ---
 
@@ -367,12 +374,10 @@ Items to build or watch. Each says what the earlier step must leave so the fix c
 
 | Item | Step | What the prior step leaves | Fix or expectation |
 |---|---|---|---|
-| **UAT launcher** | 7 | `<id>_design.md` with ACs; `<id>_uat.html` built by `fd.py uat build` | Add a stdlib-only Python launcher and HTML page like `request_form.py`: serve on `127.0.0.1`, check Host, Origin, and Content-Type, and write `.features/designs_active/<id>_feedback.md` directly (confirm before overwrite). The AC list comes from the design (the same parse as `fd.py uat build`). The file must keep the Step 7 table format. After saving, run `fd.py uat import <id>` and show the summary. |
+| **UAT launcher** | 7 | `<id>_design.md` with ACs; `<id>_uat.html` built by `fd.py uat build` | Add a stdlib-only Python launcher and HTML page like `request_form.py`: serve on `127.0.0.1`, check Host, Origin, and Content-Type, and write `.features/designs_active/<id>_feedback.md` directly (confirm before overwrite). The AC list comes from the design (the same parse as `fd.py uat build`). The file must keep the Step 7 table format. After saving, run `fd.py uat import <id> --apply` and show the summary. |
 | **Branch guard** | all agent steps | n/a | Add the allowlist in section 4 to `.clinerules/10-default-rules.md` (wording in `git-guard-snippet.md`) so it holds for every workflow. Prose cannot stop a mistake. If you want a hard stop, look at a `pre-commit` hook that refuses unless an environment variable that only you set is present, or at your Cline version's command permission settings. |
-| **Done evidence** | 6, 10 | `start` and `done` log entries | `fd.py done` does not close a task and `fd.py set T## complete` does not check the log. The Step 10 evidence audit and testing catch fake completions. If needed later, make `set complete` require a `done` entry with exit 0. |
-| **AC ticking** | 9 | all-pass `fd.py uat import` | The agent ticks boxes by hand. `uat import` could tick them itself (`--apply`). |
-| **Bug record fields** | 8, 9 | `fd.py bug` skeleton with `pending` fields | The agent fills Root cause, Fix, Check added, and Outcome by editing `<id>_bugs.md`. Step 9 expects `fd.py bugs <id> --pending` to be empty. |
-| **Test-growth check** | 10 | log line from Step 9; AC `auto:` lines | A tool that compares new test files and functions (from `git`) with the AC `auto:` lines. Until then the review agent does it by reading. |
+| **Done evidence** | 6, 9 | `start` and `done` log entries | `fd.py done` does not close a task and `fd.py set T## complete` does not check the log. The Step 9 evidence audit catches fake completions. If needed later, make `set complete` require a `done` entry with exit 0. |
+| **Test-growth check** | 9 | AC `auto:` lines | A tool that compares new test files and functions (from `git`) with the AC `auto:` lines. Until then the review agent does it by reading. |
 | **`planned` anchors** | 5 | n/a | `fd.py check` ignores them when counting files. The planner counts them by hand. |
 | **Design-phase tools** | 4 | n/a | `next`, `resume`, and `set` refuse until tasks exist and `hot` reports an error, so the design workflow edits Resume Here by hand until a Task Plan exists. |
 | **`backlog add`** | any | `docs/workflow/BACKLOG.md` with a 7-column table | It appends `id, item, source, suggested phase, size, status, phase`, using `-` for the two phase columns. Keep the file's header in that shape. |
