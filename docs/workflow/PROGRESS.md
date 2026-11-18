@@ -122,3 +122,16 @@ date | task | model | event | evidence
     uat build: 4 acceptance criteria -> .features\designs_active\fx6_uat.html
     Command: .venv\Scripts\python.exe -m pytest tests/test_fd.py -q
     7 passed in 0.07s
+
+2026-11-17 | 6.4 | cline | DONE | Modernized .features/templates/ suite: created canonical _FEATURE_REQUEST_TEMPLATE.md (problem statement, desired behaviors, surfaces, non-goals), _FEATURE_DESIGN_TEMPLATE.md (frontmatter, Resume Here, ACs, Open Questions, Task Plan with 1-3 pt sizing and file/symbol anchor rules), and _FEATURE_FEEDBACK_TEMPLATE.md (per-AC Pass/Fail feedback); removed legacy _DESCRIPTION_TEMPLATE.md, _DESIGN_TEMPLATE.md, and unused .features/tools/. Verified fd.py check passes against the new design template format: temporary design built from _FEATURE_DESIGN_TEMPLATE.md checked clean (0 errors, 0 warnings), --anchors 3 ok / 0 bad / 0 unresolved, temp design then deleted; fd.py check fx6 regression: 0 errors, 0 warnings.
+    Command: .venv\Scripts\python.exe tools\workflow\fd.py check tpl-check --anchors
+    anchors: 3 ok, 0 bad, 0 unresolved (repo root: C:\Users\rickb\vsProjects\PiFitness)
+    check: 0 errors, 0 warnings
+    Command: .venv\Scripts\python.exe tools\workflow\fd.py check fx6
+    check: 0 errors, 0 warnings
+
+2026-11-17 | 6.4 | cline | DONE | Aligned tools/workflow/request_form.py output with .features/templates/_FEATURE_REQUEST_TEMPLATE.md: export now emits frontmatter (feature-id, title, category, created) followed by sections 1-7 in template order (Summary/Users & Use Cases, Problem/Motivation, Desired Behaviors & Surfaces with `- Surfaces:` line, Non-Goals/Out of Scope, Functional Requirements FR-n, Constraints & Dependencies, Desired Outcomes with `- [ ]` checkboxes); added form fields for surfaces, functional requirements, constraints & dependencies, and desired outcomes; py_compile exit 0; build_markdown smoke test rendered all 7 sections with valid frontmatter and validation accepts/rejects correctly.
+    Command: .venv\Scripts\python.exe -m py_compile tools\workflow\request_form.py
+    (clean compile, no output)
+    Command: python %TEMP%\rf_check.py (disposable build_markdown/validate smoke test)
+    --- feature-id: feat-music-search ... created: 2026-11-17 ... sections 1-7 present ... VALIDATE: None ... EMPTY_VALIDATE: Feature ID is required.

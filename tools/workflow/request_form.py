@@ -1,192 +1,222 @@
 #!/usr/bin/env python3
-"""PiFitness Feature Request desktop form (tkinter, stdlib-only).
+"""PiFitness feature request form launcher (stdlib only).
 
-A friendly, single-file desktop GUI that captures a non-technical feature
-request and writes `.features/descriptions/<id>.md` in one step.
-
-No external dependencies. Runs with the project Python interpreter:
+Serves tools/workflow/request_form.html on localhost and writes the finished
+request to .features/descriptions/<id>.md. This file is the single home for
+validation and Markdown generation; the browser only collects input.
 
     python tools/workflow/request_form.py
+    python tools/workflow/request_form.py --port 8765 --no-browser
 """
 
 from __future__ import annotations
 
+import argparse
+import json
 import re
+import threading
+import webbrowser
 from datetime import date
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DESCRIPTIONS_DIR = REPO_ROOT / ".features" / "descriptions"
+HTML_PATH = Path(__file__).with_name("request_form.html")
 
-SLUG_RE = re.compile(r"^[a-z][a-z0-9-]*$")
-DEFAULT_DIR = Path(".features/descriptions").resolve()
-
-FIELDS = (
-    ("featureId", "Feature ID"),
-    ("title", "Title"),
-    ("problems", "Problem Statements (P1, P2…)"),
-    ("desired", "Desired Behavior"),
-    ("surfaces", "Affected Surfaces & Known Constraints"),
-    ("nongoals", "Out of Scope / Non-Goals"),
-)
-
+SLUG_RE = re.compile(r"^[a-z][a-z0-9-]{1,59}$")
 CATEGORIES = ("New Capability", "Enhancement", "Bug Fix")
+LIST_FIELDS = ("problems", "behaviors", "nongoals", "context", "questions")
+MAX_BODY_BYTES = 256 * 1024
+BULLET_PREFIX_RE = re.compile(r"^(?:[-*\u2022]\s+)+")
 
 
-def validate(values: dict[str, str]) -> str | None:
-    if not values.get("featureId"):
-        return "Feature ID is required."
-    if not SLUG_RE.match(values["featureId"]):
-        return ("Feature ID must use lowercase letters, digits, hyphens only "
-                "and must start with a letter (e.g. feat-music-search).")
-    if not values.get("title"):
-        return "Title is required."
-    if not values.get("problems"):
-        return "At least one problem statement is required."
-    if not values.get("desired"):
-        return "Desired behavior is required."
-    return None
+def clean_items(raw: object) -> list[str]:
+    """Collapse each item to one line, drop typed bullet markers and blanks."""
+    if not isinstance(raw, list):
+        return []
+    items: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str):
+            continue
+        text = BULLET_PREFIX_RE.sub("", " ".join(entry.split()))
+        if text:
+            items.append(text)
+    return items
 
 
-def build_markdown(values: dict[str, str]) -> str:
+def normalise(payload: object) -> dict:
+    data = payload if isinstance(payload, dict) else {}
+    req = {
+        "featureId": " ".join(str(data.get("featureId", "")).split()),
+        "title": " ".join(str(data.get("title", "")).split()),
+        "category": str(data.get("category", "")),
+        "overwrite": data.get("overwrite") is True,
+    }
+    for field in LIST_FIELDS:
+        req[field] = clean_items(data.get(field))
+    return req
+
+
+def validate(req: dict) -> list[str]:
+    errors: list[str] = []
+    if not req["title"]:
+        errors.append("Add a title.")
+    if not req["featureId"]:
+        errors.append("Add a feature ID.")
+    elif not SLUG_RE.match(req["featureId"]):
+        errors.append(
+            "Feature ID must be 2-60 characters: lowercase letters, digits and "
+            "hyphens, starting with a letter (e.g. feat-music-search)."
+        )
+    if req["category"] not in CATEGORIES:
+        errors.append("Pick a category.")
+    if not req["problems"]:
+        errors.append("Describe at least one problem.")
+    if not req["behaviors"]:
+        errors.append("Add at least one thing that should work when this is done.")
+    return errors
+
+
+def bullets(items: list[str], empty: str = "- None") -> list[str]:
+    return [f"- {item}" for item in items] if items else [empty]
+
+
+def build_markdown(req: dict) -> str:
     lines = [
         "---",
-        f"feature-id: {values['featureId']}",
-        f"title: {values['title']}",
-        f"category: {values['category']}",
+        f"feature-id: {req['featureId']}",
+        f"title: {req['title']}",
+        f"category: {req['category']}",
         f"created: {date.today().isoformat()}",
         "---",
         "",
-        f"# Feature: {values['title']}",
+        f"# Feature: {req['title']}",
         "",
-        "## 1. Summary / Users & Use Cases",
-        f"- As a human developer, I want {values['title'].lower()}, so that the described problem is resolved.",
+        "## 1. Problem",
+        *bullets(req["problems"]),
         "",
-        "## 2. Problem / Motivation",
-        values["problems"],
+        "## 2. What Good Looks Like",
+        *[f"- B{n}: {text}" for n, text in enumerate(req["behaviors"], start=1)],
         "",
-        "## 3. Desired Behavior",
-        values["desired"],
+        "## 3. Out of Scope",
+        *bullets(req["nongoals"]),
         "",
-        "## 4. Affected Surfaces & Known Constraints",
-        values.get("surfaces") or "-",
+        "## 4. Known Context (optional)",
+        *bullets(req["context"]),
         "",
-        "## 5. Out of Scope / Non-Goals",
-        values.get("nongoals") or "-",
+        "## 5. Open Questions (optional)",
+        *bullets(req["questions"]),
         "",
     ]
     return "\n".join(lines)
 
 
-class FeatureRequestForm(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.title("PiFitness — Feature Request")
-        self.minsize(640, 560)
-        self.category = tk.StringVar(value=CATEGORIES[0])
-        self.entries: dict[str, tk.Widget] = {}
-        self._build_ui()
+def target_path(req: dict) -> Path:
+    return DESCRIPTIONS_DIR / f"{req['featureId']}.md"
 
-    def _build_ui(self):
-        container = ttk.Frame(self, padding=16)
-        container.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(container, text="PiFitness — Feature Request", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(0, 4))
-        ttk.Label(
-            container,
-            text="Fill in the non-technical problem statement. Export writes `.features/descriptions/<id>.md`.",
-            foreground="#666",
-        ).pack(anchor="w", pady=(0, 12))
+def display_path(path: Path) -> str:
+    return path.relative_to(REPO_ROOT).as_posix()
 
-        form = ttk.Frame(container)
-        form.pack(fill=tk.BOTH, expand=True)
 
-        for i, (key, label) in enumerate(FIELDS):
-            ttk.Label(form, text=label).grid(row=i, column=0, sticky="nw", padx=(0, 8), pady=4)
-            if key in ("problems", "desired", "surfaces", "nongoals"):
-                txt = tk.Text(form, width=56, height=4)
-                txt.grid(row=i, column=1, sticky="nsew", pady=4)
-                self.entries[key] = txt
-            else:
-                ent = ttk.Entry(form, width=60)
-                ent.grid(row=i, column=1, sticky="ew", pady=4)
-                self.entries[key] = ent
+def preview_response(req: dict) -> dict:
+    errors = validate(req)
+    response = {"errors": errors, "markdown": build_markdown(req)}
+    if req["featureId"] and SLUG_RE.match(req["featureId"]):
+        path = target_path(req)
+        response["path"] = display_path(path)
+        response["exists"] = path.exists()
+    return response
 
-        ttk.Label(
-            form,
-            text="Lowercase letters, digits, hyphens only; must start with a letter.",
-            foreground="#888",
-            font=("Segoe UI", 8),
-        ).grid(row=len(FIELDS), column=1, sticky="w", pady=(0, 8))
 
-        ttk.Label(form, text="Category").grid(row=len(FIELDS) + 1, column=0, sticky="nw", padx=(0, 8), pady=4)
-        cat_frame = ttk.Frame(form)
-        cat_frame.grid(row=len(FIELDS) + 1, column=1, sticky="w", pady=4)
-        for j, cat in enumerate(CATEGORIES):
-            ttk.Radiobutton(cat_frame, text=cat, variable=self.category, value=cat).grid(row=0, column=j, padx=(0, 12))
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, fmt: str, *args: object) -> None:
+        return
 
-        form.columnconfigure(1, weight=1)
+    def _send(self, status: int, body: bytes, content_type: str) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
-        btns = ttk.Frame(container)
-        btns.pack(fill=tk.X, pady=(16, 0))
-        ttk.Button(btns, text="Export Request Markdown", command=self.export).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Button(btns, text="Copy Markdown to Clipboard", command=self.copy).pack(side=tk.LEFT)
-        ttk.Button(btns, text="Clear", command=self.clear).pack(side=tk.RIGHT)
+    def _json(self, status: int, obj: dict) -> None:
+        self._send(status, json.dumps(obj).encode("utf-8"), "application/json; charset=utf-8")
 
-        self.status = ttk.Label(container, text="", foreground="#2e7d32")
-        self.status.pack(anchor="w", pady=(12, 0))
+    def _host_allowed(self) -> bool:
+        port = self.server.server_address[1]
+        return self.headers.get("Host", "") in {f"127.0.0.1:{port}", f"localhost:{port}"}
 
-    def get_values(self) -> dict[str, str]:
-        values: dict[str, str] = {}
-        for key, _ in FIELDS:
-            widget = self.entries[key]
-            if isinstance(widget, tk.Text):
-                values[key] = widget.get("1.0", "end-1c").strip()
-            else:
-                values[key] = widget.get().strip()
-        values["category"] = self.category.get()
-        return values
+    def do_GET(self) -> None:
+        if not self._host_allowed():
+            self._json(403, {"error": "Forbidden host."})
+        elif self.path in ("/", "/index.html"):
+            self._send(200, HTML_PATH.read_bytes(), "text/html; charset=utf-8")
+        else:
+            self._json(404, {"error": "Not found."})
 
-    def export(self):
-        values = self.get_values()
-        err = validate(values)
-        if err:
-            messagebox.showerror("Validation error", err)
+    def do_POST(self) -> None:
+        if not self._host_allowed():
+            self._json(403, {"error": "Forbidden host."})
             return
-        DEFAULT_DIR.mkdir(parents=True, exist_ok=True)
-        path = filedialog.asksaveasfilename(
-            title="Save feature request",
-            initialdir=str(DEFAULT_DIR),
-            initialfile=f"{values['featureId']}.md",
-            defaultextension=".md",
-            filetypes=[("Markdown", "*.md")],
-        )
-        if not path:
+        if self.path not in ("/api/preview", "/api/save"):
+            self._json(404, {"error": "Not found."})
             return
-        Path(path).write_text(build_markdown(values), encoding="utf-8")
-        self.status.config(text=f"Saved: {path}", foreground="#2e7d32")
-
-    def copy(self):
-        values = self.get_values()
-        err = validate(values)
-        if err:
-            messagebox.showerror("Validation error", err)
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length > MAX_BODY_BYTES:
+                self._json(413, {"error": "Request too large."})
+                return
+            req = normalise(json.loads(self.rfile.read(length) or b"{}"))
+        except (ValueError, json.JSONDecodeError):
+            self._json(400, {"error": "Malformed request."})
             return
-        self.clipboard_clear()
-        self.clipboard_append(build_markdown(values))
-        self.status.config(text="Markdown copied to clipboard", foreground="#2e7d32")
 
-    def clear(self):
-        for key, _ in FIELDS:
-            widget = self.entries[key]
-            if isinstance(widget, tk.Text):
-                widget.delete("1.0", "end")
-            else:
-                widget.delete(0, tk.END)
-        self.category.set(CATEGORIES[0])
-        self.status.config(text="")
+        if self.path == "/api/preview":
+            self._json(200, preview_response(req))
+        else:
+            self._save(req)
+
+    def _save(self, req: dict) -> None:
+        errors = validate(req)
+        if errors:
+            self._json(422, {"errors": errors})
+            return
+        path = target_path(req)
+        DESCRIPTIONS_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(path, "w" if req["overwrite"] else "x", encoding="utf-8", newline="\n") as fh:
+                fh.write(build_markdown(req))
+        except FileExistsError:
+            self._json(409, {"exists": True, "path": display_path(path)})
+            return
+        self._json(200, {"saved": True, "path": display_path(path)})
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--port", type=int, default=0, help="Port to listen on (default: any free port).")
+    parser.add_argument("--no-browser", action="store_true", help="Do not open a browser window.")
+    args = parser.parse_args()
+
+    if not HTML_PATH.is_file():
+        raise SystemExit(f"Missing {HTML_PATH.name} next to this script.")
+
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    print(f"Feature request form: {url}")
+    print(f"Saving to: {display_path(DESCRIPTIONS_DIR)}/  (Ctrl+C to stop)")
+    if not args.no_browser:
+        threading.Timer(0.3, webbrowser.open, args=(url,)).start()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopped.")
+    finally:
+        server.server_close()
 
 
 if __name__ == "__main__":
-    app = FeatureRequestForm()
-    app.mainloop()
+    main()

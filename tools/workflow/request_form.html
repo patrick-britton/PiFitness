@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PiFitness feature request</title>
+<style>
+  :root {
+    --bg: #f6f7f8;
+    --surface: #ffffff;
+    --ink: #1c2530;
+    --muted: #5d6874;
+    --rule: #d6dbe0;
+    --accent: #0f6a6a;
+    --accent-ink: #ffffff;
+    --danger: #b3261e;
+    --ok: #1f7a3d;
+    --focus: #0f6a6a;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181d;
+      --surface: #1c2229;
+      --ink: #e6eaee;
+      --muted: #9aa5b1;
+      --rule: #343d47;
+      --accent: #4fc0bc;
+      --accent-ink: #0c1a1a;
+      --danger: #ff8a80;
+      --ok: #7fd49a;
+      --focus: #4fc0bc;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 var(--sans);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+    gap: 32px;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 28px 24px 48px;
+  }
+  @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lede { margin: 0 0 24px; color: var(--muted); }
+  h2 { font-size: 16px; margin: 0 0 2px; }
+  .hint { margin: 0 0 8px; color: var(--muted); font-size: 13.5px; max-width: 62ch; }
+  section { margin-bottom: 26px; }
+  .optional { color: var(--muted); font-weight: 400; font-size: 13px; }
+
+  label.field { display: block; font-weight: 600; margin-bottom: 4px; }
+  input[type="text"], textarea {
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 7px 10px;
+  }
+  textarea { resize: none; overflow: hidden; line-height: 1.45; display: block; }
+  input:focus-visible, textarea:focus-visible, button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+  .details { display: grid; gap: 14px; }
+  .id-note { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  #featureId { font-family: var(--mono); font-size: 14px; }
+
+  fieldset { border: 0; padding: 0; margin: 0; }
+  legend { font-weight: 600; padding: 0; margin-bottom: 4px; }
+  .segments { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .segments label { cursor: pointer; }
+  .segments input { position: absolute; opacity: 0; pointer-events: none; }
+  .segments span { display: block; padding: 6px 14px; background: var(--surface); border-right: 1px solid var(--rule); }
+  .segments label:last-child span { border-right: 0; }
+  .segments input:checked + span { background: var(--accent); color: var(--accent-ink); }
+  .segments input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+  .rows { display: grid; gap: 6px; }
+  .row { display: grid; grid-template-columns: 34px minmax(0, 1fr) 30px; gap: 6px; align-items: start; }
+  .marker { padding-top: 8px; text-align: right; color: var(--muted); font-family: var(--mono); font-size: 13px; }
+  .remove {
+    margin-top: 3px;
+    width: 30px; height: 30px;
+    border: 0; border-radius: 6px;
+    background: transparent; color: var(--muted);
+    font-size: 18px; line-height: 1; cursor: pointer;
+  }
+  .remove:hover { color: var(--danger); background: var(--surface); }
+  .add {
+    margin: 8px 0 0 40px;
+    border: 1px dashed var(--rule); border-radius: 6px;
+    background: transparent; color: var(--accent);
+    padding: 4px 12px; font: inherit; font-size: 13.5px; cursor: pointer;
+  }
+  .add:hover { border-color: var(--accent); }
+
+  .preview-col { position: sticky; top: 16px; align-self: start; max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
+  @media (max-width: 920px) { .preview-col { position: static; max-height: none; } }
+  .preview-col h2 { margin-bottom: 6px; }
+  pre#preview {
+    margin: 0;
+    flex: 1 1 auto;
+    overflow: auto;
+    min-height: 260px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font: 13px/1.55 var(--mono);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .savebar { margin-top: 12px; display: grid; gap: 8px; }
+  .target { font-family: var(--mono); font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  button.primary, button.secondary {
+    font: inherit; font-weight: 600; padding: 8px 16px;
+    border-radius: 6px; cursor: pointer;
+  }
+  button.primary { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
+  button.secondary { background: transparent; color: var(--ink); border: 1px solid var(--rule); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  ul.errors { margin: 0; padding-left: 18px; color: var(--danger); font-size: 13.5px; }
+  .status { font-size: 14px; min-height: 1.4em; }
+  .status.ok { color: var(--ok); }
+  .status.bad { color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <main>
+    <h1>New feature request</h1>
+    <p class="lede">Describe what you want in plain words. The design agent works out the technical side.</p>
+
+    <section class="details">
+      <div>
+        <label class="field" for="title">Title</label>
+        <input type="text" id="title" autocomplete="off" placeholder="Stop timers when leaving the workout screen">
+      </div>
+      <fieldset>
+        <legend>Category</legend>
+        <div class="segments" id="categories"></div>
+      </fieldset>
+      <div>
+        <label class="field" for="featureId">Feature ID</label>
+        <input type="text" id="featureId" autocomplete="off" spellcheck="false" placeholder="fix-timer-leak">
+        <div class="id-note">Suggested from the title. Lowercase letters, digits and hyphens.</div>
+      </div>
+    </section>
+
+    <div id="lists"></div>
+  </main>
+
+  <aside class="preview-col">
+    <h2>Saved file preview</h2>
+    <pre id="preview" aria-live="polite"></pre>
+    <div class="savebar">
+      <div class="target" id="target"></div>
+      <ul class="errors" id="errors"></ul>
+      <div class="buttons">
+        <button type="button" class="primary" id="save">Save request</button>
+        <button type="button" class="secondary" id="copy">Copy Markdown</button>
+        <button type="button" class="secondary" id="reset">Start over</button>
+      </div>
+      <div class="status" id="status" role="status"></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+(() => {
+  const CATEGORIES = [
+    { value: "New Capability", prefix: "feat-" },
+    { value: "Enhancement", prefix: "feat-" },
+    { value: "Bug Fix", prefix: "fix-" },
+  ];
+
+  const LISTS = [
+    {
+      key: "problems",
+      title: "Problem",
+      hint: "What is missing or broken, who it affects, and why it matters. Describe the problem, not the fix.",
+      placeholder: "Timers keep running after I leave the workout screen, so my phone gets warm and the battery drains.",
+    },
+    {
+      key: "behaviors",
+      title: "What good looks like",
+      hint: "One thing you could see or do on screen when this works. Each line is tested separately later, so keep them to one thing each.",
+      placeholder: "Leaving the workout screen stops the timer.",
+      numbered: "B",
+    },
+    {
+      key: "nongoals",
+      title: "Out of scope",
+      optional: true,
+      hint: "Related things that should not change in this feature.",
+      placeholder: "Redesigning the timer screen.",
+    },
+    {
+      key: "context",
+      title: "Known context",
+      optional: true,
+      hint: "Anything technical or situational you already know: screens, files, mobile-only, how it behaves today.",
+      placeholder: "Only happens on the phone. The timer lives on the Workout screen.",
+    },
+    {
+      key: "questions",
+      title: "Open questions",
+      optional: true,
+      hint: "Things you have not decided or do not know. The design agent lists these as open questions in the design file, where you answer them.",
+      placeholder: "Should the timer pause or reset when I come back?",
+    },
+  ];
+
+  const state = { title: "", featureId: "", category: CATEGORIES[0].value, idTouched: false };
+  for (const list of LISTS) state[list.key] = [""];
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    title: $("title"), featureId: $("featureId"), categories: $("categories"), lists: $("lists"),
+    preview: $("preview"), target: $("target"), errors: $("errors"), status: $("status"),
+    save: $("save"), copy: $("copy"), reset: $("reset"),
+  };
+
+  let lastPreview = { markdown: "", errors: [] };
+  let previewSeq = 0;
+  let previewTimer = null;
+
+  function slugify(text) {
+    return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/, "");
+  }
+
+  function suggestId() {
+    const prefix = CATEGORIES.find((c) => c.value === state.category).prefix;
+    let slug = slugify(state.title).replace(/^(feat|fix)-/, "");
+    return slug ? prefix + slug : "";
+  }
+
+  function syncId() {
+    if (state.idTouched) return;
+    state.featureId = suggestId();
+    els.featureId.value = state.featureId;
+  }
+
+  function growTextarea(ta) {
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + 2 + "px";
+  }
+
+  function focusRow(key, index, atEnd) {
+    const ta = els.lists.querySelector(`[data-key="${key}"] [data-index="${index}"] textarea`);
+    if (!ta) return;
+    ta.focus();
+    if (atEnd) ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+
+  function renderList(list) {
+    const wrap = els.lists.querySelector(`[data-key="${list.key}"] .rows`);
+    wrap.textContent = "";
+    state[list.key].forEach((text, i) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.dataset.index = i;
+
+      const marker = document.createElement("div");
+      marker.className = "marker";
+      marker.textContent = list.numbered ? `${list.numbered}${i + 1}` : "\u2022";
+
+      const ta = document.createElement("textarea");
+      ta.rows = 1;
+      ta.value = text;
+      ta.placeholder = i === 0 ? list.placeholder : "";
+      ta.setAttribute("aria-label", `${list.title} item ${i + 1}`);
+      ta.addEventListener("input", () => {
+        state[list.key][i] = ta.value;
+        growTextarea(ta);
+        schedulePreview();
+      });
+      ta.addEventListener("keydown", (e) => onRowKey(e, list, i, ta));
+      ta.addEventListener("paste", (e) => onRowPaste(e, list, i, ta));
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "remove";
+      remove.textContent = "\u00d7";
+      remove.setAttribute("aria-label", `Remove ${list.title} item ${i + 1}`);
+      remove.addEventListener("click", () => removeRow(list, i));
+
+      row.append(marker, ta, remove);
+      wrap.append(row);
+      growTextarea(ta);
+    });
+  }
+
+  function insertRows(list, index, texts, focusIndex) {
+    state[list.key].splice(index, 0, ...texts);
+    renderList(list);
+    focusRow(list.key, focusIndex, true);
+    schedulePreview();
+  }
+
+  function removeRow(list, i) {
+    const items = state[list.key];
+    if (items.length === 1) {
+      items[0] = "";
+      renderList(list);
+      focusRow(list.key, 0, true);
+    } else {
+      items.splice(i, 1);
+      renderList(list);
+      focusRow(list.key, Math.max(0, i - 1), true);
+    }
+    schedulePreview();
+  }
+
+  function onRowKey(e, list, i, ta) {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      if (ta.value.trim() === "") return;
+      insertRows(list, i + 1, [""], i + 1);
+    } else if (e.key === "Backspace" && ta.value === "" && state[list.key].length > 1) {
+      e.preventDefault();
+      removeRow(list, i);
+    } else if (e.key === "ArrowUp" && ta.selectionStart === 0 && i > 0) {
+      e.preventDefault();
+      focusRow(list.key, i - 1, true);
+    } else if (e.key === "ArrowDown" && ta.selectionStart === ta.value.length && i < state[list.key].length - 1) {
+      e.preventDefault();
+      focusRow(list.key, i + 1, false);
+    }
+  }
+
+  function onRowPaste(e, list, i, ta) {
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    if (!/\r?\n/.test(text)) return;
+    e.preventDefault();
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    const items = state[list.key];
+    const before = ta.value.slice(0, ta.selectionStart);
+    const after = ta.value.slice(ta.selectionEnd);
+    items[i] = (before + lines[0]).trimStart();
+    const rest = lines.slice(1);
+    if (rest.length) rest[rest.length - 1] += after;
+    else items[i] += after;
+    items.splice(i + 1, 0, ...rest);
+    renderList(list);
+    focusRow(list.key, i + rest.length, true);
+    schedulePreview();
+  }
+
+  function buildLists() {
+    for (const list of LISTS) {
+      const sec = document.createElement("section");
+      sec.dataset.key = list.key;
+      const h = document.createElement("h2");
+      h.textContent = list.title;
+      if (list.optional) {
+        const opt = document.createElement("span");
+        opt.className = "optional";
+        opt.textContent = " (optional)";
+        h.append(opt);
+      }
+      const hint = document.createElement("p");
+      hint.className = "hint";
+      hint.textContent = list.hint + " Enter adds a line; paste several lines to split them.";
+      const rows = document.createElement("div");
+      rows.className = "rows";
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "add";
+      add.textContent = "Add line";
+      add.addEventListener("click", () => {
+        const items = state[list.key];
+        if (items[items.length - 1].trim() === "") focusRow(list.key, items.length - 1, true);
+        else insertRows(list, items.length, [""], items.length);
+      });
+      sec.append(h, hint, rows, add);
+      els.lists.append(sec);
+      renderList(list);
+    }
+  }
+
+  function buildCategories() {
+    CATEGORIES.forEach((c, i) => {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = "category";
+      input.value = c.value;
+      input.checked = i === 0;
+      input.addEventListener("change", () => {
+        state.category = c.value;
+        syncId();
+        schedulePreview();
+      });
+      const span = document.createElement("span");
+      span.textContent = c.value;
+      label.append(input, span);
+      els.categories.append(label);
+    });
+  }
+
+  function payload(extra) {
+    const body = {
+      featureId: state.featureId, title: state.title, category: state.category,
+    };
+    for (const list of LISTS) body[list.key] = state[list.key];
+    return Object.assign(body, extra || {});
+  }
+
+  async function post(url, body) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, data: await res.json() };
+  }
+
+  function schedulePreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(refreshPreview, 150);
+  }
+
+  async function refreshPreview() {
+    const seq = ++previewSeq;
+    try {
+      const { data } = await post("/api/preview", payload());
+      if (seq !== previewSeq) return;
+      lastPreview = data;
+      els.preview.textContent = data.markdown;
+      els.target.textContent = data.path ? `Saves to ${data.path}${data.exists ? " (exists)" : ""}` : "";
+      els.errors.textContent = "";
+      for (const msg of data.errors) {
+        const li = document.createElement("li");
+        li.textContent = msg;
+        els.errors.append(li);
+      }
+      els.save.disabled = data.errors.length > 0;
+    } catch (err) {
+      setStatus("Lost connection to the form server. Restart request_form.py.", true);
+    }
+  }
+
+  function setStatus(text, bad) {
+    els.status.textContent = text;
+    els.status.className = "status " + (text ? (bad ? "bad" : "ok") : "");
+  }
+
+  async function save() {
+    setStatus("");
+    let { status, data } = await post("/api/save", payload());
+    if (status === 409) {
+      if (!confirm(`${data.path} already exists. Overwrite it?`)) return;
+      ({ status, data } = await post("/api/save", payload({ overwrite: true })));
+    }
+    if (status === 200) setStatus(`Saved ${data.path}`, false);
+    else setStatus((data.errors || [data.error || "Save failed."]).join(" "), true);
+    refreshPreview();
+  }
+
+  async function copyMarkdown() {
+    try {
+      await navigator.clipboard.writeText(lastPreview.markdown);
+      setStatus("Markdown copied.", false);
+    } catch (err) {
+      setStatus("Clipboard blocked by the browser. Select the preview text instead.", true);
+    }
+  }
+
+  function startOver() {
+    if (!confirm("Clear everything and start a new request?")) return;
+    state.title = ""; state.featureId = ""; state.idTouched = false;
+    state.category = CATEGORIES[0].value;
+    for (const list of LISTS) { state[list.key] = [""]; renderList(list); }
+    els.title.value = ""; els.featureId.value = "";
+    els.categories.querySelector("input").checked = true;
+    setStatus("");
+    refreshPreview();
+    els.title.focus();
+  }
+
+  els.title.addEventListener("input", () => { state.title = els.title.value; syncId(); schedulePreview(); });
+  els.featureId.addEventListener("input", () => {
+    state.featureId = els.featureId.value;
+    state.idTouched = els.featureId.value !== "";
+    if (!state.idTouched) syncId();
+    schedulePreview();
+  });
+  els.save.addEventListener("click", save);
+  els.copy.addEventListener("click", copyMarkdown);
+  els.reset.addEventListener("click", startOver);
+
+  buildCategories();
+  buildLists();
+  refreshPreview();
+  els.title.focus();
+})();
+</script>
+</body>
+</html>

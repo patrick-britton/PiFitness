@@ -21,7 +21,7 @@ READ COMMANDS
   check <id> [T01 ...] [--anchors]      validate structure; --anchors verifies that
                             anchored files/symbols exist in the repo
   brief <id> T##    resume context for a task: status, recent log, git status,
-                    current branch, commits since task start, verify run
+                    current branch, verify run
   resume <id>       brief the next executable task (interrupted first); full
                     context with no human re-explanation
 
@@ -31,13 +31,17 @@ WRITE COMMANDS
   set <id> resume           recompute Resume Here (progress/next/blocked-by)
   log <id> "text"           append '- YYYY-MM-DD text' to the log sidecar
   bug <id> T03 "summary" [--symptom text] [--ac AC-1]  symptom, root cause, fix, check added; linked to Task or AC; duplicates rejected
-  backlog add <B-ID> <item> append one item to docs/workflow/BACKLOG.md
-                            (append-only; omitted id = next ID, reserved B27-B34 skipped)
-  migrate <id>              move an inline Progress Log / Known Issues into sidecars
+  backlog add [B-ID] <item> append one item to docs/workflow/BACKLOG.md
+                            (append-only; omitted id = next ID)
   start <id> T##            record a start entry for task T## in the progress log
   done <id> T## [--force]   evidence gate: run the task's Verify command, record
                             exit code and output tail; refuses without a matching
                             start; --force logs FORCED instead (D12)
+
+TASK SIZING
+  Every task has '- **Points:** 1|2|3'. check errors on any other value, on more than
+  3 modified/created/deleted files, and on more files than points. The frontmatter
+  'points:' total is written by 'set' (including 'set <id> resume'); never edit it by hand.
 
 Files (all under <features-dir>/designs_active/, default .features):
   <id>_design.md   hot state (frontmatter, Resume Here, ACs, OQs, Task Plan)
@@ -58,14 +62,14 @@ from pathlib import Path
 
 FEATURE_STATUSES = ("draft", "reviewed", "in-progress", "complete")
 TASK_STATUSES = ("todo", "interrupted", "complete")
-COMPLEXITIES = ("trivial", "low", "medium", "high")
-TASK_FIELDS = ("surface", "skill", "complexity", "depends-on", "traces-to",
+POINTS = ("1", "2", "3")
+TASK_FIELDS = ("surface", "skill", "points", "depends-on", "traces-to",
                "anchors", "detail", "verify", "status")
 FATAL_TASK_FIELDS = ("status", "depends-on")
+# "affects" is still recognised so old files parse, but nothing reads it.
 OQ_KEYS = ("question", "affects", "answer", "decision", "rationale", "status")
 PATH_ROLES = ("modify", "delete", "pattern", "read")
 ALL_ROLES = PATH_ROLES + ("create", "planned", "search", "greenfield")
-POINTER = "> sidecar:"
 
 
 class FdError(Exception):
@@ -236,7 +240,11 @@ class Doc:
         if k not in self.fm:
             raise FdError("frontmatter key '%s' not found" % k)
         i = self.fm[k][1]
-        self.lines[i] = re.sub(r"^(%s:\s*)\S+" % re.escape(k), lambda m: m.group(1) + v, self.lines[i], count=1)
+
+        def sub(m):
+            head = m.group(1)
+            return (head if head.endswith((" ", "\t")) else head + " ") + v
+        self.lines[i] = re.sub(r"^(%s:[ \t]*)\S*" % re.escape(k), sub, self.lines[i], count=1)
         self.fm[k][0] = v
 
     def section(self, sub):
@@ -271,8 +279,11 @@ class Doc:
     def task_status(self, t):
         return first_word(t.f.get("status", [""])[0])
 
-    def task_cx(self, t):
-        return first_word(t.f.get("complexity", [""])[0])
+    def task_pts(self, t):
+        return first_word(t.f.get("points", [""])[0])
+
+    def points_total(self):
+        return sum(int(self.task_pts(t)) for t in self.tasks if self.task_pts(t) in POINTS)
 
     def deps(self, t):
         v = body(t.f.get("depends-on"))
@@ -289,12 +300,6 @@ class Doc:
     def oq_answered(self, q):
         b = body(q.f.get("answer"))
         return bool(b) and not re.match(r"^\(?\s*to be (provided|recorded)", b, re.I)
-
-    def affects(self, q, tid):
-        v = body(q.f.get("affects"))
-        if re.search(r"\ball\b", v, re.I):
-            return True
-        return int(tid[1:]) in {int(x) for x in re.findall(r"T(\d+)", v)}
 
     def save(self):
         self.path.write_bytes(self.nl.join(self.lines).encode("utf-8"))
@@ -334,8 +339,9 @@ class Doc:
                     err("%s: missing field '%s'" % (t.id, k), k in FATAL_TASK_FIELDS)
             if "status" in t.f and self.task_status(t) not in TASK_STATUSES:
                 err("%s: status '%s' not in %s" % (t.id, self.task_status(t), "|".join(TASK_STATUSES)), True)
-            if "complexity" in t.f and self.task_cx(t) not in COMPLEXITIES:
-                err("%s: complexity '%s' not in %s" % (t.id, self.task_cx(t), "|".join(COMPLEXITIES)))
+            if "points" in t.f and self.task_pts(t) not in POINTS:
+                err("%s: points '%s' not in %s (split tasks larger than 3 points)"
+                    % (t.id, self.task_pts(t), "|".join(POINTS)))
             for d in self.deps(t):
                 if d not in ids:
                     err("%s: depends-on unknown task %s" % (t.id, d), True)
@@ -353,7 +359,7 @@ class Doc:
             err("dependency cycle among: %s" % ", ".join(sorted(remaining)), True)
 
         for q in self.oqs:
-            for k in ("question", "affects", "answer", "status"):
+            for k in ("question", "answer", "status"):
                 if k not in q.f:
                     err("%s: missing field '%s'" % (q.id, k))
             if "status" in q.f and first_word(q.f["status"][0]) not in ("open", "resolved"):
@@ -375,16 +381,19 @@ class Doc:
                     ref = re.search(r"T\d+", raw)
                     if not ref or ref.group(0) not in ids:
                         warn("%s: 'planned' anchor must reference an existing task (<- T##): %s" % (t.id, raw))
-            if self.task_cx(t) in ("trivial", "low") and len(paths) > 3:
-                warn("%s: %d files modified/created/deleted but complexity is %s (limit ~3)"
-                     % (t.id, len(paths), self.task_cx(t)))
+            if len(paths) > 3:
+                err("%s: %d files modified/created/deleted; the limit is 3 (split the task)"
+                    % (t.id, len(paths)))
+            elif self.task_pts(t) in POINTS and len(paths) > int(self.task_pts(t)):
+                err("%s: %d files modified/created/deleted but points is %s; a task may touch at most as many files as it has points"
+                    % (t.id, len(paths), self.task_pts(t)))
             if "anchors" in t.f and not anchors:
                 err("%s: Anchors is empty (use 'greenfield' if there is no existing code)" % t.id)
 
-        if len(self.tasks) >= 1:
-            tail = "\n".join(self.raw(t) for t in self.tasks[-2:])
-            if not re.search(r"code[- ]review", tail, re.I):
-                warn("no code-review task in the last two positions of the Task Plan")
+        if "points" in self.fm and self.tasks:
+            declared, total = self.fmv("points"), self.points_total()
+            if declared != str(total):
+                warn("frontmatter points is '%s' but tasks sum to %d (run: fd.py set <id> resume)" % (declared, total))
 
         if "progress" in rs:
             m = re.match(r"(\d+)/(\d+)", rs["progress"][0])
@@ -395,14 +404,6 @@ class Doc:
                     warn("Resume Here progress says %s but tasks say %d/%d (run: fd.py set <id> resume)"
                          % (rs["progress"][0], comp, total))
 
-        for name in ("progress log", "known issues"):
-            sec = self.section(name)
-            if sec:
-                n = sum(1 for i in range(sec[1] + 1, sec[2])
-                        if self.mask[i] and self.lines[i].strip() not in ("", "---")
-                        and not self.lines[i].startswith(POINTER))
-                if n:
-                    warn("inline '%s' has %d lines; run: fd.py migrate <id>" % (sec[0], n))
         return P
 
 
@@ -509,7 +510,7 @@ def pick_next(doc):
         waits = "; ".join("%s waits on %s" % (t.id, ",".join(
             "%s[%s]" % (d, st.get(d, "?")) for d in doc.deps(t) if st.get(d) != "complete")) for t in pend)
         return None, [], "no executable task: " + waits
-    blk = [q.id for q in doc.oqs if doc.oq_open(q) and doc.affects(q, chosen.id)]
+    blk = [q.id for q in doc.oqs if doc.oq_open(q)]
     return chosen, blk, ""
 
 
@@ -535,6 +536,8 @@ def recompute_resume(doc):
     for k, v in vals.items():
         i = rs[k][1]
         doc.lines[i] = "**%s:** %s" % (k, v)
+    if "points" in doc.fm:
+        doc.set_fm("points", str(doc.points_total()))
     return vals
 
 
@@ -619,8 +622,6 @@ def is_pending(b):
 
 
 BACKLOG_ID_RE = re.compile(r"^B(\d+)$")
-# B27-B34 are reserved by PLAN section 5 (D6); IDs continue from B35.
-BACKLOG_RESERVED = set(range(27, 35))
 
 
 def backlog_ids(path):
@@ -628,7 +629,7 @@ def backlog_ids(path):
     for ln in path.read_text(encoding="utf-8").splitlines():
         m = re.match(r"^\|\s*(B\d+)\s*\|", ln)
         if m:
-            ids.add("B%s" % m.group(1))
+            ids.add(m.group(1))
     return ids
 
 
@@ -638,10 +639,7 @@ def next_backlog_id(path):
         m = re.match(r"^\|\s*(B(\d+))\s*\|", ln)
         if m:
             best = max(best, int(m.group(2)))
-    nid = best + 1
-    while nid in BACKLOG_RESERVED:
-        nid += 1
-    return "B%d" % nid
+    return "B%d" % (best + 1)
 
 
 # --------------------------------------------------------------------------- commands
@@ -672,7 +670,7 @@ def cmd_hot(c):
     if fatal:
         print("!! STRUCTURAL PROBLEMS - output below may be wrong; tell the human:")
         print_problems(fatal, prefix="!! ")
-    for k in ("feature-id", "title", "status", "created", "last-updated", "surfaces", "skills-engaged"):
+    for k in ("feature-id", "title", "status", "created", "last-updated", "surfaces", "points", "skills-engaged"):
         if k in d.fm:
             print("%s: %s" % (k, d.fm[k][0]))
     print("\n-- Resume Here")
@@ -680,13 +678,13 @@ def cmd_hot(c):
         print("%s: %s" % (k, v))
     print("\n-- Tasks")
     for t in d.tasks:
-        print("%s [%s] %s deps=%s" % (t.id, d.task_status(t) or "?", d.task_cx(t) or "?",
+        print("%s [%s] %spt deps=%s" % (t.id, d.task_status(t) or "?", d.task_pts(t) or "?",
                                       ",".join(d.deps(t)) or "none"))
     opn = [q for q in d.oqs if d.oq_open(q)]
     print("\n-- Open questions: %d open, %d resolved" % (len(opn), len(d.oqs) - len(opn)))
     if c.a.brief:
         for q in opn:
-            print("%s affects=%s answered=%s" % (q.id, body(q.f.get("affects")) or "?", "yes" if d.oq_answered(q) else "no"))
+            print("%s answered=%s" % (q.id, "yes" if d.oq_answered(q) else "no"))
     else:
         for q in opn:
             print(d.raw(q))
@@ -724,7 +722,7 @@ def cmd_next(c):
     print("status: %s" % d.task_status(t))
     print("blocked-by: %s" % (", ".join(blk) or "none"))
     if blk:
-        print("ACTION: stop. Set blocked-by in Resume Here and send the human to /feature-review.")
+        print("ACTION: stop. Run: fd.py set %s resume, then tell the human to answer the open question in the design file and run /feature-design." % c.a.id)
     print("---")
     print(d.raw(t))
     return 0
@@ -824,16 +822,6 @@ def git_out(root, *args):
     return p.returncode, (p.stdout or "").strip()
 
 
-def task_start_date(logp, tid):
-    """Earliest date this task has a log 'start' entry, or None."""
-    found = []
-    for ln in read_log_lines(logp):
-        m = re.match(r"- (\d{4}-\d{2}-\d{2})\s+(T\d+)\s+start\b", ln, re.I)
-        if m and m.group(2).upper() == tid.upper():
-            found.append(m.group(1))
-    return min(found) if found else None
-
-
 def brief_log_lines(c, t, limit=10):
     """Recent log: this task's events first, then the feature log tail."""
     ev = [ln for _, ln in log_events(c.logp, t.id)]
@@ -870,17 +858,6 @@ def print_brief(c, d, t):
         print("status:")
         for ln in porc.splitlines():
             print("  " + ln)
-    start = task_start_date(c.logp, t.id)
-    if start:
-        rc, commits = git_out(c.root, "log", "--oneline", "--since=%s 00:00:00" % start)
-        print("commits since %s:" % start)
-        if rc != 0 or not commits:
-            print("  (none)")
-        else:
-            for ln in commits.splitlines():
-                print("  " + ln)
-    else:
-        print("commits since <task start>: (no start entry logged)")
     print("-- verify run")
     if not verify:
         print("(no verify command on the task)")
@@ -1182,7 +1159,7 @@ def cmd_backlog_add(c):
     """Append one item to docs/workflow/BACKLOG.md (append-only).
 
     Existing rows are never edited. Give an explicit id (e.g. B27); omit it
-    to get the next ID (reserved B27-B34 are skipped).
+    to get the next ID.
     """
     backlog = c.root / "docs" / "workflow" / "BACKLOG.md"
     if not backlog.exists():
@@ -1205,7 +1182,7 @@ def cmd_backlog_add(c):
         raise FdError("backlog add: %s already exists (append-only; existing rows are never edited)" % bid)
     row = "| %s | %s | %s | %s | %s | %s | %s |" % (
         bid, item, c.a.source, c.a.suggested_phase, c.a.size, c.a.status, c.a.phase)
-    raw = backlog.read_text(encoding="utf-8", newline="")
+    raw = backlog.read_bytes().decode("utf-8")
     nl = "\r\n" if "\r\n" in raw else "\n"
     if not raw.endswith(nl):
         raw += nl
@@ -1279,7 +1256,7 @@ def cmd_set(c):
             raise FdError("task status must be one of %s" % "|".join(TASK_STATUSES))
         t = d.by_id(a.target)
         if fstat == "draft" and not a.force:
-            raise FdError("feature is still 'draft'; run /feature-review first (or --force)")
+            raise FdError("feature is still 'draft'; the human must review the plan and run: fd.py set %s feature reviewed (or --force)" % c.a.id)
         if v == "complete":
             unchecked = [d.lines[i].strip() for i, ok in t.boxes if not ok]
             if unchecked and not a.force:
@@ -1295,37 +1272,9 @@ def cmd_set(c):
         d.set_fm("last-updated", today())
     vals = recompute_resume(d)
     d.save()
-    print("; ".join(msgs + ["resume: %s | next=%s | blocked-by=%s" % (vals["progress"], vals["next"], vals["blocked-by"])]))
+    print("; ".join(msgs + ["resume: %s | next=%s | blocked-by=%s | points=%d" % (vals["progress"], vals["next"], vals["blocked-by"], d.points_total())]))
     if all(d.task_status(t) == "complete" for t in d.tasks) and d.tasks and first_word(d.fmv("status")) != "complete":
         print("All tasks complete. Tick acceptance criteria, then: fd.py set %s feature complete" % c.a.id)
-    return 0
-
-
-def cmd_migrate(c):
-    moved = []
-    for name, target, header in (
-            ("progress log", c.logp, "# Progress Log - %s (append-only)" % c.a.id),
-            ("known issues", c.bugp, "# Known Issues / Bugs - %s" % c.a.id)):
-        d = c.doc()
-        sec = d.section(name)
-        if not sec:
-            continue
-        _, s, e = sec
-        content = [d.lines[i] for i in range(s + 1, e)
-                   if d.mask[i] and d.lines[i].strip() not in ("", "---") and not d.lines[i].startswith(POINTER)]
-        if content:
-            new = (not target.exists()) or target.stat().st_size == 0
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with open(target, "a", encoding="utf-8", newline="\n") as fh:
-                if new:
-                    fh.write(header + "\n\n")
-                fh.write("\n".join(content).rstrip("\n") + "\n")
-            moved.append("%s: %d lines -> %s" % (sec[0], len(content), target.name))
-        cmd = "fd.py log %s" % c.a.id if target == c.logp else "fd.py bug %s T## \"summary\"" % c.a.id
-        pointer = "%s `%s` (append-only). Use `%s`." % (POINTER, target.name, cmd)
-        d.lines[s + 1:e] = ["", pointer, "", "---", ""]
-        d.save()
-    print("; ".join(moved) if moved else "nothing to migrate")
     return 0
 
 
@@ -1380,7 +1329,6 @@ def build_parser():
     p.add_argument("target", help="T## | feature | resume")
     p.add_argument("value", nargs="?")
     p.add_argument("--force", action="store_true")
-    add("migrate", cmd_migrate, "move inline log/bugs into sidecars")
     p = sub.add_parser("uat", help="UAT checklist build/import")
     usub = p.add_subparsers(dest="uat_cmd", required=True)
     pb = usub.add_parser("build", help="compile Acceptance Criteria into <id>_uat.html beside the design")
@@ -1396,10 +1344,10 @@ def build_parser():
     pa.add_argument("id", nargs="?", default=None, help="backlog id (e.g. B27); omitted = next ID")
     pa.add_argument("item", nargs="*", help="item text")
     pa.add_argument("--source", default="fd.py backlog add")
-    pa.add_argument("--suggested-phase", default="Phase 5")
+    pa.add_argument("--suggested-phase", default="-")
     pa.add_argument("--size", default="Small")
     pa.add_argument("--status", default="open")
-    pa.add_argument("--phase", default="5")
+    pa.add_argument("--phase", default="-")
     pa.set_defaults(fn=cmd_backlog_add)
     return ap
 

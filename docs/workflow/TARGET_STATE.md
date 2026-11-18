@@ -8,11 +8,11 @@ This document defines the architectural target state and operational invariants 
 
 1. **Tools enforce; prose advises.** If a rule matters, a script checks it.
 2. **Evidence before done.** No task or feature closes without recorded command output. Humans confirm only what requires human judgment.
-3. **Design for the weakest model.** Tasks are small and bounded; state lives in files and sidecars, never in conversation history.
+3. **Design for the weakest model.** Tasks are small and bounded; state lives in files and sidecars, never in conversation history. Open-question answers, decisions, and approvals are written to the design file; an answer given only in chat does not exist.
 4. **One home per fact.** Every concept, requirement, and data definition lives in exactly one place; everything else links to it.
 5. **Agents flag; human scopes.** Discovered out-of-scope defects go to the backlog; agents never expand scope unilaterally.
 6. **Generate where possible.** Task briefs, schema maps, UAT checklists, and request templates are produced by deterministic tools, not written by hand.
-7. **Single-feature serial flow.** Exactly one feature is in development at a time across the entire codebase by a single human developer.
+7. **Single-feature serial flow.** Exactly one feature is in development at a time across the entire codebase by a single human developer, on the single `feature-test` branch. Agents never commit; the human commits.
 8. **Lineage-first discovery.** Before inspecting source or schema, agents consult the data dictionary and lineage graph to bound context.
 9. **Unattended Pi Deployment:** No manual workflows run on the Raspberry Pi. The launcher is the sole entry point, orchestrating deployments through `deploy/scripts/autodeploy.sh` with modular step helpers in `deploy/scripts/lib/`.
 
@@ -49,25 +49,27 @@ This document defines the architectural target state and operational invariants 
 
 ### Workflow & Lifecycle
 
-- **W1. Interactive Request Form.** Feature requests originate from an interactive local HTML form (`tools/workflow/request_form.html`) that exports structured Markdown into `.features/descriptions/<id>.md`.
-- **W2. Automated UAT Generation.** Every feature design contains testable Acceptance Criteria (ACs) with explicit `auto:` and `human:` lines. `python tools/workflow/fd.py uat build <id>` compiles these into an interactive, mobile-responsive `uat.html` checklist.
-- **W3. Strict Micro-Task Sizing.** A task represents one concern, touches at most 3 files, has exactly one verify command, and is sized at **1, 2, or 3 story points**:
-  - `1 pt`: Single-file edit or test tweak.
+- **W1. Interactive Request Form.** Feature requests originate from an interactive local HTML form (`tools/workflow/request_form.html`, served by `tools/workflow/request_form.py`) that saves structured Markdown into `.features/descriptions/<id>.md`.
+- **W2. Automated UAT Generation.** Every feature design contains testable Acceptance Criteria (ACs). Each AC line is the human's UAT step (do, then see, checked at 360×740 and 448×875 for UI) and carries one `auto:` sub-line. `python tools/workflow/fd.py uat build <id>` compiles the AC lines into an interactive, mobile-responsive `<id>_uat.html` checklist.
+- **W3. Strict Micro-Task Sizing.** A task represents one concern, touches at most as many files as it has points (never more than 3), has exactly one verify command, and carries `Points: 1`, `2`, or `3`:
+  - `1 pt`: Single-file edit.
   - `2 pt`: Standard paired edit (route + query, or component + helper).
-  - `3 pt`: Maximum complexity (route + model + migration, or component + hook + test).
-  Tasks estimated >3 points are rejected and must be split during planning.
+  - `3 pt`: Maximum complexity (route + model + migration, or component + hook + helper).
+  Tasks estimated >3 points are split during planning. *Check: `python tools/workflow/fd.py check <id>` errors on any other Points value or on too many files; `fd.py set <id> resume` writes the feature's total `points:`.*
 - **W4. Anchored Planning.** Every task in the feature plan defines verified file/symbol anchors (`modify`, `create`, `delete`, `pattern`, `read`). No speculative or unverified file paths exist in the plan.
-- **W5. Evidence-Gated Execution.** `tools/workflow/fd.py` refuses to close a task without recorded verify command output (`fd.py done <id> T##`) and a prior start entry (`fd.py start <id> T##`).
-- **W6. Budgeted Execution Sessions.** Agents execute against a story point budget, completing one task per commit, and cleanly checkpointing state (`fd.py resume <id>`) when the budget is reached.
-- **W7. UAT Feedback Loop.** Human mobile testing results are exported directly from `uat.html` into `.features/designs_active/<id>_feedback.md`, driving a dedicated polish cycle before code review.
+- **W5. Evidence-Gated Execution.** `fd.py done <id> T##` refuses to run without a prior `fd.py start <id> T##` entry, and records the verify command's exit code and output. A task is set `complete` (`fd.py set <id> T## complete`) only after a `done` entry with exit 0. Agents never use `--force`. *Check: `fd.py log <id>` shows start and a passing done for every complete task; reviewed by the human, not enforced by the tool.*
+- **W6. Budgeted Execution Sessions.** Agents execute against a story point budget, completing tasks in order and cleanly checkpointing state (`fd.py resume <id>`) when the budget is reached. Agents leave changes uncommitted; the human reviews and commits.
+- **W7. UAT Feedback Loop.** Human mobile testing results are written to `.features/designs_active/<id>_feedback.md` in the format `fd.py uat import <id>` parses, by a local UAT launcher (to be built), driving a dedicated polish cycle before test hardening and code review.
 - **W8. Pre-Deploy Code & Test Review.** Prior to deployment, automated tests are verified, comments linted, and repository structure audited to ensure zero technical debt or stray files.
 - **W9. Out-of-Scope Backlog.** Findings outside the active feature are appended to `docs/workflow/BACKLOG.md` via `tools/workflow/fd.py backlog add`. Agents never expand active feature scope.
+- **W10. Bounded Test Growth.** The `auto:` lines of the design's Acceptance Criteria are the complete list of new tests a feature may add. Every new test traces to one of them, carries a docstring and a V2 marker, is named for the behavior it guards (never the feature or task), and does not duplicate existing coverage. Scratch and one-off checks are never left in the repository. *Check: the review workflow lists new test files and functions from `git status` and `git diff main` and compares them with the AC `auto:` lines; a tool for this is to be built.*
+- **W11. File-Recorded Decisions.** Open questions live in the design file. Only the human's written `Answer:` resolves one; an agent sets `Decision` and `Status` from it. *Check: `python tools/workflow/fd.py oq <id> --open` and `--unanswered`.*
 
 ### Environments & Deployment
 
 - **E1. Isolated Local DEV.** DEV runs locally. The local agent environment contains no PRD credentials. The DEV database runs on `localhost:15432` (`pifitness_dev`) and carries a database-level marker (`pifitness.env = 'dev'`). Tools and backend refuse to run without this marker.
 - **E2. Fast DEV Reset.** A clean template database enables DEV resets in seconds via `python tools/db/dev_reset.py`, automatically replaying pending migrations and re-stamping the dev marker.
-- **E3. Git Trunk Discipline.** `main` is the deployable trunk. Feature work occurs on `agent/feature-<id>` branches. Agents never push, tag, switch branches, or merge. The human performs merges to `main` and pushes.
+- **E3. Git Trunk Discipline.** `main` is the deployable trunk. All agent work happens on the single `feature-test` branch, which the human keeps up to date with `main` between features. Agents never commit, push, tag, switch branches, or merge, and every code-touching workflow stops unless `git branch --show-current` prints `feature-test`. The human commits, pushes `feature-test` for TEST deployment, merges to `main`, and pushes.
 - **E4. Pi Autodeploy Engine (`autodeploy.sh`).** All deployment to the Raspberry Pi is orchestrated by `deploy/scripts/autodeploy.sh` driven by modular Python step handlers in `deploy/scripts/lib/`:
   - **TEST Deployment (10 steps):**
     1. Read-only preflight and DB comparison (`step_preflight.py`).
@@ -97,4 +99,4 @@ This document defines the architectural target state and operational invariants 
 
 - **A1. Lean Always-On Rules.** Core global rules in `.clinerules/` are modular, concise, and enforce tool constraints without consuming excessive context tokens.
 - **A2. Specialized Workflow Prompts.** Distinct workflows (`.clinerules/workflows/`) guide specific lifecycle phases (design, plan, execute, polish, test, review), preventing model confusion.
-- **A3. Native Tool Priority.** Agents prioritize dedicated project tools (`fd.py`, `lineage.py`, `verify.py`) over manual discovery or broad shell commands.
+- **A3. Native Tool Priority.** Agents prioritize dedicated project tools (`fd.py`, `lineage.py`, `verify.py`) over manual discovery or broad shell commands. The tools are canonical: instructions and templates follow the tools, and a change to a tool's behavior is made in the tool first.
