@@ -187,10 +187,15 @@ def backup_database(keep=7):
                       err=result.stderr, exec_time=dump_elapsed_ms)
         raise RuntimeError(f"Backup failed: {result.stderr}")
 
-    backups = sorted(Path(backup_dir).glob("*.dump"))
+    # Prune oldest nightly dumps (exclude test_baseline_* which are managed separately)
+    nightly_dumps = sorted(
+        p for p in Path(backup_dir).glob("*.dump")
+        if not p.name.startswith("test_baseline_")
+        and not p.name.startswith("test_clone_source_")
+    )
     pruned = []
-    while len(backups) > keep:
-        old = backups.pop(0)
+    while len(nightly_dumps) > keep:
+        old = nightly_dumps.pop(0)
         pruned.append(old.name)
         old.unlink()
 
@@ -200,7 +205,175 @@ def backup_database(keep=7):
         desc += f" | Pruned: {', '.join(pruned)}"
     log_app_event(cat="DB Backup", desc=desc, exec_time=total_elapsed)
 
+    # Chain: immediately clone the fresh dump into TEST so the next bootstrap
+    # finds TEST clean and skips the restore cycle entirely.
+    _clone_dump_to_test(backup_file)
+
     return backup_file
+
+
+# ---------------------------------------------------------------------------
+# Private helpers for the PRD→TEST nightly clone
+# ---------------------------------------------------------------------------
+
+def _write_state_file(path: Path, state: str, **extra):
+    """Atomically write a KEY=value state file (same format as deploy/scripts/lib/common.py)."""
+    import shlex as _shlex
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    values = {"state": state}
+    values.update({k: str(v) for k, v in extra.items()})
+    text = "".join(f"{k}={_shlex.quote(str(v))}\n" for k, v in values.items())
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
+def _clone_dump_to_test(dump_path: str):
+    """Restore *dump_path* into the TEST database and record a clean baseline.
+
+    Called by backup_database() immediately after the nightly PRD dump succeeds.
+    Skips silently when TEST env vars are absent (non-PRD environments).
+    Clone failure is logged but does NOT raise — the backup task already succeeded.
+
+    Required env vars (add to prd.env):
+        TEST_PG_HOST, TEST_PG_PORT, TEST_PG_USER, TEST_PG_PASSWORD,
+        TEST_PG_DB, TEST_STATE_FILE
+    Also uses:
+        PG_HOST, PG_PORT, PG_DB, PG_USER  (PRD connection — safety checks only)
+    """
+    TEST_MARKER    = "pifitness-test-database"
+    BASELINE_PFX   = "test_baseline_"
+    KEEP_BASELINES = 3
+
+    test_vars = ["TEST_PG_HOST", "TEST_PG_PORT", "TEST_PG_USER",
+                 "TEST_PG_PASSWORD", "TEST_PG_DB", "TEST_STATE_FILE"]
+    missing = [v for v in test_vars if os.getenv(v) is None]
+    if missing:
+        log_app_event(cat="TEST Clone",
+                      desc="Skipped: TEST env vars not configured — " + ", ".join(missing))
+        return
+
+    st            = start_timer()
+    test_host     = os.getenv("TEST_PG_HOST")
+    test_port     = os.getenv("TEST_PG_PORT")
+    test_user     = os.getenv("TEST_PG_USER")
+    test_pw       = os.getenv("TEST_PG_PASSWORD", "")
+    test_db       = os.getenv("TEST_PG_DB")
+    state_file    = Path(os.getenv("TEST_STATE_FILE"))
+    prd_host      = os.getenv("PG_HOST")
+    prd_port      = os.getenv("PG_PORT")
+    prd_db        = os.getenv("PG_DB")
+    prd_user      = os.getenv("PG_USER")
+    backup_dir    = Path(dump_path).parent
+
+    try:
+        # --- Safety: refuse if TEST connection targets PRD ------------------
+        same_server = (test_host == prd_host and str(test_port) == str(prd_port))
+        if same_server and test_db == prd_db:
+            raise RuntimeError(
+                f"TEST_PG_DB={test_db!r} and PG_DB={prd_db!r} resolve to the same server+database")
+        if test_db in ("postgres", "template0", "template1"):
+            raise RuntimeError(f"TEST_PG_DB={test_db!r} is a protected system database")
+        if test_user == prd_user:
+            raise RuntimeError(
+                f"TEST_PG_USER and PG_USER are both {test_user!r}; TEST needs its own role")
+
+        env_base   = os.environ.copy()
+        env_maint  = {**env_base, "PGPASSWORD": test_pw}   # for psql against 'postgres' db
+        env_restore = {**env_base, "PGPASSWORD": test_pw}  # for pg_restore / pg_dump
+
+        def psql_maint(sql, timeout=60):
+            r = subprocess.run(
+                ["psql", "-h", test_host, "-p", str(test_port), "-U", test_user,
+                 "-d", "postgres", "-c", sql, "-t", "-A"],
+                capture_output=True, text=True, env=env_maint, timeout=timeout)
+            if r.returncode != 0:
+                raise RuntimeError(f"psql: {r.stderr.strip()[:300]}")
+            return r.stdout.strip()
+
+        # --- Mark dirty BEFORE touching the database -----------------------
+        # Crash-safe: preflight reads 'dirty' → forces restore on next deploy.
+        _write_state_file(state_file, "dirty")
+        log_app_event(cat="TEST Clone",
+                      desc=f"STATE_FILE marked dirty; restoring {Path(dump_path).name} → {test_db}")
+
+        # --- Drop and recreate TEST ----------------------------------------
+        psql_maint(f'DROP DATABASE IF EXISTS "{test_db}" WITH (FORCE);', timeout=120)
+        psql_maint(f'CREATE DATABASE "{test_db}" TEMPLATE template0;', timeout=60)
+
+        # --- pg_restore -----------------------------------------------------
+        restore_st  = start_timer()
+        r = subprocess.run(
+            ["pg_restore", "--no-owner", "--no-privileges", "--no-password",
+             f"--host={test_host}", f"--port={test_port}", f"--username={test_user}",
+             f"--dbname={test_db}", dump_path],
+            capture_output=True, text=True, env=env_restore, timeout=7200)
+        restore_s = elapsed_ms(restore_st) / 1000
+
+        # rc=1 means warnings only; check for actual errors excluding the
+        # harmless "COMMENT ON EXTENSION plpgsql must be owner" non-superuser warning.
+        if r.returncode not in (0, 1):
+            raise RuntimeError(f"pg_restore rc={r.returncode}: {r.stderr[:400]}")
+        fatal = [
+            ln for ln in (r.stdout + r.stderr).splitlines()
+            if "error:" in ln.lower()
+            and not ("extension plpgsql" in ln.lower() and "comment" in ln.lower())
+        ]
+        if fatal:
+            raise RuntimeError(f"pg_restore fatal error: {fatal[0][:300]}")
+        log_app_event(cat="TEST Clone", desc=f"Restore complete ({restore_s:.1f}s)")
+
+        # --- Set TEST marker comment ----------------------------------------
+        psql_maint(f"COMMENT ON DATABASE \"{test_db}\" IS '{TEST_MARKER}';")
+        marker_back = psql_maint(
+            f"SELECT coalesce(shobj_description(oid, 'pg_database'), '') "
+            f"FROM pg_database WHERE datname = '{test_db}'")
+        if marker_back != TEST_MARKER:
+            raise RuntimeError(f"TEST marker verification failed (got {marker_back!r})")
+
+        # --- Dump TEST → clean baseline ------------------------------------
+        ts           = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        baseline     = backup_dir / f"{BASELINE_PFX}{ts}.dump"
+        partial      = Path(str(baseline) + ".partial")
+        r = subprocess.run(
+            ["pg_dump", "-Fc", "--no-password",
+             f"--host={test_host}", f"--port={test_port}", f"--username={test_user}",
+             f"--dbname={test_db}", "--file", str(partial)],
+            capture_output=True, text=True, env=env_restore, timeout=7200)
+        if r.returncode != 0:
+            raise RuntimeError(f"pg_dump TEST baseline failed: {r.stderr[:300]}")
+        partial.replace(baseline)
+        bl_mb = baseline.stat().st_size / 1024 / 1024
+
+        # --- Write STATE_FILE clean (atomic) --------------------------------
+        _write_state_file(state_file, "clean", baseline_dump=str(baseline))
+
+        # --- Prune old test_baseline_* files --------------------------------
+        old_bl = sorted(backup_dir.glob(f"{BASELINE_PFX}*.dump"),
+                        key=lambda p: p.stat().st_mtime)
+        pruned_bl = []
+        while len(old_bl) > KEEP_BASELINES:
+            v = old_bl.pop(0)
+            try:
+                v.unlink()
+                pruned_bl.append(v.name)
+            except OSError:
+                pass
+
+        total_s = elapsed_ms(st) / 1000
+        desc = (f"TEST clone complete in {total_s:.1f}s — "
+                f"baseline {baseline.name} ({bl_mb:.0f} MB), STATE_FILE=clean")
+        if pruned_bl:
+            desc += f" | Pruned: {', '.join(pruned_bl)}"
+        log_app_event(cat="TEST Clone", desc=desc, exec_time=int(total_s * 1000))
+
+    except Exception as e:
+        # Leave STATE_FILE dirty — preflight will force a restore on next deploy.
+        log_app_event(cat="TEST Clone",
+                      desc="FAILED — STATE_FILE left dirty; next bootstrap will restore",
+                      err=str(e))
+        # Do not re-raise: backup_database() already succeeded.
 
 
 def run_health_checks():
