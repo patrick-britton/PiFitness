@@ -10,3 +10,4 @@ Out-of-scope findings and deferred enhancements. Agents append new items at the 
 | B24 | Secondary flows should use bottom sheets rather than full page changes per UI Principles R6. | UI Principles R6 | Backlog | Small | Open |
 | B25 | Android back-gesture handling for modal/sheet dismissal per UI Principles R7. | UI Principles R7 | Backlog | Small | Open |
 | B26 | PWA web app manifest (`manifest.json`) and service worker offline caching per UI Principles R10. | UI Principles R10 | Backlog | Small | Open |
+

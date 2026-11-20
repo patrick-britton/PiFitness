@@ -237,6 +237,7 @@ zz_feature_archive/
 
 memory-bank/
 node_modules/
+local_storage/
 .next/
 # .features/ retained as legacy feature-management workspace (Phase 2.3 rejected).
 # Do not move or restructure; audit tools should skip this tree.

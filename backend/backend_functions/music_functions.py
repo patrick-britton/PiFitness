@@ -242,7 +242,7 @@ def gen_playlist(client, name, description):
     return client, playlist_id
 
 
-def auto_shuffle_playlists(list_id=None, limit_minutes=False):
+def auto_shuffle_playlists(list_id=None, limit_minutes=True):
     if list_id:
         playlists = [list_id]
     else:
@@ -266,33 +266,25 @@ def auto_shuffle_playlists(list_id=None, limit_minutes=False):
     # The target_playlist_id returned is the child autoshuffle version of that playlist.
     for l in playlists:
         print(f'Pulling new order for list: {l}')
-        # Parameterized (%s) instead of f-string interpolation,
-        # and the limit_minutes branch now has its filter applied — the
-        # that string was missing the f-prefix so playlist_id was compared
-        # to the literal '{l}' and that path never returned rows.
+        # Parameterized (%s) query preserving default_new_order.
+        # When limit_minutes is True, respects minutes_to_sync when between 1 and 9998.
         if limit_minutes:
-            sql = """SELECT target_playlist_id,
-                               track_id,
-                               default_new_order
-                        FROM
-                               (SELECT DISTINCT target_playlist_id,
-                                                track_id,
-                                                default_new_order,
-                                                sum(duration_s)
-                                                OVER (PARTITION BY target_playlist_id ORDER BY default_new_order) as cumulative_duration_s,
-                                                minutes_to_sync
-                                FROM music.vw_playlist_isrc_stats
-                                WHERE playlist_id = %s) subquery
-                        WHERE cumulative_duration_s/60 < minutes_to_sync
-                        ORDER BY default_new_order asc;"""
+            sql = """SELECT DISTINCT target_playlist_id, track_id, default_new_order
+                FROM music.vw_playlist_isrc_stats
+                WHERE playlist_id = %s
+                  AND (
+                    minutes_to_sync IS NULL
+                    OR minutes_to_sync = 0
+                    OR minutes_to_sync >= 9999
+                    OR cumulative_playlist_minutes <= minutes_to_sync
+                  )
+                ORDER BY default_new_order asc;"""
         else:
             sql = """SELECT DISTINCT target_playlist_id, track_id,
                 default_new_order
                 FROM music.vw_playlist_isrc_stats WHERE playlist_id = %s
                 ORDER BY default_new_order asc;"""
-        # Dataframe library removed — sql_to_dict returns a list
-        # of dicts in result order, which preserves default_new_order for the
-        # track list.
+        # sql_to_dict returns a list of dicts in result order, preserving default_new_order.
         rows = sql_to_dict(sql, params=[l])
         if not rows:
             print(f'No songs found for list: {l}')
