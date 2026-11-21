@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PiFitness Developer Hub</title>
+<style>
+  :root {
+    --bg: #f5f7f9;
+    --surface: #ffffff;
+    --surface-hover: #f0f3f6;
+    --surface-active: #e7ecf1;
+    --ink: #1c2530;
+    --muted: #5d6874;
+    --rule: #d6dbe0;
+    --accent: #0f6a6a;
+    --accent-hover: #0c5757;
+    --accent-light: #e6f4f3;
+    --accent-ink: #ffffff;
+    --danger: #b3261e;
+    --danger-light: #fbeae9;
+    --danger-border: #f5c2be;
+    --ok: #1f7a3d;
+    --ok-light: #edf7f0;
+    --warn: #b25e00;
+    --warn-light: #fff5e6;
+    --focus: #0f6a6a;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --term-bg: #12161b;
+    --term-ink: #dbe2e8;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111418;
+      --surface: #181d22;
+      --surface-hover: #21272e;
+      --surface-active: #2b333c;
+      --ink: #e6eaee;
+      --muted: #9aa5b1;
+      --rule: #2d3640;
+      --accent: #4fc0bc;
+      --accent-hover: #63cfcb;
+      --accent-light: #162a2a;
+      --accent-ink: #0c1a1a;
+      --danger: #ff8a80;
+      --danger-light: #321919;
+      --danger-border: #522727;
+      --ok: #7fd49a;
+      --ok-light: #182d20;
+      --warn: #ffb74d;
+      --warn-light: #322514;
+      --focus: #4fc0bc;
+      --term-bg: #0c0e11;
+      --term-ink: #d0d7df;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14.5px/1.5 var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .offline-banner {
+    display: none;
+    background: var(--danger-light);
+    color: var(--danger);
+    border-bottom: 1px solid var(--danger-border);
+    padding: 10px 20px;
+    font-size: 13.5px;
+    text-align: center;
+    font-weight: 600;
+  }
+  .offline-banner code {
+    background: rgba(0,0,0,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--mono);
+  }
+
+  .app-container {
+    display: flex;
+    flex: 1;
+    min-height: 100vh;
+  }
+
+  /* SIDEBAR NAVIGATION */
+  .sidebar {
+    width: 290px;
+    background: var(--surface);
+    border-right: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .sidebar-header {
+    padding: 22px 20px 18px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .brand-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin: 0 0 3px;
+  }
+  .brand-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .brand-sub {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .nav-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    padding: 18px 20px 8px;
+  }
+
+  .nav-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .nav-item-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink);
+    text-align: left;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .nav-item-btn:hover {
+    background: var(--surface-hover);
+  }
+  .nav-item-btn:active {
+    background: var(--surface-active);
+  }
+  .nav-item-btn.danger-action:hover {
+    background: var(--danger-light);
+    color: var(--danger);
+  }
+  .nav-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--surface-hover);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .nav-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nav-tag {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--surface-hover);
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 16px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* MAIN CONTENT AREA */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  /* TOP STATUS BAR */
+  .top-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .status-cluster {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    background: var(--surface-hover);
+    border: 1px solid var(--rule);
+  }
+  .badge-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .badge-dot.ok { background: var(--ok); }
+  .badge-dot.warn { background: var(--warn); }
+  .badge-dot.danger { background: var(--danger); }
+
+  .btn-sm {
+    padding: 5px 10px;
+    font-size: 12.5px;
+    border-radius: 6px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .btn-sm:hover { background: var(--surface-hover); }
+
+  /* WORKSPACE BODY */
+  .workspace {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    flex: 1;
+    max-width: 1300px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* ACTIVE FEATURES CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .feature-pill-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .feature-pill {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--accent-light);
+    color: var(--accent);
+    border: 1px solid var(--rule);
+  }
+  .empty-note {
+    color: var(--muted);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  /* TERMINAL DRAWER */
+  .terminal-box {
+    background: var(--term-bg);
+    color: var(--term-ink);
+    border-radius: 10px;
+    border: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 440px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  .terminal-header {
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .terminal-title {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .terminal-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .term-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #cbd5e1;
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 11.5px;
+    cursor: pointer;
+  }
+  .term-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .terminal-body {
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-y: auto;
+    flex: 1;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .log-line {
+    margin: 0;
+  }
+  .log-info { color: #d0d7df; }
+  .log-heading { color: #79c0ff; font-weight: 600; }
+  .log-ok { color: #7ee787; font-weight: 600; }
+  .log-warn { color: #f2cc60; }
+  .log-error { color: #ff7b72; font-weight: 600; }
+
+  /* SPINNER */
+  .spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 500px;
+    width: 100%;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  }
+  .modal-title {
+    margin: 0 0 8px;
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .modal-desc {
+    margin: 0 0 18px;
+    color: var(--muted);
+    font-size: 13.5px;
+  }
+  .modal-code-box {
+    background: var(--term-bg);
+    color: var(--term-ink);
+    padding: 12px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: 0;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-danger {
+    background: var(--danger);
+    color: #fff;
+    border: 0;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--rule);
+    color: var(--ink);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { background: var(--surface-hover); }
+</style>
+</head>
+<body>
+
+<div class="offline-banner" id="server-offline-banner">
+  ⚠️ DevHub server is not connected. Start it in PowerShell using <code>.\tools\dev_hub.ps1</code> or double-click <code>dev_hub.bat</code>.
+</div>
+
+<div class="app-container">
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand-title">
+        <span class="brand-icon">π</span>
+        <span>PiFitness DevHub</span>
+      </div>
+      <p class="brand-sub">Local Workflow & Developer Operations</p>
+    </div>
+
+    <div class="nav-group-title">Workflow Actions</div>
+    <ul class="nav-list">
+      <li>
+        <button class="nav-item-btn" onclick="triggerAction('open_request_form')">
+          <span class="nav-num">1</span>
+          <span class="nav-label">Open Request Form</span>
+          <span class="nav-tag">/request</span>
+        </button>
+      </li>
+      <li>
+        <button class="nav-item-btn" onclick="triggerAction('open_uat_form')">
+          <span class="nav-num">2</span>
+          <span class="nav-label">Open UAT Form</span>
+          <span class="nav-tag">/uat</span>
+        </button>
+      </li>
+      <li>
+        <button class="nav-item-btn" onclick="triggerAction('prep_dev_env')">
+          <span class="nav-num">3</span>
+          <span class="nav-label">Prep Dev Environment</span>
+          <span class="nav-tag">ps1</span>
+        </button>
+      </li>
+      <li>
+        <button class="nav-item-btn" onclick="triggerAction('launch_local_env')">
+          <span class="nav-num">4</span>
+          <span class="nav-label">Launch Local Environment</span>
+          <span class="nav-tag">:3000</span>
+        </button>
+      </li>
+      <li>
+        <button class="nav-item-btn" onclick="triggerAction('launch_bootstrapper')">
+          <span class="nav-num">5</span>
+          <span class="nav-label">Launch Bootstrapper</span>
+          <span class="nav-tag">SSH</span>
+        </button>
+      </li>
+      <li>
+        <button class="nav-item-btn danger-action" onclick="openMergeModal()">
+          <span class="nav-num">6</span>
+          <span class="nav-label">Merge to PRD</span>
+          <span class="nav-tag">main</span>
+        </button>
+      </li>
+      <li>
+        <button class="nav-item-btn" onclick="openCompleteFeatureModal()">
+          <span class="nav-num">7</span>
+          <span class="nav-label">Complete Feature</span>
+          <span class="nav-tag">Archive</span>
+        </button>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div style="font-size: 11.5px; color: var(--muted); display: flex; justify-content: space-between;">
+        <span>PiFitness Dev Tools</span>
+        <span>v1.0</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN VIEW -->
+  <main class="main-content">
+    <!-- TOP STATUS BAR -->
+    <header class="top-bar">
+      <div class="status-cluster">
+        <div class="badge">
+          <span class="badge-dot" id="dot-server"></span>
+          <span>DevHub:</span>
+          <strong id="badge-server">Connecting...</strong>
+        </div>
+        <div class="badge">
+          <span>Branch:</span>
+          <strong id="badge-branch">...</strong>
+        </div>
+        <div class="badge">
+          <span class="badge-dot" id="dot-db"></span>
+          <span>DEV DB:</span>
+          <strong id="badge-db">...</strong>
+        </div>
+        <div class="badge">
+          <span class="badge-dot" id="dot-backend"></span>
+          <span>FastAPI (:8000)</span>
+        </div>
+        <div class="badge">
+          <span class="badge-dot" id="dot-frontend"></span>
+          <span>Next.js (:3000)</span>
+        </div>
+      </div>
+      <div>
+        <button class="btn-sm" onclick="fetchStatus()">Refresh Status</button>
+      </div>
+    </header>
+
+    <!-- WORKSPACE BODY -->
+    <div class="workspace">
+      <!-- ACTIVE FEATURE CARD -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Active Feature Files</h2>
+          <span style="font-size: 12px; color: var(--muted);" id="active-summary">0 files</span>
+        </div>
+        <div class="feature-pill-list" id="active-feature-list">
+          <span class="empty-note">No active feature files found in .features/descriptions or designs_active.</span>
+        </div>
+      </div>
+
+      <!-- TERMINAL DRAWER -->
+      <div class="terminal-box">
+        <div class="terminal-header">
+          <div class="terminal-title">
+            <span id="term-status-indicator" style="display: none;" class="spinner"></span>
+            <span id="term-title">Console Output: Ready</span>
+          </div>
+          <div class="terminal-actions">
+            <button class="term-btn" onclick="clearTerminal()">Clear</button>
+            <button class="term-btn" onclick="copyTerminal()">Copy Logs</button>
+          </div>
+        </div>
+        <div class="terminal-body" id="term-body">
+          <div class="log-line log-info">PiFitness DevHub ready. Select an action from the sidebar to begin.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL: MERGE TO PRD -->
+<div class="modal-overlay" id="modal-merge">
+  <div class="modal-box">
+    <h3 class="modal-title">Merge to PRD & Deploy?</h3>
+    <p class="modal-desc">
+      This will merge branch <code>feature-test</code> into <code>main</code>, push the release commit to GitHub, and launch the Pi bootstrapper.
+    </p>
+    <div class="modal-code-box">
+git checkout main<br>
+git pull origin main<br>
+git merge --no-ff feature-test -m "Merge branch 'feature-test' into main"<br>
+git push origin main<br>
+git checkout feature-test<br>
+# & Launch deploy/run-bootstrap.ps1
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModals()">Cancel</button>
+      <button class="btn-danger" onclick="confirmMergeToPrd()">Confirm & Merge</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: COMPLETE FEATURE -->
+<div class="modal-overlay" id="modal-complete">
+  <div class="modal-box">
+    <h3 class="modal-title">Complete Feature & Archive?</h3>
+    <p class="modal-desc">
+      This will move all active feature files to <code>zz_feature_archive/</code>, then run <code>refresh_dev.ps1</code> to re-sync your local DEV environment.
+    </p>
+    <div class="modal-code-box" id="complete-files-preview">
+      Scanning active files...
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModals()">Cancel</button>
+      <button class="btn-primary" onclick="confirmCompleteFeature()">Archive & Refresh</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let isRunning = false;
+  let isServerConnected = false;
+  let activeFeaturesCache = { descriptions: [], designs_active: [] };
+
+  async function fetchStatus() {
+    try {
+      const res = await fetch('/api/status', { cache: 'no-store' });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+
+      setServerOnline(true);
+
+      document.getElementById('badge-branch').textContent = data.branch;
+      
+      const dbBadge = document.getElementById('badge-db');
+      const dbDot = document.getElementById('dot-db');
+      dbBadge.textContent = data.dev_db;
+      if (data.dev_db === 'running') {
+        dbDot.className = 'badge-dot ok';
+      } else {
+        dbDot.className = 'badge-dot danger';
+      }
+
+      const beDot = document.getElementById('dot-backend');
+      beDot.className = data.ports.backend ? 'badge-dot ok' : 'badge-dot';
+
+      const feDot = document.getElementById('dot-frontend');
+      feDot.className = data.ports.frontend ? 'badge-dot ok' : 'badge-dot';
+
+      activeFeaturesCache = data.active_features || { descriptions: [], designs_active: [] };
+      renderActiveFeatures(activeFeaturesCache);
+    } catch (e) {
+      setServerOnline(false);
+    }
+  }
+
+  function setServerOnline(online) {
+    isServerConnected = online;
+    const badge = document.getElementById('badge-server');
+    const dot = document.getElementById('dot-server');
+    const banner = document.getElementById('server-offline-banner');
+
+    if (online) {
+      badge.textContent = 'Online';
+      dot.className = 'badge-dot ok';
+      banner.style.display = 'none';
+    } else {
+      badge.textContent = 'Disconnected';
+      dot.className = 'badge-dot danger';
+      banner.style.display = 'block';
+    }
+  }
+
+  function renderActiveFeatures(features) {
+    const list = document.getElementById('active-feature-list');
+    const summary = document.getElementById('active-summary');
+    const all = [...(features.descriptions || []), ...(features.designs_active || [])];
+    
+    summary.textContent = `${all.length} file${all.length === 1 ? '' : 's'}`;
+    if (all.length === 0) {
+      list.innerHTML = '<span class="empty-note">No active feature files found in .features/descriptions or designs_active.</span>';
+      return;
+    }
+
+    list.innerHTML = all.map(f => `<span class="feature-pill">${escapeHtml(f)}</span>`).join('');
+  }
+
+  function openMergeModal() {
+    if (isRunning) return;
+    if (!checkServer()) return;
+    document.getElementById('modal-merge').classList.add('active');
+  }
+
+  function openCompleteFeatureModal() {
+    if (isRunning) return;
+    if (!checkServer()) return;
+    const all = [...(activeFeaturesCache.descriptions || []), ...(activeFeaturesCache.designs_active || [])];
+    const preview = document.getElementById('complete-files-preview');
+    if (all.length === 0) {
+      preview.innerHTML = '<em>No active files found. refresh_dev.ps1 will run directly.</em>';
+    } else {
+      preview.innerHTML = all.map(f => `• ${escapeHtml(f)}`).join('<br>');
+    }
+    document.getElementById('modal-complete').classList.add('active');
+  }
+
+  function closeModals() {
+    document.querySelectorAll('.modal-overlay').forEach(el => el.classList.remove('active'));
+  }
+
+  function confirmMergeToPrd() {
+    closeModals();
+    triggerAction('merge_to_prd');
+  }
+
+  function confirmCompleteFeature() {
+    closeModals();
+    triggerAction('complete_feature');
+  }
+
+  function checkServer() {
+    if (!isServerConnected) {
+      alert("DevHub server is not running!\n\nPlease run '.\\tools\\dev_hub.ps1' or double-click 'dev_hub.bat' to start the local helper server.");
+      return false;
+    }
+    return true;
+  }
+
+  async function triggerAction(actionName) {
+    if (isRunning) {
+      alert("Another action is currently in progress. Please wait.");
+      return;
+    }
+
+    if (!isServerConnected) {
+      appendLogLine(`[${new Date().toLocaleTimeString()}] Cannot trigger action: DevHub server is disconnected.`, 'error');
+      appendLogLine(`Start the server with '.\\tools\\dev_hub.ps1' or double-click 'dev_hub.bat'.`, 'warn');
+      return;
+    }
+
+    isRunning = true;
+    const termBody = document.getElementById('term-body');
+    const termTitle = document.getElementById('term-title');
+    const spinner = document.getElementById('term-status-indicator');
+    
+    termTitle.textContent = `Running: ${actionName}...`;
+    spinner.style.display = 'inline-block';
+
+    appendLogLine(`[${new Date().toLocaleTimeString()}] Triggering action: ${actionName}`, 'heading');
+
+    try {
+      const response = await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: actionName })
+      });
+
+      if (!response.body) {
+        appendLogLine("No response stream from server.", "error");
+        finishAction();
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep remainder
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              handleEvent(data);
+            } catch (err) {
+              console.error("JSON parse error on SSE", line);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      appendLogLine(`Action request failed: ${e.message}`, 'error');
+      if (e.message.includes('fetch')) {
+        setServerOnline(false);
+        appendLogLine("DevHub server connection lost. Is the PowerShell/cmd window still running?", 'warn');
+      }
+    } finally {
+      finishAction();
+      fetchStatus();
+    }
+  }
+
+  function handleEvent(evt) {
+    if (evt.type === 'log') {
+      appendLogLine(evt.line, evt.kind || 'info');
+    } else if (evt.type === 'done') {
+      const kind = evt.success ? 'ok' : 'error';
+      appendLogLine(`\n[Result] ${evt.message}`, kind);
+      if (evt.url) {
+        appendLogLine(`Opening URL: ${evt.url}`, 'info');
+        window.open(evt.url, '_blank');
+      }
+    }
+  }
+
+  function finishAction() {
+    isRunning = false;
+    document.getElementById('term-status-indicator').style.display = 'none';
+    document.getElementById('term-title').textContent = 'Console Output: Idle';
+  }
+
+  function appendLogLine(text, kind = 'info') {
+    const termBody = document.getElementById('term-body');
+    const div = document.createElement('div');
+    div.className = `log-line log-${kind}`;
+    div.textContent = text;
+    termBody.appendChild(div);
+    termBody.scrollTop = termBody.scrollHeight;
+  }
+
+  function clearTerminal() {
+    document.getElementById('term-body').innerHTML = '';
+  }
+
+  function copyTerminal() {
+    const text = document.getElementById('term-body').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Logs copied to clipboard.");
+    });
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Poll status every 3 seconds for snappy reconnect detection
+  fetchStatus();
+  setInterval(fetchStatus, 3000);
+</script>
+</body>
+</html>
