@@ -181,8 +181,8 @@ class Migrate:
             evidence("prd_database_target", self.target.describe())
             marker, _values = read_db_marker(self.state_file)
             evidence("prd_state_marker", marker)
-            if marker not in ("clean", "dirty"):
-                raise HelperError("the PRD state marker is %r, not 'clean' or 'dirty'" % marker, self.state_file)
+            if marker not in ("clean", "dirty", "migrated"):
+                raise HelperError("the PRD state marker is %r, not 'clean', 'dirty', or 'migrated'" % marker, self.state_file)
 
     # ---------------------------------------------------------- 2. pending
     def stage_pending(self):
