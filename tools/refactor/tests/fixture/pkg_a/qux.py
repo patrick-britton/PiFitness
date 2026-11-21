@@ -1,2 +1,0 @@
-def qux():
-    return "qux"

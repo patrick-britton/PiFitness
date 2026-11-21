@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 """tools/ratchet.py - ratchet baseline comparison tool.
 
+Role in Feature Development Lifecycle:
+- Why it exists: In an actively evolving codebase, legacy code often contains pre-existing
+  violations (e.g. style discrepancies, missing docstrings, comment lint triggers). Rather
+  than blocking ongoing work on massive repo-wide cleanups or abandoning quality rules entirely,
+  the ratchet pattern records existing violations in baseline files and guarantees that NO NEW
+  violations can ever be introduced by any feature or bugfix.
+- When it is used: During the Feature Review and Verification phases (e.g., invoked via
+  verification gates such as `tools/lint_comments.py`, `tools/check_docs.py`, and `tools/verify.py`).
+  It compares current violations against `tools/baselines/<check>.txt`.
+- Why it is important: It enforces monotonic quality improvement ("the ratchet only tightens").
+  As developers touch or fix files, stale baseline entries are pruned away, gradually reducing
+  technical debt without risking regressions or blocking independent feature branches.
+
 Subcommands:
   compare <check> [key...]   Compare violation keys against baseline; exit 1 on new violations
   prune <check>              Remove stale keys from baseline (shrink-only update)

@@ -489,12 +489,13 @@ def _lookup_playlist(playlist_name: str) -> ProcessStepResult:
         parent_playlist_id = str(rows[0]["playlist_id"])
         target_ids = sql_to_list(
             "SELECT DISTINCT target_playlist_id FROM music.vw_playlist_shuffle_targets "
-            "WHERE parent_playlist_id = %s ",
+            "WHERE parent_playlist_id = %s "
+            "ORDER BY target_playlist_id",
             (parent_playlist_id,),
         )
         if not target_ids:
             raise ValueError(
-                f"No target_playlist_id found in music.vw_playlist_isrc_stats "
+                f"No target_playlist_id found in music.vw_playlist_shuffle_targets "
                 f"for playlist '{parent_playlist_id}'"
             )
         playlist_id = str(target_ids[0])
@@ -543,13 +544,19 @@ def _insert_listening_history(playlist_name: str) -> Optional[ProcessStepResultD
 def _query_isrc_stats(playlist_id: str) -> list:
     """Track send order from music.vw_playlist_isrc_stats (default_new_order asc).
 
-    Filter on the view's `playlist_id` column using the resolved target_playlist_id
-    (fix). `playlist_id` here is the target (child) playlist passed in from
-    _lookup_playlist.
+    Filter by target_playlist_id. When minutes_to_sync is between 1 and 9998,
+    cap tracks by cumulative_playlist_minutes; when NULL, 0, or >= 9999,
+    return all tracks.
     """
     sql = (
         "SELECT track_id FROM music.vw_playlist_isrc_stats "
-        "WHERE target_playlist_id = %s AND cumulative_playlist_minutes <= minutes_to_sync "
+        "WHERE target_playlist_id = %s "
+        "  AND ("
+        "    minutes_to_sync IS NULL "
+        "    OR minutes_to_sync = 0 "
+        "    OR minutes_to_sync >= 9999 "
+        "    OR cumulative_playlist_minutes <= minutes_to_sync"
+        "  ) "
         "ORDER BY default_new_order ASC"
     )
     track_ids = sql_to_list(sql, (playlist_id,))

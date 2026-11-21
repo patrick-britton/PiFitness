@@ -2186,8 +2186,7 @@ Do not edit by hand. Regenerate with python tools/db/schema_map.py.
 ### public.schema_migrations (TABLE)
 | column | type | nullable |
 |---|---|---|
-| version | bigint | NO |
-| applied_at | timestamp with time zone | NO |
+| version | character varying | NO |
 
 **Indexes:**
 - `schema_migrations_pkey`: CREATE UNIQUE INDEX schema_migrations_pkey ON public.schema_migrations USING btree (version)

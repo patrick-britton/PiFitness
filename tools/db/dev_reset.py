@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """tools/db/dev_reset.py - Drop and recreate the DEV database from a template, then stamp the D8 marker.
 
+Role in Feature Development Lifecycle:
+- Why it exists: When testing complex database operations, running destructive queries, or testing
+  new migrations, the local DEV database can get corrupted or polluted with bad test state. This tool
+  resets DEV to a clean baseline and reapplies migrations.
+- When it is used: During feature execution and testing when local data mutations need to be quickly
+  wiped, or when verifying that pending migrations apply cleanly from scratch.
+- Why it is important: Enables fast, safe, local iterative development loops without needing to re-pull
+  a full backup over the network from the Raspberry Pi.
+
 Usage:
     python tools/db/dev_reset.py
 

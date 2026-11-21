@@ -17,11 +17,11 @@ READ COMMANDS
   oq <id> [--open|--unanswered]   print open-question blocks (default: all)
   section <id> [name]       print one section by (partial) heading; no name = list them
   log <id> [-n N]           print the last N progress-log lines (default 10)
-  bugs <id> [--pending|--show BUG-ID]   list bugs from the bugs sidecar
+  bugs <id> [--unresolved|--show BUG-ID|all]   list bugs from the bugs sidecar
   check <id> [T01 ...] [--anchors]      validate structure; --anchors verifies that
                             anchored files/symbols exist in the repo
   brief <id> T##    resume context for a task: status, recent log, git status,
-                    current branch, commits since task start, verify run
+                    current branch, verify run
   resume <id>       brief the next executable task (interrupted first); full
                     context with no human re-explanation
 
@@ -30,24 +30,39 @@ WRITE COMMANDS
   set <id> feature <draft|reviewed|in-progress|complete> [--force]
   set <id> resume           recompute Resume Here (progress/next/blocked-by)
   log <id> "text"           append '- YYYY-MM-DD text' to the log sidecar
-  bug <id> T03 "summary" [--symptom text] [--ac AC-1]  symptom, root cause, fix, check added; linked to Task or AC; duplicates rejected
-  backlog add <B-ID> <item> append one item to docs/workflow/BACKLOG.md
-                            (append-only; omitted id = next ID, reserved B27-B34 skipped)
-  migrate <id>              move an inline Progress Log / Known Issues into sidecars
+  bug <id> "summary" [--symptom text] [--ac AC-1] [--task T03]
+                            record a bug (status open). UAT bugs link an AC; review
+                            findings link nothing. An AC with an unresolved bug is rejected.
+  bugs <id> --update BUG-1 [--root-cause T] [--fix T] [--status S]
+                            fill diagnosis / move a bug: open|not-fixed -> in-review
+                            (needs root cause and fix), in-review -> fixed|not-fixed
+  uat import <id> [path] [--apply]
+                            summarize <id>_feedback.md; --apply also ticks/unticks the AC
+                            boxes to match it and moves in-review UAT bugs to
+                            fixed (AC passed) or not-fixed (AC failed)
+  backlog add [B-ID] <item> append one item to docs/workflow/BACKLOG.md
+                            (append-only; omitted id = next ID)
   start <id> T##            record a start entry for task T## in the progress log
   done <id> T## [--force]   evidence gate: run the task's Verify command, record
                             exit code and output tail; refuses without a matching
                             start; --force logs FORCED instead (D12)
 
+TASK SIZING
+  Every task has '- **Points:** 1|2|3'. check errors on any other value, on more than
+  3 modified/created/deleted files, and on more files than points. The frontmatter
+  'points:' total is written by 'set' (including 'set <id> resume'); never edit it by hand.
+
 Files (all under <features-dir>/designs_active/, default .features):
   <id>_design.md   hot state (frontmatter, Resume Here, ACs, OQs, Task Plan)
   <id>_log.md      append-only progress log
-  <id>_bugs.md     bug entries
+  <id>_bugs.md     bug entries (status: open | in-review | not-fixed | fixed)
 
 Exit code: 0 = ok, 1 = error / structural problem (details on stderr or in output).
 """
 import argparse
 import datetime
+import html
+import json
 import os
 import re
 import subprocess
@@ -56,14 +71,15 @@ from pathlib import Path
 
 FEATURE_STATUSES = ("draft", "reviewed", "in-progress", "complete")
 TASK_STATUSES = ("todo", "interrupted", "complete")
-COMPLEXITIES = ("trivial", "low", "medium", "high")
-TASK_FIELDS = ("surface", "skill", "complexity", "depends-on", "traces-to",
+POINTS = ("1", "2", "3")
+BUG_STATUSES = ("open", "in-review", "not-fixed", "fixed")
+TASK_FIELDS = ("surface", "skill", "points", "depends-on", "traces-to",
                "anchors", "detail", "verify", "status")
 FATAL_TASK_FIELDS = ("status", "depends-on")
+# "affects" is still recognised so old files parse, but nothing reads it.
 OQ_KEYS = ("question", "affects", "answer", "decision", "rationale", "status")
 PATH_ROLES = ("modify", "delete", "pattern", "read")
 ALL_ROLES = PATH_ROLES + ("create", "planned", "search", "greenfield")
-POINTER = "> sidecar:"
 
 
 class FdError(Exception):
@@ -234,7 +250,11 @@ class Doc:
         if k not in self.fm:
             raise FdError("frontmatter key '%s' not found" % k)
         i = self.fm[k][1]
-        self.lines[i] = re.sub(r"^(%s:\s*)\S+" % re.escape(k), lambda m: m.group(1) + v, self.lines[i], count=1)
+
+        def sub(m):
+            head = m.group(1)
+            return (head if head.endswith((" ", "\t")) else head + " ") + v
+        self.lines[i] = re.sub(r"^(%s:[ \t]*)\S*" % re.escape(k), sub, self.lines[i], count=1)
         self.fm[k][0] = v
 
     def section(self, sub):
@@ -269,8 +289,11 @@ class Doc:
     def task_status(self, t):
         return first_word(t.f.get("status", [""])[0])
 
-    def task_cx(self, t):
-        return first_word(t.f.get("complexity", [""])[0])
+    def task_pts(self, t):
+        return first_word(t.f.get("points", [""])[0])
+
+    def points_total(self):
+        return sum(int(self.task_pts(t)) for t in self.tasks if self.task_pts(t) in POINTS)
 
     def deps(self, t):
         v = body(t.f.get("depends-on"))
@@ -287,12 +310,6 @@ class Doc:
     def oq_answered(self, q):
         b = body(q.f.get("answer"))
         return bool(b) and not re.match(r"^\(?\s*to be (provided|recorded)", b, re.I)
-
-    def affects(self, q, tid):
-        v = body(q.f.get("affects"))
-        if re.search(r"\ball\b", v, re.I):
-            return True
-        return int(tid[1:]) in {int(x) for x in re.findall(r"T(\d+)", v)}
 
     def save(self):
         self.path.write_bytes(self.nl.join(self.lines).encode("utf-8"))
@@ -332,8 +349,9 @@ class Doc:
                     err("%s: missing field '%s'" % (t.id, k), k in FATAL_TASK_FIELDS)
             if "status" in t.f and self.task_status(t) not in TASK_STATUSES:
                 err("%s: status '%s' not in %s" % (t.id, self.task_status(t), "|".join(TASK_STATUSES)), True)
-            if "complexity" in t.f and self.task_cx(t) not in COMPLEXITIES:
-                err("%s: complexity '%s' not in %s" % (t.id, self.task_cx(t), "|".join(COMPLEXITIES)))
+            if "points" in t.f and self.task_pts(t) not in POINTS:
+                err("%s: points '%s' not in %s (split tasks larger than 3 points)"
+                    % (t.id, self.task_pts(t), "|".join(POINTS)))
             for d in self.deps(t):
                 if d not in ids:
                     err("%s: depends-on unknown task %s" % (t.id, d), True)
@@ -351,7 +369,7 @@ class Doc:
             err("dependency cycle among: %s" % ", ".join(sorted(remaining)), True)
 
         for q in self.oqs:
-            for k in ("question", "affects", "answer", "status"):
+            for k in ("question", "answer", "status"):
                 if k not in q.f:
                     err("%s: missing field '%s'" % (q.id, k))
             if "status" in q.f and first_word(q.f["status"][0]) not in ("open", "resolved"):
@@ -373,16 +391,19 @@ class Doc:
                     ref = re.search(r"T\d+", raw)
                     if not ref or ref.group(0) not in ids:
                         warn("%s: 'planned' anchor must reference an existing task (<- T##): %s" % (t.id, raw))
-            if self.task_cx(t) in ("trivial", "low") and len(paths) > 3:
-                warn("%s: %d files modified/created/deleted but complexity is %s (limit ~3)"
-                     % (t.id, len(paths), self.task_cx(t)))
+            if len(paths) > 3:
+                err("%s: %d files modified/created/deleted; the limit is 3 (split the task)"
+                    % (t.id, len(paths)))
+            elif self.task_pts(t) in POINTS and len(paths) > int(self.task_pts(t)):
+                err("%s: %d files modified/created/deleted but points is %s; a task may touch at most as many files as it has points"
+                    % (t.id, len(paths), self.task_pts(t)))
             if "anchors" in t.f and not anchors:
                 err("%s: Anchors is empty (use 'greenfield' if there is no existing code)" % t.id)
 
-        if len(self.tasks) >= 1:
-            tail = "\n".join(self.raw(t) for t in self.tasks[-2:])
-            if not re.search(r"code[- ]review", tail, re.I):
-                warn("no code-review task in the last two positions of the Task Plan")
+        if "points" in self.fm and self.tasks:
+            declared, total = self.fmv("points"), self.points_total()
+            if declared != str(total):
+                warn("frontmatter points is '%s' but tasks sum to %d (run: fd.py set <id> resume)" % (declared, total))
 
         if "progress" in rs:
             m = re.match(r"(\d+)/(\d+)", rs["progress"][0])
@@ -393,14 +414,6 @@ class Doc:
                     warn("Resume Here progress says %s but tasks say %d/%d (run: fd.py set <id> resume)"
                          % (rs["progress"][0], comp, total))
 
-        for name in ("progress log", "known issues"):
-            sec = self.section(name)
-            if sec:
-                n = sum(1 for i in range(sec[1] + 1, sec[2])
-                        if self.mask[i] and self.lines[i].strip() not in ("", "---")
-                        and not self.lines[i].startswith(POINTER))
-                if n:
-                    warn("inline '%s' has %d lines; run: fd.py migrate <id>" % (sec[0], n))
         return P
 
 
@@ -507,7 +520,7 @@ def pick_next(doc):
         waits = "; ".join("%s waits on %s" % (t.id, ",".join(
             "%s[%s]" % (d, st.get(d, "?")) for d in doc.deps(t) if st.get(d) != "complete")) for t in pend)
         return None, [], "no executable task: " + waits
-    blk = [q.id for q in doc.oqs if doc.oq_open(q) and doc.affects(q, chosen.id)]
+    blk = [q.id for q in doc.oqs if doc.oq_open(q)]
     return chosen, blk, ""
 
 
@@ -523,7 +536,7 @@ def recompute_resume(doc):
     if first_word(doc.fmv("status")) == "draft" and open_all:
         nv, bv = "review", open_all
     elif nxt is None:
-        nv, bv = ("none", []) if done == total else ("review", open_all)
+        nv, bv = ("none", []) if done == total and not open_all else ("review", open_all)
     elif blk:
         nv, bv = "review", blk
     else:
@@ -533,6 +546,8 @@ def recompute_resume(doc):
     for k, v in vals.items():
         i = rs[k][1]
         doc.lines[i] = "**%s:** %s" % (k, v)
+    if "points" in doc.fm:
+        doc.set_fm("points", str(doc.points_total()))
     return vals
 
 
@@ -589,36 +604,109 @@ def parse_bugs(path):
     if not path.exists():
         return []
     text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
-    parts = re.split(r"(?m)^(?=### Bug )", text)
+    parts = re.split(r"(?m)^(?=### BUG-\d+\b)", text)
     out = []
     for p in parts:
-        m = re.match(r"### Bug (\S+)\s*[—–-]+\s*(.*)", p)
+        m = re.match(r"### (BUG-\d+)\s*[\u2014\u2013-]+\s*(.*)", p)
         if not m:
             continue
-        task = re.search(r"\*\*Task:\*\*\s*(.*)", p)
-        ac = re.search(r"\*\*AC:\*\*\s*(.*)", p)
-        outc = re.search(r"\*\*Outcome:\*\*\s*(.*)", p)
-        sym = re.search(r"\*\*Symptom:\*\*\s*(.*)", p)
-        if ac:
-            linkkind, linkid = "AC", ac.group(1).strip()
-        else:
-            linkkind, linkid = "Task", task.group(1).strip() if task else "?"
-        symptom = sym.group(1).strip() if sym else ""
+
+        def fld(name):
+            f = re.search(r"(?m)^- \*\*%s:\*\*[ \t]*(.*)$" % re.escape(name), p)
+            return f.group(1).strip() if f else ""
         out.append({"id": m.group(1), "summary": m.group(2).strip(), "text": p.rstrip(),
-                    "linkkind": linkkind, "linkid": linkid.upper(),
-                    "symptom": symptom, "symptom-key": norm_key(symptom),
-                    "task": task.group(1).strip() if task else "?",
-                    "outcome": outc.group(1).strip() if outc else "pending"})
+                    "ac": fld("AC").upper(), "task": fld("Task").upper(),
+                    "symptom": fld("Symptom"), "symptom-key": norm_key(fld("Symptom")),
+                    "root": fld("Root cause"), "fix": fld("Fix"),
+                    "status": first_word(fld("Status")) or "open", "since": fld("Since")})
     return out
 
 
-def is_pending(b):
-    return first_word(b["outcome"]) in ("", "pending")
+def is_unresolved(b):
+    return b["status"] != "fixed"
+
+
+def now_stamp():
+    return datetime.datetime.now().isoformat(timespec="seconds")
+
+
+def parse_stamp(v):
+    try:
+        return datetime.datetime.strptime((v or "").strip()[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return None
+
+
+def one_line(v):
+    return " ".join((v or "").split())
+
+
+def update_bug(c, bid, root=None, fix=None, status=None, from_uat=False):
+    """Fill a bug's diagnosis and/or move its status, enforcing the lifecycle."""
+    bugs = parse_bugs(c.bugp)
+    b = next((x for x in bugs if x["id"].upper() == bid.upper()), None)
+    if not b:
+        raise FdError("no bug '%s' (have: %s)" % (bid, ", ".join(x["id"] for x in bugs) or "none"))
+    bid, cur = b["id"], b["status"]
+    root = one_line(root) if root is not None else None
+    fix = one_line(fix) if fix is not None else None
+    if status:
+        if status not in BUG_STATUSES:
+            raise FdError("status must be one of %s" % "|".join(BUG_STATUSES))
+        allowed = {"in-review": ("open", "not-fixed"), "fixed": ("in-review",),
+                   "not-fixed": ("in-review",), "open": ()}
+        if cur not in allowed[status]:
+            raise FdError("%s is '%s'; it cannot move to '%s'" % (bid, cur, status))
+        if status in ("fixed", "not-fixed") and b["ac"] and not from_uat:
+            raise FdError("%s is linked to %s: only the human's UAT settles it (fd.py uat import %s --apply)"
+                          % (bid, b["ac"], c.a.id))
+        if status == "in-review":
+            r = root if root is not None else b["root"]
+            f = fix if fix is not None else b["fix"]
+            if not r or r.lower() == "pending" or not f or f.lower() == "pending":
+                raise FdError("%s: give --root-cause and --fix before moving it to in-review" % bid)
+    lines = c.bugp.read_text(encoding="utf-8").replace("\r\n", "\n").split("\n")
+    s0 = next(i for i, ln in enumerate(lines) if re.match(r"### %s\b" % re.escape(bid), ln))
+    e0 = next((j for j in range(s0 + 1, len(lines)) if lines[j].startswith("### ")), len(lines))
+
+    def find(name):
+        for i in range(s0, e0):
+            if re.match(r"- \*\*%s:\*\*" % re.escape(name), lines[i]):
+                return i
+        return None
+
+    def setf(name, value, after=None):
+        i = find(name)
+        if i is not None:
+            lines[i] = "- **%s:** %s" % (name, value)
+        else:
+            j = find(after)
+            lines.insert(j + 1, "- **%s:** %s" % (name, value))
+
+    if status == "in-review" and cur == "not-fixed" and (root is not None or fix is not None):
+        n = sum(1 for i in range(s0, e0) if lines[i].startswith("- **Attempt ")) + 1
+        lines.insert(find("Root cause"), "- **Attempt %d (not fixed):** root cause: %s; fix: %s"
+                     % (n, b["root"], b["fix"]))
+        e0 += 1
+    if root is not None:
+        setf("Root cause", root)
+    if fix is not None:
+        setf("Fix", fix)
+    if status:
+        setf("Status", status)
+        if status == "in-review":
+            setf("Since", now_stamp(), after="Status")
+    c.bugp.write_text("\n".join(lines), encoding="utf-8", newline="\n")
+    if status:
+        append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
+                    "- %s bug %s %s -> %s" % (today(), bid, cur, status))
+    else:
+        append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
+                    "- %s bug %s diagnosis updated" % (today(), bid))
+    return bid, cur
 
 
 BACKLOG_ID_RE = re.compile(r"^B(\d+)$")
-# B27-B34 are reserved by PLAN section 5 (D6); IDs continue from B35.
-BACKLOG_RESERVED = set(range(27, 35))
 
 
 def backlog_ids(path):
@@ -626,7 +714,7 @@ def backlog_ids(path):
     for ln in path.read_text(encoding="utf-8").splitlines():
         m = re.match(r"^\|\s*(B\d+)\s*\|", ln)
         if m:
-            ids.add("B%s" % m.group(1))
+            ids.add(m.group(1))
     return ids
 
 
@@ -636,10 +724,7 @@ def next_backlog_id(path):
         m = re.match(r"^\|\s*(B(\d+))\s*\|", ln)
         if m:
             best = max(best, int(m.group(2)))
-    nid = best + 1
-    while nid in BACKLOG_RESERVED:
-        nid += 1
-    return "B%d" % nid
+    return "B%d" % (best + 1)
 
 
 # --------------------------------------------------------------------------- commands
@@ -670,7 +755,7 @@ def cmd_hot(c):
     if fatal:
         print("!! STRUCTURAL PROBLEMS - output below may be wrong; tell the human:")
         print_problems(fatal, prefix="!! ")
-    for k in ("feature-id", "title", "status", "created", "last-updated", "surfaces", "skills-engaged"):
+    for k in ("feature-id", "title", "status", "created", "last-updated", "surfaces", "points", "skills-engaged"):
         if k in d.fm:
             print("%s: %s" % (k, d.fm[k][0]))
     print("\n-- Resume Here")
@@ -678,13 +763,13 @@ def cmd_hot(c):
         print("%s: %s" % (k, v))
     print("\n-- Tasks")
     for t in d.tasks:
-        print("%s [%s] %s deps=%s" % (t.id, d.task_status(t) or "?", d.task_cx(t) or "?",
+        print("%s [%s] %spt deps=%s" % (t.id, d.task_status(t) or "?", d.task_pts(t) or "?",
                                       ",".join(d.deps(t)) or "none"))
     opn = [q for q in d.oqs if d.oq_open(q)]
     print("\n-- Open questions: %d open, %d resolved" % (len(opn), len(d.oqs) - len(opn)))
     if c.a.brief:
         for q in opn:
-            print("%s affects=%s answered=%s" % (q.id, body(q.f.get("affects")) or "?", "yes" if d.oq_answered(q) else "no"))
+            print("%s answered=%s" % (q.id, "yes" if d.oq_answered(q) else "no"))
     else:
         for q in opn:
             print(d.raw(q))
@@ -697,8 +782,8 @@ def cmd_hot(c):
     print("log: %d entries%s" % (len(logs), "; last 3:" if logs else ""))
     for ln in logs[-3:]:
         print("  " + ln)
-    print("bugs: %d (%d pending)%s" % (len(bugs), sum(is_pending(b) for b in bugs),
-                                       "  -> fd.py bugs %s --pending" % c.a.id if bugs else ""))
+    print("bugs: %d (%d unresolved)%s" % (len(bugs), sum(is_unresolved(b) for b in bugs),
+                                          "  -> fd.py bugs %s --unresolved" % c.a.id if bugs else ""))
     print("\n-- Sections: " + ", ".join("%s (%d lines)" % (n, e - s) for n, s, e in d.sections))
     print("   read one with: fd.py section %s \"<name>\"" % c.a.id)
     for lvl, f, m in probs:
@@ -722,7 +807,7 @@ def cmd_next(c):
     print("status: %s" % d.task_status(t))
     print("blocked-by: %s" % (", ".join(blk) or "none"))
     if blk:
-        print("ACTION: stop. Set blocked-by in Resume Here and send the human to /feature-review.")
+        print("ACTION: stop. Run: fd.py set %s resume, then tell the human to answer the open question in the design file and run /feature-design." % c.a.id)
     print("---")
     print(d.raw(t))
     return 0
@@ -746,6 +831,8 @@ def cmd_oq(c):
         print(d.raw(q))
     if c.a.unanswered:
         print("\nUNANSWERED: " + (", ".join(q.id for q in sel) or "none (all answered)"))
+    elif c.a.open:
+        print("\nOPEN: " + (", ".join(q.id for q in sel) or "none"))
     else:
         print("\n%d shown of %d total; %d open, %d unanswered" % (
             len(sel), len(d.oqs), sum(d.oq_open(q) for q in d.oqs), sum(not d.oq_answered(q) for q in d.oqs)))
@@ -822,16 +909,6 @@ def git_out(root, *args):
     return p.returncode, (p.stdout or "").strip()
 
 
-def task_start_date(logp, tid):
-    """Earliest date this task has a log 'start' entry, or None."""
-    found = []
-    for ln in read_log_lines(logp):
-        m = re.match(r"- (\d{4}-\d{2}-\d{2})\s+(T\d+)\s+start\b", ln, re.I)
-        if m and m.group(2).upper() == tid.upper():
-            found.append(m.group(1))
-    return min(found) if found else None
-
-
 def brief_log_lines(c, t, limit=10):
     """Recent log: this task's events first, then the feature log tail."""
     ev = [ln for _, ln in log_events(c.logp, t.id)]
@@ -868,17 +945,6 @@ def print_brief(c, d, t):
         print("status:")
         for ln in porc.splitlines():
             print("  " + ln)
-    start = task_start_date(c.logp, t.id)
-    if start:
-        rc, commits = git_out(c.root, "log", "--oneline", "--since=%s 00:00:00" % start)
-        print("commits since %s:" % start)
-        if rc != 0 or not commits:
-            print("  (none)")
-        else:
-            for ln in commits.splitlines():
-                print("  " + ln)
-    else:
-        print("commits since <task start>: (no start entry logged)")
     print("-- verify run")
     if not verify:
         print("(no verify command on the task)")
@@ -901,6 +967,169 @@ def cmd_brief(c):
     return 0
 
 
+# --------------------------------------------------------------------------- uat
+
+AC_RE = re.compile(r"^\s*-\s*\[([ xX])\]\s*(AC-\d+)\b[:.\-]?\s*(.*)$", re.I)
+AUTO_RE = re.compile(r"^\s+-\s+auto:\s*`?(.+?)`?\s*$", re.I)
+
+
+def parse_acceptance(doc):
+    """Return [{id, text, auto, done}] from the design's ## Acceptance section.
+
+    'auto' is the content of the first '  - auto: ...' sub-bullet that follows
+    the AC checkbox line, or '' when absent.
+    """
+    sec = doc.section("acceptance")
+    if not sec:
+        return []
+    out, seen = [], set()
+    pending = None  # AC entry awaiting an auto: line
+    for i in range(sec[1] + 1, sec[2]):
+        if not doc.mask[i]:
+            continue
+        line = doc.lines[i]
+        m = AC_RE.match(line)
+        if m:
+            ac_id = m.group(2).upper()
+            if ac_id in seen:
+                pending = None
+                continue
+            seen.add(ac_id)
+            entry = {
+                "id": ac_id,
+                "text": m.group(3).strip(),
+                "auto": "",
+                "done": m.group(1).lower() in ("x", "X"),
+            }
+            out.append(entry)
+            pending = entry
+            continue
+        if pending is not None:
+            am = AUTO_RE.match(line)
+            if am:
+                pending["auto"] = am.group(1).strip()
+            pending = None  # only capture first sub-bullet
+    return out
+
+
+# uat_html removed: the launcher uses tools/workflow/uat.json (written by cmd_uat_build).
+
+
+def cmd_uat_build(c):
+    """Compile the design's Acceptance Criteria into tools/workflow/uat.json.
+
+    The evergreen uat.json is read by uat_launcher.py at runtime; it always
+    reflects the current feature.  The old per-feature <id>_uat.html is no
+    longer written.
+    """
+    d = c.doc()
+    acs = parse_acceptance(d)
+    if not acs:
+        raise FdError("%s: no Acceptance Criteria found in the '## Acceptance' section" % c.a.id)
+    import datetime as _dt
+    payload = {
+        "feature_id": c.a.id,
+        "title": d.fmv("title") or c.a.id,
+        "generated_at": _dt.date.today().isoformat(),
+        "acceptance_criteria": [
+            {"id": a["id"], "text": a["text"], "auto": a["auto"], "done": a["done"]}
+            for a in acs
+        ],
+    }
+    out = Path(__file__).parent / "uat.json"
+    out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print("uat build: %d acceptance criteria -> %s" % (len(acs), out))
+    return 0
+
+
+
+def parse_feedback(path):
+    """-> (results {AC: Pass|Fail|Pending}, notes {AC: text}, exported stamp or '')."""
+    results, notes, exported = {}, {}, ""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^\s*\|\s*(AC-\d+)\s*\|\s*(Pass|Fail|Pending)\s*\|\s*(.*?)\s*\|?\s*$", line, re.I)
+        if m:
+            results[m.group(1).upper()] = m.group(2).capitalize()
+            notes[m.group(1).upper()] = m.group(3).strip()
+            continue
+        e = re.match(r"^\*\*Exported:\*\*\s*(\S+)", line)
+        if e:
+            exported = e.group(1)
+    return results, notes, exported
+
+
+def cmd_uat_import(c):
+    """Summarize a UAT feedback file; with --apply, sync AC boxes and in-review bugs to it."""
+    d = c.doc()
+    acs = parse_acceptance(d)
+    known = {a["id"] for a in acs}
+    path = Path(c.a.path) if c.a.path else c.design.parent / ("%s_feedback.md" % c.a.id)
+    if not path.exists():
+        raise FdError("feedback file not found: %s" % path)
+    results, notes, exported = parse_feedback(path)
+    for ac_id in results:
+        if ac_id not in known:
+            raise FdError("unknown AC in feedback: %s" % ac_id)
+    if not results:
+        raise FdError("no AC result rows found in %s" % path)
+    print("uat import: %s (%d rows)" % (path, len(results)))
+    npass = nfail = 0
+    for a in acs:
+        r = results.get(a["id"])
+        if not r:
+            print("  %s: pending" % a["id"])
+        elif r == "Fail" and notes.get(a["id"]):
+            print("  %s: Fail - %s" % (a["id"], notes[a["id"]]))
+        else:
+            print("  %s: %s" % (a["id"], r))
+        if r == "Pass":
+            npass += 1
+        elif r == "Fail":
+            nfail += 1
+    npend = len(acs) - npass - nfail
+    print("summary: %d pass, %d fail, %d pending of %d" % (npass, nfail, npend, len(acs)))
+    if c.a.apply:
+        fb_time = parse_stamp(exported) or datetime.datetime.fromtimestamp(path.stat().st_mtime)
+        ticked = unticked = 0
+        sec = d.section("acceptance")
+        for i in range(sec[1] + 1, sec[2]):
+            m = AC_RE.match(d.lines[i]) if d.mask[i] else None
+            r = results.get(m.group(2).upper()) if m else None
+            if r is None:
+                continue
+            want = r == "Pass"
+            if (m.group(1) in "xX") != want:
+                d.lines[i] = re.sub(r"\[[ xX]\]", "[x]" if want else "[ ]", d.lines[i], count=1)
+                ticked, unticked = ticked + want, unticked + (not want)
+        if ticked or unticked:
+            if "last-updated" in d.fm:
+                d.set_fm("last-updated", today())
+            d.save()
+        print("apply: %d AC boxes ticked, %d unticked" % (ticked, unticked))
+        moved = []
+        for b in parse_bugs(c.bugp):
+            if b["status"] != "in-review" or not b["ac"]:
+                continue
+            r = results.get(b["ac"])
+            since = parse_stamp(b["since"])
+            if r not in ("Pass", "Fail"):
+                print("  %s: in-review, %s has no result yet (awaiting UAT)" % (b["id"], b["ac"]))
+            elif since is None or fb_time < since:
+                print("  %s: in-review, awaiting UAT (feedback is older than the fix)" % b["id"])
+            else:
+                new = "fixed" if r == "Pass" else "not-fixed"
+                update_bug(c, b["id"], status=new, from_uat=True)
+                moved.append("%s %s" % (b["id"], new))
+                print("  %s: %s (%s %s)" % (b["id"], new, b["ac"], r))
+        if ticked or unticked or moved:
+            append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
+                        "- %s uat import: %d ticked, %d unticked%s" % (
+                            today(), ticked, unticked, "; " + ", ".join(moved) if moved else ""))
+    bugs = parse_bugs(c.bugp)
+    print("bugs: %d unresolved of %d" % (sum(is_unresolved(b) for b in bugs), len(bugs)))
+    return 0
+
+
 def cmd_resume(c):
     """Resume the next executable task (interrupted first), with full context."""
     d = c.doc()
@@ -920,35 +1149,36 @@ def cmd_resume(c):
 
 def cmd_bug(c):
     d = c.doc()
-    t = d.by_id(c.a.task)
-    n = int(t.id[1:])
-    prefix = "%s-%d-" % (c.a.id, n)
-    existing = [int(m.group(1)) for b in parse_bugs(c.bugp)
-                for m in [re.match(re.escape(prefix) + r"(\d+)$", b["id"])] if m]
-    bid = "%s%d" % (prefix, max(existing or [0]) + 1)
-    summary = c.a.summary.strip()
-    symptom = (c.a.symptom or summary).strip()
-    if c.a.ac:
-        linkkind, linkid = "AC", c.a.ac.strip()
-    else:
-        linkkind, linkid = "Task", t.id
-    key = (linkkind, linkid.upper(), norm_key(symptom))
-    for b in parse_bugs(c.bugp):
-        if (b.get("linkkind"), b.get("linkid"), b.get("symptom-key")) == key:
-            raise FdError("duplicate bug: %s already recorded for %s %s (symptom: %s)"
-                          % (b["id"], linkkind, linkid, symptom))
-    skeleton = "\n".join([
-        "", "### Bug %s \u2014 %s" % (bid, summary),
-        "- **%s:** %s" % (linkkind, linkid),
-        "- **Symptom:** %s" % symptom,
-        "- **Root cause:** pending",
-        "- **Fix:** pending",
-        "- **Check added:** pending",
-        "- **Outcome:** pending", ""])
-    append_line(c.bugp, "# Known Issues / Bugs - %s" % c.a.id, skeleton)
+    summary = one_line(c.a.summary)
+    symptom = one_line(c.a.symptom or summary)
+    ac = (c.a.ac or "").strip().upper()
+    task = (c.a.task or "").strip().upper()
+    if ac and ac not in {a["id"] for a in parse_acceptance(d)}:
+        raise FdError("unknown AC %s" % ac)
+    if task:
+        task = d.by_id(task).id
+    bugs = parse_bugs(c.bugp)
+    for b in bugs:
+        if not is_unresolved(b):
+            continue
+        if ac and b["ac"] == ac:
+            raise FdError("duplicate bug: %s is already unresolved for %s (%s); work that bug instead"
+                          % (b["id"], ac, b["status"]))
+        if not ac and not b["ac"] and b["symptom-key"] == norm_key(symptom):
+            raise FdError("duplicate bug: %s already records this symptom (%s)" % (b["id"], b["status"]))
+    bid = "BUG-%d" % (max([int(b["id"][4:]) for b in bugs] or [0]) + 1)
+    entry = ["", "### %s \u2014 %s" % (bid, summary)]
+    if ac:
+        entry.append("- **AC:** %s" % ac)
+    if task:
+        entry.append("- **Task:** %s" % task)
+    entry += ["- **Symptom:** %s" % symptom, "- **Root cause:** pending", "- **Fix:** pending",
+              "- **Status:** open", ""]
+    append_line(c.bugp, "# Known Issues / Bugs - %s" % c.a.id, "\n".join(entry))
     append_line(c.logp, "# Progress Log - %s (append-only)" % c.a.id,
                 "- %s bug %s recorded: %s" % (today(), bid, summary))
-    print("bug id: %s\nfile: %s\nFill in the pending fields by editing that entry; never guess a root cause." % (bid, c.bugp))
+    print("bug id: %s\nfile: %s\nNext: diagnose it, then: fd.py bugs %s --update %s --root-cause ... --fix ... --status in-review"
+          % (bid, c.bugp, c.a.id, bid))
     return 0
 
 
@@ -956,7 +1186,7 @@ def cmd_backlog_add(c):
     """Append one item to docs/workflow/BACKLOG.md (append-only).
 
     Existing rows are never edited. Give an explicit id (e.g. B27); omit it
-    to get the next ID (reserved B27-B34 are skipped).
+    to get the next ID.
     """
     backlog = c.root / "docs" / "workflow" / "BACKLOG.md"
     if not backlog.exists():
@@ -979,7 +1209,7 @@ def cmd_backlog_add(c):
         raise FdError("backlog add: %s already exists (append-only; existing rows are never edited)" % bid)
     row = "| %s | %s | %s | %s | %s | %s | %s |" % (
         bid, item, c.a.source, c.a.suggested_phase, c.a.size, c.a.status, c.a.phase)
-    raw = backlog.read_text(encoding="utf-8", newline="")
+    raw = backlog.read_bytes().decode("utf-8")
     nl = "\r\n" if "\r\n" in raw else "\n"
     if not raw.endswith(nl):
         raw += nl
@@ -991,18 +1221,27 @@ def cmd_backlog_add(c):
 
 
 def cmd_bugs(c):
+    a = c.a
+    if (a.root_cause is not None or a.fix is not None or a.status) and not a.update:
+        raise FdError("--root-cause, --fix and --status need --update BUG-ID")
+    if a.update:
+        if a.root_cause is None and a.fix is None and not a.status:
+            raise FdError("--update needs --root-cause, --fix and/or --status")
+        bid, cur = update_bug(c, a.update, a.root_cause, a.fix, a.status)
+        print("%s: %s" % (bid, ("%s -> %s" % (cur, a.status)) if a.status else "diagnosis updated"))
+        return 0
     bugs = parse_bugs(c.bugp)
-    if c.a.show:
-        m = [b for b in bugs if c.a.show in b["id"]]
-        if not m:
-            raise FdError("no bug matching '%s'" % c.a.show)
-        for b in m:
+    if a.show:
+        sel = bugs if a.show.lower() == "all" else [b for b in bugs if b["id"].upper() == a.show.upper()]
+        if not sel:
+            raise FdError("no bug matching '%s'" % a.show)
+        for b in sel:
             print(b["text"])
         return 0
-    sel = [b for b in bugs if is_pending(b)] if c.a.pending else bugs
+    sel = [b for b in bugs if is_unresolved(b)] if a.unresolved else bugs
     for b in sel:
-        print("%s | %s | %s | %s" % (b["id"], b["task"], first_word(b["outcome"]) or "pending", b["summary"]))
-    print("(%d shown of %d)" % (len(sel), len(bugs)))
+        print("%s | %s | %s | %s" % (b["id"], b["status"], b["ac"] or b["task"] or "-", b["summary"]))
+    print("(%d shown of %d; %d unresolved)" % (len(sel), len(bugs), sum(is_unresolved(b) for b in bugs)))
     return 0
 
 
@@ -1041,6 +1280,9 @@ def cmd_set(c):
             left = [t.id for t in d.tasks if d.task_status(t) != "complete"]
             if left:
                 raise FdError("tasks not complete: %s (use --force to override)" % ", ".join(left))
+            open_bugs = [b["id"] for b in parse_bugs(c.bugp) if is_unresolved(b)]
+            if open_bugs:
+                raise FdError("unresolved bugs: %s (use --force to override)" % ", ".join(open_bugs))
             sec = d.section("acceptance")
             unticked = [i for i in range(sec[1], sec[2]) if d.mask[i] and re.match(r"^\s*- \[ \]", d.lines[i])] if sec else []
             if unticked:
@@ -1053,7 +1295,7 @@ def cmd_set(c):
             raise FdError("task status must be one of %s" % "|".join(TASK_STATUSES))
         t = d.by_id(a.target)
         if fstat == "draft" and not a.force:
-            raise FdError("feature is still 'draft'; run /feature-review first (or --force)")
+            raise FdError("feature is still 'draft'; the human must review the plan and run: fd.py set %s feature reviewed (or --force)" % c.a.id)
         if v == "complete":
             unchecked = [d.lines[i].strip() for i, ok in t.boxes if not ok]
             if unchecked and not a.force:
@@ -1069,37 +1311,9 @@ def cmd_set(c):
         d.set_fm("last-updated", today())
     vals = recompute_resume(d)
     d.save()
-    print("; ".join(msgs + ["resume: %s | next=%s | blocked-by=%s" % (vals["progress"], vals["next"], vals["blocked-by"])]))
+    print("; ".join(msgs + ["resume: %s | next=%s | blocked-by=%s | points=%d" % (vals["progress"], vals["next"], vals["blocked-by"], d.points_total())]))
     if all(d.task_status(t) == "complete" for t in d.tasks) and d.tasks and first_word(d.fmv("status")) != "complete":
-        print("All tasks complete. Tick acceptance criteria, then: fd.py set %s feature complete" % c.a.id)
-    return 0
-
-
-def cmd_migrate(c):
-    moved = []
-    for name, target, header in (
-            ("progress log", c.logp, "# Progress Log - %s (append-only)" % c.a.id),
-            ("known issues", c.bugp, "# Known Issues / Bugs - %s" % c.a.id)):
-        d = c.doc()
-        sec = d.section(name)
-        if not sec:
-            continue
-        _, s, e = sec
-        content = [d.lines[i] for i in range(s + 1, e)
-                   if d.mask[i] and d.lines[i].strip() not in ("", "---") and not d.lines[i].startswith(POINTER)]
-        if content:
-            new = (not target.exists()) or target.stat().st_size == 0
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with open(target, "a", encoding="utf-8", newline="\n") as fh:
-                if new:
-                    fh.write(header + "\n\n")
-                fh.write("\n".join(content).rstrip("\n") + "\n")
-            moved.append("%s: %d lines -> %s" % (sec[0], len(content), target.name))
-        cmd = "fd.py log %s" % c.a.id if target == c.logp else "fd.py bug %s T## \"summary\"" % c.a.id
-        pointer = "%s `%s` (append-only). Use `%s`." % (POINTER, target.name, cmd)
-        d.lines[s + 1:e] = ["", pointer, "", "---", ""]
-        d.save()
-    print("; ".join(moved) if moved else "nothing to migrate")
+        print("All tasks complete. Next: human UAT (%s_uat.html); the feature is completed after PRD deploy." % c.a.id)
     return 0
 
 
@@ -1131,14 +1345,18 @@ def build_parser():
     p = add("log", cmd_log, "read or append the progress log")
     p.add_argument("text", nargs="*")
     p.add_argument("-n", type=int, default=10)
-    p = add("bug", cmd_bug, "record a bug skeleton")
-    p.add_argument("task")
+    p = add("bug", cmd_bug, "record a bug (status open)")
     p.add_argument("summary")
     p.add_argument("--symptom", default=None, help="symptom description (default: the summary)")
-    p.add_argument("--ac", default=None, help="link to an acceptance criterion (e.g. AC-1) instead of the task")
-    p = add("bugs", cmd_bugs, "list bugs")
-    p.add_argument("--pending", action="store_true")
-    p.add_argument("--show", default=None)
+    p.add_argument("--ac", default=None, help="the acceptance criterion that failed (e.g. AC-1)")
+    p.add_argument("--task", default=None, help="optional task the bug traces to (e.g. T03)")
+    p = add("bugs", cmd_bugs, "list, show or update bugs")
+    p.add_argument("--unresolved", action="store_true", help="only bugs not yet fixed")
+    p.add_argument("--show", default=None, help="print one bug (BUG-1) or 'all'")
+    p.add_argument("--update", default=None, metavar="BUG-ID", help="fill diagnosis and/or move status")
+    p.add_argument("--root-cause", default=None)
+    p.add_argument("--fix", default=None, help="what changed, ending with the files touched")
+    p.add_argument("--status", default=None, choices=BUG_STATUSES)
     p = add("start", cmd_start, "record a start entry for a task")
     p.add_argument("task", help="task id (T##)")
     p = add("done", cmd_done, "evidence gate: run a task's Verify command")
@@ -1154,17 +1372,27 @@ def build_parser():
     p.add_argument("target", help="T## | feature | resume")
     p.add_argument("value", nargs="?")
     p.add_argument("--force", action="store_true")
-    add("migrate", cmd_migrate, "move inline log/bugs into sidecars")
+    p = sub.add_parser("uat", help="UAT checklist build/import")
+    usub = p.add_subparsers(dest="uat_cmd", required=True)
+    pb = usub.add_parser("build", help="compile Acceptance Criteria into tools/workflow/uat.json (read by uat_launcher.py)")
+    pb.add_argument("id", help="feature id")
+    pb.set_defaults(fn=cmd_uat_build)
+    pi = usub.add_parser("import", help="import a UAT feedback Markdown file and summarize per-AC results")
+    pi.add_argument("id", help="feature id")
+    pi.add_argument("path", nargs="?", help="feedback markdown path (default <id>_feedback.md beside the design)")
+    pi.add_argument("--apply", action="store_true",
+                    help="tick/untick AC boxes to match the feedback and settle in-review UAT bugs")
+    pi.set_defaults(fn=cmd_uat_import)
     p = sub.add_parser("backlog", help="backlog file operations")
     bsub = p.add_subparsers(dest="backlog_cmd", required=True)
     pa = bsub.add_parser("add", help="append one item to the backlog")
     pa.add_argument("id", nargs="?", default=None, help="backlog id (e.g. B27); omitted = next ID")
     pa.add_argument("item", nargs="*", help="item text")
     pa.add_argument("--source", default="fd.py backlog add")
-    pa.add_argument("--suggested-phase", default="Phase 5")
+    pa.add_argument("--suggested-phase", default="-")
     pa.add_argument("--size", default="Small")
     pa.add_argument("--status", default="open")
-    pa.add_argument("--phase", default="5")
+    pa.add_argument("--phase", default="-")
     pa.set_defaults(fn=cmd_backlog_add)
     return ap
 
