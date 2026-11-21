@@ -11,7 +11,7 @@ import json
 from typing import List, Dict, Any, Optional, Union, Sequence, cast
 from datetime import datetime
 import math
-from backend_functions.database_functions import qec, sql_to_dict, sql_to_list, sql_insert_returning
+from pifitness.core.db import qec, sql_to_dict, sql_to_list, sql_insert_returning
 
 # ---------------------------------------------------------------------------
 # Service Management
@@ -216,7 +216,7 @@ def get_placeholder_task_id() -> Optional[int]:
     Returns:
         Optional[int]: The task_id if found, None otherwise.
     """
-    from backend_functions.database_functions import one_sql_result
+    from pifitness.core.db import one_sql_result
     sql = "SELECT MIN(task_id) FROM tasks.task_configuration WHERE task_name = 'placeholder_task'"
     return one_sql_result(sql)
 
@@ -667,7 +667,7 @@ def get_log_tables_simple() -> Sequence[str]:
     Returns:
         Sequence[str]: List of log table names.
     """
-    from backend_functions.database_functions import get_log_tables
+    from pifitness.core.db import get_log_tables
     return list(get_log_tables())
 
 def get_log_data_simple(log_table: str, limit: int = 100) -> Sequence[Dict[str, Any]]:
@@ -682,7 +682,7 @@ def get_log_data_simple(log_table: str, limit: int = 100) -> Sequence[Dict[str, 
         Sequence[Dict[str, Any]]: List of log records.
         NULL database values are returned as None (no NaN conversion needed).
     """
-    from backend_functions.database_functions import get_log_data
+    from pifitness.core.db import get_log_data
     logs = get_log_data(log_table)
     # sql_to_dict() returns None for NULL values, no pandas NaN cleanup needed
     return logs[:limit] if logs else []

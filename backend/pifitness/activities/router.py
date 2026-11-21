@@ -33,8 +33,8 @@ from pifitness.activities.queries import (
     stage_leaderboard_visuals,
     get_segment_name,
 )
-from backend_functions.database_functions import sql_to_dict, get_conn, qec, one_sql_result, sql_to_list
-from backend_functions.music_functions import (
+from pifitness.core.db import sql_to_dict, get_conn, qec, one_sql_result, sql_to_list
+from pifitness.music.functions import (
     get_spotify_client,
     playlist_upload,
     playlist_to_db,
@@ -57,8 +57,6 @@ from pifitness.activities.schemas import (
     ActivityReportEfficiency,
     ActivityElevationPoint,
     ActivityHeartratePoint,
-)
-from backend_functions.schemas.leaderboard_schemas import (
     Leaderboard,
     LeaderboardEffort,
     LeaderboardVisualsRequest,
@@ -363,7 +361,7 @@ def process_generator(req: ProcessActivityRequest):
         # sequence per AC-5; each executed substep emits start + terminal.
         # -----------------------------------------------------------------------
         if not has_error:
-            from backend_functions.activity_smoothing import activity_post_processing_steps
+            from pifitness.activities.smoothing import activity_post_processing_steps
 
             if not post_row:
                 # No resolvable activity: skip all known substeps

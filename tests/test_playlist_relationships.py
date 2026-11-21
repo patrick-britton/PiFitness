@@ -15,10 +15,10 @@ def test_ensure_playlist_relationships_no_delete_on_empty():
     """ensure_playlist_relationships returns None and performs no database writes when
     no relationships are missing.
     """
-    from backend_functions.music_functions import ensure_playlist_relationships
+    from pifitness.music.functions import ensure_playlist_relationships
 
-    with patch('backend_functions.music_functions.sql_to_dict', return_value=[]) as mock_sql, \
-         patch('backend_functions.music_functions.qec') as mock_qec:
+    with patch('pifitness.music.functions.sql_to_dict', return_value=[]) as mock_sql, \
+         patch('pifitness.music.functions.qec') as mock_qec:
         result = ensure_playlist_relationships(None)
 
     assert result is None
@@ -32,17 +32,17 @@ def test_ensure_playlist_relationships_no_delete_on_rows():
     """ensure_playlist_relationships creates each missing child playlist and records it
     with a parameterized insert, never issuing a DELETE.
     """
-    from backend_functions.music_functions import ensure_playlist_relationships
+    from pifitness.music.functions import ensure_playlist_relationships
 
     mock_missing = [
         {"playlist_id": "parent1", "playlist_name": "Running",
          "needs_auto": True, "needs_manual": False, "needs_recs": False},
     ]
 
-    with patch('backend_functions.music_functions.sql_to_dict', return_value=mock_missing), \
-         patch('backend_functions.music_functions.get_spotify_client', return_value={"client": MagicMock()}), \
-         patch('backend_functions.music_functions.gen_playlist', return_value=("client", "newchild123")) as mock_gen, \
-         patch('backend_functions.music_functions.qec') as mock_qec:
+    with patch('pifitness.music.functions.sql_to_dict', return_value=mock_missing), \
+         patch('pifitness.music.functions.get_spotify_client', return_value={"client": MagicMock()}), \
+         patch('pifitness.music.functions.gen_playlist', return_value=("client", "newchild123")) as mock_gen, \
+         patch('pifitness.music.functions.qec') as mock_qec:
         result = ensure_playlist_relationships(None)
 
     # No DELETE statements on qec — only INSERTs

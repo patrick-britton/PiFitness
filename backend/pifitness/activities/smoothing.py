@@ -1,11 +1,16 @@
+"""Activity elevation smoothing and post-processing pipeline.
+
+Moved from ``backend_functions/activity_smoothing.py``.
+"""
+
 import time
 
 import numpy as np
 from scipy.signal import savgol_filter
 from psycopg2.extras import execute_values
 
-from backend_functions.database_functions import get_conn, sql_to_list, qec, one_sql_result
-from backend_functions.logging_functions import start_timer, elapsed_ms, log_app_event
+from pifitness.core.db import get_conn, sql_to_list, qec, one_sql_result
+from pifitness.core.logging import start_timer, elapsed_ms, log_app_event
 
 
 def apply_savgol_filter(records, polyorder=3, is_time=False):
@@ -58,7 +63,7 @@ def update_smoothed_elevation(conn, smoothed_records, field_name, is_time=False)
         UPDATE activities.activity_details{table_appendix} AS t
         SET {field_name} = v.elevation_m_smooth
         FROM (VALUES %s) AS v(activity_id, {pk_field}, elevation_m_smooth)
-        WHERE t.activity_id = v.activity_id::bigint 
+        WHERE t.activity_id = v.activity_id::bigint
           AND t.{pk_field} = v.{pk_field}::int;
     """
 
@@ -76,17 +81,16 @@ def process_all_activities(activity_ids, is_reference=False, is_time=False):
     # Connect to the database
     conn = get_conn()
 
-
     if is_reference:
         field_name = 'elevation_reference'
     else:
         field_name = 'elevation_m_smooth'
 
     if is_time:
-        table_appendix=''
+        table_appendix = ''
         order_field = 'elapsed_duration_s'
     else:
-        table_appendix='_distance'
+        table_appendix = '_distance'
         order_field = 'distance_m'
 
     for index, act_id in enumerate(activity_ids, start=1):
@@ -95,9 +99,9 @@ def process_all_activities(activity_ids, is_reference=False, is_time=False):
                 # 2. Fetch the raw data for this activity
                 # We use COALESCE to ensure we don't pass NULLs into the math function
                 cur.execute(f"""
-                    SELECT activity_id, {order_field}, COALESCE({field_name}, 0) 
+                    SELECT activity_id, {order_field}, COALESCE({field_name}, 0)
                     FROM activities.activity_details{table_appendix}
-                    WHERE activity_id = %s 
+                    WHERE activity_id = %s
                     ORDER BY {order_field};
                 """, (act_id,))
 
@@ -111,7 +115,6 @@ def process_all_activities(activity_ids, is_reference=False, is_time=False):
 
             # 4. Push it back to the database
             update_smoothed_elevation(conn, smoothed_records, field_name, is_time=is_time)
-
 
         except Exception as e:
             print(f"\nERROR on activity {act_id}: {e}")
@@ -196,7 +199,7 @@ def build_activity_path(int_a: int):
                                  4326
                          ) AS path
                      FROM activities.activity_details_distance rd
-                     WHERE activity_id = {int_a} 
+                     WHERE activity_id = {int_a}
                      GROUP BY rd.activity_id
                  ) AS sub
             WHERE activities.activity_id = sub.activity_id;"""

@@ -15,8 +15,8 @@ load_dotenv(Path(__file__).resolve().parents[1] / "backend" / ".env",
 import importlib  # noqa: E402
 import pifitness.food.router as food_api  # noqa: E402
 food_api_module = importlib.import_module('pifitness.food.router')  # noqa: E402
-import backend_functions.food_search as fsearch  # noqa: E402
-from backend_functions.food_normalize import (  # noqa: E402
+import pifitness.food.search as fsearch  # noqa: E402
+from pifitness.food.normalize import (  # noqa: E402
     normalize_off, normalize_usda_branded,
 )
 

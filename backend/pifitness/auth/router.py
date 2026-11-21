@@ -25,8 +25,8 @@ from pifitness.auth.status import get_auth_status
 from pifitness.integrations._common import save_token_to_db
 
 from pifitness.integrations.spotify.provider import get_spotify_client
-from backend_functions.database_functions import sql_to_dict, one_sql_result
-from backend_functions.logging_functions import log_api_event
+from pifitness.core.db import sql_to_dict, one_sql_result
+from pifitness.core.logging import log_api_event
 
 from pifitness.integrations.spotify.oauth_flow import (
     build_authorize_url,

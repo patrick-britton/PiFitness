@@ -1,19 +1,27 @@
+"""Shared database connection helpers and query primitives.
+
+This is the canonical home for ``get_conn``, ``qec``, ``sql_to_dict``, and
+related low-level DB utilities.  ``core/`` is a leaf package — this module
+only imports from the standard library, third-party packages, and
+``pifitness.core.config`` / ``pifitness.core.utils``.
+"""
+
 import os
+import time
 from datetime import datetime
+
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 import psycopg2
 import socket
 from psycopg2.extras import RealDictCursor, execute_values
-import time
 
-
-from backend_functions.helper_functions import list_to_dict_by_key
+from pifitness.core.utils import list_to_dict_by_key
 
 # Load .env from project root and backend/ subdirectory.
 # load_dotenv() does NOT override already-set environment variables.
 load_dotenv()  # Try CWD (project root) first
-_load_dotenv_backend = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+_load_dotenv_backend = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env')
 if os.path.exists(_load_dotenv_backend):
     load_dotenv(_load_dotenv_backend, override=False)
 
@@ -64,7 +72,7 @@ def get_conn(alchemy=False):
 
 def con_cur():
     c = get_conn()
-    cr= c.cursor()
+    cr = c.cursor()
     return c, cr
 
 
@@ -84,9 +92,9 @@ def qec(t_sql=None, p=None, auto_commit=False):
         cur.close()
         conn.close()
     except Exception as e:
-        msg1=f"Query Execution failure: {e}"
-        msg2=f"Failing SQL: {t_sql}"
-        msg3=f"Failing Params: {p}"
+        msg1 = f"Query Execution failure: {e}"
+        msg2 = f"Failing SQL: {t_sql}"
+        msg3 = f"Failing Params: {p}"
         print(msg1)
         print(msg2)
         print(msg3)
@@ -131,14 +139,14 @@ def sql_to_dict(query_str, params=None):
 def sql_insert_returning(query_str, params=None):
     """
     Execute an INSERT...RETURNING query and commit the transaction.
-    
+
     Unlike sql_to_dict, this function commits the transaction before closing
     the connection, ensuring the inserted data persists.
-    
+
     Args:
         query_str: SQL INSERT...RETURNING statement
         params: Optional tuple/list of parameters
-        
+
     Returns:
         List of dicts with returned values (from RETURNING clause), or None on error
     """
@@ -172,7 +180,6 @@ def sql_to_lookup_dict(query_str, params=None):
     return result
 
 
-
 def sql_to_list(query_str, params=None):
     conn = get_conn()
     cur = conn.cursor()
@@ -180,16 +187,15 @@ def sql_to_list(query_str, params=None):
         cur.execute(query_str)
     else:
         cur.execute(query_str, params)
-    values = [row[0] for row in cur.fetchall()] # list of dicts if using RealDictCursor
+    values = [row[0] for row in cur.fetchall()]
     cur.close()
     conn.close()
     return values
 
 
-
 def get_sproc_list(append_option=None):
     # Returns the known api services as a list
-    sql="""SELECT 
+    sql = """SELECT
             routine_name,
             routine_type,
             data_type AS return_type,
@@ -226,11 +232,11 @@ def get_log_tables(as_list=False):
                     FROM pg_catalog.pg_class c
                     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                     JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid
-                    WHERE 
+                    WHERE
                         n.nspname = 'logging'
                         AND a.attname = 'event_time_utc'
                         AND c.relkind = 'r'     -- only real tables
-                    ORDER BY 
+                    ORDER BY
                         c.relname;"""
     if as_list:
         return list(list_to_dict_by_key(sql_to_dict(logging_sql), 'table_name').keys())
@@ -241,10 +247,10 @@ def get_log_tables(as_list=False):
 def get_log_data(table_name):
     """
     Get log data from a specific log table.
-    
+
     Args:
         table_name: Name of the log table in logging schema
-        
+
     Returns:
         List[Dict[str, Any]]: List of log records with NULL values as None
     """
@@ -259,23 +265,22 @@ def get_table_row_count(pg_schema, pg_table, fact_col):
 
 def performance_profiling(segment=None, code=None, time_ms=None):
     sql = "INSERT INTO staging.temp_performance_profiling (segment, code, time_ms) VALUES (%s, %s, %s);"
-    params=(segment, code, int(time_ms))
+    params = (segment, code, int(time_ms))
     qec(sql, params)
-    # print(rf)
     return start_timer()
 
 
 def reinterpolate(schema, tables):
     for table in tables:
         infer = True if table != 'body_composition_raw' else False
-        numeric_col_sql = f"""WITH ts_col as 
+        numeric_col_sql = f"""WITH ts_col as
                 (SELECT column_name from information_schema.columns
                 WHERE table_schema = '{schema}' and table_name = '{table}'
                 AND data_type = 'timestamp with time zone'
                 ORDER BY ordinal_position LIMIT 1)
-    
-    
-                select 
+
+
+                select
                 table_schema as src_schema,
                 table_name as src_table,
                 column_name as src_col,

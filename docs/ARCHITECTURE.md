@@ -44,10 +44,9 @@ flowchart TD
 1. **Application Entry (`backend/main.py`):** Instantiates FastAPI, configures CORS and Private-Network-Access middleware, registers domain routers, and provides basic `/api/health`.
 2. **Domain Routers (`backend/pifitness/<domain>/router.py`):** HTTP layer per business domain (`activities`, `admin`, `auth`, `food`, `health`, `music`, `segments`, `tri_tip`, `volleyball`, `config`). Routers handle HTTP request parsing, payload validation, and invoke domain queries.
 3. **Domain Queries (`backend/pifitness/<domain>/queries.py`):** Pure SQL / database access layer. Encapsulates parameterized SQL statements, keyset pagination, and result shaping.
-4. **Core Configuration (`backend/pifitness/core/`):** Shared settings (`config.py`) loading environment variables (`PG_HOST`, `PG_PORT`, `PG_DB`, `PG_USER`, `PG_PASSWORD`). `core/` is a leaf module and must not import domain logic.
+4. **Core Infrastructure (`backend/pifitness/core/`):** Shared settings (`config.py`), database connection and query primitives (`db.py`, `db_schema.py`), application logging (`logging.py`), credential encryption (`credentials.py`), local file handlers (`files.py`), exceptions (`exceptions.py`), and shared utilities (`utils.py`). `core/` is a leaf module and must not import domain logic.
 5. **Integrations (`backend/pifitness/integrations/`):** Dedicated API clients for external providers (Garmin, Spotify).
 6. **Worker Engine (`backend/pifitness/worker/`):** Background task scheduling, queue processing, and data synchronization workers.
-7. **Legacy Utilities (`backend/backend_functions/`):** Shared database connection helper (`get_conn`) and legacy utility routines.
 
 #### Strict Import Rules
 * Domain modules (`backend/pifitness/<domain>/`) may import `core/` and their own submodules.

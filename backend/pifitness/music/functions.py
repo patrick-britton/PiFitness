@@ -1,13 +1,17 @@
+"""Music domain functions.
+
+Moved from ``backend_functions/music_functions.py``.
+"""
+
 import os
 
-from backend_functions.database_functions import sql_to_list, elapsed_ms, qec, sql_to_dict, one_sql_result
-from backend_functions.logging_functions import log_app_event, start_timer
+from pifitness.core.db import sql_to_list, elapsed_ms, qec, sql_to_dict, one_sql_result
+from pifitness.core.logging import log_app_event, start_timer
 from pifitness.integrations.spotify.provider import get_spotify_client
 from pifitness.integrations.spotify.provider import check_rate_limit_cached
 from pifitness.worker.task_execution import json_loading, task_log
 from datetime import datetime, timedelta, timezone
 import time
-
 
 
 def get_playlist_list(list_type=None):
@@ -40,12 +44,12 @@ def playlist_to_db(client=None, list_id=None):
     sp = client.get("client")
 
     # Initialize Results
-    all_items=[]
-    e=None
+    all_items = []
+    e = None
     # Iterate through list of playlists
     for l in playlists:
         if l != playlists[0]:
-            time.sleep(10) # Sleep for 10 seconds between playlists
+            time.sleep(10)  # Sleep for 10 seconds between playlists
         try:
             results = sp.playlist_items(playlist_id=l, additional_types=['track'])
             log_app_event(cat='Playlist item Fetch', desc=f"ID: {l}", err=e)
@@ -79,10 +83,10 @@ def playlist_to_db(client=None, list_id=None):
                  l_time=None,
                  t_time=None,
                  fail_type='No playlist items',
-                                   fail_text=f"{len(playlists)} playlist(s) attempted: {e}")
+                 fail_text=f"{len(playlists)} playlist(s) attempted: {e}")
         return client
 
-            # 000-001 AC-8: fail-loud payload validation before staging load.
+    # 000-001 AC-8: fail-loud payload validation before staging load.
     # Lazy import to avoid circular dependency (json_extractors imports
     # get_playlist_list from this module at module load time).
     from pifitness.worker.json_extractors import validate_playlist_payload
@@ -119,7 +123,6 @@ def playlist_to_db(client=None, list_id=None):
         qec(sql)
         transform_ms = elapsed_ms(t0)
 
-
     except Exception as e:
         task_log(task_name=task_name,
                  e_time=extract_ms,
@@ -131,7 +134,7 @@ def playlist_to_db(client=None, list_id=None):
 
     for l in playlists:
         up_sql = "UPDATE music.playlist_config SET last_synced = CURRENT_TIMESTAMP where playlist_id = %s"
-        params = [l,]
+        params = [l, ]
         qec(up_sql, params)
 
     task_log(task_name=task_name,
@@ -235,9 +238,9 @@ def gen_playlist(client, name, description):
     sp = client.get("client")
     user_id = sp.me()["id"]
     playlist = sp.user_playlist_create(user=user_id,
-                                           name=name,
-                                           public=False,
-                                           description=description)
+                                       name=name,
+                                       public=False,
+                                       description=description)
     playlist_id = playlist["id"]
     return client, playlist_id
 
@@ -255,8 +258,8 @@ def auto_shuffle_playlists(list_id=None, limit_minutes=True):
 
         print(f"{len(playlists)} Playlists to shuffle")
 
-    client=get_spotify_client(None)
-    #only execute with a valid client
+    client = get_spotify_client(None)
+    # only execute with a valid client
     if client.get("client") is None:
         log_app_event(cat='Playlist Shuffling', desc='Could not shuffle, bad client')
         print('Client bad, cannot shuffle')
@@ -319,7 +322,6 @@ def get_now_playing(client=None):
 
     playback = sp.current_user_playing_track()
 
-
     if playback is None or playback.get("item") is None:
         return None
 
@@ -344,7 +346,6 @@ def get_now_playing(client=None):
     # Extract track-level info
     track_id = track["id"]
     track_isrc = track['external_ids'].get('isrc')
-    # timestamp = track["timestamp"]
     t0 = start_timer()
     progress = playback["progress_ms"]
     # If playback is happening in a playlist, extract it
@@ -364,13 +365,13 @@ def get_now_playing(client=None):
                 playlist_id = None
 
     # Look up ISRC ratings from sql
-    sql= f"SELECT isrc FROM music.vw_track_id_to_isrc WHERE track_id = '{track_id}';"
+    sql = f"SELECT isrc FROM music.vw_track_id_to_isrc WHERE track_id = '{track_id}';"
     isrc = one_sql_result(sql)
     print(f"From API: {track_isrc}")
     print(f"From SQL: {isrc}")
     duration_ms = track.get("duration_ms")
     complete_at = t0 + (duration_ms - progress)
-    done_in_s = round((duration_ms-progress)/1000,1)
+    done_in_s = round((duration_ms - progress) / 1000, 1)
 
     # Lookup best track info from database
     sql = f"""SELECT DISTINCT
@@ -379,7 +380,7 @@ def get_now_playing(client=None):
                 b.track_name_clean as track_name,
                 b.artist_display_name as artist_name,
                 alb.album_name_clean as album_name,
-                b.album_id	
+                b.album_id
             FROM music.vw_best_track_id bt
                 INNER JOIN music.all_tracks b on b.track_id = bt.best_track_id
                 INNER JOIN music.all_albums alb on alb.album_id = b.album_id
@@ -417,7 +418,6 @@ def get_now_playing(client=None):
                         WHERE isrc='{isrc}' and playlist_id='{fetch_id}';"""
             elo = one_sql_result(sql)
 
-    # print(f"Playlist Type 2 : {playlist_type} : eval {playlist_type == 'recommendation'}")
     if playlist_id == '':
         playlist_id = None
 
@@ -615,7 +615,7 @@ def resolve_now_playing():
     return {
         "playing": True,
         "rateLimited": False,
-            "track": {
+        "track": {
             "trackId": track_id,
             "bestTrackId": best_track_id,
             "isrc": isrc,
@@ -648,26 +648,25 @@ def add_isrc_to_local(id, isrc):
 
 def record_recommendation_decision(id, isrc, was_promoted):
     # Record decision
-    rec_sql = f"""SELECT 
-	playlist_id,
-	isrc,
-	elo_track_linear,
-	elo_track_random_forest as elo_track_rf,
-	elo_track_neural_net,
-	elo_track_pairwise,
-	elo_track_predicted,
-	artist_elo as artist_elo_snap,
-	genre_elo as genre_elo_snap,
-	popularity as popularity_snap,
-	%s as was_promoted,
+    rec_sql = f"""SELECT
+    playlist_id,
+    isrc,
+    elo_track_linear,
+    elo_track_random_forest as elo_track_rf,
+    elo_track_neural_net,
+    elo_track_pairwise,
+    elo_track_predicted,
+    artist_elo as artist_elo_snap,
+    genre_elo as genre_elo_snap,
+    popularity as popularity_snap,
+    %s as was_promoted,
     'second' as model_version,
-	NULL as notes
+    NULL as notes
     FROM music.track_recommendations
-	WHERE playlist_id = %s and isrc = %s ;"""
+    WHERE playlist_id = %s and isrc = %s ;"""
 
     ins_sql = f"""INSERT INTO music.track_recommendations {rec_sql}"""
     qec(ins_sql, [was_promoted, id, isrc])
-
 
     return
 
@@ -732,9 +731,8 @@ def save_matchup_results(hd, ad, mr):
             """
             qec(insert_sql, params)
 
-
             # Merge ratings
-            params=(isrc, playlist_id)
+            params = (isrc, playlist_id)
             update_sql = """INSERT INTO music.ratings (
                             playlist_id,
                             isrc,
@@ -755,7 +753,6 @@ def save_matchup_results(hd, ad, mr):
                             last_rated_utc=EXCLUDED.last_rated_utc
                         WHERE music.ratings.last_rated_utc IS DISTINCT FROM EXCLUDED.last_rated_utc;"""
             qec(update_sql, params)
-
 
     except Exception as e:
         log_app_event(cat='Ratings', desc="Error saving matchup results", err=e)
@@ -779,8 +776,8 @@ def elo_update(home_elo, away_elo, result, k=100):
     margin_multiplier = 1 + (abs(result) / 5)  # between 1x and 2x impact
 
     # Update ratings
-    homeNewELO = round(home_elo + k * margin_multiplier * (actual_home - expected_home),0)
-    awayNewELO = round(away_elo + k * margin_multiplier * (actual_away - expected_away),0)
+    homeNewELO = round(home_elo + k * margin_multiplier * (actual_home - expected_home), 0)
+    awayNewELO = round(away_elo + k * margin_multiplier * (actual_away - expected_away), 0)
 
     return homeNewELO, awayNewELO
 
@@ -822,7 +819,7 @@ def get_matchup_dictionary(i):
     playlist_id = id[0]["playlist_id"]
 
     matchup_sql = f"""
-                    SELECT 
+                    SELECT
                         sub.playlist_id,
                         pc.playlist_name,
                         sub.isrc,
@@ -836,14 +833,14 @@ def get_matchup_dictionary(i):
                         at2.artist_display_name as isrc_vs_artist,
                         at2.album_id as isrc_vs_album_id
                         FROM (
-                            SELECT 
+                            SELECT
                                 i.isrc,
                                 COALESCE(ri2.elo_rating,1500) as isrc_elo,
                                 i.playlist_id,
                                 i2.isrc as isrc_vs,
                                 COALESCE(ri2.elo_rating,1500) as isrc_vs_elo,
                                 ROW_NUMBER() OVER (PARTITION BY i.playlist_id ORDER BY abs(COALESCE(ri.elo_rating,1500)-COALESCE(ri2.elo_rating,1500))) as row_num
-                            FROM music.playlist_isrcs i 
+                            FROM music.playlist_isrcs i
                                 LEFT JOIN music.ratings ri on ri.isrc = i.isrc and ri.playlist_id = i.playlist_id
                                 INNER JOIN music.playlist_isrcs i2 on i.playlist_id = i2.playlist_id and i2.isrc != '{isrc}'
                                 LEFT JOIN music.ratings ri2 on ri2.isrc = i2.isrc and ri2.playlist_id = i2.playlist_id
@@ -884,7 +881,7 @@ def album_image_retrieval(album_id):
     """
     import requests
 
-    from backend_functions.file_handlers import album_art_path
+    from pifitness.core.files import album_art_path
 
     filename = f"{album_id}.jpg"
     filepath = os.path.join(str(album_art_path()), filename)

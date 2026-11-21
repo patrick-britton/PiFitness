@@ -10,8 +10,8 @@ import json
 from typing import List, Dict, Any, Optional, Union, Sequence
 from datetime import date
 from psycopg2.extras import execute_values
-from backend_functions.database_functions import qec, sql_to_dict, get_conn, one_sql_result
-from backend_functions.db_schema import get_columns
+from pifitness.core.db import qec, sql_to_dict, get_conn, one_sql_result
+from pifitness.core.db_schema import get_columns
 
 
 def get_activities_list(

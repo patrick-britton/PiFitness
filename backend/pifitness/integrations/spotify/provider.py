@@ -318,7 +318,7 @@ def store_spotify_auth_metadata(refresh_token):
     Args:
         refresh_token: The Spotify refresh token obtained during authorization.
     """
-    from backend_functions.database_functions import qec
+    from pifitness.core.db import qec
 
     token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
     sql = """INSERT INTO api_services.spotify_auth_metadata 
@@ -347,7 +347,7 @@ def get_spotify_token_expiry():
         str | None: The latest expiry timestamp from api_services.spotify_auth_metadata,
                     or None if no data exists.
     """
-    from backend_functions.database_functions import one_sql_result
+    from pifitness.core.db import one_sql_result
     sql = "SELECT MAX(expires_at_utc) FROM api_services.spotify_auth_metadata WHERE is_active = true"
     return one_sql_result(sql)
 
@@ -374,10 +374,10 @@ from dotenv import load_dotenv
 from spotipy import SpotifyException, SpotifyOAuth
 from spotipy.cache_handler import CacheFileHandler
 
-from backend_functions.credential_management import decrypt_dict
-from backend_functions.database_functions import get_conn, one_sql_result, qec
-from backend_functions.helper_functions import random_sleep
-from backend_functions.logging_functions import (
+from pifitness.core.credentials import decrypt_dict
+from pifitness.core.db import get_conn, one_sql_result, qec
+from pifitness.core.utils import random_sleep
+from pifitness.core.logging import (
     elapsed_ms,
     log_api_event,
     log_app_event,

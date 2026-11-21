@@ -25,7 +25,7 @@ def _garmin_session(di_expires=None, it_expires=None):
 @pytest.mark.unit
 def test_save_garmin_with_both_expires_uses_min():
     s = _garmin_session(di_expires=2000, it_expires=1000)
-    with patch("backend_functions.database_functions.qec", return_value=None) as m:
+    with patch("pifitness.core.db.qec", return_value=None) as m:
         save_token_to_db("Garmin", s)
     assert m.call_count == 2
     insert_sql = m.call_args_list[1].args[0]
@@ -38,7 +38,7 @@ def test_save_garmin_with_both_expires_uses_min():
 @pytest.mark.unit
 def test_save_garmin_no_expires_3col():
     s = _garmin_session()
-    with patch("backend_functions.database_functions.qec", return_value=None) as m:
+    with patch("pifitness.core.db.qec", return_value=None) as m:
         save_token_to_db("Garmin", s)
     insert_sql = m.call_args_list[1].args[0]
     assert "refresh_token_expires_at_utc" not in insert_sql
@@ -50,7 +50,7 @@ def test_save_garmin_no_expires_3col():
 def test_save_raises_on_deactivate_fail():
     s = _garmin_session()
     err = ["Query failure: boom", "SQL: ...", "Params: ..."]
-    with patch("backend_functions.database_functions.qec", return_value=err):
+    with patch("pifitness.core.db.qec", return_value=err):
         with pytest.raises(RuntimeError, match="deactivate failed"):
             save_token_to_db("Garmin", s)
 
@@ -60,6 +60,6 @@ def test_save_raises_on_deactivate_fail():
 def test_save_raises_on_insert_fail():
     s = _garmin_session()
     err = ["Query failure: insert boom", "SQL: ...", "Params: ..."]
-    with patch("backend_functions.database_functions.qec", side_effect=[None, err]):
+    with patch("pifitness.core.db.qec", side_effect=[None, err]):
         with pytest.raises(RuntimeError, match="insert failed"):
             save_token_to_db("Garmin", s)

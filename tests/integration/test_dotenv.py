@@ -6,18 +6,18 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from dotenv import load_dotenv
 
-# Simulate what database_functions.py does now
+# Simulate what db.py does now
 load_dotenv()  # CWD
 
 backend_env = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath('backend_functions/database_functions.py'))),
+    os.path.dirname(os.path.dirname(os.path.abspath('backend/pifitness/core/db.py'))),
     'backend', '.env'
 )
 print(f"backend_env path computed: {backend_env}")
 print(f"backend_env exists: {os.path.exists(backend_env)}")
 
 # Also check what __file__ resolves to from the actual module
-from backend_functions.database_functions import __file__ as dbf_file
+from pifitness.core.db import __file__ as dbf_file
 print(f"database_functions.py __file__: {dbf_file}")
 
 backend_env2 = os.path.join(os.path.dirname(os.path.dirname(dbf_file)), 'backend', '.env')

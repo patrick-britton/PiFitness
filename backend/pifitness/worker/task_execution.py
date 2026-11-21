@@ -6,9 +6,9 @@ from datetime import date, datetime, timedelta
 import pytz
 from psycopg2.extras import execute_values
 
-from backend_functions.database_functions import sql_to_dict, qec, con_cur, get_table_row_count
-from backend_functions.helper_functions import get_sync_dates, get_last_date
-from backend_functions.logging_functions import start_timer, log_app_event, elapsed_ms
+from pifitness.core.db import sql_to_dict, qec, con_cur, get_table_row_count
+from pifitness.core.utils import get_sync_dates, get_last_date
+from pifitness.core.logging import start_timer, log_app_event, elapsed_ms
 from pifitness.integrations.spotify.provider import sql_rate_limited
 
 

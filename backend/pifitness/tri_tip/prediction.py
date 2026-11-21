@@ -7,7 +7,7 @@ Computes the `prediction` object of the cross-surface contract (OQ-1):
     {
       "projected_done_at":   ISO time-of-day meat is projected to reach target temp,
       "minutes_remaining":   relative minutes between now and projected_done_at,
-      "curve":               [{ "grill_min": float, "internal_temp_f": float }, ...]
+      "curve":               [{ "grill_min": float, "internal_temp_f": float }, ...],
     }
 
 Model (OQ-1 decision):

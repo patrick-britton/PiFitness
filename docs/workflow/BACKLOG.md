@@ -4,7 +4,7 @@ Out-of-scope findings and deferred enhancements. Agents append new items at the 
 
 | ID | Item | Source | Target Phase | Size | Status |
 |---|---|---|---|---|---|
-| B1 | Fold `backend/backend_functions/` into `backend/pifitness/core/` and domain modules. | Architecture review | Backlog | Large | Open |
+| B1 | Fold `backend/backend_functions/` into `backend/pifitness/core/` and domain modules. | Architecture review | Backlog | Large | Completed |
 | B20 | Unbounded-read risk: add keyset pagination and bounded scans to historical diary queries. | Performance audit | Backlog | Medium | Open |
 | B23 | Add active pressed visual states (`active:`, `onPressIn`) to touch controls per UI Principles R3. | UI Principles R3 | Backlog | Small | Open |
 | B24 | Secondary flows should use bottom sheets rather than full page changes per UI Principles R6. | UI Principles R6 | Backlog | Small | Open |

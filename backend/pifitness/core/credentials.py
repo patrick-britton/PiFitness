@@ -1,3 +1,8 @@
+"""Credential encryption/decryption helpers.
+
+No database or domain dependency — ``core/`` leaf module.
+"""
+
 import json
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
@@ -8,9 +13,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 
-# credential_management.py lives at <root>/backend/backend_functions/
 # .env lives at <root>/backend/.env
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 
 def load_key():
@@ -35,7 +39,6 @@ def encrypt_dict(dict, key=None):
         key = load_key()
     json_data = json.dumps(dict)
     return Fernet(key).encrypt(json_data.encode()).decode()
-
 
 
 def decrypt_dict(token, key=None):

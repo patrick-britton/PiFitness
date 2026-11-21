@@ -4,7 +4,7 @@ quarantined as manual gates.
 
 import pytest
 
-from backend_functions.database_functions import one_sql_result, sql_to_list
+from pifitness.core.db import one_sql_result, sql_to_list
 from pifitness.integrations.spotify.provider import get_spotify_client
 from backend.pifitness.activities.services import verify_spotify
 

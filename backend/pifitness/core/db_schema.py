@@ -3,11 +3,11 @@ Database Schema Introspection
 ==============================
 
 Helper functions to query and validate database schema.
-Connects to the production database (Pi) using standard .env configuration.
+Connects to the database using standard .env configuration.
 """
 
 from typing import List, Dict, Any, Sequence
-from backend_functions.database_functions import sql_to_dict
+from pifitness.core.db import sql_to_dict
 
 def get_columns(schema: str, table: str) -> List[str]:
     """

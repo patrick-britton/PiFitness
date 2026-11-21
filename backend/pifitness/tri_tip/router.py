@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
-from backend_functions.tri_tip_prediction import build_tri_tip_prediction
+from pifitness.tri_tip.prediction import build_tri_tip_prediction
 
 from pifitness.tri_tip.schemas import (
     TriTipActiveResponse,

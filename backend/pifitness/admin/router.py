@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Body
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
 
-from backend_functions.credential_management import encrypt_dict
+from pifitness.core.credentials import encrypt_dict
 from pifitness.admin.queries import (
     get_task_execution_view,
     get_task_scheduling_view,
@@ -205,7 +205,7 @@ def execute_task_v2_async(task_name: str, request: Optional[TaskExecuteRequest] 
             
             # If still not found, try querying task_configuration directly
             if task_id is None:
-                from backend_functions.database_functions import one_sql_result
+                from pifitness.core.db import one_sql_result
                 sql = "SELECT task_id FROM tasks.task_configuration WHERE task_name = %s LIMIT 1"
                 result = one_sql_result(sql, (task_name,))
                 if result:
@@ -218,7 +218,7 @@ def execute_task_v2_async(task_name: str, request: Optional[TaskExecuteRequest] 
             )
 
         # Create execution record
-        from backend_functions.database_functions import sql_insert_returning
+        from pifitness.core.db import sql_insert_returning
         sql = """
             INSERT INTO tasks.task_executions (task_id, task_name, status, started_at)
             VALUES (%s, %s, 'running', CURRENT_TIMESTAMP)

@@ -1,3 +1,9 @@
+"""Pure utility helpers shared across the backend.
+
+No database, no domain logic.  ``core/`` is a leaf — this module must not
+import anything else from the repository.
+"""
+
 import json
 import math
 import random
@@ -220,7 +226,6 @@ def safe_float(value):
 
 def random_sleep(min_ms, max_ms):
     val = random.randint(min_ms, random.randint(min_ms+500, max(min_ms+500, max_ms))) / 1000
-    # print(val)
     time.sleep(val)
     return
 
