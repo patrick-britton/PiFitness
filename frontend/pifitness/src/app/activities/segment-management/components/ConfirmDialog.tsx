@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useId } from 'react';
+import { useId } from 'react';
+import { useBackGestureDismiss } from '@/hooks/useBackGestureDismiss';
 
 /**
  * Confirmation dialog for destructive actions (009-003 T09 delete segment;
@@ -49,14 +50,14 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   const titleId = useId();
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onCancel();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onCancel]);
+  // Android back-gesture & Escape key dismissal (UI Principles R7)
+  useBackGestureDismiss({
+    isOpen: true,
+    onDismiss: () => {
+      if (!busy) onCancel();
+    },
+    id: 'confirm-dialog',
+  });
 
   return (
     <div
@@ -82,7 +83,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/50 active:scale-95 active:bg-gray-100 dark:active:bg-gray-700 disabled:opacity-50 transition-all select-none focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             Cancel
           </button>
@@ -90,7 +91,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 active:scale-95 active:bg-red-800 disabled:opacity-50 transition-all select-none focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {busy ? busyLabel : confirmLabel}
           </button>

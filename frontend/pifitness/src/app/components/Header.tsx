@@ -47,7 +47,7 @@ export default function Header() {
               window.location.reload(); // Force refresh to show/hide debug panel
             }
           }}
-          className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95 active:bg-gray-200 dark:active:bg-gray-600 transition-all select-none"
           aria-label="Toggle debug info"
         >
           <span className="text-sm">🐛</span>

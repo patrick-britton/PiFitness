@@ -30,7 +30,7 @@ export default function ThemeToggle() {
       onClick={handleClick}
       aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
       title={`Switch to ${isDark ? 'light' : 'dark'} theme`}
-      className="inline-flex items-center justify-center h-11 w-11 rounded-full text-gray-900 dark:text-yellow-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+      className="inline-flex items-center justify-center h-11 w-11 rounded-full text-gray-900 dark:text-yellow-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-95 active:bg-gray-300 dark:active:bg-gray-600 transition-all select-none"
     >
       <WbSunnyIcon className="text-[20px] pointer-events-none" />
     </button>
