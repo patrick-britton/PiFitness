@@ -191,11 +191,19 @@ class Regression:
         marker, _values = read_db_marker(state_file)
         evidence("state_marker_before", marker)
         if c.is_test:
-            register_undo(c.run_dir, "test_db")
-            evidence("undo_registered", "test_db")
-            if marker != "dirty":
-                update_db_marker(state_file, "dirty")
-            evidence("state_marker", "dirty (the tests may write to the database)")
+            migrations_applied = c.state.get("MIGRATIONS_APPLIED", "")
+            if migrations_applied == "0":
+                # No migrations were applied this run: the database schema is unchanged, so a
+                # test failure does not leave it in an unknown state.  Skip the undo registration
+                # and leave the marker as-is to avoid the 500 s baseline restore on failure.
+                evidence("undo_registered", "none (MIGRATIONS_APPLIED=0: no schema change this run)")
+                evidence("state_marker", "%s (unchanged: no migrations applied)" % marker)
+            else:
+                register_undo(c.run_dir, "test_db")
+                evidence("undo_registered", "test_db")
+                if marker != "dirty":
+                    update_db_marker(state_file, "dirty")
+                evidence("state_marker", "dirty (the tests may write to the database)")
         else:
             evidence("state_marker", marker)
 
@@ -215,7 +223,11 @@ class Regression:
             if reason:
                 failed.append(name)
         if failed:
-            warn("state marker stays 'dirty': the exit handler restores the baseline on failure")
+            migrations_applied = self.ctx.state.get("MIGRATIONS_APPLIED", "")
+            if migrations_applied == "0":
+                warn("no undo registered (MIGRATIONS_APPLIED=0): database is left as-is")
+            else:
+                warn("state marker stays 'dirty': the exit handler restores the baseline on failure")
             raise HelperError("%d of %d suite(s) failed: %s" % (len(failed), len(self.suites),
                                                                ", ".join(failed)),
                               os.path.join(self.app_dir, TESTS_CONF))

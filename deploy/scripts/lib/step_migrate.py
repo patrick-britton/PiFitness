@@ -49,7 +49,7 @@ from urllib.parse import quote
 
 from common import (HelperError, Parser, PgTarget, evidence, expected_app_env, info,
                     is_inside, load_context, norm_host, psql_rows, read_db_marker,
-                    register_undo, run_cmd, step_main, update_db_marker, warn)
+                    register_undo, run_cmd, step_main, update_db_marker, update_state, warn)
 from step_db_prepare import STATE_KEY, TestDatabase, elapsed, reason_from
 
 MIGRATION_FILE_RE = re.compile(r"^(\d+).*\.sql$")      # dbmate's own rule: version = leading digits
@@ -219,6 +219,7 @@ class Migrate:
         if not self.pending:
             evidence("migrate", "nothing pending: the %s database was not touched"
                      % self.ctx.environment.upper())
+            update_state(self.ctx.run_dir, {"MIGRATIONS_APPLIED": "0"})
             return "done"
 
     # ------------------------------------------------------------- 3. apply
@@ -249,6 +250,7 @@ class Migrate:
                               result.command())
         evidence("migrations_applied", "%d (%s)" % (len(applying), ", ".join(applying[:LIST_LIMIT])))
         evidence("dbmate_up_seconds", "%.1f" % result.seconds)
+        update_state(self.ctx.run_dir, {"MIGRATIONS_APPLIED": str(len(applying))})
 
     # ------------------------------------------------------------ 4. verify
     def stage_verify(self):
