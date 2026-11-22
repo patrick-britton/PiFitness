@@ -13,8 +13,8 @@ request: .features/descriptions/feat-dev-hub-rebuild.md
 # Design: dev-hub-rebuild
 
 ## Resume Here
-**progress:** 3/5 tasks complete
-**next:** T04
+**progress:** 5/5 tasks complete
+**next:** none
 **blocked-by:** none
 
 ## Architecture
@@ -151,7 +151,7 @@ request: .features/descriptions/feat-dev-hub-rebuild.md
   Finding: Header at lines 573-601 contains status badges and can host the app toggle links.
   Finding: `triggerAction` at line 784 sets `isRunning = true` but an interrupted SSE stream leaves it permanently true.
 - **Verify:** python -m py_compile tools/workflow/dev_hub.py
-- **Status:** todo
+- **Status:** complete
 
 ### T05 Create desktop application launcher and taskbar shortcut
 - **Surface:** deployment
@@ -168,4 +168,4 @@ request: .features/descriptions/feat-dev-hub-rebuild.md
   Finding: Chromium and Edge support `--app=http://127.0.0.1:8760/` for running web apps in a standalone desktop window.
   Finding: A `.lnk` file created with WScript.Shell can be pinned to the Windows taskbar.
 - **Verify:** powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Command tools\create-devhub-shortcut.ps1"
-- **Status:** todo
+- **Status:** complete

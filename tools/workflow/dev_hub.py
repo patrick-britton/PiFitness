@@ -80,6 +80,18 @@ def is_port_open(port: int, host: str = "127.0.0.1") -> bool:
         return False
 
 
+def _silent_subprocess_kwargs() -> dict:
+    """Return creationflags and startupinfo to ensure no console windows ever appear on Windows."""
+    kwargs = {}
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = 0  # SW_HIDE
+        kwargs["startupinfo"] = si
+    return kwargs
+
+
 def get_git_branch() -> str:
     """Get current git branch name."""
     try:
@@ -89,6 +101,7 @@ def get_git_branch() -> str:
             text=True,
             cwd=str(REPO_ROOT),
             timeout=3,
+            **_silent_subprocess_kwargs(),
         )
         return res.stdout.strip() or "unknown"
     except Exception:
@@ -103,6 +116,7 @@ def get_docker_dev_db_status() -> str:
             capture_output=True,
             text=True,
             timeout=3,
+            **_silent_subprocess_kwargs(),
         )
         status = res.stdout.strip()
         return status if status else "not found"
@@ -171,11 +185,12 @@ def inject_devhub_link(html_bytes: bytes, current_title: str) -> bytes:
     """Inject a small, subtle 'Back to DevHub' banner button into the integrated forms."""
     pill = (
         b'<div style="position:fixed;top:10px;right:14px;z-index:99999;">'
-        b'<a href="/" style="display:inline-flex;align-items:center;gap:6px;'
+        b'<a href="javascript:void(0)" onclick="if(window.parent&&window.parent.switchTab){window.parent.switchTab(\'dashboard\');}else{window.location.href=\'/\';}" '
+        b'style="display:inline-flex;align-items:center;gap:6px;'
         b'background:var(--surface,#ffffff);color:var(--accent,#0f6a6a);'
         b'border:1px solid var(--rule,#d6dbe0);padding:5px 12px;border-radius:20px;'
         b'font-family:system-ui,sans-serif;font-size:12px;font-weight:600;'
-        b'text-decoration:none;box-shadow:0 2px 6px rgba(0,0,0,0.08);">'
+        b'text-decoration:none;box-shadow:0 2px 6px rgba(0,0,0,0.08);cursor:pointer;">'
         b'&larr; DevHub Dashboard</a></div>'
     )
     if b"</body>" in html_bytes:
@@ -392,16 +407,14 @@ class DevHubHandler(BaseHTTPRequestHandler):
         try:
             # 1. Open Request Form (directly on DevHub server)
             if action == "open_request_form":
-                url = f"http://127.0.0.1:{port}/request"
-                log("Opening integrated Request Form...", "ok")
-                finish(True, "Opened Request Form", {"url": url})
+                log("Switching to integrated Request Form...", "ok")
+                finish(True, "Opened Request Form", {"tab": "request"})
                 return
 
             # 2. Open UAT Form (directly on DevHub server)
             if action == "open_uat_form":
-                url = f"http://127.0.0.1:{port}/uat"
-                log("Opening integrated UAT Form...", "ok")
-                finish(True, "Opened UAT Form", {"url": url})
+                log("Switching to integrated UAT Form...", "ok")
+                finish(True, "Opened UAT Form", {"tab": "uat"})
                 return
 
             # 3. Prep Dev Environment
@@ -415,7 +428,6 @@ class DevHubHandler(BaseHTTPRequestHandler):
             if action == "launch_local_env":
                 log("Launching Local Environment...", "heading")
                 py_path = str(PYTHON)
-                creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
                 # Backend
                 if is_port_open(8000):
@@ -431,7 +443,7 @@ class DevHubHandler(BaseHTTPRequestHandler):
                         encoding="utf-8",
                         errors="replace",
                         bufsize=1,
-                        creationflags=creationflags,
+                        **_silent_subprocess_kwargs(),
                     )
                     BACKGROUND_PROCS.append(backend_proc)
 
@@ -460,7 +472,7 @@ class DevHubHandler(BaseHTTPRequestHandler):
                         encoding="utf-8",
                         errors="replace",
                         bufsize=1,
-                        creationflags=creationflags,
+                        **_silent_subprocess_kwargs(),
                     )
                     BACKGROUND_PROCS.append(frontend_proc)
 
@@ -490,13 +502,12 @@ class DevHubHandler(BaseHTTPRequestHandler):
                 else:
                     log("Frontend is still initializing on port 3000...", "info")
 
-                threading.Timer(1.0, lambda: webbrowser.open("http://localhost:3000/")).start()
-                finish(True, "Local Environment Launched", {"url": "http://localhost:3000/"})
+                finish(True, "Local Environment Launched (Click 'App (:3000)' tab to view)")
                 return
 
-            # 5. Launch Bootstrapper (DEV / test)
-            if action in ("launch_bootstrapper_dev", "launch_bootstrapper"):
-                log("Running PiFitness Bootstrapper (DEV / test)...", "heading")
+            # 5. Migrate to Test
+            if action in ("migrate_to_test", "launch_bootstrapper_dev", "launch_bootstrapper"):
+                log("Running PiFitness Migration to Test (Pi test environment)...", "heading")
                 cmd = [
                     "powershell.exe",
                     "-NoProfile",
@@ -510,9 +521,9 @@ class DevHubHandler(BaseHTTPRequestHandler):
                 self._run_streaming_cmd(cmd, log, finish)
                 return
 
-            # 6. Launch Bootstrapper (PRD)
-            if action == "launch_bootstrapper_prd":
-                log("Running PiFitness Bootstrapper (PRD)...", "heading")
+            # 6. Migrate to PRD
+            if action in ("migrate_to_prd", "launch_bootstrapper_prd"):
+                log("Running PiFitness Migration to PRD (Pi production environment)...", "heading")
                 cmd = [
                     "powershell.exe",
                     "-NoProfile",
@@ -522,6 +533,21 @@ class DevHubHandler(BaseHTTPRequestHandler):
                     str(BOOTSTRAP_PS1),
                     "-Environment",
                     "prd",
+                ]
+                self._run_streaming_cmd(cmd, log, finish)
+                return
+
+            # Create Taskbar / Desktop Shortcut Helper
+            if action in ("create_taskbar_shortcut", "create_shortcut"):
+                log("Creating Desktop & Taskbar Shortcut...", "heading")
+                ps_script = REPO_ROOT / "tools" / "create-devhub-shortcut.ps1"
+                cmd = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(ps_script),
                 ]
                 self._run_streaming_cmd(cmd, log, finish)
                 return
@@ -540,7 +566,6 @@ class DevHubHandler(BaseHTTPRequestHandler):
                     ("git checkout feature-test", ["git", "checkout", "feature-test"]),
                 ]
 
-                creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
                 success = True
                 for desc, cmd in git_steps:
                     log(f"> {desc} ...")
@@ -549,7 +574,7 @@ class DevHubHandler(BaseHTTPRequestHandler):
                         cwd=str(REPO_ROOT),
                         capture_output=True,
                         text=True,
-                        creationflags=creationflags,
+                        **_silent_subprocess_kwargs(),
                     )
                     if proc.stdout.strip():
                         for line in proc.stdout.splitlines():
@@ -612,7 +637,6 @@ class DevHubHandler(BaseHTTPRequestHandler):
     def _run_streaming_cmd(self, cmd: list[str], log_fn, finish_fn) -> None:
         """Run a command and stream stdout/stderr line-by-line via SSE."""
         try:
-            creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
             proc = subprocess.Popen(
                 cmd,
                 cwd=str(REPO_ROOT),
@@ -622,7 +646,7 @@ class DevHubHandler(BaseHTTPRequestHandler):
                 encoding="utf-8",
                 errors="replace",
                 bufsize=1,
-                creationflags=creationflags,
+                **_silent_subprocess_kwargs(),
             )
 
             if proc.stdout:

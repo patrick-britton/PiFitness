@@ -8,3 +8,16 @@
 - 2026-11-22 T03 start: verify='python -m py_compile tools/workflow/dev_hub.py'
 - 2026-11-22 T03 done: exit=0 cmd='python -m py_compile tools/workflow/dev_hub.py' tail=''
 - 2026-11-22 execute: T01, T02, T03 complete, 4 points; stopped: budget used
+- 2026-11-22 T04 start: verify='python -m py_compile tools/workflow/dev_hub.py'
+- 2026-11-22 T04 done: exit=0 cmd='python -m py_compile tools/workflow/dev_hub.py' tail=''
+- 2026-11-22 T05 start: verify='powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Command tools\\create-devhub-shortcut.ps1"'
+- 2026-11-22 T05 done: exit=0 cmd='powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Command tools\\create-devhub-shortcut.ps1"' tail='\nCommandType     Name                                               Version    Source                                   \n-----------     ----                                               -------    ------                                   \nExternalScript  create-devhub-shortcut.ps1                                    C:\\Users\\rickb\\vsProjects\\PiFitness\\to...\n\n'
+- 2026-11-22 execute: T04, T05 complete, 3 points; stopped: all tasks complete
+- 2026-11-22 bug BUG-1 recorded: DevHub launch dependent on taskbar pinning clarity
+- 2026-11-22 bug BUG-2 recorded: Bootstrap Dev label should be Migrate to Test
+- 2026-11-22 bug BUG-3 recorded: Missing clear instructions and shortcut creation for taskbar pinning
+- 2026-11-22 bug BUG-1 open -> in-review
+- 2026-11-22 bug BUG-2 open -> in-review
+- 2026-11-22 bug BUG-3 open -> in-review
+- 2026-11-22 polish: 3 bugs -> in-review (BUG-1, BUG-2, BUG-3); 0 blocked; 3 awaiting UAT (BUG-1, BUG-2, BUG-3)
+- 2026-11-22 polish: resolved edge default to chrome, eliminated periodic status popup windows via CREATE_NO_WINDOW, integrated request and uat forms into embedded app views

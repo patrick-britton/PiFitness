@@ -233,6 +233,38 @@
     flex-wrap: wrap;
     gap: 12px;
   }
+  .app-nav-tabs {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg);
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid var(--rule);
+    gap: 4px;
+  }
+  .tab-link {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 6px;
+    color: var(--text-dim);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+  }
+  .tab-link:hover {
+    color: var(--text-main);
+  }
+  .tab-link.active {
+    background: var(--surface);
+    color: var(--accent);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
   .status-cluster {
     display: flex;
     align-items: center;
@@ -509,16 +541,16 @@
     <div class="nav-group-title">Workflow Actions</div>
     <ul class="nav-list">
       <li>
-        <button class="nav-item-btn" onclick="triggerAction('open_request_form')">
+        <button class="nav-item-btn" onclick="switchTab('request')">
           <span class="nav-num">1</span>
-          <span class="nav-label">Open Request Form</span>
+          <span class="nav-label">Request Form</span>
           <span class="nav-tag">/request</span>
         </button>
       </li>
       <li>
-        <button class="nav-item-btn" onclick="triggerAction('open_uat_form')">
+        <button class="nav-item-btn" onclick="switchTab('uat')">
           <span class="nav-num">2</span>
-          <span class="nav-label">Open UAT Form</span>
+          <span class="nav-label">UAT Form</span>
           <span class="nav-tag">/uat</span>
         </button>
       </li>
@@ -537,22 +569,29 @@
         </button>
       </li>
       <li>
-        <button class="nav-item-btn" onclick="triggerAction('launch_bootstrapper')">
+        <button class="nav-item-btn" onclick="triggerAction('migrate_to_test')">
           <span class="nav-num">5</span>
-          <span class="nav-label">Launch Bootstrapper</span>
-          <span class="nav-tag">SSH</span>
+          <span class="nav-label">Migrate to Test</span>
+          <span class="nav-tag">Test</span>
+        </button>
+      </li>
+      <li>
+        <button class="nav-item-btn" onclick="triggerAction('migrate_to_prd')">
+          <span class="nav-num">6</span>
+          <span class="nav-label">Migrate to PRD</span>
+          <span class="nav-tag">PRD</span>
         </button>
       </li>
       <li>
         <button class="nav-item-btn danger-action" onclick="openMergeModal()">
-          <span class="nav-num">6</span>
+          <span class="nav-num">7</span>
           <span class="nav-label">Merge to PRD</span>
           <span class="nav-tag">main</span>
         </button>
       </li>
       <li>
         <button class="nav-item-btn" onclick="openCompleteFeatureModal()">
-          <span class="nav-num">7</span>
+          <span class="nav-num">8</span>
           <span class="nav-label">Complete Feature</span>
           <span class="nav-tag">Archive</span>
         </button>
@@ -560,6 +599,11 @@
     </ul>
 
     <div class="sidebar-footer">
+      <div style="margin-bottom: 8px;">
+        <button class="btn btn-secondary btn-sm" style="width: 100%; font-size: 11px; padding: 4px 8px;" onclick="triggerAction('create_taskbar_shortcut')">
+          📌 Pin to Taskbar Helper
+        </button>
+      </div>
       <div style="font-size: 11.5px; color: var(--muted); display: flex; justify-content: space-between;">
         <span>PiFitness Dev Tools</span>
         <span>v1.0</span>
@@ -572,6 +616,12 @@
     <!-- TOP STATUS BAR -->
     <header class="top-bar">
       <div class="status-cluster">
+        <nav class="app-nav-tabs">
+          <button id="tab-btn-dashboard" class="tab-link active" onclick="switchTab('dashboard')">Console</button>
+          <button id="tab-btn-request" class="tab-link" onclick="switchTab('request')">Request Form</button>
+          <button id="tab-btn-uat" class="tab-link" onclick="switchTab('uat')">UAT Form</button>
+          <a href="http://localhost:3000" target="pifitness_app" class="tab-link">App (:3000) &nearr;</a>
+        </nav>
         <div class="badge">
           <span class="badge-dot" id="dot-server"></span>
           <span>DevHub:</span>
@@ -600,8 +650,8 @@
       </div>
     </header>
 
-    <!-- WORKSPACE BODY -->
-    <div class="workspace">
+    <!-- TAB PANEL: DASHBOARD / WORKSPACE -->
+    <div id="panel-dashboard" class="workspace" style="flex: 1;">
       <!-- ACTIVE FEATURE CARD -->
       <div class="card">
         <div class="card-header">
@@ -621,6 +671,7 @@
             <span id="term-title">Console Output: Ready</span>
           </div>
           <div class="terminal-actions">
+            <button class="term-btn" onclick="forceUnlockAction()" title="Reset lock if an action gets stuck">Reset Lock</button>
             <button class="term-btn" onclick="clearTerminal()">Clear</button>
             <button class="term-btn" onclick="copyTerminal()">Copy Logs</button>
           </div>
@@ -629,6 +680,16 @@
           <div class="log-line log-info">PiFitness DevHub ready. Select an action from the sidebar to begin.</div>
         </div>
       </div>
+    </div>
+
+    <!-- TAB PANEL: REQUEST FORM -->
+    <div id="panel-request" style="display: none; flex: 1; height: calc(100vh - 65px); background: var(--bg);">
+      <iframe id="frame-request" src="/request" style="width: 100%; height: 100%; border: none;"></iframe>
+    </div>
+
+    <!-- TAB PANEL: UAT FORM -->
+    <div id="panel-uat" style="display: none; flex: 1; height: calc(100vh - 65px); background: var(--bg);">
+      <iframe id="frame-uat" src="/uat" style="width: 100%; height: 100%; border: none;"></iframe>
     </div>
   </main>
 </div>
@@ -675,7 +736,18 @@ git checkout feature-test<br>
 <script>
   let isRunning = false;
   let isServerConnected = false;
+  let currentAbortController = null;
   let activeFeaturesCache = { descriptions: [], designs_active: [] };
+
+  function forceUnlockAction() {
+    if (currentAbortController) {
+      try { currentAbortController.abort(); } catch (_) {}
+      currentAbortController = null;
+    }
+    finishAction();
+    appendLogLine(`[${new Date().toLocaleTimeString()}] Action state manually reset.`, 'warn');
+    fetchStatus();
+  }
 
   async function fetchStatus() {
     try {
@@ -783,9 +855,11 @@ git checkout feature-test<br>
 
   async function triggerAction(actionName) {
     if (isRunning) {
-      alert("Another action is currently in progress. Please wait.");
+      alert("Another action is currently in progress. Click 'Reset Lock' if it has stalled.");
       return;
     }
+
+    switchTab('dashboard');
 
     if (!isServerConnected) {
       appendLogLine(`[${new Date().toLocaleTimeString()}] Cannot trigger action: DevHub server is disconnected.`, 'error');
@@ -794,6 +868,7 @@ git checkout feature-test<br>
     }
 
     isRunning = true;
+    currentAbortController = new AbortController();
     const termBody = document.getElementById('term-body');
     const termTitle = document.getElementById('term-title');
     const spinner = document.getElementById('term-status-indicator');
@@ -807,12 +882,12 @@ git checkout feature-test<br>
       const response = await fetch('/api/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: actionName })
+        body: JSON.stringify({ action: actionName }),
+        signal: currentAbortController.signal
       });
 
       if (!response.body) {
         appendLogLine("No response stream from server.", "error");
-        finishAction();
         return;
       }
 
@@ -833,6 +908,9 @@ git checkout feature-test<br>
             try {
               const data = JSON.parse(line.slice(6));
               handleEvent(data);
+              if (data.type === 'done') {
+                finishAction();
+              }
             } catch (err) {
               console.error("JSON parse error on SSE", line);
             }
@@ -840,15 +918,35 @@ git checkout feature-test<br>
         }
       }
     } catch (e) {
-      appendLogLine(`Action request failed: ${e.message}`, 'error');
-      if (e.message.includes('fetch')) {
-        setServerOnline(false);
-        appendLogLine("DevHub server connection lost. Is the PowerShell/cmd window still running?", 'warn');
+      if (e.name !== 'AbortError') {
+        appendLogLine(`Action request failed: ${e.message}`, 'error');
+        if (e.message && e.message.includes('fetch')) {
+          setServerOnline(false);
+          appendLogLine("DevHub server connection lost. Is the DevHub process running?", 'warn');
+        }
       }
     } finally {
+      currentAbortController = null;
       finishAction();
       fetchStatus();
     }
+  }
+
+  function switchTab(tab) {
+    const pDash = document.getElementById('panel-dashboard');
+    const pReq = document.getElementById('panel-request');
+    const pUat = document.getElementById('panel-uat');
+    const btnDash = document.getElementById('tab-btn-dashboard');
+    const btnReq = document.getElementById('tab-btn-request');
+    const btnUat = document.getElementById('tab-btn-uat');
+
+    if (pDash) pDash.style.display = (tab === 'dashboard') ? 'flex' : 'none';
+    if (pReq) pReq.style.display = (tab === 'request') ? 'block' : 'none';
+    if (pUat) pUat.style.display = (tab === 'uat') ? 'block' : 'none';
+
+    if (btnDash) btnDash.classList.toggle('active', tab === 'dashboard');
+    if (btnReq) btnReq.classList.toggle('active', tab === 'request');
+    if (btnUat) btnUat.classList.toggle('active', tab === 'uat');
   }
 
   function handleEvent(evt) {
@@ -857,9 +955,8 @@ git checkout feature-test<br>
     } else if (evt.type === 'done') {
       const kind = evt.success ? 'ok' : 'error';
       appendLogLine(`\n[Result] ${evt.message}`, kind);
-      if (evt.url) {
-        appendLogLine(`Opening URL: ${evt.url}`, 'info');
-        window.open(evt.url, '_blank');
+      if (evt.tab) {
+        switchTab(evt.tab);
       }
     }
   }
