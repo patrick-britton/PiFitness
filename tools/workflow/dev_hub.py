@@ -23,6 +23,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 import shutil
@@ -53,6 +54,20 @@ BOOTSTRAP_PS1 = REPO_ROOT / "deploy" / "run-bootstrap.ps1"
 PYTHON = sys.executable
 
 MAX_BODY_BYTES = 256 * 1024
+
+BACKGROUND_PROCS: list[subprocess.Popen] = []
+
+
+def cleanup_background_procs() -> None:
+    for proc in BACKGROUND_PROCS:
+        if proc.poll() is None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+
+
+atexit.register(cleanup_background_procs)
 
 
 def is_port_open(port: int, host: str = "127.0.0.1") -> bool:
@@ -123,15 +138,30 @@ def archive_feature_files() -> list[str]:
     for source_dir in (DESCRIPTIONS_DIR, DESIGNS_ACTIVE_DIR):
         if not source_dir.is_dir():
             continue
-        for file_path in source_dir.iterdir():
+        for file_path in list(source_dir.iterdir()):
             if file_path.is_file() and file_path.name != ".gitkeep":
+                source_resolved = file_path.resolve()
                 dest_path = ARCHIVE_DIR / file_path.name
                 if dest_path.exists():
                     timestamp = time.strftime("%Y%m%d_%H%M%S")
                     stem = file_path.stem
                     suffix = file_path.suffix
                     dest_path = ARCHIVE_DIR / f"{stem}_{timestamp}{suffix}"
-                shutil.move(str(file_path), str(dest_path))
+                    counter = 1
+                    while dest_path.exists():
+                        dest_path = ARCHIVE_DIR / f"{stem}_{timestamp}_{counter}{suffix}"
+                        counter += 1
+
+                dest_resolved = dest_path.resolve()
+                shutil.move(str(source_resolved), str(dest_resolved))
+
+                # Verify source file is removed; if still present, delete explicitly
+                if source_resolved.exists():
+                    try:
+                        source_resolved.unlink()
+                    except OSError:
+                        pass
+
                 moved.append(f"{file_path.name} -> {dest_path.name}")
 
     return moved
@@ -359,138 +389,230 @@ class DevHubHandler(BaseHTTPRequestHandler):
                 data.update(extra)
             self._send_sse_event(data)
 
-        # 1. Open Request Form (directly on DevHub server)
-        if action == "open_request_form":
-            url = f"http://127.0.0.1:{port}/request"
-            log("Opening integrated Request Form...", "ok")
-            finish(True, "Opened Request Form", {"url": url})
-            return
-
-        # 2. Open UAT Form (directly on DevHub server)
-        if action == "open_uat_form":
-            url = f"http://127.0.0.1:{port}/uat"
-            log("Opening integrated UAT Form...", "ok")
-            finish(True, "Opened UAT Form", {"url": url})
-            return
-
-        # 3. Prep Dev Environment
-        if action == "prep_dev_env":
-            log("Running tools/refresh_dev.ps1 ...", "heading")
-            cmd = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(REFRESH_DEV_PS1)]
-            self._run_streaming_cmd(cmd, log, finish)
-            return
-
-        # 4. Launch Local Environment
-        if action == "launch_local_env":
-            log("Launching Local Environment...", "heading")
-            py_path = str(PYTHON)
-            log("Starting FastAPI Backend (uvicorn) in a dedicated terminal...")
-            backend_cmd = (
-                f'Start-Process powershell -ArgumentList '
-                f'"-NoExit", "-Command", "cd backend; & \'{py_path}\' -m uvicorn main:app --reload"'
-            )
-            subprocess.run(["powershell.exe", "-NoProfile", "-Command", backend_cmd], cwd=str(REPO_ROOT))
-            log("Backend process spawned on port 8000.", "ok")
-
-            log("Starting Next.js Frontend (npm run build; npm run dev) in a dedicated terminal...")
-            frontend_cmd = (
-                'Start-Process powershell -ArgumentList '
-                '"-NoExit", "-Command", "cd frontend\\pifitness; npm run build; npm run dev"'
-            )
-            subprocess.run(["powershell.exe", "-NoProfile", "-Command", frontend_cmd], cwd=str(REPO_ROOT))
-            log("Frontend process spawned on port 3000.", "ok")
-
-            log("Opening http://localhost:3000/ in browser...")
-            threading.Timer(2.0, lambda: webbrowser.open("http://localhost:3000/")).start()
-            finish(True, "Local Environment Launched", {"url": "http://localhost:3000/"})
-            return
-
-        # 5. Launch Bootstrapper
-        if action == "launch_bootstrapper":
-            log("Launching PiFitness Bootstrapper...", "heading")
-            log("Opening interactive SSH session in dedicated terminal (deploy/run-bootstrap.ps1)...")
-            cmd = (
-                f'Start-Process powershell -ArgumentList '
-                f'"-NoExit", "-ExecutionPolicy", "Bypass", "-File", "\'{str(BOOTSTRAP_PS1)}\'"'
-            )
-            subprocess.run(["powershell.exe", "-NoProfile", "-Command", cmd], cwd=str(REPO_ROOT))
-            log("Bootstrapper terminal launched.", "ok")
-            log("Evergreen log will sync to deploy/bootstrap.log upon completion.")
-            finish(True, "Bootstrapper Launched in Terminal")
-            return
-
-        # 6. Merge to PRD & Launch Bootstrapper
-        if action == "merge_to_prd":
-            log("=== Merge to PRD & Deploy Sequence ===", "heading")
-            git_steps = [
-                ("git checkout main", ["git", "checkout", "main"]),
-                ("git pull origin main", ["git", "pull", "origin", "main"]),
-                (
-                    "git merge --no-ff feature-test",
-                    ["git", "merge", "--no-ff", "feature-test", "-m", "Merge branch 'feature-test' into main"],
-                ),
-                ("git push origin main", ["git", "push", "origin", "main"]),
-                ("git checkout feature-test", ["git", "checkout", "feature-test"]),
-            ]
-
-            success = True
-            for desc, cmd in git_steps:
-                log(f"> {desc} ...")
-                proc = subprocess.run(cmd, cwd=str(REPO_ROOT), capture_output=True, text=True)
-                if proc.stdout.strip():
-                    for line in proc.stdout.splitlines():
-                        log(f"  {line}")
-                if proc.stderr.strip():
-                    for line in proc.stderr.splitlines():
-                        log(f"  {line}", "warn" if proc.returncode == 0 else "error")
-
-                if proc.returncode != 0:
-                    log(f"FAILED: {desc} exited with code {proc.returncode}. Aborting.", "error")
-                    success = False
-                    break
-
-            if not success:
-                finish(False, "Git merge sequence failed. Check logs above.")
+        try:
+            # 1. Open Request Form (directly on DevHub server)
+            if action == "open_request_form":
+                url = f"http://127.0.0.1:{port}/request"
+                log("Opening integrated Request Form...", "ok")
+                finish(True, "Opened Request Form", {"url": url})
                 return
 
-            log("Git merge to main completed successfully!", "ok")
-            log("Now launching Bootstrapper in a dedicated terminal...")
-            cmd = (
-                f'Start-Process powershell -ArgumentList '
-                f'"-NoExit", "-ExecutionPolicy", "Bypass", "-File", "\'{str(BOOTSTRAP_PS1)}\'"'
-            )
-            subprocess.run(["powershell.exe", "-NoProfile", "-Command", cmd], cwd=str(REPO_ROOT))
-            log("Bootstrapper terminal opened.", "ok")
-            finish(True, "Merged to main and launched Bootstrapper")
-            return
+            # 2. Open UAT Form (directly on DevHub server)
+            if action == "open_uat_form":
+                url = f"http://127.0.0.1:{port}/uat"
+                log("Opening integrated UAT Form...", "ok")
+                finish(True, "Opened UAT Form", {"url": url})
+                return
 
-        # 7. Complete Feature
-        if action == "complete_feature":
-            log("=== Complete Feature Workflow ===", "heading")
-            log("Step 1: Moving active feature files to zz_feature_archive/ ...")
-            try:
-                moved = archive_feature_files()
-                if moved:
-                    for item in moved:
-                        log(f"  Archived: {item}", "ok")
+            # 3. Prep Dev Environment
+            if action == "prep_dev_env":
+                log("Running tools/refresh_dev.ps1 ...", "heading")
+                cmd = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(REFRESH_DEV_PS1)]
+                self._run_streaming_cmd(cmd, log, finish)
+                return
+
+            # 4. Launch Local Environment
+            if action == "launch_local_env":
+                log("Launching Local Environment...", "heading")
+                py_path = str(PYTHON)
+                creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
+                # Backend
+                if is_port_open(8000):
+                    log("FastAPI backend is already running on port 8000.", "ok")
                 else:
-                    log("  No active feature files found to archive.", "warn")
-            except Exception as e:
-                log(f"Failed to archive files: {e}", "error")
-                finish(False, f"Archiving failed: {e}")
+                    log("Starting FastAPI Backend (uvicorn main:app --reload)...")
+                    backend_proc = subprocess.Popen(
+                        [py_path, "-m", "uvicorn", "main:app", "--reload"],
+                        cwd=str(REPO_ROOT / "backend"),
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        bufsize=1,
+                        creationflags=creationflags,
+                    )
+                    BACKGROUND_PROCS.append(backend_proc)
+
+                    def stream_backend():
+                        if backend_proc.stdout:
+                            for line in iter(backend_proc.stdout.readline, ""):
+                                cl = line.rstrip("\r\n")
+                                if cl:
+                                    log(f"[backend] {cl}")
+
+                    threading.Thread(target=stream_backend, daemon=True).start()
+                    log(f"Backend process spawned (PID: {backend_proc.pid}).", "ok")
+
+                # Frontend
+                if is_port_open(3000):
+                    log("Next.js frontend is already running on port 3000.", "ok")
+                else:
+                    log("Starting Next.js Frontend (npm run dev)...")
+                    frontend_cmd = ["cmd.exe", "/c", "npm run dev"] if os.name == "nt" else ["npm", "run", "dev"]
+                    frontend_proc = subprocess.Popen(
+                        frontend_cmd,
+                        cwd=str(REPO_ROOT / "frontend" / "pifitness"),
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        bufsize=1,
+                        creationflags=creationflags,
+                    )
+                    BACKGROUND_PROCS.append(frontend_proc)
+
+                    def stream_frontend():
+                        if frontend_proc.stdout:
+                            for line in iter(frontend_proc.stdout.readline, ""):
+                                cl = line.rstrip("\r\n")
+                                if cl:
+                                    log(f"[frontend] {cl}")
+
+                    threading.Thread(target=stream_frontend, daemon=True).start()
+                    log(f"Frontend process spawned (PID: {frontend_proc.pid}).", "ok")
+
+                log("Checking local services...")
+                for _ in range(6):
+                    if is_port_open(8000) and is_port_open(3000):
+                        break
+                    time.sleep(0.5)
+
+                if is_port_open(8000):
+                    log("Backend is listening on http://127.0.0.1:8000", "ok")
+                else:
+                    log("Backend is still initializing on port 8000...", "info")
+
+                if is_port_open(3000):
+                    log("Frontend is listening on http://localhost:3000", "ok")
+                else:
+                    log("Frontend is still initializing on port 3000...", "info")
+
+                threading.Timer(1.0, lambda: webbrowser.open("http://localhost:3000/")).start()
+                finish(True, "Local Environment Launched", {"url": "http://localhost:3000/"})
                 return
 
-            log("\nStep 2: Refreshing DEV environment (tools/refresh_dev.ps1) ...", "heading")
-            cmd = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(REFRESH_DEV_PS1)]
-            self._run_streaming_cmd(cmd, log, finish)
-            return
+            # 5. Launch Bootstrapper (DEV / test)
+            if action in ("launch_bootstrapper_dev", "launch_bootstrapper"):
+                log("Running PiFitness Bootstrapper (DEV / test)...", "heading")
+                cmd = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(BOOTSTRAP_PS1),
+                    "-Environment",
+                    "test",
+                ]
+                self._run_streaming_cmd(cmd, log, finish)
+                return
 
-        log(f"Unknown action: {action}", "error")
-        finish(False, f"Unknown action: {action}")
+            # 6. Launch Bootstrapper (PRD)
+            if action == "launch_bootstrapper_prd":
+                log("Running PiFitness Bootstrapper (PRD)...", "heading")
+                cmd = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(BOOTSTRAP_PS1),
+                    "-Environment",
+                    "prd",
+                ]
+                self._run_streaming_cmd(cmd, log, finish)
+                return
+
+            # 7. Merge to PRD & Launch Bootstrapper
+            if action == "merge_to_prd":
+                log("=== Merge to PRD & Deploy Sequence ===", "heading")
+                git_steps = [
+                    ("git checkout main", ["git", "checkout", "main"]),
+                    ("git pull origin main", ["git", "pull", "origin", "main"]),
+                    (
+                        "git merge --no-ff feature-test",
+                        ["git", "merge", "--no-ff", "feature-test", "-m", "Merge branch 'feature-test' into main"],
+                    ),
+                    ("git push origin main", ["git", "push", "origin", "main"]),
+                    ("git checkout feature-test", ["git", "checkout", "feature-test"]),
+                ]
+
+                creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                success = True
+                for desc, cmd in git_steps:
+                    log(f"> {desc} ...")
+                    proc = subprocess.run(
+                        cmd,
+                        cwd=str(REPO_ROOT),
+                        capture_output=True,
+                        text=True,
+                        creationflags=creationflags,
+                    )
+                    if proc.stdout.strip():
+                        for line in proc.stdout.splitlines():
+                            log(f"  {line}")
+                    if proc.stderr.strip():
+                        for line in proc.stderr.splitlines():
+                            log(f"  {line}", "warn" if proc.returncode == 0 else "error")
+
+                    if proc.returncode != 0:
+                        log(f"FAILED: {desc} exited with code {proc.returncode}. Aborting.", "error")
+                        success = False
+                        break
+
+                if not success:
+                    finish(False, "Git merge sequence failed. Check logs above.")
+                    return
+
+                log("Git merge to main completed successfully!", "ok")
+                log("Now running Bootstrapper for PRD...")
+                cmd = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(BOOTSTRAP_PS1),
+                    "-Environment",
+                    "prd",
+                ]
+                self._run_streaming_cmd(cmd, log, finish)
+                return
+
+            # 8. Complete Feature
+            if action == "complete_feature":
+                log("=== Complete Feature Workflow ===", "heading")
+                log("Step 1: Moving active feature files to zz_feature_archive/ ...")
+                try:
+                    moved = archive_feature_files()
+                    if moved:
+                        for item in moved:
+                            log(f"  Archived: {item}", "ok")
+                    else:
+                        log("  No active feature files found to archive.", "warn")
+                except Exception as e:
+                    log(f"Failed to archive files: {e}", "error")
+                    finish(False, f"Archiving failed: {e}")
+                    return
+
+                log("\nStep 2: Refreshing DEV environment (tools/refresh_dev.ps1) ...", "heading")
+                cmd = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(REFRESH_DEV_PS1)]
+                self._run_streaming_cmd(cmd, log, finish)
+                return
+
+            log(f"Unknown action: {action}", "error")
+            finish(False, f"Unknown action: {action}")
+        except Exception as e:
+            log(f"Unexpected error executing action '{action}': {e}", "error")
+            finish(False, f"Action failed: {e}")
 
     def _run_streaming_cmd(self, cmd: list[str], log_fn, finish_fn) -> None:
         """Run a command and stream stdout/stderr line-by-line via SSE."""
         try:
+            creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
             proc = subprocess.Popen(
                 cmd,
                 cwd=str(REPO_ROOT),
@@ -500,6 +622,7 @@ class DevHubHandler(BaseHTTPRequestHandler):
                 encoding="utf-8",
                 errors="replace",
                 bufsize=1,
+                creationflags=creationflags,
             )
 
             if proc.stdout:
@@ -510,7 +633,7 @@ class DevHubHandler(BaseHTTPRequestHandler):
 
             proc.wait()
             if proc.returncode == 0:
-                log_fn(f"Command succeeded with exit code 0.", "ok")
+                log_fn("Command succeeded with exit code 0.", "ok")
                 finish_fn(True, "Command completed successfully")
             else:
                 log_fn(f"Command failed with exit code {proc.returncode}.", "error")

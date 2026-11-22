@@ -5,37 +5,37 @@
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "text": "Click \"Complete Feature\" and confirm → all files from `.features/descriptions/` and `.features/designs_active/` appear in `zz_feature_archive/` and are absent from their source folders (covers B1)",
+      "text": "Trigger \"Complete Feature\" and confirm → all active feature files move to the archive folder and are absent from their source locations (covers B1)",
       "auto": "python -m py_compile tools/workflow/dev_hub.py",
       "done": false
     },
     {
       "id": "AC-2",
-      "text": "Trigger any action, let it finish or error, then immediately trigger another → second action runs without \"Another action is currently in progress\" blocking it (covers B1, B2)",
+      "text": "Trigger any action, let it finish or error out, then immediately trigger another → the second action runs without a \"another action is in progress\" block (covers B1, B2)",
       "auto": "python -m py_compile tools/workflow/dev_hub.py",
       "done": false
     },
     {
       "id": "AC-3",
-      "text": "Click \"Launch Local Environment\" → backend and frontend start without opening new PowerShell windows; output lines appear in the DevHub terminal (covers B2)",
-      "auto": "none (subprocess launch behavior not automatable from a compile check; human verifies in UAT)",
+      "text": "Click \"Launch Local Environment\" → backend and frontend start and their output appears in the DevHub terminal; no new PowerShell or console window opens (covers B2)",
+      "auto": "none (subprocess launch behavior requires UAT)",
       "done": false
     },
     {
       "id": "AC-4",
-      "text": "The DevHub shows a tab strip; clicking between tabs switches the visible pane without launching a new service or opening a new window (covers B3) (pending OQ-2)",
-      "auto": "none (UI layout requires UAT)",
+      "text": "The DevHub shows clearly labelled links or tabs for the DevHub and the app (:3000); clicking either opens or focuses that page without launching a new service (covers B3)",
+      "auto": "none (UI behavior requires UAT)",
       "done": false
     },
     {
       "id": "AC-5",
-      "text": "Clicking \"Launch Bootstrapper (DEV)\" starts the Pi bootstrap without a keep/wipe prompt and targets the dev environment; \"Launch Bootstrapper (PRD)\" targets production (covers B4) (pending OQ-4)",
+      "text": "Clicking \"Bootstrap DEV\" starts the Pi bootstrapper targeting the test environment without any interactive prompt; clicking \"Bootstrap PRD\" targets production without any interactive prompt (covers B4)",
       "auto": "none (SSH to Pi; human verifies in UAT)",
       "done": false
     },
     {
       "id": "AC-6",
-      "text": "Running the pinning helper makes `dev_hub.bat` available to pin to the Windows taskbar (covers B5) (pending OQ-3)",
+      "text": "The launcher can be pinned to the Windows taskbar and launches the DevHub when clicked (covers B1, B5)",
       "auto": "none (Windows shell feature; human verifies in UAT)",
       "done": false
     }

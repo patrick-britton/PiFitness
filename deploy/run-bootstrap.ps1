@@ -22,7 +22,8 @@ param(
     [string]$User = "god",
     [string]$RemoteLauncher = "/home/god/pifitness-bootstrap/pi_bootstrap_shell.sh",
     [string]$RemoteLogPath = "/home/god/pifitness-logs/bootstrap.log",
-    [string]$LocalPath = "deploy\bootstrap.log"
+    [string]$LocalPath = "deploy\bootstrap.log",
+    [string]$Environment = ""
 )
 
 $target = "$User@$HostName"
@@ -31,10 +32,17 @@ Write-Host "=== PiFitness Bootstrap Runner ===" -ForegroundColor Cyan
 Write-Host "Target:   $target"
 Write-Host "Launcher: $RemoteLauncher"
 Write-Host "Log Dest: $LocalPath"
+if ($Environment) {
+    Write-Host "Env:      $Environment"
+}
 Write-Host "Starting SSH session with terminal allocation (-t)...`n" -ForegroundColor DarkGray
 
 # Launch interactive SSH session with -t (pseudo-terminal allocation) and -l (login shell)
-ssh -t "$target" "bash -l $RemoteLauncher"
+$launcherCmd = "bash -l $RemoteLauncher"
+if ($Environment) {
+    $launcherCmd += " --environment $Environment"
+}
+ssh -t "$target" "$launcherCmd"
 $sessionExitCode = $LASTEXITCODE
 
 Write-Host "`n=== Bootstrap Session Finished (Exit Code: $sessionExitCode) ===" -ForegroundColor Cyan

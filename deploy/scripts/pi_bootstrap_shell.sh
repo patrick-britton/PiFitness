@@ -13,41 +13,77 @@ BOOTSTRAP_DIR="/home/god/pifitness-bootstrap"
 PRD_ENV="/home/god/.config/pifitness/prd.env"
 TEST_ENV="/home/god/.config/pifitness/test.env"
 
-echo
-echo "================================"
-echo "       PiFitness Bootstrap"
-echo "================================"
-echo
-echo "1) PRD"
-echo "2) TEST"
-echo "Q) Quit"
-echo
+ENVIRONMENT=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -e|--environment)
+            ENVIRONMENT="$2"
+            shift 2
+            ;;
+        --environment=*)
+            ENVIRONMENT="${1#*=}"
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
-while true; do
-    read -r -p "Select environment: " choice
-
-    case "${choice,,}" in
+if [[ -n "$ENVIRONMENT" ]]; then
+    case "${ENVIRONMENT,,}" in
         1|p|prd)
             ENVIRONMENT="prd"
             BRANCH="main"
             ENV_FILE="$PRD_ENV"
-            break
             ;;
         2|t|test|tst)
             ENVIRONMENT="test"
             BRANCH="feature-test"
             ENV_FILE="$TEST_ENV"
-            break
-            ;;
-        q|quit)
-            echo "Cancelled."
-            exit 0
             ;;
         *)
-            echo "Invalid selection."
+            echo "ERROR: Invalid environment '$ENVIRONMENT'. Expected 'prd' or 'test'." >&2
+            exit 1
             ;;
     esac
-done
+else
+    echo
+    echo "================================"
+    echo "       PiFitness Bootstrap"
+    echo "================================"
+    echo
+    echo "1) PRD"
+    echo "2) TEST"
+    echo "Q) Quit"
+    echo
+
+    while true; do
+        read -r -p "Select environment: " choice
+
+        case "${choice,,}" in
+            1|p|prd)
+                ENVIRONMENT="prd"
+                BRANCH="main"
+                ENV_FILE="$PRD_ENV"
+                break
+                ;;
+            2|t|test|tst)
+                ENVIRONMENT="test"
+                BRANCH="feature-test"
+                ENV_FILE="$TEST_ENV"
+                break
+                ;;
+            q|quit)
+                echo "Cancelled."
+                exit 0
+                ;;
+            *)
+                echo "Invalid selection."
+                ;;
+        esac
+    done
+fi
 
 if [[ ! -f "$ENV_FILE" ]]; then
     echo "ERROR: ${ENVIRONMENT^^} environment file not found: $ENV_FILE" >&2
