@@ -166,12 +166,21 @@ class Migrate:
             self.db.verify_not_prd()
             evidence("write_target_is_prd", "no (APP_ENV, database name, server and role checked)")
             evidence("test_database", self.target.describe())
-            marker, _values = read_db_marker(self.state_file)
+            marker, values = read_db_marker(self.state_file)
             evidence("test_state_marker", marker)
-            if marker != "clean":
-                raise HelperError("the TEST state marker is %r, not 'clean': migrating now would not "
-                                  "have a trustworthy rollback baseline (a run restores the database "
-                                  "first when TEST is not clean)" % marker, self.state_file)
+            if marker not in ("clean", "migrated"):
+                raise HelperError("the TEST state marker is %r, not 'clean' or 'migrated': "
+                                  "migrating now would not have a trustworthy rollback baseline "
+                                  "(a run restores the database first when TEST is dirty)"
+                                  % marker, self.state_file)
+            if marker == "migrated":
+                baseline = values.get("baseline_dump", "")
+                if not baseline or not os.path.isfile(baseline):
+                    raise HelperError(
+                        "TEST state is 'migrated' but its recorded baseline dump is %s; "
+                        "a rollback would be impossible" % (
+                            "missing: " + baseline if baseline else "not recorded"),
+                        self.state_file)
         else:
             expected = expected_app_env(c.conf, c.conf_path, "prd")
             if c.env_value("APP_ENV") != expected:
