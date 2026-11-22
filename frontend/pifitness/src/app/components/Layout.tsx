@@ -12,10 +12,8 @@ import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore } from '../../stores/uiStore';
-import Header from './Header';
 import Sidebar from './Sidebar';
 import NavBar from './NavBar';
-import DebugPanel from './DebugPanel';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -25,8 +23,7 @@ export default function Layout({ children }: LayoutProps) {
   const { initialize: initializeViewport, setViewport, layoutMode, layoutVariant } = useViewportStore();
   const { initialize: initializeUI, syncActiveModuleFromPath, syncActiveSubPageFromPath } = useUIStore();
   // Kiosk routes (006-002): the unlisted /beachchanger viewer renders without
-  // the app chrome — no header, sidebar, or nav. DebugPanel intentionally
-  // stays (dev-only toggle). Every other route is unchanged.
+  // the app chrome — no sidebar or nav. Every other route is unchanged.
   const isKiosk = usePathname() === '/beachchanger';
 
   // Initialize stores on mount
@@ -67,9 +64,6 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header (hidden on kiosk routes) */}
-      {!isKiosk && <Header />}
-
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar for desktop - always visible */}
@@ -99,9 +93,6 @@ export default function Layout({ children }: LayoutProps) {
           <NavBar showLabels={true} />
         </div>
       )}
-
-      {/* Debug Panel - always rendered but conditionally visible */}
-      <DebugPanel />
 
       {/* Centered device frame when a mobile layout is forced via the dev toggle */}
       {forcedMobile && (

@@ -1,18 +1,24 @@
 {
-  "feature_id": "fix-the-target-running-playlist",
-  "title": "Fix the target running playlist",
-  "generated_at": "2026-11-18",
+  "feature_id": "feat-mobile-layout-revamp-header",
+  "title": "Mobile Layout Revamp, Header",
+  "generated_at": "2026-11-21",
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "text": "Process an activity with Run mode and Running music -> the shuffle step sends only the duration-capped track list (~20 to 35 tracks, <= 150 minutes) to the child playlist ('Running (a)') on Spotify rather than all 400+ tracks from the parent playlist (covers B1)",
-      "auto": "& 'C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe' -m pytest tests/test_activities.py -q",
+      "text": "Open the app on mobile portrait (360x740) and desktop (1440x900) -> The top Header bar is not rendered and main page content starts at the top of the viewport (covers B1)",
+      "auto": "powershell -NoProfile -Command \"cd frontend\\pifitness; npx tsc --noEmit\"",
       "done": false
     },
     {
       "id": "AC-2",
-      "text": "Run `auto_shuffle_playlists` for a playlist with a configured `minutes_to_sync` duration cap -> tracks sent to the target child playlist are limited to the duration cap rather than all tracks from the parent playlist (covers B2)",
-      "auto": "& 'C:\\users\\rickb\\vsprojects\\pifitness\\.venv\\Scripts\\python.exe' -m pytest tests/test_auto_shuffle_pandas_free.py -q",
+      "text": "Inspect the UI and codebase -> The bug button (🐛) is absent, DebugPanel is removed from Layout and deleted, and localStorage 'pifitness-debug' is no longer toggled (covers B2)",
+      "auto": "powershell -NoProfile -Command \"cd frontend\\pifitness; npx tsc --noEmit\"",
+      "done": false
+    },
+    {
+      "id": "AC-3",
+      "text": "Navigate to Admin -> Theme tab on mobile (360x740) and desktop (1440x900) -> The ThemeToggle button is rendered on its own admin page and toggles between light and dark mode (covers B3)",
+      "auto": "powershell -NoProfile -Command \"cd frontend\\pifitness; npx tsc --noEmit\"",
       "done": false
     }
   ]
