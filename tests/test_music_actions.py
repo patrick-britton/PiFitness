@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from fastapi.testclient import TestClient
 from backend.main import app
-from backend_functions.music_functions import album_image_retrieval
-from backend_functions.file_handlers import album_art_path
+from pifitness.music.functions import album_image_retrieval
+from pifitness.core.files import album_art_path
 
 client = TestClient(app)
 
@@ -301,7 +301,7 @@ def test_album_image_retrieval_no_client():
     client is available.
     """
     with patch('os.path.exists', return_value=False), \
-         patch('backend_functions.music_functions.get_spotify_client', return_value=None):
+         patch('pifitness.music.functions.get_spotify_client', return_value=None):
         result = album_image_retrieval("nonexistent")
         assert result is None
 

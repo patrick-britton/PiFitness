@@ -49,7 +49,7 @@ from urllib.parse import quote
 
 from common import (HelperError, Parser, PgTarget, evidence, expected_app_env, info,
                     is_inside, load_context, norm_host, psql_rows, read_db_marker,
-                    register_undo, run_cmd, step_main, update_db_marker, warn)
+                    register_undo, run_cmd, step_main, update_db_marker, update_state, warn)
 from step_db_prepare import STATE_KEY, TestDatabase, elapsed, reason_from
 
 MIGRATION_FILE_RE = re.compile(r"^(\d+).*\.sql$")      # dbmate's own rule: version = leading digits
@@ -166,12 +166,21 @@ class Migrate:
             self.db.verify_not_prd()
             evidence("write_target_is_prd", "no (APP_ENV, database name, server and role checked)")
             evidence("test_database", self.target.describe())
-            marker, _values = read_db_marker(self.state_file)
+            marker, values = read_db_marker(self.state_file)
             evidence("test_state_marker", marker)
-            if marker != "clean":
-                raise HelperError("the TEST state marker is %r, not 'clean': migrating now would not "
-                                  "have a trustworthy rollback baseline (a run restores the database "
-                                  "first when TEST is not clean)" % marker, self.state_file)
+            if marker not in ("clean", "migrated"):
+                raise HelperError("the TEST state marker is %r, not 'clean' or 'migrated': "
+                                  "migrating now would not have a trustworthy rollback baseline "
+                                  "(a run restores the database first when TEST is dirty)"
+                                  % marker, self.state_file)
+            if marker == "migrated":
+                baseline = values.get("baseline_dump", "")
+                if not baseline or not os.path.isfile(baseline):
+                    raise HelperError(
+                        "TEST state is 'migrated' but its recorded baseline dump is %s; "
+                        "a rollback would be impossible" % (
+                            "missing: " + baseline if baseline else "not recorded"),
+                        self.state_file)
         else:
             expected = expected_app_env(c.conf, c.conf_path, "prd")
             if c.env_value("APP_ENV") != expected:
@@ -210,6 +219,7 @@ class Migrate:
         if not self.pending:
             evidence("migrate", "nothing pending: the %s database was not touched"
                      % self.ctx.environment.upper())
+            update_state(self.ctx.run_dir, {"MIGRATIONS_APPLIED": "0"})
             return "done"
 
     # ------------------------------------------------------------- 3. apply
@@ -240,6 +250,7 @@ class Migrate:
                               result.command())
         evidence("migrations_applied", "%d (%s)" % (len(applying), ", ".join(applying[:LIST_LIMIT])))
         evidence("dbmate_up_seconds", "%.1f" % result.seconds)
+        update_state(self.ctx.run_dir, {"MIGRATIONS_APPLIED": str(len(applying))})
 
     # ------------------------------------------------------------ 4. verify
     def stage_verify(self):

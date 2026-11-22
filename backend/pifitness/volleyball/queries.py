@@ -37,7 +37,7 @@ so the API can surface it to the UI.
 
 from typing import Any, Dict, Optional, Sequence
 
-from backend_functions.database_functions import (
+from pifitness.core.db import (
     qec,
     sql_to_dict,
     sql_insert_returning,

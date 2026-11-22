@@ -54,3 +54,18 @@ body {
 button {
   font-family: var(--font-primary) !important;
 }
+
+/* UI Principles R3: Immediate pressed visual feedback for touch controls */
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active,
+  a:active {
+    transform: scale(0.97);
+    opacity: 0.85;
+    transition: transform 75ms ease-out, opacity 75ms ease-out;
+  }
+}

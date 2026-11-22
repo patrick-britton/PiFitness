@@ -12,8 +12,8 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from backend_functions.database_functions import sql_to_dict
-from backend_functions.schemas.segment_schemas import (
+from pifitness.core.db import sql_to_dict
+from pifitness.segments.schemas import (
     CreateSegmentRequest,
     CreateSegmentResponse,
     ConfirmMatchRequest,
@@ -47,7 +47,7 @@ from pifitness.activities.queries import (
     rename_segment,
 )
 from pifitness.config.queries import mapbox_token
-from backend_functions.segments_service import json_safe, safe_row, with_reference_window
+from pifitness.segments.service import json_safe, safe_row, with_reference_window
 
 router = APIRouter(prefix="/api", tags=["segments"])
 

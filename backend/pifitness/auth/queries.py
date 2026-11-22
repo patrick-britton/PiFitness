@@ -1,2 +1,2 @@
-# Auth query functions - re-exports from backend_functions.queries
+# Auth query functions
 __all__ = []

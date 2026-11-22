@@ -33,7 +33,7 @@ Exceptions:
 
 from typing import Any, Dict, Optional, Sequence
 
-from backend_functions.database_functions import (
+from pifitness.core.db import (
     get_conn,
     one_sql_result,
     qec,

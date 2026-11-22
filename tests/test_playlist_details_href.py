@@ -3,7 +3,7 @@ playlist ids.
 """
 import pytest
 
-import backend_functions.music_functions as mf
+import pifitness.music.functions as mf
 
 BARE_ID = "1Rfae5pyaheNsvr7ajdeBR"
 PAGE0_HREF = (

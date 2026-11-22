@@ -19,8 +19,7 @@ import DBInfo from './components/DBInfo';
 import TaskList from './components/TaskList';
 import ServiceConfig from './components/ServiceConfig';
 import CredentialManager from './components/CredentialManager';
-
-
+import ThemeSettings from './components/ThemeSettings';
 
 /**
  * Tab configuration
@@ -30,6 +29,7 @@ const TABS = [
   { id: 'task-management', label: 'Task Management', icon: '⚙️', component: TaskList },
   { id: 'services', label: 'Services', icon: '🔌', component: ServiceConfig },
   { id: 'credentials', label: 'Credentials', icon: '🔐', component: CredentialManager },
+  { id: 'theme', label: 'Theme', icon: '🌓', component: ThemeSettings },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];

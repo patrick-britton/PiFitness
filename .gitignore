@@ -228,9 +228,7 @@ __marimo__/
 /.idea/
 zz_feature_archive/
 
-# Pictures
-*.svg
-*.png
+
 
 # Plugins
 .cline/plugins/

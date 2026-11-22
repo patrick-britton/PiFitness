@@ -7,7 +7,7 @@ FastAPI endpoints for music data (playlists, ratings, shuffle, playback).
 Note: The shuffle endpoint still requires further extraction
 from frontend_functions/ into backend functions. It is marked as
 PENDING and will be added when the backend extraction is complete.
-Now-playing is served by backend_functions.music_functions.resolve_now_playing
+Now-playing is served by pifitness.music.functions.resolve_now_playing
 (feature 008-001).
 """
 
@@ -16,8 +16,8 @@ from fastapi.responses import FileResponse, Response
 from pathlib import Path
 from typing import Optional
 
-from backend_functions.database_functions import sql_to_dict, sql_to_list, one_sql_result, qec
-from backend_functions.music_functions import (
+from pifitness.core.db import sql_to_dict, sql_to_list, one_sql_result, qec
+from pifitness.music.functions import (
     resolve_now_playing,
     save_matchup_results,
     album_image_retrieval,
@@ -25,7 +25,7 @@ from backend_functions.music_functions import (
     playlist_to_db,
 )
 from pifitness.integrations.spotify.provider import sql_rate_limited
-from backend_functions.music_service import get_spotify_client_for_music
+from pifitness.music.service import get_spotify_client_for_music
 from pifitness.music.queries import (
     add_isrc_to_local_playlist,
     add_into_current_ratings,
@@ -68,7 +68,7 @@ async def list_playlists():
     """
     try:
         # Get all playlists from playlist_config table
-        from backend_functions.database_functions import sql_to_dict
+        from pifitness.core.db import sql_to_dict
         sql = "SELECT * FROM music.playlist_config ORDER BY playlist_name"
         playlists = sql_to_dict(sql)
         return {"data": playlists, "count": len(playlists)}
@@ -1155,7 +1155,7 @@ async def smart_shuffle(
     Generate a smart shuffle for a playlist.
 
     PENDING: The smart_shuffle() function needs to be extracted from
-    frontend_functions/music_module.py into backend_functions/music_functions.py
+    frontend_functions/music_module.py into pifitness/music/functions.py
     before this endpoint can return real data.
 
     Args:

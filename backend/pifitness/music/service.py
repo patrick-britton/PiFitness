@@ -5,7 +5,7 @@ service layer rather than reaching into router private names (PY-005) or
 calling DB functions directly from route handlers (PY-006).
 """
 
-from backend_functions.database_functions import (
+from pifitness.core.db import (
     one_sql_result,
     qec,
     sql_to_dict,

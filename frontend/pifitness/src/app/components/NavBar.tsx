@@ -41,7 +41,7 @@ export default function NavBar({ showLabels = true, vertical = false }: NavBarPr
           <button
             key={module.id}
             onClick={() => handleNavigation(module)}
-            className={`flex items-center justify-center ${
+            className={`flex items-center justify-center rounded-lg transition-transform active:scale-95 active:bg-gray-100 dark:active:bg-gray-700/60 select-none ${
               vertical ? 'p-2 w-full' : 'flex-col p-3 flex-1'
             } ${
               activeModule === module.id

@@ -3,7 +3,7 @@ they finish.
 """
 import pytest
 
-import backend_functions.activity_smoothing as sm
+import pifitness.activities.smoothing as sm
 
 
 # ---------------------------------------------------------------------------

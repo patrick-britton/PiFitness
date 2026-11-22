@@ -10,9 +10,8 @@
  * is invisible. This component must never import a mutation hook or the
  * scorekeeper component.
  *
- * Kiosk shell (OQ-1 B1): Layout.tsx hides the app chrome (header/sidebar/
- * nav) for /beachchanger only; DebugPanel intentionally stays (dev-only
- * toggle).
+ * Kiosk shell (OQ-1 B1): Layout.tsx hides the app chrome (sidebar/nav)
+ * for /beachchanger only. DebugPanel is deprecated.
  */
 'use client';
 

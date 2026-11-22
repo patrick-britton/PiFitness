@@ -5,9 +5,9 @@ from pathlib import Path
 import json
 from dotenv import load_dotenv
 
-from backend_functions.database_functions import qec, one_sql_result, con_cur, sql_to_dict, get_log_tables
-from backend_functions.helper_functions import list_to_dict_by_key
-from backend_functions.logging_functions import log_app_event, elapsed_ms, start_timer
+from pifitness.core.db import qec, one_sql_result, con_cur, sql_to_dict, get_log_tables
+from pifitness.core.utils import list_to_dict_by_key
+from pifitness.core.logging import log_app_event, elapsed_ms, start_timer
 import os
 
 load_dotenv()

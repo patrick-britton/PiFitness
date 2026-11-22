@@ -8,7 +8,7 @@ These functions return plain Python data structures with no Streamlit dependenci
 
 from typing import List, Dict, Any, Optional, Union, Sequence
 from datetime import datetime, date
-from backend_functions.database_functions import qec, sql_to_dict
+from pifitness.core.db import qec, sql_to_dict
 from pifitness.health.schemas import HeartRate, SleepData
 
 def get_weight_targets() -> Sequence[Dict[str, Any]]:

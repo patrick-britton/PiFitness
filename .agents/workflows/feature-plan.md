@@ -19,7 +19,7 @@ Break the approved design into small tasks in the design file's `## Task Plan`. 
 
 ## 2. Verify anchors
 
-For each surface, run `python tools/data_dictionary/lineage.py describe <target>` first, then read only the files it points to (`lineage.py trace <node> --files` lists a data-flow chain). Exit 2: `lineage.py search <name>`, then describe the exact id. Skip lineage for `(new)` things. `No graph`: stop and tell the human to run `lineage.py build`. Confirm every file you will touch exists and every symbol exists in it. A file that does not exist is `create`; one an earlier task creates is `planned`.
+Start from the Surfaces lines in Architecture: the design already recorded each target's lineage result, file path, symbols, pattern file and gotchas. For each file and symbol they name, confirm only that it exists (one targeted search or read). Run `python tools/data_dictionary/lineage.py describe <target>` only for a target Surfaces does not cover (`lineage.py trace <node> --files` lists a data-flow chain). Exit 2: `lineage.py search <name>`, then describe the exact id. Skip lineage for `(new)` things. `No graph`: stop and tell the human to run `lineage.py build`. Confirm every file you will touch exists and every symbol exists in it. A file that does not exist is `create`; one an earlier task creates is `planned`. Read source only to confirm anchors and to find the exact function or section for each task's `Finding:` lines.
 
 ## 3. Decompose
 
@@ -30,8 +30,10 @@ Order: database, backend, frontend. **One task = one concern, one Verify command
 - Migrations are additive only, with a `COMMENT` for every new table and column.
 - Verify must finish in about 30 seconds or less in the foreground. If the AC's `auto:` is slower, use the nearest fast existing check and say so in Detail.
 - **Tests:** the design's `auto:` lines are the complete list of new tests. Create a test file only for an AC whose `auto:` says `new test`, named exactly as the AC does (prefer adding to an existing file). An existing test this change breaks may be modified in the same task. Never create tests for implementation details, scratch checks or snapshots. For `auto: none (...)`, Verify is the nearest existing check.
+- **Verify defaults:** the default Verify is the cheapest compile, type-check or import check for the task's files (`python -m py_compile <path>`, `npx tsc --noEmit` from `frontend\pifitness`, or an existing test that already covers the area). A Verify never creates or adds a test unless the AC's `auto:` says `new test`. Never write a Verify or test that asserts a specific value, text, count or layout the request asked for; the human's UAT checks that.
 - **Verify from `auto:`:** copy the command out of its backticks (a Verify never has backticks); for `new test`, use the command that runs that one test.
-- **New files later tasks use:** the creating task's Detail gives the path and one `Interface:` line per exported symbol (signature or shape, and what it does). Each task that uses it has a `planned` anchor repeating that symbol and signature. `Interface:` lines do not count toward the Detail sentence limit.
+- **New files later tasks use:** the creating task's Detail gives the path and one `Interface:` line per exported symbol (signature or shape, and what it does). Each task that uses it has a `planned` anchor repeating that symbol and signature.
+- **Carry the research forward:** each task's `Finding:` lines (step 4) hold what design and planning learned that the executor needs, so it does not search again. Copy relevant facts out of the Surfaces lines and add what you confirmed in step 2.
 
 ## 4. Write the Task Plan
 
@@ -40,12 +42,12 @@ Replace everything under `## Task Plan` with task blocks in the format of the te
 - `Surface`: frontend, backend, database, deployment or integration (this selects the principle doc).
 - `Skill`: one or two words (react, fastapi, postgres). `Points`: 1, 2 or 3. `Depends-on`: task ids or `none`. `Traces-to`: AC ids.
 - `Anchors`: one line per file, `` `role`: `path` `symbol` ``. Roles: `modify`, `delete`, `pattern`, `read`, `create`, `planned` (written `` `planned` <- T01 `path` `symbol` ``). Never `search`; `greenfield` only with no existing code to anchor to.
-- `Detail`: at most 3 sentences plus `Interface:` lines; no code beyond a signature.
+- `Detail`: at most 3 sentences, plus `Interface:` lines (for new symbols) and up to 4 `Finding:` lines. Each `Finding:` is one fact from design or planning research that the executor would otherwise have to rediscover: where in the file to change (function, component or section), the current behavior, a gotcha or constraint, or what must not change. No code beyond a signature. `Interface:` and `Finding:` lines do not count toward the sentence limit.
 - `Verify`: one plain command on one line, no backticks, pipes or `&&`, exiting 0 only when this task's change works.
 - `Status`: `todo`.
 
 ## 5. Finish
 
 1. Run `python tools/workflow/fd.py set <id> resume` (it writes `points:`, `last-updated` and Resume Here).
-2. Run `python tools/workflow/fd.py check <id> --anchors`: 0 errors, 0 warnings, `0 bad`, `0 unresolved`. Then confirm by reading what it cannot check: no task touches more than 3 files counting `planned`; every `planned` anchor matches its creator's `Interface:` line; every new test file traces to a `new test` AC; every AC id appears in some `Traces-to`.
-3. Reply with task count, total points, T01's title, and "Review the plan. Then run `python tools/workflow/fd.py set <id> feature reviewed` and /feature-execute <budget>." Do not start execution.
+2. Run `python tools/workflow/fd.py check <id> --anchors`: 0 errors, 0 warnings, `0 bad`, `0 unresolved`. Then confirm by reading what it cannot check: no task touches more than 3 files counting `planned`; every `planned` anchor matches its creator's `Interface:` line; every new test file traces to a `new test` AC; no Verify adds a test or asserts a request-specific value; every AC id appears in some `Traces-to`.
+3. Reply with task count, total points, T01's title, and "Review the plan, then run /feature-execute [budget]. Running it also marks the plan reviewed; with no budget it does one task (up to 3 points)." Do not start execution.

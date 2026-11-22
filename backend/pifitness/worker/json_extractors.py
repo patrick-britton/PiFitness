@@ -5,10 +5,10 @@ import time
 from datetime import date, timedelta, datetime
 import pytz
 
-from backend_functions.database_functions import sql_to_dict, qec, sql_to_list, start_timer, elapsed_ms
-from backend_functions.helper_functions import get_sync_dates, random_sleep, safe_parse
-from backend_functions.logging_functions import log_app_event
-from backend_functions.music_functions import get_playlist_list
+from pifitness.core.db import sql_to_dict, qec, sql_to_list, start_timer, elapsed_ms
+from pifitness.core.utils import get_sync_dates, random_sleep, safe_parse
+from pifitness.core.logging import log_app_event
+from pifitness.music.functions import get_playlist_list
 from pifitness.integrations.spotify.provider import get_spotify_client
 from pifitness.integrations.garmin.endpoints import resolve_endpoint
 

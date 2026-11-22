@@ -13,7 +13,7 @@ Apply to every `/feature-*` run. `<id>` is the prefix of the single `*_design.md
 - Never tick or untick an Acceptance Criteria box by hand; `fd.py uat import --apply` does it.
 - Never write log text beginning with a task id followed by `start`, `done` or `forced`; `fd.py` reads that as evidence.
 - Source comments describe WHAT and HOW only: no task ids, bug ids or change history.
-- Write no tests, snapshots or scratch scripts unless the workflow authorizes a test. Never run `tools/verify.py --scope all`.
+- Write no tests, snapshots or scratch scripts. The only exception is a `new test` that the design's `auto:` line lists after the human approved it in an OQ. Compile, type-check and import checks are Verify commands, not tests. Never write a test that asserts a specific value, text, count or layout the human asked for; UAT checks that. Never run `tools/verify.py --scope all`.
 - Do not create plan, task-list or walkthrough artifacts; the design file and `fd.py` are the record.
 - Never commit, and never start UAT or another workflow's work.
 

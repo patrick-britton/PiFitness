@@ -27,10 +27,10 @@ from garminconnect import (
     GarminConnectTooManyRequestsError,
 )
 
-from backend_functions.credential_management import decrypt_dict
-from backend_functions.database_functions import get_conn, one_sql_result, qec
-from backend_functions.helper_functions import random_sleep
-from backend_functions.logging_functions import (
+from pifitness.core.credentials import decrypt_dict
+from pifitness.core.db import get_conn, one_sql_result, qec
+from pifitness.core.utils import random_sleep
+from pifitness.core.logging import (
     elapsed_ms,
     log_api_event,
     log_app_event,

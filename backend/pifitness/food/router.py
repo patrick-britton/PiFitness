@@ -93,7 +93,7 @@ def _log_pick_if_any(rank: Optional[int], result_source: Optional[str],
     """
     if rank is None:
         return
-    from backend_functions.food_search import log_pick
+    from pifitness.food.search import log_pick
     log_pick(rank, result_source or "", query or "")
 
 
@@ -207,7 +207,7 @@ async def combined_search(
     fdcId is already saved are suppressed (single saved DB row, ranked
     first). Raw bodies never reach the UI beyond nutrients_raw passthrough.
     """
-    from backend_functions.food_search import quality_label, fetch_usda_ranked, fetch_off_ranked
+    from pifitness.food.search import quality_label, fetch_usda_ranked, fetch_off_ranked
     query = (q or "").strip()
     if not query:
         raise HTTPException(status_code=400, detail="q must be non-empty")
@@ -314,7 +314,7 @@ async def combined_search(
             continue
         seen_off_codes.add(code) if code else None
         # Map OFF per-100g nutriments to output columns via normalize_off
-        from backend_functions.food_normalize import normalize_off as _norm_off
+        from pifitness.food.normalize import normalize_off as _norm_off
         nutriments = m.get("nutriments") or {}
         norm = _norm_off(nutriments)
         out.append({
@@ -360,7 +360,7 @@ def _persist_api_payload(payload) -> dict:
     one place. Natural-key dedupe inside `persist_api_food` returns the
     existing row for a repeat fdcId/barcode. Raises ValueError -> 400.
     """
-    from backend_functions.food_normalize import (
+    from pifitness.food.normalize import (
         normalize_off, normalize_usda_branded, normalize_usda_survey,
         serving_fields)
     provider = payload.provider

@@ -10,7 +10,7 @@ pifitness.integrations.garmin.provider for provider-specific helpers
 
 """
 
-from backend_functions.database_functions import one_sql_result
+from pifitness.core.db import one_sql_result
 from pifitness.integrations.garmin.provider import garmin_creds
 from datetime import datetime, timezone
 from pifitness.integrations.spotify.provider import (

@@ -146,7 +146,7 @@ app.include_router(food)
 async def health():
     """Health check endpoint that tests database connectivity."""
     try:
-        from backend_functions.database_functions import get_conn
+        from pifitness.core.db import get_conn
 
         conn = get_conn()
         conn.close()

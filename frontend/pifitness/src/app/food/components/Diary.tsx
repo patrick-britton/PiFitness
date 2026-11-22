@@ -24,6 +24,7 @@ import type { DayEntry, DiaryStats } from '../../../lib/types/food-contract';
 import { EmptyBox, ErrorBox, LoadingSkeleton } from './food-ui';
 import AddEntry from './AddEntry';
 import AmountPicker, { type AmountUnit } from './AmountPicker';
+import BottomSheet from '../../components/BottomSheet';
 
 /** How long a removed entry stays undoable before the delete write commits. */
 export const UNDO_WINDOW_MS = 5000;
@@ -145,14 +146,16 @@ function EditPopup({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
-      role="presentation">
-      <div role="dialog" aria-modal="true" aria-label={`Edit ${entry.name_snapshot}`}
-        className="w-full max-w-md rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-xl"
-        onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-base font-semibold text-gray-900 dark:text-white">{entry.name_snapshot}</h2>
-
-        <div className="mt-3">
+    <BottomSheet
+      isOpen={true}
+      onClose={onCancel}
+      title={`Edit ${entry.name_snapshot}`}
+      ariaLabel={`Edit ${entry.name_snapshot}`}
+      id="diary-edit"
+      dismissOnBackdrop={false}
+    >
+      <div>
+        <div className="mt-1">
           <AmountPicker key={entry.entry_id}
             value={{ qty, unit: unit as AmountUnit }}
             extraUnit={entry.unit ?? null}
@@ -173,22 +176,22 @@ function EditPopup({
 
         <div className="mt-4 flex items-center justify-between gap-2">
           <button type="button" onClick={() => onDelete(entry)}
-            className="rounded-md border border-red-300 dark:border-red-700 px-3 py-2 min-h-[44px] text-sm text-red-700 dark:text-red-300">
+            className="rounded-md border border-red-300 dark:border-red-700 px-3 py-2 min-h-[44px] text-sm text-red-700 dark:text-red-300 active:scale-95 active:bg-red-50 dark:active:bg-red-900/20 transition-all select-none">
             Delete
           </button>
           <div className="flex items-center gap-2">
             <button type="button" onClick={onCancel}
-              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 min-h-[44px] text-sm text-gray-700 dark:text-gray-300">
+              className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 min-h-[44px] text-sm text-gray-700 dark:text-gray-300 active:scale-95 active:bg-gray-100 dark:active:bg-gray-700 transition-all select-none">
               Cancel
             </button>
             <button type="button" onClick={() => void save()} disabled={saving}
-              className="rounded-md bg-blue-600 hover:bg-blue-700 px-4 py-2 min-h-[44px] text-sm font-medium text-white disabled:opacity-60">
+              className="rounded-md bg-blue-600 hover:bg-blue-700 active:scale-95 active:bg-blue-800 px-4 py-2 min-h-[44px] text-sm font-medium text-white disabled:opacity-60 transition-all select-none">
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 }
 

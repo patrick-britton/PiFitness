@@ -6,7 +6,7 @@ import types
 
 import pytest
 
-import backend_functions.activity_smoothing as sm
+import pifitness.activities.smoothing as sm
 import pifitness.worker.ultimate_task_executioner_v2 as ute
 from backend.pifitness.activities.services import run_step, task_failure_message
 

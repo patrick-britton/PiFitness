@@ -6,8 +6,8 @@ persistence used by every provider module under pifitness.integrations.
 
 import json
 
-from backend_functions.credential_management import decrypt_dict
-from backend_functions.database_functions import one_sql_result, qec
+from pifitness.core.credentials import decrypt_dict
+from pifitness.core.db import one_sql_result, qec
 
 
 def load_api_credentials(service=None):
@@ -42,7 +42,7 @@ def load_token_from_db(service_name):
     Returns:
         dict | None: The deserialized token dict, or None if no token found.
     """
-    from backend_functions.database_functions import one_sql_result
+    from pifitness.core.db import one_sql_result
     import json
 
     sql = f"""SELECT token_data FROM api_services.api_tokens
@@ -71,7 +71,7 @@ def save_token_to_db(service_name, token_info):
         service_name: 'Spotify' or other service name.
         token_info: The token dict from Spotipy (or similar).
     """
-    from backend_functions.database_functions import qec
+    from pifitness.core.db import qec
     import json
     from datetime import datetime, timezone
     from psycopg2.extras import Json

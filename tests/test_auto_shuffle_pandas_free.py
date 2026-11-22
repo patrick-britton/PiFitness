@@ -3,7 +3,7 @@ interaction mocked.
 """
 import pytest
 
-import backend_functions.music_functions as mf
+import pifitness.music.functions as mf
 
 
 # VERIFIED: Regression — auto_shuffle_playlists uploads tracks in row order to first row's target playlist, uses parameterized SQL

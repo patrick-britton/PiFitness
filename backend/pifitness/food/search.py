@@ -3,6 +3,8 @@
 USDA candidate fetch (2 parallel + fallback) + OQ-4 tiered ranking, a ~1-day
 normalized-query cache, and the pick-logging tuning hook. Payloads are trimmed
 server-side; no Pandas, no raw-body forwarding.
+
+Moved from ``backend_functions/food_search.py``.
 """
 
 import logging
@@ -196,13 +198,7 @@ _COUNT_G_EACH = {"nut": 1.2, "nuts": 1.2, "almond": 1.2, "almonds": 1.2}
 
 
 def _density_flag(fd: Dict[str, Any]) -> Optional[str]:
-    """Flag physically-implausible serving declarations, else None.
-
-    Catches Schnucks-style "28 GRM in 1/45 CUP" (~5.3 g/mL, denser than
-    lead) and Argires-style "73 g for 22 NUTS" (~3x the ~26 g real weight).
-    Weight-only servings (no household volume/count text) cannot be
-    checked and return None.
-    """
+    """Flag physically-implausible serving declarations, else None."""
     size, unit = fd.get("servingSize"), fd.get("servingSizeUnit")
     try:
         grams = float(size)
@@ -212,7 +208,7 @@ def _density_flag(fd: Dict[str, Any]) -> Optional[str]:
         return None
     u = str(unit or "").strip().lower()
     if u not in ("g", "gram", "grams", "grm", "ml", "mlt"):
-        return None  # IU and friends stay fail-closed elsewhere
+        return None
     text = str(fd.get("householdServingFullText") or "")
     m = _HH_CUP_RE.search(text)
     if m:
@@ -221,7 +217,7 @@ def _density_flag(fd: Dict[str, Any]) -> Optional[str]:
         except (TypeError, ValueError, ZeroDivisionError):
             return None
         ml = cups * 236.6
-        if ml > 0 and grams / ml > 2.0:  # densest real food ~1.5 g/mL
+        if ml > 0 and grams / ml > 2.0:
             return (f"implausible density: {grams:g} g in "
                     f"{cups:g} cup (~{grams / ml:.1f} g/mL)")
         return None
@@ -243,13 +239,7 @@ def _density_flag(fd: Dict[str, Any]) -> Optional[str]:
 
 def _consensus_flags(mapped: List[Dict[str, Any]],
                      query: str) -> Dict[int, str]:
-    """MAD outlier flags for the single-ingredient exact-name group.
-
-    Group = gate-passing hits whose description is the query itself and
-    whose ingredient list is only the query (19 almond rows). n>=5 ->
-    median + MAD; flag beyond max(3x1.4826xMAD, 10% of median).
-    Returns {id(m): reason}; empty when the group is too small.
-    """
+    """MAD outlier flags for the single-ingredient exact-name group."""
     group = [m for m in mapped
              if m.get("gate_ok")
              and (m.get("name") or "").strip().lower()
@@ -270,14 +260,7 @@ def _consensus_flags(mapped: List[Dict[str, Any]],
 
 
 def _category_mismatch(fd: Dict[str, Any], query: str) -> Optional[str]:
-    """Flag description/category/ingredient disagreement (Post cereal case).
-
-    Description says the food ("ALMONDS") AND the ingredient list is long
-    and multi-item AND the category doesn't contain the query — all three
-    must hold. Category alone is not enough: canonical single-ingredient
-    rows live in "Popcorn, Peanuts, Seeds & Related Snacks", which does
-    not contain "almonds" but is not a mismatch.
-    """
+    """Flag description/category/ingredient disagreement."""
     desc = (fd.get("description") or "").strip().lower()
     q = (query or "").strip().lower()
     if not desc or not q or desc != q:
@@ -299,35 +282,12 @@ _PANEL_EXTRA = ("satfat", "transfat", "cholesterol", "sodium", "fiber",
 
 
 def quality_label(extra_present: int) -> str:
-    # Survey/SR-Legacy rows top out at 6/11 extras, so High
-    # starts at 6 — the old 8/4 made High unattainable for the best dtypes.
     if extra_present >= 6:
         return "High"
     if extra_present >= 3:
         return "Medium"
     return "Low"
 
-
-# 010-004: calorie-reconciliation + ranked-search helpers.
-# Pure-Python, O(n) over the mapped hits, stdlib only (no pandas).
-# kcal gate (OQ-4): computed = 4P + 4C + 9F + 7A with alcohol defaulting to
-# 0 when absent; gate requires kcal+P+F+C present. A hit is excluded only
-# when abs(reported - computed) > max(0.15 * computed, 20) — the 20 kcal
-# absolute floor protects trace-macro items like black coffee.
-# quality_percent (OQ-5): round(100 * present / 10) over exactly kcal,
-# protein, fat, carbs, fiber, sugars, sodium, caffeine, serving_size,
-# serving unit — each by presence (0 counts, null does not); caffeine null
-# always penalizes, including OFF rows. Serving counts by presence, not
-# parseability. Match (OQ-2): exact name=100 / starts-with=90 /
-# all-query-words-whole-word=80 anchors, else token-overlap percent
-# 0-100; match_band = pct // 10 (10% bands). Single-ingredient (OQ-3):
-# non-null bool, true only when the normalized ingredient text exactly
-# equals the normalized (possibly multi-word) query; missing/empty -> False.
-# ingredient_count is the ingredient token count (null when missing, sorts
-# last ascending). Sort (AC-4): saved-first is handled by the caller;
-# within USDA hits: match_band desc, is_single_ingredient,
-# quality_percent desc, ingredient_count asc — ahead of the legacy
-# tier/dtype/prior keys, which remain as tiebreaks.
 
 _KCAL_ATWATER = {"protein_g": 4.0, "carbs_g": 4.0, "fat_g": 9.0,
                  "alcohol_g": 7.0}
@@ -353,8 +313,6 @@ def match_pct(name: str, query: str) -> int:
     qw = _words(q)
     if qw and all(w in set(_words(n)) for w in qw):
         return 80
-    # Token overlap below the anchors: Jaccard-style share of query words
-    # hit as substrings, scaled into 0-79 so anchors always win.
     hit = sum(1 for w in qw if w and w in n)
     return int(79 * hit / len(qw)) if qw else 0
 
@@ -372,7 +330,7 @@ def ingredient_stats(ingredients: Any, query: str) -> tuple:
 
 
 def quality_percent(nuts: Dict[str, Any],
-                     serving_size: Any, serving_unit: Any) -> int:
+                    serving_size: Any, serving_unit: Any) -> int:
     present = sum(1 for k in (
         "kcal_per_100g", "protein_g", "fat_g", "carbs_g", "fiber_g",
         "sugars_g", "sodium_mg", "caffeine_mg")
@@ -390,13 +348,8 @@ def quality_percent(nuts: Dict[str, Any],
 
 
 def kcal_gate(nuts: Dict[str, Any],
-               alcohol_g: Optional[float] = None) -> tuple:
-    """(excluded bool, kcal_delta_pct float|None).
-
-    Gate requires kcal+P+F+C; computed = 4P + 4C + 9F + 7A (alcohol 0 when
-    absent). Excluded only when
-    abs(reported - computed) > max(0.15 * computed, 20).
-    """
+              alcohol_g: Optional[float] = None) -> tuple:
+    """(excluded bool, kcal_delta_pct float|None)."""
     kcal = nuts.get("kcal_per_100g")
     p, f, c = (nuts.get("protein_g"), nuts.get("fat_g"),
                nuts.get("carbs_g"))
@@ -418,7 +371,7 @@ def kcal_gate(nuts: Dict[str, Any],
 
 
 def map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
-    from backend_functions.food_normalize import (
+    from pifitness.food.normalize import (
         normalize_usda_branded, normalize_usda_survey, serving_fields)
     dtype = fd.get("dataType") or ""
     nuts_raw = {str(n.get("nutrientName") or "").strip().lower(): n.get("value")
@@ -437,12 +390,9 @@ def map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
         present = sum(1 for v in extra.values() if v is not None)
     gate_ok = all(nuts.get(k) is not None
                   for k in ("kcal_per_100g", "protein_g", "fat_g", "carbs_g"))
-    # Feed serving for popup defaults + persistence (fail-closed;
-    # survey/legacy rows carry no servingSize -> all-None, 100 g fallback).
     sv_size, sv_unit, sv_text = serving_fields(
         fd.get("servingSize"), fd.get("servingSizeUnit"),
         fd.get("householdServingFullText"))
-    # Annotation-only quality flags (penalty/review_reason, never a block).
     t12_notes = []
     dens = _density_flag(fd)
     if dens:
@@ -453,10 +403,6 @@ def map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
         base_reason = ""
     if base_reason:
         t12_notes.insert(0, base_reason)
-    # 010-004: calorie-reconciliation gate + ranked-search fields. Alcohol
-    # comes from the raw hit ("Alcohol, ethyl" by name or id 1018), 0 when
-    # absent; excluded hits are hard-filtered in rank_usda_hits, but the
-    # flag + delta travel on the map for contract/tests.
     alcohol = nuts_raw.get("alcohol, ethyl")
     if alcohol is None:
         for n in (fd.get("foodNutrients") or []):
@@ -472,7 +418,7 @@ def map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
         alcohol_g = None
     excluded, delta_pct = kcal_gate(nuts, alcohol_g)
     qp = quality_percent(nuts, fd.get("servingSize"),
-                           fd.get("servingSizeUnit"))
+                         fd.get("servingSizeUnit"))
     is_single, ing_count = ingredient_stats(fd.get("ingredients"), "")
     return {"dtype": dtype or "Unknown",
             "fdcId": fd.get("fdcId"),
@@ -501,33 +447,17 @@ def map_usda_food(fd: Dict[str, Any]) -> Dict[str, Any]:
 
 def rank_usda_hits(hits: Sequence[Dict[str, Any]],
                    query: str) -> List[Dict[str, Any]]:
-    """Tiered rank (OQ-4, 010-004 fields).
-
-    010-004 sort within USDA hits: match_band desc, is_single_ingredient,
-    quality_percent desc, ingredient_count asc (nulls last) — ahead of the
-    legacy tier/dtype/prior keys, which remain as tiebreaks. The kcal gate
-    is a hard filter: excluded_kcal_mismatch hits are dropped (never merely
-    sunk). Gate, name bonus, relevance tier, then anchor/data-type prior
-    (Foundation/SR Legacy lab-analysed rows outrank branded *within*
-    the same tier — implemented as a (tier, prior) pair so the tier
-    order that existing tests pin is preserved), completeness, penalty,
-    freshness, USDA score tiebreak. Consensus/outlier +
-    category-mismatch flags add +1 penalty and a review_reason note each —
-    annotation only, never a block.
-    """
+    """Tiered rank (OQ-4, 010-004 fields)."""
     qw = _words(query)
     mapped = [map_usda_food(h) for h in hits]
     for m in mapped:
         pct = match_pct(m["name"], query)
         m["match_pct"] = pct
         m["match_band"] = match_band(pct)
-        # Query-aware single-ingredient flag (mapper runs query-blind).
         is_single, _ = ingredient_stats((m.get("raw") or {}).get(
             "ingredients"), query)
         m["is_single_ingredient"] = is_single
-    # 010-004 kcal gate: hard filter (drop), never a sink.
     mapped = [m for m in mapped if not m.get("excluded_kcal_mismatch")]
-    # Consensus + category-mismatch pass over the mapped hits.
     consensus = _consensus_flags(mapped, query)
     for m in mapped:
         extra_pen = 0
@@ -545,9 +475,6 @@ def rank_usda_hits(hits: Sequence[Dict[str, Any]],
             prior = m.get("review_reason") or ""
             m["review_reason"] = "; ".join(
                 t for t in [prior, *notes] if t)
-    # Gate: missing any of kcal/P/F/C (or no kcal = unloggable) sinks.
-    # 010-004 keys lead (band desc, single-ingredient, percent desc, count
-    # asc with nulls last); legacy keys tiebreak below.
     mapped.sort(key=lambda m: (
         0 if m["gate_ok"] else 1,
         -m["match_band"],
@@ -567,11 +494,7 @@ def rank_usda_hits(hits: Sequence[Dict[str, Any]],
 
 
 async def fetch_usda_ranked(query: str) -> Dict[str, Any]:
-    """2 parallel fetches (~75 candidates) + fallback; cached ~1d.
-
-    Returns {results: ranked-mapped, fetches: n, cached: bool}. Backend trims
-    each hit to the ranking fields; the full body is never forwarded.
-    """
+    """2 parallel fetches (~75 candidates) + fallback; cached ~1d."""
     norm = _norm_query(query)
     if not norm:
         return {"results": [], "fetches": 0, "cached": False}
@@ -604,13 +527,7 @@ async def fetch_usda_ranked(query: str) -> Dict[str, Any]:
 
 
 async def fetch_off_ranked(query: str) -> Dict[str, Any]:
-    """Open Food Facts text search; parallel-safe counterpart to fetch_usda_ranked.
-
-    Returns {results: [raw OFF product dicts], fetches: n, cached: False}.
-    OFF *_100g nutriments are already per-100g; the caller normalizes via
-    normalize_off. Fails closed (empty results) when OFF is unreachable so a
-    single source never blocks the blended search.
-    """
+    """Open Food Facts text search; parallel-safe counterpart to fetch_usda_ranked."""
     norm = _norm_query(query)
     if not norm:
         return {"results": [], "fetches": 0, "cached": False}

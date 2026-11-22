@@ -17,7 +17,7 @@ from collections import defaultdict
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from backend_functions.database_functions import (
+from pifitness.core.db import (
     qec,
     sql_to_dict,
     sql_insert_returning,
@@ -322,7 +322,7 @@ def persist_api_food(provider: str, name: str, fdc_id: Optional[int],
     serving_size/unit/text record the feed's standard serving
     (parsed fail-closed by `serving_fields`) so the `serving` unit resolves.
     """
-    from backend_functions.food_normalize import NUTRIENT_COLS
+    from pifitness.food.normalize import NUTRIENT_COLS
     existing = None
     if fdc_id is not None:
         rows = sql_to_dict("SELECT food_id FROM food.foods WHERE fdc_id = %s",
