@@ -1,24 +1,42 @@
 {
-  "feature_id": "feat-mobile-layout-revamp-header",
-  "title": "Mobile Layout Revamp, Header",
-  "generated_at": "2026-11-21",
+  "feature_id": "feat-dev-hub-rebuild",
+  "title": "dev-hub-rebuild",
+  "generated_at": "2026-11-22",
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "text": "Open the app on mobile portrait (360x740) and desktop (1440x900) -> The top Header bar is not rendered and main page content starts at the top of the viewport (covers B1)",
-      "auto": "powershell -NoProfile -Command \"cd frontend\\pifitness; npx tsc --noEmit\"",
+      "text": "Click \"Complete Feature\" and confirm → all files from `.features/descriptions/` and `.features/designs_active/` appear in `zz_feature_archive/` and are absent from their source folders (covers B1)",
+      "auto": "python -m py_compile tools/workflow/dev_hub.py",
       "done": false
     },
     {
       "id": "AC-2",
-      "text": "Inspect the UI and codebase -> The bug button (🐛) is absent, DebugPanel is removed from Layout and deleted, and localStorage 'pifitness-debug' is no longer toggled (covers B2)",
-      "auto": "powershell -NoProfile -Command \"cd frontend\\pifitness; npx tsc --noEmit\"",
+      "text": "Trigger any action, let it finish or error, then immediately trigger another → second action runs without \"Another action is currently in progress\" blocking it (covers B1, B2)",
+      "auto": "python -m py_compile tools/workflow/dev_hub.py",
       "done": false
     },
     {
       "id": "AC-3",
-      "text": "Navigate to Admin -> Theme tab on mobile (360x740) and desktop (1440x900) -> The ThemeToggle button is rendered on its own admin page and toggles between light and dark mode (covers B3)",
-      "auto": "powershell -NoProfile -Command \"cd frontend\\pifitness; npx tsc --noEmit\"",
+      "text": "Click \"Launch Local Environment\" → backend and frontend start without opening new PowerShell windows; output lines appear in the DevHub terminal (covers B2)",
+      "auto": "none (subprocess launch behavior not automatable from a compile check; human verifies in UAT)",
+      "done": false
+    },
+    {
+      "id": "AC-4",
+      "text": "The DevHub shows a tab strip; clicking between tabs switches the visible pane without launching a new service or opening a new window (covers B3) (pending OQ-2)",
+      "auto": "none (UI layout requires UAT)",
+      "done": false
+    },
+    {
+      "id": "AC-5",
+      "text": "Clicking \"Launch Bootstrapper (DEV)\" starts the Pi bootstrap without a keep/wipe prompt and targets the dev environment; \"Launch Bootstrapper (PRD)\" targets production (covers B4) (pending OQ-4)",
+      "auto": "none (SSH to Pi; human verifies in UAT)",
+      "done": false
+    },
+    {
+      "id": "AC-6",
+      "text": "Running the pinning helper makes `dev_hub.bat` available to pin to the Windows taskbar (covers B5) (pending OQ-3)",
+      "auto": "none (Windows shell feature; human verifies in UAT)",
       "done": false
     }
   ]
