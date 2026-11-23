@@ -5,14 +5,24 @@
 
 'use client';
 
+import { useMemo } from 'react';
 import { NAVIGATION_MODULES, NavigationModule } from '../../stores/uiStore';
 import { useUIStore } from '../../stores/uiStore';
 import * as Icons from '@mui/icons-material';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 export default function Sidebar() {
-  const { activeModule, setActiveModule, setActiveSubPage } = useUIStore();
   const router = useRouter();
+  const pathname = usePathname();
+  const { setActiveModule, setActiveSubPage } = useUIStore();
+
+  const activeModule = useMemo(() => {
+    if (!pathname || pathname === '/') return 'home';
+    const found = NAVIGATION_MODULES.find(
+      (m) => m.id !== 'home' && (pathname === m.path || pathname.startsWith(m.path + '/'))
+    );
+    return found ? found.id : 'home';
+  }, [pathname]);
 
   // Get the appropriate Material UI icon for each module
   const getIcon = (iconName: string) => {

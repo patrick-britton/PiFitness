@@ -17,6 +17,7 @@ export type NavigationModule = 'home' | 'music' | 'activities' | 'health' | 'foo
 export interface SubNavigationConfig {
   id: string;
   label: string;
+  shortLabel?: string;
   iconName: string;
   /** Path relative to the module root, e.g. '/now-playing' */
   path: string;
@@ -89,10 +90,12 @@ export const useUIStore = create<UIState>((set) => ({
   syncActiveModuleFromPath: () => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
-      const module = NAVIGATION_MODULES.find(m => path === m.path || path.startsWith(m.path + '/'));
-      if (module) {
-        set({ activeModule: module.id });
+      if (path === '/') {
+        set({ activeModule: 'home' });
+        return;
       }
+      const module = NAVIGATION_MODULES.find(m => m.id !== 'home' && (path === m.path || path.startsWith(m.path + '/')));
+      set({ activeModule: module ? module.id : 'home' });
     }
   },
 
@@ -206,36 +209,42 @@ export const NAVIGATION_MODULES: {
 export const MODULE_SUB_PAGES: Record<NavigationModule, SubNavigationConfig[]> = {
   home: [],
   music: [
-    { id: 'now-playing', label: 'Now Playing', iconName: 'PlayCircle', path: '/now-playing' },
-    { id: 'ratings', label: 'Ratings', iconName: 'Star', path: '/ratings' },
-    { id: 'playlist-shuffle', label: 'Playlist Config', iconName: 'Tune', path: '/playlist-shuffle' },
-    { id: 'isrc-review', label: 'ISRC Review', iconName: 'Search', path: '/isrc-review' },
-    { id: 'playlist-sync', label: 'Playlist Sync', iconName: 'Sync', path: '/playlist-sync' },
+    { id: 'now-playing', label: 'Now Playing', shortLabel: 'Now Playing', iconName: 'PlayCircle', path: '/now-playing' },
+    { id: 'ratings', label: 'Ratings', shortLabel: 'Ratings', iconName: 'Star', path: '/ratings' },
+    { id: 'playlist-shuffle', label: 'Playlist Config', shortLabel: 'Playlists', iconName: 'Tune', path: '/playlist-shuffle' },
+    { id: 'isrc-review', label: 'ISRC Review', shortLabel: 'ISRC', iconName: 'Search', path: '/isrc-review' },
+    { id: 'playlist-sync', label: 'Playlist Sync', shortLabel: 'Sync', iconName: 'Sync', path: '/playlist-sync' },
   ],
   activities: [
-    { id: 'recent-activity', label: 'Recent Activity Report', iconName: 'Timeline', path: '/recent-activity' },
-    { id: 'leaderboards', label: 'Leaderboards', iconName: 'Leaderboard', path: '/leaderboards' },
-    { id: 'run-predictions', label: 'Run Predictions', iconName: 'Speed', path: '/run-predictions' },
-    { id: 'segment-management', label: 'Segment Management', iconName: 'Route', path: '/segment-management' },
-    { id: 'activity-processing', label: 'Activity Processing', iconName: 'Cached', path: '/activity-processing' },
-    { id: 'training-cycles', label: 'Training Cycle Management', iconName: 'Repeat', path: '/training-cycles' },
-    { id: 'beach', label: 'Beach', iconName: 'SportsVolleyball', path: '/beach' },
+    { id: 'recent-activity', label: 'Recent Activity Report', shortLabel: 'Recent', iconName: 'Timeline', path: '/recent-activity' },
+    { id: 'leaderboards', label: 'Leaderboards', shortLabel: 'Leaders', iconName: 'Leaderboard', path: '/leaderboards' },
+    { id: 'run-predictions', label: 'Run Predictions', shortLabel: 'Predict', iconName: 'Speed', path: '/run-predictions' },
+    { id: 'segment-management', label: 'Segment Management', shortLabel: 'Segments', iconName: 'Route', path: '/segment-management' },
+    { id: 'activity-processing', label: 'Activity Processing', shortLabel: 'Process', iconName: 'Cached', path: '/activity-processing' },
+    { id: 'training-cycles', label: 'Training Cycle Management', shortLabel: 'Cycles', iconName: 'Repeat', path: '/training-cycles' },
+    { id: 'beach', label: 'Beach', shortLabel: 'Beach', iconName: 'SportsVolleyball', path: '/beach' },
   ],
   health: [
-    { id: 'charting', label: 'Charting', iconName: 'BarChart', path: '/charting' },
-    { id: 'photo-intake', label: 'Photo Intake', iconName: 'CameraAlt', path: '/photo-intake' },
-    { id: 'dimension-intake', label: 'Dimension Intake', iconName: 'Straighten', path: '/dimension-intake' },
-    { id: 'weight-targets', label: 'Weight Targets', iconName: 'TrackChanges', path: '/weight-targets' },
+    { id: 'charting', label: 'Charting', shortLabel: 'Charts', iconName: 'BarChart', path: '/charting' },
+    { id: 'photo-intake', label: 'Photo Intake', shortLabel: 'Photos', iconName: 'CameraAlt', path: '/photo-intake' },
+    { id: 'dimension-intake', label: 'Dimension Intake', shortLabel: 'Measure', iconName: 'Straighten', path: '/dimension-intake' },
+    { id: 'weight-targets', label: 'Weight Targets', shortLabel: 'Weight', iconName: 'TrackChanges', path: '/weight-targets' },
   ],
   food: [
-    { id: 'logging', label: 'Diary', iconName: 'EditNote', path: '/logging' },
-    { id: 'summary', label: 'Recipe Box', iconName: 'Summarize', path: '/summary' },
-    { id: 'recipe-selection', label: 'Food Database', iconName: 'MenuBook', path: '/recipe-selection' },
-    { id: 'tri-tip-timer', label: 'Tri-tip Timer', iconName: 'Timer', path: '/tri-tip-timer' },
+    { id: 'logging', label: 'Diary', shortLabel: 'Diary', iconName: 'EditNote', path: '/logging' },
+    { id: 'summary', label: 'Recipe Box', shortLabel: 'Recipes', iconName: 'Summarize', path: '/summary' },
+    { id: 'recipe-selection', label: 'Food Database', shortLabel: 'Foods', iconName: 'MenuBook', path: '/recipe-selection' },
+    { id: 'tri-tip-timer', label: 'Tri-tip Timer', shortLabel: 'Tri-Tip', iconName: 'Timer', path: '/tri-tip-timer' },
   ],
   exercises: [
-    { id: 'timer-activation', label: 'Timer Activation', iconName: 'PlayArrow', path: '/timer-activation' },
-    { id: 'timer-creation', label: 'Timer Creation', iconName: 'AddCircle', path: '/timer-creation' },
+    { id: 'timer-activation', label: 'Timer Activation', shortLabel: 'Timers', iconName: 'PlayArrow', path: '/timer-activation' },
+    { id: 'timer-creation', label: 'Timer Creation', shortLabel: 'Create', iconName: 'AddCircle', path: '/timer-creation' },
   ],
-  admin: [],
+  admin: [
+    { id: 'db-info', label: 'DB Info', shortLabel: 'DB Info', iconName: 'Storage', path: '/db-info' },
+    { id: 'task-management', label: 'Tasks', shortLabel: 'Tasks', iconName: 'Assignment', path: '/task-management' },
+    { id: 'services', label: 'Services', shortLabel: 'Services', iconName: 'Power', path: '/services' },
+    { id: 'credentials', label: 'Credentials', shortLabel: 'Keys', iconName: 'VpnKey', path: '/credentials' },
+    { id: 'theme', label: 'Theme', shortLabel: 'Theme', iconName: 'Brightness4', path: '/theme' },
+  ],
 };
