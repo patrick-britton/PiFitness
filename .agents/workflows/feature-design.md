@@ -13,17 +13,18 @@ Turn the feature request into a design and record everything you are unsure abou
 - Existing files, tables and endpoints come from the request or lineage. Anything new is added only if the feature needs it, marked `(new)`, and follows the nearest naming pattern; with no pattern, ask an OQ.
 - Every B# is covered by at least one AC and every AC covers at least one B#.
 - A design with no open questions is wrong. Only the human's written answer resolves an OQ; you judge whether it is enough (step 8).
+- The human only writes answers; they never set statuses. Any OQ whose `Answer:` line holds text other than the placeholder `(to be provided)` is answered, whatever its `Status` or `Decision` currently says, and you process it (step 8) even on a first run. Setting `Status`, `Decision` and `blocked-by` is your job.
 - With no Task Plan, `fd.py next/resume/set` refuse and `hot` reports a structural error. Use `check`, `oq`, `section`, `uat build`, and edit Resume Here by hand. Once a Task Plan exists, use `fd.py set <id> resume`.
 
 ## 1. Locate
 
-Branch must be `feature-test`; `.features/descriptions/` must hold exactly one `.md` whose frontmatter `feature-id` (= `<id>`) matches its filename; `designs_active/` must hold no other feature's file. Otherwise stop and tell the human. No `<id>_design.md` yet: step 2. Exists: step 8.
+Branch must be `feature-test`; `.features/descriptions/` must hold exactly one `.md` whose frontmatter `feature-id` (= `<id>`) matches its filename; `designs_active/` must hold no other feature's file. Otherwise stop and tell the human. No `<id>_design.md` yet: step 2. Exists: step 8. After step 2 creates the design, if any OQ already carries a written answer (for example the request's own questions arrived with answers, or the human answered before this run), go to step 8 instead of stopping at step 7.
 
 ## 2. First run
 
 1. Copy `.features/templates/_FEATURE_DESIGN_TEMPLATE.md` to `.features/designs_active/<id>_design.md`. Fill the frontmatter from the request: `status` stays `draft`, `created` and `last-updated` today, leave `surfaces` and `points`.
 2. Write OQ-1 (step 5) from the request alone, assuming scope is exactly B1 to Bn.
-3. If section 5 of the request lists anything but `- None`, add one OQ per item: the item as written plus `Default: ...`.
+3. If section 5 of the request lists anything but `- None`, add one OQ per item: the item as written plus `Default: ...`. If an item already carries the human's answer, copy that answer unchanged onto the OQ's `Answer:` line.
 4. Resume Here: `progress` `0/0 tasks complete`, `next` `review`, `blocked-by` every open OQ id.
 5. If the request had questions, go to step 7 now: no research or drafting. Otherwise continue.
 
@@ -70,7 +71,7 @@ Reply with the design path and AC count (if drafted), then: "Open questions are 
 
 ## 8. Re-run: process the answers
 
-1. Run `fd.py oq <id> --open` and `fd.py oq <id> --unanswered`; an open OQ that is not unanswered has text on its `Answer:` line.
+1. Run `fd.py oq <id> --open` and `fd.py oq <id> --unanswered`; an open OQ that is not unanswered has text on its `Answer:` line. Treat every OQ with such text as answered, even if its `Status` still says open or the human changed nothing else. If the two commands disagree with what you read on the `Answer:` lines (`fd.py section <id> "Open Questions"`), trust the `Answer:` lines.
 2. Judge each answer:
    - **Enough** (you can proceed without guessing; `default` means accept the Default): set `Decision` to the outcome in one line and `Status: resolved`. Leave `Answer` exactly as written.
    - **Not enough** (unclear, partial, off-topic, contradictory, or raising a new question): do not resolve or guess. Rewrite the Question as `You said: "<their words>". Still open: <what is missing>.`, keep a useful Default, reset `Answer` to `(to be provided)`, keep `Status: open` and the same id.

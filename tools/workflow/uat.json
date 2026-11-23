@@ -1,24 +1,42 @@
 {
-  "feature_id": "feat-mobile-layout-revamp-header",
-  "title": "Mobile Layout Revamp, Header",
-  "generated_at": "2026-11-21",
+  "feature_id": "feat-dev-hub-rebuild",
+  "title": "dev-hub-rebuild",
+  "generated_at": "2026-11-22",
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "text": "Open the app on mobile portrait (360x740) and desktop (1440x900) -> The top Header bar is not rendered and main page content starts at the top of the viewport (covers B1)",
-      "auto": "powershell -NoProfile -Command \"cd frontend\\pifitness; npx tsc --noEmit\"",
+      "text": "Trigger \"Complete Feature\" and confirm → all active feature files move to the archive folder and are absent from their source locations (covers B1)",
+      "auto": "python -m py_compile tools/workflow/dev_hub.py",
       "done": false
     },
     {
       "id": "AC-2",
-      "text": "Inspect the UI and codebase -> The bug button (🐛) is absent, DebugPanel is removed from Layout and deleted, and localStorage 'pifitness-debug' is no longer toggled (covers B2)",
-      "auto": "powershell -NoProfile -Command \"cd frontend\\pifitness; npx tsc --noEmit\"",
+      "text": "Trigger any action, let it finish or error out, then immediately trigger another → the second action runs without a \"another action is in progress\" block (covers B1, B2)",
+      "auto": "python -m py_compile tools/workflow/dev_hub.py",
       "done": false
     },
     {
       "id": "AC-3",
-      "text": "Navigate to Admin -> Theme tab on mobile (360x740) and desktop (1440x900) -> The ThemeToggle button is rendered on its own admin page and toggles between light and dark mode (covers B3)",
-      "auto": "powershell -NoProfile -Command \"cd frontend\\pifitness; npx tsc --noEmit\"",
+      "text": "Click \"Launch Local Environment\" → backend and frontend start and their output appears in the DevHub terminal; no new PowerShell or console window opens (covers B2)",
+      "auto": "none (subprocess launch behavior requires UAT)",
+      "done": false
+    },
+    {
+      "id": "AC-4",
+      "text": "The DevHub shows clearly labelled links or tabs for the DevHub and the app (:3000); clicking either opens or focuses that page without launching a new service (covers B3)",
+      "auto": "none (UI behavior requires UAT)",
+      "done": false
+    },
+    {
+      "id": "AC-5",
+      "text": "Clicking \"Bootstrap DEV\" starts the Pi bootstrapper targeting the test environment without any interactive prompt; clicking \"Bootstrap PRD\" targets production without any interactive prompt (covers B4)",
+      "auto": "none (SSH to Pi; human verifies in UAT)",
+      "done": false
+    },
+    {
+      "id": "AC-6",
+      "text": "The launcher can be pinned to the Windows taskbar and launches the DevHub when clicked (covers B1, B5)",
+      "auto": "none (Windows shell feature; human verifies in UAT)",
       "done": false
     }
   ]

@@ -93,11 +93,13 @@ def build_feedback_md(data: dict, verdicts: list[dict]) -> str:
 
 def run_import(fid: str) -> str:
     """Run fd.py uat import <id> --apply and return stdout+stderr combined."""
+    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     result = subprocess.run(
         [PYTHON, str(FD_PY), "uat", "import", fid, "--apply"],
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
+        creationflags=creationflags,
     )
     out = (result.stdout + result.stderr).strip()
     return out

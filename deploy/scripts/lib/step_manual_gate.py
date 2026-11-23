@@ -24,6 +24,20 @@ Required behaviour:
 Required evidence: prompt, answer (or "timeout after 30m"), elapsed_seconds,
 and merge_command on GO.
 
+Output channel notes:
+  autodeploy.sh redirects this script's stdout/stderr into the log file via
+  "exec >> LOG 2>&1".  The only channel that reaches the SSH caller (and
+  therefore the DevHub browser console) is /dev/tty, which flows through the
+  SSH pseudo-TTY (-tt flag on run-bootstrap.ps1).
+
+  The DevHub sentinel line "DEVHUB_PROMPT:gonogo" is therefore written to
+  /dev/tty, not stdout, so it arrives in the DevHub SSE stream and triggers
+  the GO/NO-GO button bar in the browser.
+
+  User input from the DevHub GO/NO-GO buttons is sent via POST /api/stdin →
+  written to the subprocess stdin pipe → SSH client forwards it through the
+  PTY → arrives on /dev/tty on the Pi side, where select.select picks it up.
+
 WHAT IS AND IS NOT VERIFIED
   Verified  : the prompt is presented, valid/invalid inputs are handled, the
               state marker is updated on GO, the step exits 0/1 correctly.
@@ -63,11 +77,15 @@ def parse_args(argv):
 # Timed TTY prompt
 # ---------------------------------------------------------------------------
 
-def ask_tty_with_timeout(tty, prompt_text, reminder_text, timeout, reminder_interval):
+def ask_tty_with_timeout(tty, prompt_text, timeout, reminder_interval):
     """Prompt on /dev/tty with a timeout.
 
     Returns the upper-cased answer string, or None on timeout.
     Reprompts on invalid input; prints reminder lines at reminder_interval.
+
+    Input arrives via the SSH PTY (the same fd as /dev/tty on the Pi).
+    When running from DevHub, the user's GO/NO-GO button click sends the
+    answer via POST /api/stdin → proc.stdin → SSH → PTY → /dev/tty here.
     """
     deadline = time.monotonic() + timeout
     next_reminder = time.monotonic() + reminder_interval
@@ -164,7 +182,7 @@ class ManualGate:
         if tty is None:
             raise HelperError(
                 "no interactive terminal (/dev/tty cannot be opened); "
-                "a TEST run requires a terminal for the GO / NO-GO prompt",
+                "run-bootstrap.ps1 must use 'ssh -tt' to allocate a PTY",
                 "open('/dev/tty')")
 
         started = time.monotonic()
@@ -179,26 +197,34 @@ class ManualGate:
             "  SHA      : %s\n"
             "\n"
             "  Open the URL in a browser and exercise the feature branch.\n"
-            "  When done, type GO to promote to PRD or NO-GO to abort.\n"
+            "  When done, use the DevHub GO / NO-GO buttons, or type your\n"
+            "  answer directly if running in an interactive terminal.\n"
             "  (30-minute timeout — reminder every 5 minutes)\n"
             "  ============================================================\n"
         ) % (self.test_url, self.sha)
 
         try:
+            # Emit the DevHub sentinel FIRST through /dev/tty (the SSH PTY).
+            # This is a complete line ending in \n, so dev_hub.py's
+            # "for line in proc.stdout" yields it immediately.
+            # dev_hub.html intercepts it silently and shows the GO/NO-GO bar.
+            # It must go via tty.write, NOT print/sys.stdout, because
+            # autodeploy.sh redirects stdout to the log file.
+            tty.write("DEVHUB_PROMPT:gonogo\n")
+            tty.flush()
+
             tty.write(preamble)
             tty.flush()
 
             prompt_text = "\n  Enter GO or NO-GO: "
-            reminder_text = ""   # composed inline in ask_tty_with_timeout
 
-            info("prompt presented on /dev/tty")
+            info("prompt presented on /dev/tty (DevHub sentinel emitted)")
             evidence("test_url", self.test_url)
             evidence("sha", self.sha)
             evidence("prompt", "Enter GO or NO-GO (waits up to 30 minutes)")
 
             answer = ask_tty_with_timeout(
-                tty, prompt_text, reminder_text,
-                TIMEOUT_SECONDS, REMINDER_INTERVAL)
+                tty, prompt_text, TIMEOUT_SECONDS, REMINDER_INTERVAL)
 
             elapsed = time.monotonic() - started
 

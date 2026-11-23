@@ -22,17 +22,21 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { initialize: initializeViewport, setViewport, layoutMode, layoutVariant } = useViewportStore();
   const { initialize: initializeUI, syncActiveModuleFromPath, syncActiveSubPageFromPath } = useUIStore();
+  const pathname = usePathname();
   // Kiosk routes (006-002): the unlisted /beachchanger viewer renders without
   // the app chrome — no sidebar or nav. Every other route is unchanged.
-  const isKiosk = usePathname() === '/beachchanger';
+  const isKiosk = pathname === '/beachchanger';
+
+  // Sync navigation state from URL path on route changes
+  useEffect(() => {
+    syncActiveModuleFromPath();
+    syncActiveSubPageFromPath();
+  }, [pathname, syncActiveModuleFromPath, syncActiveSubPageFromPath]);
 
   // Initialize stores on mount
   useEffect(() => {
     initializeViewport();
     initializeUI();
-    // Sync navigation state from URL path on initial load
-    syncActiveModuleFromPath();
-    syncActiveSubPageFromPath();
 
     const handleResize = () => {
       // Only track the real window in native mode; forced modes keep their
