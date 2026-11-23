@@ -57,15 +57,10 @@ from pifitness.integrations.garmin.client import GarminClient
 def garmin_creds():
     # Loads the decrypted garmin credentials from the database and returns email & password
     creds = load_api_credentials('Garmin')
-    if 'email' in creds:
-        e = creds['email']
-    else:
-        e= None
-
-    if 'password' in creds:
-        p = creds['password']
-    else:
-        p = None
+    if not creds:
+        return None, None
+    e = creds.get('email')
+    p = creds.get('password')
     return e, p
 
 
@@ -121,37 +116,43 @@ def garmin_login(headless=False):
     import json
     from pathlib import Path
     
-    # Get credentials
-    email, password = garmin_creds()
-    if not email or not password:
-        log_api_event(service='Garmin', event='Login aborted — missing credentials')
-        return None
-    
-    # Set up cache directory for Garmin auth files
-    # The file cache exists because AuthManager reads and writes tokens to
-    # disk, not DB. garmin_login() bridges the two:
-    #   DB (api_services.api_tokens) -> file cache -> AuthManager
-    #   AuthManager -> file cache -> DB (via save_token_to_db)
-    # The DB tier lets every machine share sessions; the file tier gives
-    # AuthManager the interface it expects.
-    cache_dir = Path(os.getenv("LOCAL_STORAGE_PATH")) / "garmin"
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Step 1: Load any stored session from DB and write to local cache file
-    # This is the cross-device sync mechanism — same pattern as Spotify
-    db_session = load_token_from_db('Garmin')
-    if db_session:
-        session_file = cache_dir / "native-oauth2.json"
-        try:
-            session_file.write_text(json.dumps(db_session, indent=2) + "\n")
-        except OSError:
-            log_api_event('Garmin', 'Could not write session to cache file (non-fatal)')
-        else:
-            log_api_event('Garmin', 'Session loaded from DB to local cache')
-    
-    # Step 2: Create GarminClient with the internal AuthManager
-    # This handles: load cache → refresh tokens → Playwright login if all expired
     try:
+        # Get credentials
+        email, password = garmin_creds()
+        if not email or not password:
+            log_api_event(service='Garmin', event='Login aborted — missing credentials')
+            return None
+        
+        # Set up cache directory for Garmin auth files
+        # The file cache exists because AuthManager reads and writes tokens to
+        # disk, not DB. garmin_login() bridges the two:
+        #   DB (api_services.api_tokens) -> file cache -> AuthManager
+        #   AuthManager -> file cache -> DB (via save_token_to_db)
+        # The DB tier lets every machine share sessions; the file tier gives
+        # AuthManager the interface it expects.
+        storage_path = os.getenv("LOCAL_STORAGE_PATH")
+        if not storage_path:
+            storage_path = str(Path.home() / ".config" / "pifitness")
+        cache_dir = Path(storage_path) / "garmin"
+        try:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            log_api_event('Garmin', f'Could not create cache directory (non-fatal): {e}')
+        
+        # Step 1: Load any stored session from DB and write to local cache file
+        # This is the cross-device sync mechanism — same pattern as Spotify
+        db_session = load_token_from_db('Garmin')
+        if db_session:
+            session_file = cache_dir / "native-oauth2.json"
+            try:
+                session_file.write_text(json.dumps(db_session, indent=2) + "\n")
+            except OSError:
+                log_api_event('Garmin', 'Could not write session to cache file (non-fatal)')
+            else:
+                log_api_event('Garmin', 'Session loaded from DB to local cache')
+        
+        # Step 2: Create GarminClient with the internal AuthManager
+        # This handles: load cache → refresh tokens → Playwright login if all expired
         client = GarminClient.from_credentials(
             username=email,
             password=password,

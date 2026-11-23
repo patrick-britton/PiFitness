@@ -119,9 +119,6 @@ export default function StepChecklist({ steps, loadingStart, distanceM, showPlay
                     : 'text-gray-700 dark:text-gray-200'
                 }`}>
                   {label}
-                  {isError && step.error && (
-                    <span className="font-normal text-red-700 dark:text-red-300"> — {step.error}</span>
-                  )}
                 </p>
                 <span className="shrink-0 font-mono tabular-nums text-gray-500 dark:text-gray-400">
                   {isComplete || isError || isRunning ? `${Math.round(elapsedMs).toLocaleString()} ms` : '–'}
@@ -161,6 +158,12 @@ export default function StepChecklist({ steps, loadingStart, distanceM, showPlay
                 )}
               </div>
             </div>
+
+            {isError && step.error && (
+              <p className="mt-1 pl-3 text-xs text-red-700 dark:text-red-300 break-words">
+                {step.error}
+              </p>
+            )}
 
             {isComplete && step.result && (
               <div className="mt-0.5 text-gray-600 dark:text-gray-300">

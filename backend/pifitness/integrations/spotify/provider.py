@@ -10,20 +10,11 @@ tests/test_integration_protocol.py::test_spotify_provider_conforms.
 
 def spotify_creds():
     creds = load_api_credentials('Spotify')
-    if 'client_id' in creds:
-        cid = creds['client_id']
-    else:
-        cid = None
-
-    if 'client_secret' in creds:
-        csec = creds['client_secret']
-    else:
-        csec = None
-
-    if 'redirect_uri' in creds:
-        uri = creds['redirect_uri']
-    else:
-        uri = None
+    if not creds:
+        return None, None, None
+    cid = creds.get('client_id')
+    csec = creds.get('client_secret')
+    uri = creds.get('redirect_uri')
     return cid, csec, uri
 
 

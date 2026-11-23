@@ -49,7 +49,7 @@ request: .features/descriptions/fix-activity-processing-fixes.md
   - auto: python -m py_compile backend/pifitness/activities/router.py
 - [ ] AC-3: At mobile viewports (360x740 and 448x875) on /activities/activity-processing while a step is executing -> the step status bar displays active progress that fills smoothly over time based on elapsed time and estimated duration (covers B2)
   - auto: node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit
-- [ ] AC-4: Profile backend pipeline execution times and database stored procedures (including resample_activity_to_distance and segment matching) -> evaluation summary identifies latency hotspots and safe optimization opportunities without breaking match criteria or replay smoothness (covers B3)
+- [x] AC-4: Profile backend pipeline execution times and database stored procedures (including resample_activity_to_distance and segment matching) -> evaluation summary identifies latency hotspots and safe optimization opportunities without breaking match criteria or replay smoothness (covers B3)
   - auto: python -m py_compile backend/pifitness/activities/smoothing.py
 
 ## Open Questions

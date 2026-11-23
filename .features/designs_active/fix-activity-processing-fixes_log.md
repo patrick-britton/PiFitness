@@ -9,3 +9,7 @@
 - 2026-11-23 T03 start: verify='node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit'
 - 2026-11-23 T03 done: exit=0 cmd='node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit' tail=''
 - 2026-11-23 execute: T01, T02, T03 complete, 4 points; stopped: all tasks complete
+- 2026-11-23 uat import: 1 ticked, 0 unticked
+- 2026-11-23 bug BUG-1 recorded: Syncing activities fails with Client error
+- 2026-11-23 bug BUG-1 open -> in-review
+- 2026-11-23 polish: 1 bugs -> in-review (BUG-1); 0 blocked (); 1 awaiting UAT (BUG-1)
