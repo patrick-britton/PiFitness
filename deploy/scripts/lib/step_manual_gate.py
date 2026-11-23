@@ -12,11 +12,10 @@ Required behaviour:
   1. Assert this is a TEST run.  PRD has no human gate.
   2. Print the TEST URL, the deployed SHA, and the instruction to run the manual
      test script.
-  3. Prompt "Enter GO or NO-GO" on /dev/tty (or sys.stdin when no tty is
-     available, e.g. when launched from DevHub).  Accept only those two answers
+  3. Prompt "Enter GO or NO-GO" on /dev/tty.  Accept only those two answers
      (case-insensitive); reprompt on anything else.
   4. 30-minute timeout with no answer = treated as NO-GO (failure).
-     Countdown/reminder lines are printed at intervals.
+     Countdown/reminder lines are printed to /dev/tty at intervals.
   5. GO : set the TEST DB state marker to 'migrated'; print the exact git
      commands to merge feature-test into main; print the launcher instruction;
      exit 0  (cleanup outcome = success → undo_test_db skips the restore).
@@ -24,6 +23,20 @@ Required behaviour:
 
 Required evidence: prompt, answer (or "timeout after 30m"), elapsed_seconds,
 and merge_command on GO.
+
+Output channel notes:
+  autodeploy.sh redirects this script's stdout/stderr into the log file via
+  "exec >> LOG 2>&1".  The only channel that reaches the SSH caller (and
+  therefore the DevHub browser console) is /dev/tty, which flows through the
+  SSH pseudo-TTY (-tt flag on run-bootstrap.ps1).
+
+  The DevHub sentinel line "DEVHUB_PROMPT:gonogo" is therefore written to
+  /dev/tty, not stdout, so it arrives in the DevHub SSE stream and triggers
+  the GO/NO-GO button bar in the browser.
+
+  User input from the DevHub GO/NO-GO buttons is sent via POST /api/stdin →
+  written to the subprocess stdin pipe → SSH client forwards it through the
+  PTY → arrives on /dev/tty on the Pi side, where select.select picks it up.
 
 WHAT IS AND IS NOT VERIFIED
   Verified  : the prompt is presented, valid/invalid inputs are handled, the
@@ -64,79 +77,15 @@ def parse_args(argv):
 # Timed TTY prompt
 # ---------------------------------------------------------------------------
 
-def ask_stdin_with_timeout(prompt_text, timeout, reminder_interval):
-    """Prompt via sys.stdout / sys.stdin with a timeout.
-
-    Used when /dev/tty is unavailable (e.g. launched from DevHub).  The
-    prompt is written to stdout so it appears in the DevHub console stream.
-    Input is read from stdin, which DevHub pipes via /api/stdin.
-
-    Returns the upper-cased answer string, or None on timeout.
-    Reprompts on invalid input; prints reminder lines at reminder_interval.
-    """
-    deadline = time.monotonic() + timeout
-    next_reminder = time.monotonic() + reminder_interval
-
-    sys.stdout.write(prompt_text)
-    sys.stdout.flush()
-
-    fd = sys.stdin.fileno()
-
-    line_buf = ""
-    while True:
-        now = time.monotonic()
-        remaining = deadline - now
-
-        if remaining <= 0:
-            sys.stdout.write("\n  Timeout: no answer received after 30 minutes.\n")
-            sys.stdout.flush()
-            return None
-
-        # Wake at the earlier of: deadline or next reminder
-        wait = min(remaining, max(0.0, next_reminder - now))
-
-        ready, _, _ = select.select([fd], [], [], wait)
-
-        if ready:
-            ch = os.read(fd, 1)
-            if not ch:
-                raise HelperError(
-                    "stdin closed while waiting for GO / NO-GO",
-                    "read(sys.stdin)")
-            decoded = ch.decode("utf-8", "replace")
-            if decoded in ("\r", "\n"):
-                answer = line_buf.strip().upper()
-                line_buf = ""
-                if answer in VALID_ANSWERS:
-                    sys.stdout.write("\n")
-                    sys.stdout.flush()
-                    return answer
-                if answer:
-                    sys.stdout.write("  Please answer GO or NO-GO: ")
-                    sys.stdout.flush()
-                else:
-                    sys.stdout.write(prompt_text)
-                    sys.stdout.flush()
-            else:
-                line_buf += decoded
-        else:
-            # Reminder time (or just woke for deadline check)
-            now = time.monotonic()
-            if now >= next_reminder and now < deadline:
-                remaining_m = int((deadline - now) / 60) + 1
-                sys.stdout.write(
-                    "\n  [reminder] still waiting for GO / NO-GO — "
-                    "%d minute(s) remaining\n  Enter GO or NO-GO: "
-                    % remaining_m)
-                sys.stdout.flush()
-                next_reminder = now + reminder_interval
-
-
-def ask_tty_with_timeout(tty, prompt_text, reminder_text, timeout, reminder_interval):
+def ask_tty_with_timeout(tty, prompt_text, timeout, reminder_interval):
     """Prompt on /dev/tty with a timeout.
 
     Returns the upper-cased answer string, or None on timeout.
     Reprompts on invalid input; prints reminder lines at reminder_interval.
+
+    Input arrives via the SSH PTY (the same fd as /dev/tty on the Pi).
+    When running from DevHub, the user's GO/NO-GO button click sends the
+    answer via POST /api/stdin → proc.stdin → SSH → PTY → /dev/tty here.
     """
     deadline = time.monotonic() + timeout
     next_reminder = time.monotonic() + reminder_interval
@@ -230,9 +179,11 @@ class ManualGate:
                 "ctx.environment")
 
         tty = open_tty()
-        using_stdin = tty is None
-        if using_stdin:
-            info("no /dev/tty — using stdin (DevHub interactive mode)")
+        if tty is None:
+            raise HelperError(
+                "no interactive terminal (/dev/tty cannot be opened); "
+                "run-bootstrap.ps1 must use 'ssh -tt' to allocate a PTY",
+                "open('/dev/tty')")
 
         started = time.monotonic()
 
@@ -246,38 +197,34 @@ class ManualGate:
             "  SHA      : %s\n"
             "\n"
             "  Open the URL in a browser and exercise the feature branch.\n"
-            "  When done, type GO to promote to PRD or NO-GO to abort.\n"
+            "  When done, use the DevHub GO / NO-GO buttons, or type your\n"
+            "  answer directly if running in an interactive terminal.\n"
             "  (30-minute timeout — reminder every 5 minutes)\n"
             "  ============================================================\n"
         ) % (self.test_url, self.sha)
 
         try:
-            if using_stdin:
-                # Emit a sentinel that dev_hub.html watches for to show the GO/NO-GO buttons.
-                # Must be a complete line (ends with \n) so it arrives as a full SSE event.
-                print("DEVHUB_PROMPT:gonogo", flush=True)
-                sys.stdout.write(preamble)
-                sys.stdout.flush()
-            else:
-                tty.write(preamble)
-                tty.flush()
+            # Emit the DevHub sentinel FIRST through /dev/tty (the SSH PTY).
+            # This is a complete line ending in \n, so dev_hub.py's
+            # "for line in proc.stdout" yields it immediately.
+            # dev_hub.html intercepts it silently and shows the GO/NO-GO bar.
+            # It must go via tty.write, NOT print/sys.stdout, because
+            # autodeploy.sh redirects stdout to the log file.
+            tty.write("DEVHUB_PROMPT:gonogo\n")
+            tty.flush()
+
+            tty.write(preamble)
+            tty.flush()
 
             prompt_text = "\n  Enter GO or NO-GO: "
-            reminder_text = ""   # composed inline in ask_tty_with_timeout
 
-            info("prompt presented%s" % (" on stdin" if using_stdin else " on /dev/tty"))
+            info("prompt presented on /dev/tty (DevHub sentinel emitted)")
             evidence("test_url", self.test_url)
             evidence("sha", self.sha)
             evidence("prompt", "Enter GO or NO-GO (waits up to 30 minutes)")
-            evidence("prompt_mode", "stdin (DevHub)" if using_stdin else "tty")
 
-            if using_stdin:
-                answer = ask_stdin_with_timeout(
-                    prompt_text, TIMEOUT_SECONDS, REMINDER_INTERVAL)
-            else:
-                answer = ask_tty_with_timeout(
-                    tty, prompt_text, reminder_text,
-                    TIMEOUT_SECONDS, REMINDER_INTERVAL)
+            answer = ask_tty_with_timeout(
+                tty, prompt_text, TIMEOUT_SECONDS, REMINDER_INTERVAL)
 
             elapsed = time.monotonic() - started
 
@@ -287,7 +234,7 @@ class ManualGate:
                 raise HelperError(
                     "GO / NO-GO prompt timed out after 30 minutes "
                     "(treated as NO-GO)",
-                    "ask_with_timeout")
+                    "ask_tty_with_timeout")
 
             evidence("answer", answer)
             evidence("elapsed_seconds", "%.0f" % elapsed)
@@ -309,7 +256,7 @@ class ManualGate:
             )
             evidence("merge_command", merge_cmd)
 
-            go_message = (
+            tty.write(
                 "\n"
                 "  GO received.  Next steps on your local machine:\n"
                 "\n"
@@ -318,20 +265,13 @@ class ManualGate:
                 "  Then re-run the launcher and select PRD.\n"
                 "\n"
                 % merge_cmd)
-
-            if using_stdin:
-                sys.stdout.write(go_message)
-                sys.stdout.flush()
-            else:
-                tty.write(go_message)
-                tty.flush()
+            tty.flush()
 
             info("GO accepted — TEST DB marker set to 'migrated'")
-            info("merge command printed to %s" % ("stdout" if using_stdin else "terminal"))
+            info("merge command printed to terminal")
 
         finally:
-            if tty is not None:
-                tty.close()
+            tty.close()
 
 
 def main():
