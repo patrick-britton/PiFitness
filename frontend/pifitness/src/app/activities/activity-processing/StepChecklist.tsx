@@ -148,7 +148,7 @@ export default function StepChecklist({ steps, loadingStart, distanceM, showPlay
                     aria-valuemax={100}
                   >
                     <div
-                      className={`h-full rounded-full ${
+                      className={`h-full rounded-full transition-[width] duration-300 ease-out ${
                         isComplete
                           ? 'bg-green-600 dark:bg-green-400'
                           : over
