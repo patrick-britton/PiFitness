@@ -508,29 +508,33 @@ class DevHubHandler(BaseHTTPRequestHandler):
             # 5. Migrate to Test
             if action in ("migrate_to_test", "launch_bootstrapper_dev", "launch_bootstrapper"):
                 log("Running PiFitness Migration to Test (Pi test environment)...", "heading")
-                log("Opening interactive SSH session in dedicated terminal...")
-                cmd = (
-                    f'Start-Process powershell -ArgumentList '
-                    f'"-NoExit", "-ExecutionPolicy", "Bypass", "-File", "`"{str(BOOTSTRAP_PS1)}`"", "-Environment", "test"'
-                )
-                subprocess.run(["powershell.exe", "-NoProfile", "-Command", cmd], cwd=str(REPO_ROOT))
-                log("Bootstrapper terminal launched.", "ok")
-                log("Please complete the interactive prompts (database choice, manual gate) in the terminal window.", "info")
-                finish(True, "Bootstrapper Launched in Terminal")
+                cmd = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(BOOTSTRAP_PS1),
+                    "-Environment",
+                    "test",
+                ]
+                self._run_streaming_cmd(cmd, log, finish)
                 return
 
             # 6. Migrate to PRD
             if action in ("migrate_to_prd", "launch_bootstrapper_prd"):
                 log("Running PiFitness Migration to PRD (Pi production environment)...", "heading")
-                log("Opening interactive SSH session in dedicated terminal...")
-                cmd = (
-                    f'Start-Process powershell -ArgumentList '
-                    f'"-NoExit", "-ExecutionPolicy", "Bypass", "-File", "`"{str(BOOTSTRAP_PS1)}`"", "-Environment", "prd"'
-                )
-                subprocess.run(["powershell.exe", "-NoProfile", "-Command", cmd], cwd=str(REPO_ROOT))
-                log("Bootstrapper terminal launched.", "ok")
-                log("Follow deployment progress in the terminal window.", "info")
-                finish(True, "Bootstrapper Launched in Terminal")
+                cmd = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(BOOTSTRAP_PS1),
+                    "-Environment",
+                    "prd",
+                ]
+                self._run_streaming_cmd(cmd, log, finish)
                 return
 
             # Create Taskbar / Desktop Shortcut Helper
@@ -589,15 +593,18 @@ class DevHubHandler(BaseHTTPRequestHandler):
                     return
 
                 log("Git merge to main completed successfully!", "ok")
-                log("Now launching Bootstrapper for PRD in a dedicated terminal...")
-                cmd = (
-                    f'Start-Process powershell -ArgumentList '
-                    f'"-NoExit", "-ExecutionPolicy", "Bypass", "-File", "`"{str(BOOTSTRAP_PS1)}`"", "-Environment", "prd"'
-                )
-                subprocess.run(["powershell.exe", "-NoProfile", "-Command", cmd], cwd=str(REPO_ROOT))
-                log("Bootstrapper terminal launched.", "ok")
-                log("Follow deployment progress in the terminal window.", "info")
-                finish(True, "Merged to main and launched Bootstrapper")
+                log("Now running Bootstrapper for PRD...")
+                cmd = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(BOOTSTRAP_PS1),
+                    "-Environment",
+                    "prd",
+                ]
+                self._run_streaming_cmd(cmd, log, finish)
                 return
 
             # 8. Complete Feature
