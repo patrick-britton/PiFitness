@@ -462,6 +462,10 @@ async def process_activity(req: ProcessActivityRequest):
     return StreamingResponse(
         process_generator(req),
         media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

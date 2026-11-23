@@ -13,3 +13,7 @@
 - 2026-11-23 bug BUG-1 recorded: Syncing activities fails with Client error
 - 2026-11-23 bug BUG-1 open -> in-review
 - 2026-11-23 polish: 1 bugs -> in-review (BUG-1); 0 blocked (); 1 awaiting UAT (BUG-1)
+- 2026-11-23 bug BUG-2 recorded: Progress bars do not update on mobile viewports while step executes
+- 2026-11-23 bug BUG-2 open -> in-review
+- 2026-11-23 bug BUG-1 diagnosis updated
+- 2026-11-23 polish: 2 bugs -> in-review (BUG-1, BUG-2); 0 blocked (); 2 awaiting UAT (BUG-1, BUG-2)

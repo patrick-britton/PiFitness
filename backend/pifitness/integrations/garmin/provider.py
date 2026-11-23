@@ -117,11 +117,8 @@ def garmin_login(headless=False):
     from pathlib import Path
     
     try:
-        # Get credentials
+        # Get credentials (optional when reusing a valid session from DB)
         email, password = garmin_creds()
-        if not email or not password:
-            log_api_event(service='Garmin', event='Login aborted — missing credentials')
-            return None
         
         # Set up cache directory for Garmin auth files
         # The file cache exists because AuthManager reads and writes tokens to
@@ -150,6 +147,9 @@ def garmin_login(headless=False):
                 log_api_event('Garmin', 'Could not write session to cache file (non-fatal)')
             else:
                 log_api_event('Garmin', 'Session loaded from DB to local cache')
+        elif not email or not password:
+            log_api_event(service='Garmin', event='Login aborted — missing credentials and no cached session in database')
+            return None
         
         # Step 2: Create GarminClient with the internal AuthManager
         # This handles: load cache → refresh tokens → Playwright login if all expired

@@ -38,7 +38,8 @@ export function estimateForStep(stepId: ProcessStepId, distanceM: number | null 
 /** Bar fill fraction (0–1) and over-estimate flag for a row. */
 export function barFraction(elapsedMs: number, estimateMs: number | null): { frac: number; over: boolean } {
   if (estimateMs == null || estimateMs <= 0) return { frac: 0, over: false };
-  return { frac: Math.min(elapsedMs / estimateMs, 1), over: elapsedMs > estimateMs };
+  const safeElapsed = Math.max(0, elapsedMs);
+  return { frac: Math.min(safeElapsed / estimateMs, 1), over: safeElapsed > estimateMs };
 }
 
 export default function StepChecklist({ steps, loadingStart, distanceM, showPlaylistSteps = true }: StepChecklistProps) {
@@ -70,12 +71,12 @@ export default function StepChecklist({ steps, loadingStart, distanceM, showPlay
         const isError = step.status === 'error';
 
         // Compute elapsed time — live for the running step, stored for terminal steps
-        let elapsedMs = step.elapsed_ms;
+        let elapsedMs = Math.max(0, step.elapsed_ms);
         if (isRunning) {
           const stepStart = step.started_at
             ? new Date(step.started_at).getTime()
             : (loadingStart ?? Date.now());
-          elapsedMs = Date.now() - stepStart;
+          elapsedMs = Math.max(0, Date.now() - stepStart);
         }
 
         const estimateMs = estimateForStep(step.step_id, distanceM);
@@ -137,7 +138,7 @@ export default function StepChecklist({ steps, loadingStart, distanceM, showPlay
                   <div
                     data-testid="step-bar"
                     data-over={over && isRunning ? 'true' : 'false'}
-                    className="h-full"
+                    className="h-full w-full"
                     role="progressbar"
                     aria-label={`${label} progress`}
                     aria-valuenow={Math.round(frac * 100)}
