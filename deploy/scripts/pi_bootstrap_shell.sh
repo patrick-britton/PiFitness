@@ -148,3 +148,4 @@ echo
 bash "$SCRIPT" \
     --environment "$ENVIRONMENT" \
     --commit "$COMMIT"
+exit $?

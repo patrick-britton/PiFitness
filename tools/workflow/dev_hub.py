@@ -12,7 +12,7 @@ Features:
 3. Prep Dev Environment (tools/refresh_dev.ps1)
 4. Launch Local Environment (backend uvicorn + frontend next dev) & open http://localhost:3000
 5. Launch Bootstrapper (deploy/run-bootstrap.ps1)
-6. Merge to PRD (git checkout main, pull, merge --no-ff, push, checkout feature-test) + Launch Bootstrapper
+6. Merge to Main & Deploy (git checkout main, pull, merge --no-ff, push, checkout feature-test) + Launch Bootstrapper
 7. Complete Feature (move .features/descriptions & designs_active to zz_feature_archive + refresh_dev.ps1)
 
 Usage:
@@ -357,6 +357,18 @@ class DevHubHandler(BaseHTTPRequestHandler):
                 self._json(400, {"ok": False, "error": "No active process to receive input."})
             return
 
+        # 5. DevHub Safe Shutdown (/api/shutdown)
+        if clean_path == "/api/shutdown":
+            self._json(200, {"ok": True, "message": "DevHub is shutting down."})
+
+            def _shutdown_server(srv: ThreadingHTTPServer) -> None:
+                time.sleep(0.5)
+                cleanup_background_procs()
+                srv.shutdown()
+
+            threading.Thread(target=_shutdown_server, args=(self.server,), daemon=True).start()
+            return
+
         self._json(404, {"error": "Endpoint not found."})
 
     def _handle_request_save(self, payload: dict) -> None:
@@ -588,9 +600,9 @@ class DevHubHandler(BaseHTTPRequestHandler):
                 self._run_streaming_cmd(cmd, log, finish)
                 return
 
-            # 7. Merge to PRD & Launch Bootstrapper
-            if action == "merge_to_prd":
-                log("=== Merge to PRD & Deploy Sequence ===", "heading")
+            # 7. Merge to Main & Launch Bootstrapper
+            if action in ("merge_to_prd", "merge_to_main"):
+                log("=== Merge to Main & Deploy Sequence ===", "heading")
                 git_steps = [
                     ("git checkout main", ["git", "checkout", "main"]),
                     ("git pull origin main", ["git", "pull", "origin", "main"]),
