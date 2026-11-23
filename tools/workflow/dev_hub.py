@@ -56,6 +56,27 @@ PYTHON = sys.executable
 MAX_BODY_BYTES = 256 * 1024
 
 BACKGROUND_PROCS: list[subprocess.Popen] = []
+ACTIVE_STREAMING_PROC: subprocess.Popen | None = None
+ACTIVE_PROC_LOCK = threading.Lock()
+
+
+def set_active_proc(proc: subprocess.Popen | None) -> None:
+    global ACTIVE_STREAMING_PROC
+    with ACTIVE_PROC_LOCK:
+        ACTIVE_STREAMING_PROC = proc
+
+
+def write_active_proc_stdin(text: str) -> bool:
+    with ACTIVE_PROC_LOCK:
+        proc = ACTIVE_STREAMING_PROC
+        if proc and proc.poll() is None and proc.stdin:
+            try:
+                proc.stdin.write(text)
+                proc.stdin.flush()
+                return True
+            except (BrokenPipeError, OSError):
+                return False
+        return False
 
 
 def cleanup_background_procs() -> None:
@@ -63,6 +84,12 @@ def cleanup_background_procs() -> None:
         if proc.poll() is None:
             try:
                 proc.terminate()
+            except Exception:
+                pass
+    with ACTIVE_PROC_LOCK:
+        if ACTIVE_STREAMING_PROC and ACTIVE_STREAMING_PROC.poll() is None:
+            try:
+                ACTIVE_STREAMING_PROC.terminate()
             except Exception:
                 pass
 
@@ -319,6 +346,15 @@ class DevHubHandler(BaseHTTPRequestHandler):
         if clean_path == "/api/action":
             action = payload.get("action")
             self._handle_action_stream(action, payload)
+            return
+
+        # 4. DevHub Stdin Input (/api/stdin)
+        if clean_path == "/api/stdin":
+            text = payload.get("input", "")
+            if write_active_proc_stdin(text):
+                self._json(200, {"ok": True})
+            else:
+                self._json(400, {"ok": False, "error": "No active process to receive input."})
             return
 
         self._json(404, {"error": "Endpoint not found."})
@@ -635,11 +671,13 @@ class DevHubHandler(BaseHTTPRequestHandler):
             finish(False, f"Action failed: {e}")
 
     def _run_streaming_cmd(self, cmd: list[str], log_fn, finish_fn) -> None:
-        """Run a command and stream stdout/stderr line-by-line via SSE."""
+        """Run a command, stream stdout/stderr via SSE, and keep stdin open for interactive input."""
+        proc = None
         try:
             proc = subprocess.Popen(
                 cmd,
                 cwd=str(REPO_ROOT),
+                stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -648,6 +686,7 @@ class DevHubHandler(BaseHTTPRequestHandler):
                 bufsize=1,
                 **_silent_subprocess_kwargs(),
             )
+            set_active_proc(proc)
 
             if proc.stdout:
                 for line in proc.stdout:
@@ -665,6 +704,8 @@ class DevHubHandler(BaseHTTPRequestHandler):
         except Exception as e:
             log_fn(f"Exception running command: {e}", "error")
             finish_fn(False, str(e))
+        finally:
+            set_active_proc(None)
 
 
 def main() -> None:

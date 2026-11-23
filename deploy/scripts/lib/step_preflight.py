@@ -257,9 +257,14 @@ class Preflight:
         if tty is not None:
             tty.close()
         evidence("terminal_available", "yes" if available else "no")
-        if self.is_test and not available:
-            raise HelperError("no interactive terminal: TEST runs need one for the GO/NO-GO prompt",
-                              "open('/dev/tty')")
+        if self.is_test:
+            # /dev/tty is used by step_manual_gate for the GO/NO-GO prompt.
+            # When no tty is present (e.g. launched via DevHub), step_manual_gate
+            # falls back to reading from stdin, which DevHub pipes interactively.
+            if not available:
+                evidence("terminal_mode", "stdin (DevHub interactive mode)")
+            else:
+                evidence("terminal_mode", "tty (direct terminal)")
         if not self.is_test:
             evidence("terminal_required", "no (PRD runs prompt nobody)")
 
@@ -775,7 +780,7 @@ class Preflight:
             evidence("plan_unit_files_moved_aside_at_step_7", self.decision.get("UNITS_TO_DISPLACE") or "none")
             evidence("plan_units_installed_and_started_at_step_8", ", ".join(self.start_units) or "none")
             evidence("plan_units_restored_on_exit", ", ".join(self.restore_units) or "none (restore set is re-polled at step 7)")
-            evidence("plan_input", "no further input is needed until step 10 (GO / NO-GO)")
+            evidence("plan_input", "no further input needed until step 10 (GO / NO-GO via DevHub or terminal)")
         else:
             evidence("plan_prd_units_stopped_at_step_2", ", ".join(prd_active) or "none active")
             evidence("plan_unit_files_moved_aside_at_step_2", self.decision.get("UNITS_TO_DISPLACE") or "none")
