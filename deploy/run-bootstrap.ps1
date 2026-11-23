@@ -35,14 +35,14 @@ Write-Host "Log Dest: $LocalPath"
 if ($Environment) {
     Write-Host "Env:      $Environment"
 }
-Write-Host "Starting SSH session with terminal allocation (-t)...`n" -ForegroundColor DarkGray
+Write-Host "Starting SSH session with terminal allocation (-tt)...`n" -ForegroundColor DarkGray
 
-# Launch interactive SSH session with -t (pseudo-terminal allocation) and -l (login shell)
+# Launch interactive SSH session with -tt (force pseudo-terminal allocation) and -l (login shell)
 $launcherCmd = "bash -l $RemoteLauncher"
 if ($Environment) {
     $launcherCmd += " --environment $Environment"
 }
-ssh -t "$target" "$launcherCmd"
+ssh -tt "$target" "$launcherCmd"
 $sessionExitCode = $LASTEXITCODE
 
 Write-Host "`n=== Bootstrap Session Finished (Exit Code: $sessionExitCode) ===" -ForegroundColor Cyan
