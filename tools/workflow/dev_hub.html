@@ -407,6 +407,7 @@
     line-height: 1.6;
     overflow-y: auto;
     flex: 1;
+    min-height: 0;    /* allow flex child to shrink below natural height */
     white-space: pre-wrap;
     word-break: break-word;
   }
@@ -959,11 +960,12 @@ git checkout feature-test<br>
 
   function handleEvent(evt) {
     if (evt.type === 'log') {
-      appendLogLine(evt.line, evt.kind || 'info');
-      // Show GO/NO-GO bar when the manual gate prompt appears in the stream
-      if (evt.line && evt.line.includes('Enter GO or NO-GO')) {
+      // Intercept the DevHub sentinel — show the GO/NO-GO bar but don't print it
+      if (evt.line && evt.line.includes('DEVHUB_PROMPT:gonogo')) {
         document.getElementById('gonogo-bar').style.display = 'flex';
+        return;
       }
+      appendLogLine(evt.line, evt.kind || 'info');
     } else if (evt.type === 'done') {
       const kind = evt.success ? 'ok' : 'error';
       appendLogLine(`\n[Result] ${evt.message}`, kind);

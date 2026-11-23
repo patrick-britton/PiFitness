@@ -253,6 +253,9 @@ class ManualGate:
 
         try:
             if using_stdin:
+                # Emit a sentinel that dev_hub.html watches for to show the GO/NO-GO buttons.
+                # Must be a complete line (ends with \n) so it arrives as a full SSE event.
+                print("DEVHUB_PROMPT:gonogo", flush=True)
                 sys.stdout.write(preamble)
                 sys.stdout.flush()
             else:
