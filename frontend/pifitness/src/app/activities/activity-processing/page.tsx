@@ -132,7 +132,7 @@ export default function ActivityProcessingPage() {
             elapsed_ms: event.status === 'running' ? 0 : event.elapsed_ms,
             started_at:
               event.status === 'running'
-                ? (event as ProcessStepStartEvent).started_at
+                ? new Date().toISOString()
                 : existing?.started_at,
             error: 'error' in event ? event.error : undefined,
             result: 'result' in event ? event.result : undefined,

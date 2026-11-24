@@ -40,6 +40,7 @@ from pifitness.music.functions import (
     playlist_to_db,
 )
 from pifitness.worker.ultimate_task_executioner_v2 import ultimate_task_executioner
+from pifitness.activities.services import run_step
 
 from pifitness.activities.schemas import (
     ProcessActivityRequest,
@@ -461,6 +462,10 @@ async def process_activity(req: ProcessActivityRequest):
     return StreamingResponse(
         process_generator(req),
         media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

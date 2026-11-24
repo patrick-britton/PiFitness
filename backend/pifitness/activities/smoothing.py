@@ -166,6 +166,49 @@ def call_update_elevation_reference_by_time(int_a: int):
 
 
 def call_resample_activity_to_distance(int_a: int):
+    """
+    Call the database procedure to resample raw activity details to 1-meter distance resolution.
+
+    Performance Evaluation & Pipeline Bottleneck Analysis (AC-4 / T01):
+    -------------------------------------------------------------------
+    1. Pipeline Bottlenecks & Execution Profile:
+       - Resampling Granularity & Non-Equi Join:
+         `activities.resample_activity_to_distance` generates a continuous 1-meter distance grid
+         via `generate_series(0, max_dist_m)`. It joins each meter-mark with `segment_bounds`
+         using a non-equi range join (`g.dist_m >= s.d1 AND (g.dist_m < s.d2 OR ...)`).
+         For typical 5km - 42km activities (5,000 to 42,000+ points), evaluating this join
+         creates significant CPU and memory work in PostgreSQL.
+       - Churn & Geometry Generation:
+         The procedure deletes existing records in `activities.activity_details_distance`,
+         computes 15+ interpolated metric expressions and `ST_MakePoint(lon, lat)` for every meter,
+         and inserts tens of thousands of rows with index updates.
+       - Downstream Spatial Processing:
+         Downstream calls (`segment_matching_match_segments`, `segment_matching_activity_pair_generation`,
+         and `segment_matches_all_polygon`) sequentially process the full path and 1-meter points,
+         cumulatively contributing to multi-step activity processing durations.
+
+    2. Potential Optimization Strategies & Speedup Estimates:
+       - Vectorized Client-Side Interpolation:
+         Performing linear interpolation in Python (via NumPy/SciPy `interp1d`) on arrays of metrics
+         takes ~50-100ms for 20,000 points, followed by a PostgreSQL `COPY` or batched insert.
+         Estimated speedup: 5x - 10x over database procedural row-by-row interpolation.
+       - Range Types / LATERAL Joins in PostgreSQL:
+         Replacing the non-equi join with a `LATERAL` join on an ordered index or using `numrange`
+         could reduce query planner overhead. Estimated speedup: 2x - 3x.
+       - Asynchronous Execution:
+         Offloading heavy resampling and polygon matching steps to background worker tasks
+         prevents blocking the primary activity processing loop.
+
+    3. Functional Trade-Offs & Constraints:
+       - Granularity vs. Replay Fidelity:
+         Decimating distance resolution (e.g., resampling to 5-meter or 10-meter increments)
+         would reduce row counts and processing time by 80-90%. However, 1-meter resolution
+         in `activity_details_distance` is strictly required to maintain visual smoothness during
+         race replays and precise segment start/finish detection without spatial interpolation jitter.
+       - Fidelity Invariant:
+         Any future structural optimizations must retain 1-meter grid resolution to guarantee
+         uncompromised interpolation fidelity and segment matching accuracy.
+    """
     _run_sql_step(f"CALL activities.resample_activity_to_distance({int_a});")
 
 

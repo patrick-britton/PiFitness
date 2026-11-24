@@ -58,12 +58,16 @@
   }
 
   * { box-sizing: border-box; }
+  html, body {
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+  }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--ink);
     font: 14.5px/1.5 var(--sans);
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
   }
@@ -88,7 +92,9 @@
   .app-container {
     display: flex;
     flex: 1;
-    min-height: 100vh;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   /* SIDEBAR NAVIGATION */
@@ -99,6 +105,8 @@
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
+    height: 100%;
+    overflow-y: auto;
   }
   .sidebar-header {
     padding: 22px 20px 18px;
@@ -219,7 +227,9 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   /* TOP STATUS BAR */
@@ -232,6 +242,7 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
+    flex-shrink: 0;
   }
   .app-nav-tabs {
     display: inline-flex;
@@ -306,14 +317,16 @@
 
   /* WORKSPACE BODY */
   .workspace {
-    padding: 24px;
+    padding: 16px 24px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 14px;
     flex: 1;
-    max-width: 1300px;
+    min-height: 0;
+    max-width: 1400px;
     width: 100%;
     margin: 0 auto;
+    overflow: hidden;
   }
 
   /* ACTIVE FEATURES CARD */
@@ -321,7 +334,8 @@
     background: var(--surface);
     border: 1px solid var(--rule);
     border-radius: 10px;
-    padding: 18px 20px;
+    padding: 14px 18px;
+    flex-shrink: 0;
   }
   .card-header {
     display: flex;
@@ -363,7 +377,7 @@
     display: flex;
     flex-direction: column;
     flex: 1;
-    min-height: 440px;
+    min-height: 0;
     box-shadow: 0 4px 16px rgba(0,0,0,0.06);
     overflow: hidden;
   }
@@ -374,6 +388,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-shrink: 0;
   }
   .terminal-title {
     font-family: var(--mono);
@@ -586,7 +601,7 @@
       <li>
         <button class="nav-item-btn danger-action" onclick="openMergeModal()">
           <span class="nav-num">7</span>
-          <span class="nav-label">Merge to PRD</span>
+          <span class="nav-label">Merge to Main & Deploy</span>
           <span class="nav-tag">main</span>
         </button>
       </li>
@@ -603,6 +618,11 @@
       <div style="margin-bottom: 8px;">
         <button class="btn btn-secondary btn-sm" style="width: 100%; font-size: 11px; padding: 4px 8px;" onclick="triggerAction('create_taskbar_shortcut')">
           📌 Pin to Taskbar Helper
+        </button>
+      </div>
+      <div style="margin-bottom: 8px;">
+        <button class="btn btn-secondary btn-sm" style="width: 100%; font-size: 11px; padding: 4px 8px; color: var(--danger); border-color: var(--danger-border);" onclick="confirmShutdown()">
+          🛑 Safe Shutdown DevHub
         </button>
       </div>
       <div style="font-size: 11.5px; color: var(--muted); display: flex; justify-content: space-between;">
@@ -692,21 +712,21 @@
     </div>
 
     <!-- TAB PANEL: REQUEST FORM -->
-    <div id="panel-request" style="display: none; flex: 1; height: calc(100vh - 65px); background: var(--bg);">
+    <div id="panel-request" style="display: none; flex: 1; height: 100%; min-height: 0; background: var(--bg);">
       <iframe id="frame-request" src="/request" style="width: 100%; height: 100%; border: none;"></iframe>
     </div>
 
     <!-- TAB PANEL: UAT FORM -->
-    <div id="panel-uat" style="display: none; flex: 1; height: calc(100vh - 65px); background: var(--bg);">
+    <div id="panel-uat" style="display: none; flex: 1; height: 100%; min-height: 0; background: var(--bg);">
       <iframe id="frame-uat" src="/uat" style="width: 100%; height: 100%; border: none;"></iframe>
     </div>
   </main>
 </div>
 
-<!-- MODAL: MERGE TO PRD -->
+<!-- MODAL: MERGE TO MAIN & DEPLOY -->
 <div class="modal-overlay" id="modal-merge">
   <div class="modal-box">
-    <h3 class="modal-title">Merge to PRD & Deploy?</h3>
+    <h3 class="modal-title">Merge to Main & Deploy?</h3>
     <p class="modal-desc">
       This will merge branch <code>feature-test</code> into <code>main</code>, push the release commit to GitHub, and launch the Pi bootstrapper.
     </p>
@@ -720,7 +740,7 @@ git checkout feature-test<br>
     </div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="closeModals()">Cancel</button>
-      <button class="btn-danger" onclick="confirmMergeToPrd()">Confirm & Merge</button>
+      <button class="btn-danger" onclick="confirmMergeToPrd()">Confirm Merge & Deploy</button>
     </div>
   </div>
 </div>
@@ -852,6 +872,21 @@ git checkout feature-test<br>
   function confirmCompleteFeature() {
     closeModals();
     triggerAction('complete_feature');
+  }
+
+  async function confirmShutdown() {
+    if (!confirm("Are you sure you want to shut down DevHub? Any running background services managed by DevHub will be stopped.")) {
+      return;
+    }
+    try {
+      appendLogLine(`[${new Date().toLocaleTimeString()}] Initiating safe shutdown...`, 'warn');
+      const resp = await fetch('/api/shutdown', { method: 'POST' });
+      setServerOnline(false);
+      appendLogLine(`[${new Date().toLocaleTimeString()}] DevHub server safely shut down. You may now close this browser tab.`, 'ok');
+    } catch (e) {
+      setServerOnline(false);
+      appendLogLine(`[${new Date().toLocaleTimeString()}] DevHub server shut down.`, 'info');
+    }
   }
 
   function checkServer() {

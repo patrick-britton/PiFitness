@@ -1,42 +1,30 @@
 {
-  "feature_id": "feat-dev-hub-rebuild",
-  "title": "dev-hub-rebuild",
-  "generated_at": "2026-11-22",
+  "feature_id": "fix-activity-processing-fixes",
+  "title": "Activity Processing fixes",
+  "generated_at": "2026-11-23",
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "text": "Trigger \"Complete Feature\" and confirm → all active feature files move to the archive folder and are absent from their source locations (covers B1)",
-      "auto": "python -m py_compile tools/workflow/dev_hub.py",
+      "text": "Navigate to /activities/activity-processing, select Last Walk or Last Run, and click Start Processing -> step 1 Syncing activities starts and runs without a \"name 'run_step' is not defined\" error, and processing runs to completion (covers B1)",
+      "auto": "new test tests/test_process_generator_events.py::test_process_generator_yields_step_without_name_error [smoke]",
       "done": false
     },
     {
       "id": "AC-2",
-      "text": "Trigger any action, let it finish or error out, then immediately trigger another → the second action runs without a \"another action is in progress\" block (covers B1, B2)",
-      "auto": "python -m py_compile tools/workflow/dev_hub.py",
+      "text": "On /activities/activity-processing with Last Run and a playlist selected, click Start Processing -> all sync, playlist shuffle, elevation/smoothing, and segment matching steps execute in order to completion (covers B1)",
+      "auto": "python -m py_compile backend/pifitness/activities/router.py",
       "done": false
     },
     {
       "id": "AC-3",
-      "text": "Click \"Launch Local Environment\" → backend and frontend start and their output appears in the DevHub terminal; no new PowerShell or console window opens (covers B2)",
-      "auto": "none (subprocess launch behavior requires UAT)",
+      "text": "At mobile viewports (360x740 and 448x875) on /activities/activity-processing while a step is executing -> the step status bar displays active progress that fills smoothly over time based on elapsed time and estimated duration (covers B2)",
+      "auto": "node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit",
       "done": false
     },
     {
       "id": "AC-4",
-      "text": "The DevHub shows clearly labelled links or tabs for the DevHub and the app (:3000); clicking either opens or focuses that page without launching a new service (covers B3)",
-      "auto": "none (UI behavior requires UAT)",
-      "done": false
-    },
-    {
-      "id": "AC-5",
-      "text": "Clicking \"Bootstrap DEV\" starts the Pi bootstrapper targeting the test environment without any interactive prompt; clicking \"Bootstrap PRD\" targets production without any interactive prompt (covers B4)",
-      "auto": "none (SSH to Pi; human verifies in UAT)",
-      "done": false
-    },
-    {
-      "id": "AC-6",
-      "text": "The launcher can be pinned to the Windows taskbar and launches the DevHub when clicked (covers B1, B5)",
-      "auto": "none (Windows shell feature; human verifies in UAT)",
+      "text": "Profile backend pipeline execution times and database stored procedures (including resample_activity_to_distance and segment matching) -> evaluation summary identifies latency hotspots and safe optimization opportunities without breaking match criteria or replay smoothness (covers B3)",
+      "auto": "python -m py_compile backend/pifitness/activities/smoothing.py",
       "done": false
     }
   ]

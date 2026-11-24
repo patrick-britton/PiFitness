@@ -37,8 +37,8 @@ if ($Environment) {
 }
 Write-Host "Starting SSH session with terminal allocation (-tt)...`n" -ForegroundColor DarkGray
 
-# Launch interactive SSH session with -tt (force pseudo-terminal allocation) and -l (login shell)
-$launcherCmd = "bash -l $RemoteLauncher"
+# Launch interactive SSH session with -tt (force pseudo-terminal allocation)
+$launcherCmd = "bash $RemoteLauncher"
 if ($Environment) {
     $launcherCmd += " --environment $Environment"
 }
