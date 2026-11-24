@@ -223,3 +223,45 @@ def test_is_configured_false_when_creds_missing():
 
     with patch("pifitness.integrations.garmin.provider.garmin_creds", return_value=(None, None)):
         assert provider.is_configured() is False
+
+
+@pytest.mark.regression
+def test_garmin_login_reuses_incoming_client_dict():
+    """garmin_login immediately returns incoming_token if already authenticated."""
+    from pifitness.integrations.garmin.provider import garmin_login
+
+    incoming = {"client": MagicMock(), "token": "tok123", "token_age": 123.0}
+    with patch("pifitness.integrations.garmin.provider.load_token_from_db") as mock_db:
+        result = garmin_login(incoming)
+        assert result is incoming
+        mock_db.assert_not_called()
+
+
+@pytest.mark.regression
+def test_garmin_login_falls_back_to_disk_cache_when_db_empty_and_no_creds(monkeypatch):
+    """When DB has no session and creds are missing, garmin_login uses existing disk cache."""
+    import json
+    tmp_storage = pathlib.Path(tempfile.mkdtemp(prefix="garmin-disk-test-"))
+    monkeypatch.setenv("LOCAL_STORAGE_PATH", str(tmp_storage))
+
+    cache_dir = tmp_storage / "garmin"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    fake_session = _fake_session()
+    (cache_dir / "native-oauth2.json").write_text(json.dumps(fake_session.to_dict()))
+
+    mock_client = MagicMock()
+    mock_client.auth.ensure_authenticated.return_value = fake_session
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("pifitness.integrations.garmin.provider.garmin_creds", return_value=(None, None)))
+        stack.enter_context(patch("pifitness.integrations.garmin.provider.load_token_from_db", return_value=None))
+        mock_save = stack.enter_context(patch("pifitness.integrations.garmin.provider.save_token_to_db"))
+        mock_client_class = stack.enter_context(patch("pifitness.integrations.garmin.provider.GarminClient"))
+        stack.enter_context(patch("pifitness.integrations.garmin.provider.log_api_event"))
+        mock_client_class.from_credentials.return_value = mock_client
+        result = __import__("pifitness.integrations.garmin.provider", fromlist=["garmin_login"]).garmin_login()
+
+    assert result is not None
+    assert result["client"] is mock_client
+    mock_save.assert_called_once()
+

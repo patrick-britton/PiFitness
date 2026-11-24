@@ -58,8 +58,10 @@ def garmin_creds():
     # Loads the decrypted garmin credentials from the database and returns email & password
     creds = load_api_credentials('Garmin')
     if not creds:
+        creds = load_api_credentials('Pirate Garmin')
+    if not creds:
         return None, None
-    e = creds.get('email')
+    e = creds.get('email') or creds.get('username')
     p = creds.get('password')
     return e, p
 
@@ -101,11 +103,11 @@ def get_garmin_client(incoming_token=None):
     return incoming_token
 
 
-def garmin_login(headless=False):
+def garmin_login(incoming_token=None, headless=False):
     """Garmin login using the internal Android auth flow.
     
     Uses the same DB-backed session pattern as Spotify:
-    1. Load session from api_services.api_tokens → write to local cache file
+    1. Load session from api_services.api_tokens or local cache file
     2. Call AuthManager.ensure_authenticated() → handles refresh if needed
     3. Read refreshed session from cache file → save back to DB
     4. Return GarminClient with valid session
@@ -117,7 +119,14 @@ def garmin_login(headless=False):
     from pathlib import Path
     
     try:
-        # Get credentials (optional when reusing a valid session from DB)
+        # Support reuse if client_dict is passed in (mirrors get_spotify_client)
+        if isinstance(incoming_token, bool):
+            headless = incoming_token
+            incoming_token = None
+        elif isinstance(incoming_token, dict) and incoming_token.get("client") is not None:
+            return incoming_token
+
+        # Get credentials (optional when reusing a valid session from DB or disk)
         email, password = garmin_creds()
         
         # Set up cache directory for Garmin auth files
@@ -125,8 +134,6 @@ def garmin_login(headless=False):
         # disk, not DB. garmin_login() bridges the two:
         #   DB (api_services.api_tokens) -> file cache -> AuthManager
         #   AuthManager -> file cache -> DB (via save_token_to_db)
-        # The DB tier lets every machine share sessions; the file tier gives
-        # AuthManager the interface it expects.
         storage_path = os.getenv("LOCAL_STORAGE_PATH")
         if not storage_path:
             storage_path = str(Path.home() / ".config" / "pifitness")
@@ -136,19 +143,37 @@ def garmin_login(headless=False):
         except OSError as e:
             log_api_event('Garmin', f'Could not create cache directory (non-fatal): {e}')
         
+        session_file = cache_dir / "native-oauth2.json"
+        
         # Step 1: Load any stored session from DB and write to local cache file
-        # This is the cross-device sync mechanism — same pattern as Spotify
         db_session = load_token_from_db('Garmin')
         if db_session:
-            session_file = cache_dir / "native-oauth2.json"
             try:
                 session_file.write_text(json.dumps(db_session, indent=2) + "\n")
             except OSError:
                 log_api_event('Garmin', 'Could not write session to cache file (non-fatal)')
             else:
                 log_api_event('Garmin', 'Session loaded from DB to local cache')
-        elif not email or not password:
-            log_api_event(service='Garmin', event='Login aborted — missing credentials and no cached session in database')
+        else:
+            # If not in DB, check fallback disk cache paths (e.g. Pi host config)
+            if not session_file.exists():
+                fallback_paths = [
+                    Path.home() / ".config" / "pifitness" / "garmin" / "native-oauth2.json",
+                    Path.home() / ".config" / "pifitness" / "native-oauth2.json",
+                    Path("/home/god/.config/pifitness/garmin/native-oauth2.json"),
+                ]
+                for fb in fallback_paths:
+                    try:
+                        if fb.resolve() != session_file.resolve() and fb.exists() and fb.stat().st_size > 0:
+                            session_file.write_text(fb.read_text())
+                            log_api_event('Garmin', f'Session copied from host path: {fb}')
+                            break
+                    except Exception:
+                        continue
+
+        has_cached_session = bool(db_session) or (session_file.exists() and session_file.stat().st_size > 0)
+        if not has_cached_session and (not email or not password):
+            log_api_event(service='Garmin', event='Login aborted — missing credentials and no cached session in database or disk')
             return None
         
         # Step 2: Create GarminClient with the internal AuthManager
@@ -160,9 +185,9 @@ def garmin_login(headless=False):
         )
         
         # This triggers the full auth chain:
-        # 1. Load cached session from native-oauth2.json (which we populated from DB)
-        # 2. Check DI token expiry → refresh if needed
-        # 3. Check IT token expiry → refresh if needed
+        # 1. Load cached session from native-oauth2.json
+        # 2. Check DI token expiry → refresh via HTTP if needed
+        # 3. Check IT token expiry → refresh via HTTP if needed
         # 4. If all expired → run Playwright browser login (headless)
         session = client.auth.ensure_authenticated()
         
@@ -172,7 +197,7 @@ def garmin_login(headless=False):
         
         log_api_event(
             service='Garmin',
-            event='login with New Token' if db_session is None else 'Token reuse from cached session',
+            event='login with New Token' if not has_cached_session else 'Token reuse from cached session',
             token_age=0
         )
         
