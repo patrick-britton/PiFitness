@@ -1,30 +1,30 @@
 {
-  "feature_id": "fix-activity-processing-fixes",
-  "title": "Activity Processing fixes",
-  "generated_at": "2026-11-23",
+  "feature_id": "fix-ensure-all-activities-process",
+  "title": "Ensure All Activities Process",
+  "generated_at": "2026-11-26",
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "text": "Navigate to /activities/activity-processing, select Last Walk or Last Run, and click Start Processing -> step 1 Syncing activities starts and runs without a \"name 'run_step' is not defined\" error, and processing runs to completion (covers B1)",
-      "auto": "new test tests/test_process_generator_events.py::test_process_generator_yields_step_without_name_error [smoke]",
+      "text": "Open Recent Activity Report and inspect activity 25165738610 -> activity 25165738610 was missing from report and unlinked to 'Beeler Summit 4.9' (covers B1)",
+      "auto": "none (Bug reproduction step for human UAT)",
       "done": false
     },
     {
       "id": "AC-2",
-      "text": "On /activities/activity-processing with Last Run and a playlist selected, click Start Processing -> all sync, playlist shuffle, elevation/smoothing, and segment matching steps execute in order to completion (covers B1)",
-      "auto": "python -m py_compile backend/pifitness/activities/router.py",
+      "text": "Navigate to any activity on the Recent Activity Report page and click the postprocess button -> button initiates background postprocessing with confirmation feedback (covers B3)",
+      "auto": "npx tsc --noEmit",
       "done": false
     },
     {
       "id": "AC-3",
-      "text": "At mobile viewports (360x740 and 448x875) on /activities/activity-processing while a step is executing -> the step status bar displays active progress that fills smoothly over time based on elapsed time and estimated duration (covers B2)",
-      "auto": "node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit",
+      "text": "Run postprocessing for activity 25165738610 -> activity 25165738610 has course matching completed to 'Beeler Summit 4.9' and appears in Recent Activity Report (covers B1)",
+      "auto": "python -m py_compile backend/pifitness/activities/router.py backend/pifitness/activities/smoothing.py backend/pifitness/worker/json_extractors.py",
       "done": false
     },
     {
       "id": "AC-4",
-      "text": "Profile backend pipeline execution times and database stored procedures (including resample_activity_to_distance and segment matching) -> evaluation summary identifies latency hotspots and safe optimization opportunities without breaking match criteria or replay smoothness (covers B3)",
-      "auto": "python -m py_compile backend/pifitness/activities/smoothing.py",
+      "text": "Verify background sync views for a newly recorded run when older runs exist -> older runs and walks/hikes > 1000m are eligible for auto-download and auto-postprocessing while the newest run is withheld (covers B1, B2)",
+      "auto": "python -m py_compile backend/pifitness/activities/router.py backend/pifitness/activities/smoothing.py backend/pifitness/worker/json_extractors.py",
       "done": false
     }
   ]
