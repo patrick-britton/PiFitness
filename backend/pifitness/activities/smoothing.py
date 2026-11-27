@@ -430,8 +430,11 @@ def activity_post_processing_steps(activity_id: int):
 
 # Backwards compatibility wrapper
 def activity_post_processing(manual_list=None):
-    if manual_list:
-        activity_list = manual_list
+    if manual_list is not None:
+        if isinstance(manual_list, (int, str)):
+            activity_list = [manual_list]
+        else:
+            activity_list = list(manual_list)
     else:
         activity_list = sql_to_list(
             "SELECT DISTINCT activity_id from activities.activity_processing_queue order by activity_id desc LIMIT 5"

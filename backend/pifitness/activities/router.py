@@ -9,7 +9,7 @@ Includes the Activity Processing & Playlist Shuffle pipeline.
 import json
 import time
 import threading
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from starlette.responses import JSONResponse
 from typing import Optional
@@ -41,6 +41,7 @@ from pifitness.music.functions import (
 )
 from pifitness.worker.ultimate_task_executioner_v2 import ultimate_task_executioner
 from pifitness.activities.services import run_step
+from pifitness.activities.smoothing import activity_post_processing
 
 from pifitness.activities.schemas import (
     ProcessActivityRequest,
@@ -1244,3 +1245,19 @@ async def get_activity_segment_matches(activity_id: int):
             status_code=500,
             detail=f"Failed to fetch segment matches: {str(e)}",
         )
+
+
+@router.post("/{activity_id}/postprocess", status_code=202)
+async def postprocess_activity_endpoint(
+    activity_id: int,
+    background_tasks: BackgroundTasks,
+):
+    """
+    Queue background post-processing (smoothing, path generation, segment matching)
+    for a specific activity.
+    """
+    activity = get_activity_by_id(activity_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    background_tasks.add_task(activity_post_processing, manual_list=[activity_id])
+    return {"status": "queued", "activity_id": activity_id}

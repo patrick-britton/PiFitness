@@ -2,19 +2,19 @@
 feature-id: fix-ensure-all-activities-process
 title: Ensure All Activities Process
 category: Bug Fix
-status: draft
+status: in-progress
 created: 2026-11-26
 last-updated: 2026-11-26
 surfaces: page:/activities/recent-activity, endpoint:POST /api/activities/{activity_id}/postprocess, view:activities.vw_activity_ids_to_sync, table:activities.activity_processing_queue, py:backend/pifitness/activities/smoothing.py::activity_post_processing
-points:
+points: 6
 request: .features/descriptions/fix-ensure-all-activities-process.md
 ---
 
 # Design: Ensure All Activities Process
 
 ## Resume Here
-**progress:** 0/0 tasks complete
-**next:** review
+**progress:** 4/4 tasks complete
+**next:** none
 **blocked-by:** none
 
 ## Architecture
@@ -48,7 +48,7 @@ request: .features/descriptions/fix-ensure-all-activities-process.md
 - [ ] AC-1: Open Recent Activity Report and inspect activity 25165738610 -> activity 25165738610 was missing from report and unlinked to 'Beeler Summit 4.9' (covers B1)
   - auto: `none (Bug reproduction step for human UAT)`
 - [ ] AC-2: Navigate to any activity on the Recent Activity Report page and click the postprocess button -> button initiates background postprocessing with confirmation feedback (covers B3)
-  - auto: `npx tsc --noEmit`
+  - auto: `node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit`
 - [ ] AC-3: Run postprocessing for activity 25165738610 -> activity 25165738610 has course matching completed to 'Beeler Summit 4.9' and appears in Recent Activity Report (covers B1)
   - auto: `python -m py_compile backend/pifitness/activities/router.py backend/pifitness/activities/smoothing.py backend/pifitness/worker/json_extractors.py`
 - [ ] AC-4: Verify background sync views for a newly recorded run when older runs exist -> older runs and walks/hikes > 1000m are eligible for auto-download and auto-postprocessing while the newest run is withheld (covers B1, B2)
@@ -84,4 +84,72 @@ request: .features/descriptions/fix-ensure-all-activities-process.md
   - **Status:** resolved
 
 ## Task Plan
-Filled by /feature-plan.
+
+### T01 Exclude newest run from sync view
+- **Surface:** database
+- **Skill:** postgres
+- **Points:** 2
+- **Depends-on:** none
+- **Traces-to:** AC-4, AC-1
+- **Anchors:**
+  - `create`: `deploy/migrations/20261126120000_exclude_newest_run_from_sync_view.sql`
+  - `modify`: `docs/lineage/defs/view.activities.vw_activity_ids_to_sync.sql` `vw_activity_ids_to_sync`
+  - `pattern`: `deploy/migrations/20261108000001_int25_repoint_get_spotify_client.sql`
+- **Detail:** Update database view `activities.vw_activity_ids_to_sync` to exclude the single newest run or trail run (> 1000m) while including all prior qualifying runs, walks, and hikes. Create an idempotent dbmate migration script with up and down sections and update the offline schema view definition. Apply the migration to DEV so background queries reflect the updated filter.
+  Interface: `activities.vw_activity_ids_to_sync` view returning `(activity_id, max_points)` for un-downloaded activities excluding the single newest run or trail run.
+  Finding: In `view.activities.vw_activity_ids_to_sync.sql`, the query orders by running activities first and start time, but does not exclude the newest run.
+  Finding: Exclusion predicate: `AND activity_id IS DISTINCT FROM (SELECT max(activity_id) FROM activities.activities WHERE (activity_type_name ~~ '%running%'::text OR activity_type_name ~~ '%trail%'::text) AND distance_m > 1000::numeric)`.
+  Finding: `IS DISTINCT FROM` handles empty table or null results without dropping all candidate rows.
+- **Verify:** python -m py_compile backend/pifitness/worker/json_extractors.py
+- **Status:** complete
+
+### T02 Add postprocess endpoint and activity queue processing
+- **Surface:** backend
+- **Skill:** fastapi
+- **Points:** 2
+- **Depends-on:** none
+- **Traces-to:** AC-3, AC-1
+- **Anchors:**
+  - `modify`: `backend/pifitness/activities/router.py` `router`
+  - `modify`: `backend/pifitness/activities/smoothing.py` `activity_post_processing`
+  - `pattern`: `backend/pifitness/activities/router.py` `process_activity`
+- **Detail:** Add endpoint `POST /api/activities/{activity_id}/postprocess` to enqueue background postprocessing for the specified activity. Update `activity_post_processing` in `smoothing.py` to ensure single-activity manual runs execute postprocessing steps and remove the item from the queue without failing. Return HTTP 202 accepted with status and activity ID so callers are not blocked.
+  Interface: `postprocess_activity_endpoint(activity_id: int, background_tasks: BackgroundTasks)` returning `{"status": "queued", "activity_id": activity_id}`.
+  Finding: `backend/pifitness/activities/router.py` has prefix `/api/activities` and can add `{activity_id}/postprocess` using FastAPI `BackgroundTasks`.
+  Finding: `activity_post_processing_steps(int_a)` in `smoothing.py:297` executes elevation smoothing, path building, segment and course matching, and clears queue state.
+  Finding: `activity_post_processing(manual_list=None)` in `smoothing.py:432` accepts `manual_list=[int_a]` and processes the target activity.
+- **Verify:** python -m py_compile backend/pifitness/activities/router.py backend/pifitness/activities/smoothing.py backend/pifitness/worker/json_extractors.py
+- **Status:** complete
+
+### T03 Add postprocess client method to API client
+- **Surface:** frontend
+- **Skill:** react
+- **Points:** 1
+- **Depends-on:** T02
+- **Traces-to:** AC-2
+- **Anchors:**
+  - `modify`: `frontend/pifitness/src/lib/api-client.ts` `API`
+  - `pattern`: `frontend/pifitness/src/lib/api-client.ts` `getLeaderboard`
+- **Detail:** Add `postprocessActivity` to `API.activities` in `frontend/pifitness/src/lib/api-client.ts`. Send an HTTP POST request to `/api/activities/${activityId}/postprocess`. Return the typed promise resolving to the status response.
+  Interface: `postprocessActivity: (activityId: number) => Promise<{ status: string; activity_id: number }>`
+  Finding: `API.activities` in `api-client.ts:606` contains activity endpoints using `fetchAPI`.
+  Finding: `fetchAPI` accepts the path and request options including method POST.
+- **Verify:** node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit
+- **Status:** complete
+
+### T04 Add reprocess action button to Recent Activity Report
+- **Surface:** frontend
+- **Skill:** react
+- **Points:** 1
+- **Depends-on:** T03
+- **Traces-to:** AC-2
+- **Anchors:**
+  - `modify`: `frontend/pifitness/src/app/activities/recent-activity/page.tsx` `RecentActivityPage`
+  - `planned` <- T03 `frontend/pifitness/src/lib/api-client.ts` `postprocessActivity: (activityId: number) => Promise<{ status: string; activity_id: number }>`
+  - `pattern`: `frontend/pifitness/src/app/activities/recent-activity/page.tsx` `goNewer`
+- **Detail:** Add an icon button in the header bar next to the navigation controls on `RecentActivityPage` to trigger activity postprocessing. Manage loading and disabled state while postprocessing is in flight, calling `API.activities.postprocessActivity`. Display a confirmation toast or badge informing the user that postprocessing has been queued.
+  Finding: `RecentActivityPage` renders navigation arrows in a flex group at `page.tsx:266`.
+  Finding: Place the reprocess icon button adjacent to the arrows with tooltip "Reprocess activity" and aria-label "Reprocess activity".
+  Finding: Responsive layout must satisfy UI principles across 360x740 and 448x875 viewports without breaking title truncation.
+- **Verify:** node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit
+- **Status:** complete

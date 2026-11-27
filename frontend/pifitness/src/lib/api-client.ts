@@ -637,6 +637,14 @@ export const API = {
     getLeaderboard: (segmentId: number) =>
       fetchAPI<Leaderboard>(`/api/activities/leaderboard/${segmentId}`),
     /**
+     * Queue background post-processing for a specific activity.
+     */
+    postprocessActivity: (activityId: number) =>
+      fetchAPI<{ status: string; activity_id: number }>(
+        `/api/activities/${activityId}/postprocess`,
+        { method: "POST" }
+      ),
+    /**
      * Stage the selected efforts and fetch the generated replay + telemetry visuals (009-002).
      */
     postLeaderboardVisuals: (request: LeaderboardVisualsRequest) =>

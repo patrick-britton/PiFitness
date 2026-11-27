@@ -12,7 +12,7 @@
     {
       "id": "AC-2",
       "text": "Navigate to any activity on the Recent Activity Report page and click the postprocess button -> button initiates background postprocessing with confirmation feedback (covers B3)",
-      "auto": "npx tsc --noEmit",
+      "auto": "node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit",
       "done": false
     },
     {

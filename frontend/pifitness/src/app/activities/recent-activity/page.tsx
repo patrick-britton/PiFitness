@@ -197,12 +197,15 @@ export default function RecentActivityPage() {
   const [selectedSegmentId, setSelectedSegmentId] = useState<number | null>(
     null,
   );
+  const [postprocessing, setPostprocessing] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fetchReport = useCallback(async (activityId?: number) => {
     setLoading(true);
     setError(null);
     setReport(null);
     setSelectedSegmentId(null);
+    setToastMessage(null);
     try {
       const data = await API.activities.getReport(activityId);
       setReport(data);
@@ -223,6 +226,21 @@ export default function RecentActivityPage() {
       prev === seg.segment_id ? null : seg.segment_id,
     );
   }, []);
+
+  const handlePostprocess = useCallback(async () => {
+    if (!report?.activity_id || postprocessing) return;
+    setPostprocessing(true);
+    try {
+      await API.activities.postprocessActivity(report.activity_id);
+      setToastMessage('Postprocessing queued');
+      setTimeout(() => setToastMessage(null), 3500);
+    } catch (err) {
+      setToastMessage(err instanceof Error ? err.message : 'Failed to queue postprocessing');
+      setTimeout(() => setToastMessage(null), 3500);
+    } finally {
+      setPostprocessing(false);
+    }
+  }, [report?.activity_id, postprocessing]);
 
   // The course is a card too (Bug 004-006-T07-1), so selection resolves
   // against the segments list first, then the course row.
@@ -258,7 +276,7 @@ export default function RecentActivityPage() {
 
   return (
     <div className="space-y-4">
-      {/* Title + prev/next nav (AC-1/AC-2) */}
+      {/* Title + prev/next nav + reprocess (AC-1/AC-2) */}
       <div className="flex items-center justify-between gap-2">
         <h2 className="min-w-0 flex-1 truncate text-lg font-semibold text-gray-900 dark:text-white">
           {loading ? 'Loading…' : reportTitle}
@@ -282,8 +300,51 @@ export default function RecentActivityPage() {
           >
             ▶
           </button>
+          <button
+            type="button"
+            onClick={handlePostprocess}
+            disabled={loading || postprocessing || report?.activity_id == null}
+            title="Reprocess activity"
+            aria-label="Reprocess activity"
+            className="w-11 h-11 flex items-center justify-center text-lg font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <svg
+              className={`w-5 h-5 ${postprocessing ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
         </div>
       </div>
+
+      {/* Confirmation feedback */}
+      {toastMessage && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-md bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 px-3 py-2 text-sm font-medium text-blue-800 dark:text-blue-200 flex items-center justify-between"
+        >
+          <span>{toastMessage}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 ml-2"
+            aria-label="Dismiss feedback"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Loading */}
       {loading && (
