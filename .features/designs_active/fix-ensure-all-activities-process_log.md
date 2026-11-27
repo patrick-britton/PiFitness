@@ -11,3 +11,6 @@
 - 2026-11-26 T04 start: verify='node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit'
 - 2026-11-26 T04 done: exit=0 cmd='node frontend/pifitness/node_modules/typescript/bin/tsc -p frontend/pifitness/tsconfig.json --noEmit' tail=''
 - 2026-11-26 execute: T03, T04 complete, 2 points; stopped: all tasks complete
+- 2026-11-27 bug BUG-1 recorded: Unprocessed activities missing from Recent Activity Report navigation
+- 2026-11-27 bug BUG-1 open -> in-review
+- 2026-11-27 polish: 1 bugs -> in-review (BUG-1); 0 blocked (none); 1 awaiting UAT (BUG-1)

@@ -381,6 +381,20 @@ export default function RecentActivityPage() {
           <p className="text-sm italic text-gray-500 dark:text-gray-400">
             {formatStartShort(report.header.start_utc)}
           </p>
+          {/* Unprocessed activity notice banner */}
+          {report.course_path.length === 0 && report.charts.heartrate.length === 0 && (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3 text-sm text-amber-800 dark:text-amber-200 flex items-center justify-between">
+              <span>This activity has not been processed yet.</span>
+              <button
+                type="button"
+                onClick={handlePostprocess}
+                disabled={loading || postprocessing}
+                className="ml-3 px-3 py-1.5 text-xs font-semibold rounded bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50"
+              >
+                {postprocessing ? 'Processing…' : 'Process Now'}
+              </button>
+            </div>
+          )}
           {/* Course-only info bar (AC-3) */}
           {report.course && <CourseInfoBar course={report.course} />}
           {/* Header band (004-006 T05): 2-column flex row — (1) stats text,
