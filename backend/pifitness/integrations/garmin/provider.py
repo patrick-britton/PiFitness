@@ -126,8 +126,16 @@ def garmin_login(incoming_token=None, headless=False):
         elif isinstance(incoming_token, dict) and incoming_token.get("client") is not None:
             return incoming_token
 
-        # Get credentials (optional when reusing a valid session from DB or disk)
-        email, password = garmin_creds()
+        # Get credentials (optional when reusing a valid session from DB or disk).
+        # Guard against decryption/KEY_PATH errors so a valid DB/disk session can
+        # still be used even if KEY_PATH is missing or differs across environments.
+        email, password = None, None
+        creds_error = None
+        try:
+            email, password = garmin_creds()
+        except Exception as e:
+            creds_error = str(e)
+            log_api_event('Garmin', f'Could not load credentials (will try cached session): {creds_error}')
         
         # Set up cache directory for Garmin auth files
         # The file cache exists because AuthManager reads and writes tokens to
@@ -173,7 +181,8 @@ def garmin_login(incoming_token=None, headless=False):
 
         has_cached_session = bool(db_session) or (session_file.exists() and session_file.stat().st_size > 0)
         if not has_cached_session and (not email or not password):
-            log_api_event(service='Garmin', event='Login aborted — missing credentials and no cached session in database or disk')
+            err_detail = f' ({creds_error})' if creds_error else ''
+            log_api_event(service='Garmin', event=f'Login aborted — missing credentials and no cached session in database or disk{err_detail}')
             return None
         
         # Step 2: Create GarminClient with the internal AuthManager
